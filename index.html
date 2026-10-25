@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WoW TCG – Azeroth vs CPU</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/cards.css">
+</head>
+<body>
+
+<div id="error-banner"></div>
+
+<div id="arena">
+    <div class="player-row top-row">
+        <div class="deck-zone"><div class="deck-stack" id="p2-deck-stack">📚</div></div>
+        <div id="top-hand" class="opp-hand-tray"></div>
+        <div id="top-resource-tray" class="resource-tray"></div>
+        <div class="hero-dock horde" id="top-dock">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                <div id="top-hero-card-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="battlefield-zone">
+        <div id="top-allies" class="battlefield-row"><span class="row-watermark">Gegnerische Diener</span></div>
+        <div id="bot-allies" class="battlefield-row"><span class="row-watermark">Deine Diener (Dropzone)</span></div>
+    </div>
+
+    <div class="player-row bottom-row">
+        <div class="deck-zone"><div class="deck-stack" id="p1-deck-stack">📚</div></div>
+        <div id="bot-hand" class="hand-arc-container"></div>
+        <div id="bot-resource-tray" class="resource-tray"></div>
+        <div class="hero-dock alliance" id="bot-dock">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                <div id="bot-hero-card-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="side-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:900;color:var(--gold);font-size:15px;">WoW TCG</span>
+        <span id="turn-badge" style="background:#1a1512;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold;border:1px solid var(--border);">Turn 1</span>
+    </div>
+    <div id="cpu-status-box" class="cpu-indicator" style="display:none;"><div class="spinner"></div><span id="cpu-status-text">CPU überlegt...</span></div>
+    <div style="display:flex;gap:6px;">
+        <button id="btn-end-turn" class="success" style="flex:1;padding:9px;">Zug beenden</button>
+        <button id="btn-undo" disabled title="Letzte eigene Aktion rückgängig machen">↶ Rückgängig</button>
+        <button id="btn-cancel-action" class="danger" style="display:none;">Abbrechen</button>
+    </div>
+    <div class="stats-box">
+        <div class="stats-row">
+            <span style="color:#60a5fa;font-weight:900;" id="bot-deck-label">Du:</span>
+            <span>Deck <b id="p1-deck-count">0</b></span>
+            <span>· Friedhof <b id="p1-grave-count">0</b></span>
+            <span>· Res <b id="p1-res-count">0/0</b></span>
+        </div>
+        <div class="stats-row">
+            <span style="color:#f87171;font-weight:900;" id="top-deck-label">CPU:</span>
+            <span>Deck <b id="p2-deck-count">0</b></span>
+            <span>· Friedhof <b id="p2-grave-count">0</b></span>
+            <span>· Res <b id="p2-res-count">0/0</b></span>
+        </div>
+        <button id="btn-draw" style="font-size:10px;padding:3px;">+1 Karte ziehen (Debug)</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+        <label style="font-size:11px;color:var(--text-dim);">Schwierigkeit:</label>
+        <select id="cfg-difficulty" style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
+            <option value="easy">Einfach</option><option value="normal" selected>Normal</option><option value="hard">Schwer</option>
+        </select>
+    </div>
+    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
+    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
+    <button id="btn-new-game">🎲 Neues Spiel (Zufällig)</button>
+    <button id="btn-decks" style="border-color:#8a6d2b;">📖 Deck Übersicht</button>
+    <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
+    <button id="btn-simulate-all">🎯 All-Cards Test</button>
+    <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
+    <button id="btn-test-setup">⚡ Test-Setup</button>
+    <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
+    <div style="border-top:1px solid var(--border);padding-top:6px;">
+        <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
+        <input type="text" id="cfg-img-path" value="AZEROTH-{id}-EA.png" style="width:100%;font-size:10px;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px 5px;border-radius:3px;">
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">Log:</span>
+        <button id="btn-sound" style="padding:2px 8px;font-size:10px;">🔊 Sound An</button>
+    </div>
+    <div id="log-area"></div>
+</div>
+
+<div id="turn-banner">Dein Zug!</div>
+
+<div id="multi-target-ui">
+    <h3 id="mt-title">Multi-Target Zauber</h3>
+    <div class="mt-info" id="mt-info">Wähle Ziele aus.</div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+        <button id="mt-confirm-btn" class="success" disabled>Bestätigen (0/0)</button>
+        <button id="mt-cancel-btn" class="danger">Abbrechen</button>
+    </div>
+</div>
+
+<div id="pending-panel">
+    <div id="pp-title">Entscheidung</div>
+    <div id="pp-prompt"></div>
+    <div id="pp-chain"></div>
+    <div id="pp-opts"></div>
+</div>
+
+<div id="decision-modal"><div id="decision-box" class="modal-box">
+    <h3 id="decision-title" style="margin-top:0;color:var(--gold);">Entscheidung</h3>
+    <p id="decision-text" style="font-size:14px;line-height:1.5;"></p>
+    <div id="decision-actions" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;"></div>
+</div></div>
+
+<div id="sim-modal"><div id="sim-box" class="modal-box">
+    <h2 id="sim-title" style="margin-top:0;color:var(--gold);">Simulation</h2>
+    <div id="sim-progress-wrapper">
+        <div id="sim-progress"><span id="sim-progress-text">Bereit.</span><span id="sim-progress-eta"></span></div>
+        <div class="sim-bar-bg"><div id="sim-progress-bar"></div></div>
+    </div>
+    <div id="sim-content"></div>
+    <div style="text-align:right;margin-top:14px;"><button id="sim-close-btn" class="danger">Schließen</button></div>
+</div></div>
+
+<div id="deck-overview-modal"><div id="deck-overview-box" class="modal-box">
+    <h2 style="margin-top:0;color:var(--gold);text-align:center;">Deck Übersicht</h2>
+    <div class="deck-grid" id="deck-overview-grid"></div>
+    <div style="text-align:right;margin-top:16px;"><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
+</div></div>
+
+<div id="deck-view-modal"><div id="deck-view-box" class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h2 id="deck-view-title" style="margin:0;color:var(--gold);">Deck Details</h2>
+        <button id="deck-view-close-btn" class="danger">Schließen</button>
+    </div>
+    <div id="deck-view-content"></div>
+</div></div>
+
+<div id="graveyard-modal"><div id="graveyard-box" class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <h2 id="graveyard-title" style="margin:0;color:var(--gold);">Friedhof</h2>
+        <button id="graveyard-close-btn" class="danger">Schließen</button>
+    </div>
+    <div id="graveyard-content"></div>
+</div></div>
+
+<div id="deck-builder-modal"><div class="modal-box">
+    <div class="db-header">
+        <h2 style="margin:0;color:var(--gold);">Deck Builder</h2>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <select id="db-hero-select" style="background:#0a0705; color:#fff; padding:5px; border:1px solid var(--gold); border-radius:3px;"></select>
+            <div id="db-count" style="font-weight:bold; color:var(--gold);">0 / 60 Karten</div>
+            <button id="db-save-btn" class="success">Speichern & Spielen</button>
+            <button id="db-close-btn" class="danger">Schließen</button>
+        </div>
+    </div>
+    <div class="db-content">
+        <div class="db-pool">
+            <div class="db-filters">
+                <input type="text" id="db-search" placeholder="Karten suchen..." style="flex:1;">
+                <select id="db-type-filter">
+                    <option value="All">Alle Typen</option>
+                    <option value="Ally">Diener</option>
+                    <option value="Ability">Fähigkeiten</option>
+                    <option value="Weapon">Waffen</option>
+                    <option value="Armor">Rüstung</option>
+                    <option value="Quest">Quests</option>
+                </select>
+            </div>
+            <div class="db-scroll" id="db-pool-cards"></div>
+        </div>
+        <div class="db-deck">
+            <div style="padding:10px; background:#1a1512; border-bottom:1px solid var(--border); font-weight:bold; color:var(--gold);">Dein Deck</div>
+            <div class="db-deck-list" id="db-deck-cards"></div>
+        </div>
+    </div>
+</div></div>
+
+<div id="booster-modal">
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 1000000;">
+        <button id="booster-close-btn" class="danger">Schließen</button>
+    </div>
+    <div id="booster-pack-container" class="booster-pack-container">
+        <img id="booster-pack-img" class="booster-pack-img" src="booster/booster1.png" alt="Booster">
+    </div>
+    <div id="booster-cards-container" class="booster-cards-container"></div>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/decks.js"></script>
+<script src="js/state.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/cardfx.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/simcore.js"></script>
+<script src="js/tests.js"></script>
+<script src="js/features.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

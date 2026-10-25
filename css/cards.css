@@ -1,0 +1,64 @@
+/* Karten-Rendering & Effects */
+.card-wrapper { --cw: var(--field-w, 150px); position: relative; flex: none; width: var(--cw); aspect-ratio: 5 / 7; container-type: inline-size; cursor: pointer; transition: transform 0.2s; }
+.card-wrapper.hand-card { --cw: var(--hand-w, 140px); }
+.card-wrapper.is-exhausted { margin-inline: calc(var(--cw) * 0.2); }
+.deck-view-card { position: relative; }
+.cfx-rot  { position: absolute; inset: 0; }
+.card-wrapper.is-exhausted > .cfx-rot { transform: rotate(90deg); }
+.cfx-tilt { position: absolute; inset: 0; pointer-events: none; transition: transform 0.1s; }
+.cfx-tilt.cfx-live { transform: perspective(900px) translateY(var(--lift, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+.card-visual { --bd: #4a3f35; position: absolute; inset: 0; overflow: hidden; isolation: isolate; border-radius: 4.6cqw; background: linear-gradient(180deg, #1f1a16 0%, #0f0c0a 100%); box-shadow: 0 0.8cqw 2.4cqw rgba(0,0,0,.65); backface-visibility: hidden; }
+.card-visual::after { content: ''; position: absolute; inset: 0; z-index: 9; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 0 0.7cqw var(--bd); }
+.card-visual.has-img::after { box-shadow: none; }
+.card-visual.can-play { --bd: var(--gold, #c9a84c); box-shadow: 0 0 3cqw rgba(201,168,76,.85); }
+.card-visual.can-play.has-img::after { box-shadow: inset 0 0 0 0.7cqw var(--gold, #c9a84c); }
+.card-wrapper.is-dragging .card-visual { opacity: .4; }
+.card-wrapper.target-pulsing .card-visual { --bd: #ef4444; box-shadow: 0 0 5cqw 1.5cqw #ef4444 !important; }
+.card-wrapper.target-pulsing .card-visual.has-img::after { box-shadow: inset 0 0 0 0.7cqw #ef4444; }
+.card-wrapper.target-drop-valid .card-visual { box-shadow: 0 0 4cqw 1cqw #22c55e; }
+.dropzone-active { outline: 2px dashed var(--gold, #c9a84c); outline-offset: -4px; }
+.card-image-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; object-fit: fill; opacity: 0; transition: opacity .15s; image-rendering: auto; -webkit-user-drag: none; user-select: none; }
+.card-visual.has-img .card-image-layer { opacity: 1; }
+.card-visual.has-img .cfx-text { visibility: hidden; }
+.cfx-text { position: absolute; inset: 0; z-index: 1; padding: 5cqw; display: flex; flex-direction: column; gap: 2cqw; overflow: hidden; }
+.cfx-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 2cqw; font-size: 7.5cqw; font-weight: 700; line-height: 1.15; }
+.cfx-cost { background: #1e3a5f; color: #b0d4ff; border: 0.5cqw solid #4a7aab; border-radius: 6cqw; padding: 0.5cqw 3.5cqw; font-size: 8cqw; flex: none; }
+.cfx-sub  { font-size: 6cqw; color: var(--gold, #c9a84c); font-style: italic; }
+.cfx-body { font-size: 6.2cqw; line-height: 1.3; flex: 1; overflow: hidden; }
+.cfx-stats-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; z-index: 10; pointer-events: none; }
+.cfx-stat-badge { position: relative; width: 38cqw; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0 1cqw 2cqw rgba(0,0,0,0.85)); }
+.cfx-stat-badge img { display: block; width: 100%; height: auto; }
+.cfx-stat-badge span { position: absolute; left: 50%; top: 51%; transform: translate(-50%, -50%); font-size: 20cqw; line-height: 1; font-weight: 900; font-family: Impact, 'Arial Black', 'Georgia', sans-serif; color: #fff;
+    -webkit-text-stroke: 3.4cqw #000; paint-order: stroke fill; text-shadow: 0 0 1.5cqw #000, 0 0 3cqw #000; }
+.cfx-stat-badge.lean span { left: 42%; top: 58%; }
+.cfx-stat-badge.hp-badge span { left: 57%; }
+.card-action-bar { position: absolute; left: 0; right: 0; bottom: -32px; z-index: 20; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; pointer-events: auto; }
+.card-wrapper:hover .card-action-bar { opacity: 1; }
+.card-action-bar button { flex: 1; padding: 5px 0; font-size: 10px; border-radius: 3px; border: 1px solid var(--gold-dark, #8a6d2b); font-weight: bold; color: #fff; cursor: pointer; background: linear-gradient(180deg, #3d3530, #1a1512); }
+.card-action-bar button:hover { border-color: var(--gold, #c9a84c); }
+.cfx-glare { position: absolute; inset: 0; z-index: 7; pointer-events: none; border-radius: inherit; background: radial-gradient(farthest-corner circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.34), transparent 55%); mix-blend-mode: soft-light; opacity: calc(var(--h, 0) * 1); }
+.cfx-foil { position: absolute; inset: 0; z-index: 6; pointer-events: none; border-radius: inherit; opacity: 0; mix-blend-mode: color-dodge; transition: opacity 0.3s; }
+.card-wrapper:hover .cfx-foil { opacity: 1; }
+#cfx-preview .cfx-foil { opacity: 1 !important; }
+.cfx-foil.f2 { background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255, 215, 0, 0.8) 0%, rgba(255, 140, 0, 0.4) 40%, transparent 70%); mix-blend-mode: overlay; }
+.cfx-foil.f5 { background: linear-gradient(0deg, rgba(255,0,0,0.6) 0%, transparent 50%, rgba(255,100,0,0.6) 100%); background-size: 100% 200%; background-position: 50% var(--my, 50%); mix-blend-mode: overlay; }
+.cfx-foil.f9 { background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.8) 50%, transparent 60%); background-size: 200% 200%; background-position: var(--mx, 50%) var(--my, 50%); mix-blend-mode: overlay; }
+#cfx-preview { position: fixed; z-index: 999999; margin: 0; pointer-events: none; opacity: 0; transition: opacity .12s; display: none; cursor: default; }
+#cfx-preview.show { opacity: 1; }
+#cfx-preview .cfx-stats-bar { display: none !important; }
+#cfx-preview .card-visual { box-shadow: 0 2.5cqw 9cqw rgba(0,0,0,.85); }
+#cfx-preview.card-wrapper.is-exhausted, #cfx-preview .cfx-rot { margin: 0; transform: none; }
+
+/* FIX: Damage-Maske */
+.damage-mask { 
+    position: absolute; 
+    inset: 0; 
+    width: 100%; 
+    height: 100%; 
+    z-index: 8 !important; 
+    pointer-events: none; 
+    mix-blend-mode: normal; 
+    -webkit-mix-blend-mode: normal;
+    display: block !important;
+    transition: opacity 0.1s ease-out; /* NEU: Sanfter Übergang beim Scrollen */
+}
