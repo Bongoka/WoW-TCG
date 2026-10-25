@@ -9,6 +9,7 @@
 const UI = {
     attacker: null, drag: null, busy: false, shownProtect: 0,
     handSeen: new Set(), handFly: new Map(),   // Handkarten, die schon gezeigt wurden / gerade anfliegen (uid -> Startzeit)
+    oppSeen: new Set(), oppFly: new Map(),     // dasselbe für die Kartenrücken der CPU-Hand
     reset() { this.attacker = null; this.drag = null; }
 };
 
@@ -138,6 +139,7 @@ function render() {
         const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.className = "opp-hand-card-img";
         wrapper.appendChild(img); th.appendChild(wrapper);
     }
+    flyNewOppCards(G.p2, th);
 
     renderBattlefield(G.p2, "top-allies", true);
     renderBattlefield(G.p1, "bot-allies", false);
@@ -157,7 +159,7 @@ function decorateInPlay(node, c) {
     const pend = myPending('choose');
     // 1) Offene Entscheidung: wählbare Karten leuchten
     if (choices.has(uid)) {
-        node.classList.add(pend.protect ? 'protect-pulsing' : 'target-pulsing');
+        node.classList.add(pend.protect ? 'protect-pulsing' : 'choice-target');
         node.style.cursor = 'pointer';
         node.onclick = (e) => { e.stopPropagation(); chooseV(uid); };
         if (pend.protect) {
@@ -262,7 +264,7 @@ function renderPlayerHand(p) {
         slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(${offset * 6}deg)`;
         if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
-            node.classList.add('target-pulsing'); node.style.cursor = 'pointer';
+            node.classList.add('choice-target'); node.style.cursor = 'pointer';
             node.onclick = (e) => { e.stopPropagation(); chooseV(card.uid); };
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
@@ -333,21 +335,160 @@ function flyTo(node, to, delay = 0) {
         { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(-25deg)`, opacity: 0 }
     ], { duration: 420, delay, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' }).finished;
 }
-function flyNewHandCards(p, box) {
-    const now = performance.now();
+// nodes[i] = DOM-Knoten der Handkarte i; angleOf(i) = Drehung ihres Fächer-Slots
+function flyNewCards(hand, nodes, seenKey, flyKey, from, angleOf) {
+    const now = performance.now(), fly = UI[flyKey];
     let k = 0;
-    for (const c of p.hand) if (!UI.handSeen.has(c.uid)) UI.handFly.set(c.uid, now + FLY_GAP * k++);
-    UI.handSeen = new Set(p.hand.map(c => c.uid));
-    for (const uid of UI.handFly.keys()) if (!UI.handSeen.has(uid)) UI.handFly.delete(uid);
-    const from = deckRect(), mid = (p.hand.length - 1) / 2;
-    p.hand.forEach((c, idx) => {
-        const t0 = UI.handFly.get(c.uid); if (t0 === undefined) return;
+    for (const c of hand) if (!UI[seenKey].has(c.uid)) fly.set(c.uid, now + FLY_GAP * k++);
+    UI[seenKey] = new Set(hand.map(c => c.uid));
+    for (const uid of fly.keys()) if (!UI[seenKey].has(uid)) fly.delete(uid);
+    hand.forEach((c, idx) => {
+        const t0 = fly.get(c.uid); if (t0 === undefined) return;
         const el = now - t0;
-        if (el >= FLY_MS) { UI.handFly.delete(c.uid); return; }
-        const node = box.children[idx] && box.children[idx].firstChild;
-        if (node) flyFrom(node, from, { delay: Math.max(0, -el), elapsed: el, angle: (idx - mid) * 6 });
+        if (el >= FLY_MS) { fly.delete(c.uid); return; }
+        if (nodes[idx]) flyFrom(nodes[idx], from, { delay: Math.max(0, -el), elapsed: el, angle: angleOf(idx) });
     });
 }
+function flyNewHandCards(p, box) {
+    const mid = (p.hand.length - 1) / 2;
+    flyNewCards(p.hand, [...box.children].map(s => s.firstChild), 'handSeen', 'handFly', deckRect(), i => (i - mid) * 6);
+}
+// Gegner-Hand: Kartenrücken fliegen vom gegnerischen Deck heran (Container ist um 180° gedreht)
+function flyNewOppCards(p, box) {
+    const mid = (p.hand.length - 1) / 2, d = document.getElementById("p2-deck-stack");
+    const from = d ? d.getBoundingClientRect() : { left: 0, top: 0, width: 50, height: 70 };
+    flyNewCards(p.hand, [...box.children].map(w => w.firstChild), 'oppSeen', 'oppFly', from, i => 180 + (i - mid) * 5);
+}
+
+// ---------------------------------------------------------------- Sprechblasen der CPU (nach Rasse des Helden)
+const BANTER = {
+    Human: {
+        greet: ["Für das Licht und für Sturmwind!", "Ihr wollt Ärger? Den sollt Ihr haben."],
+        turn: ["Meine Runde.", "Nun zu mir.", "Für König und Vaterland!"],
+        think: ["Hm, lasst mich überlegen …", "Ein kluger Zug will bedacht sein.", "Was würde Lothar tun?"],
+        attack: ["Für die Allianz!", "Zum Angriff!", "Haltet stand, wenn Ihr könnt!"],
+        big: ["Sturmwind schickt Verstärkung!", "Seht her und staunt!"],
+        hurt: ["Nur ein Kratzer!", "Das wird Euch noch leidtun."],
+        low: ["Licht, steh mir bei …", "Ich … gebe nicht auf!"],
+        win: ["Sieg für die Allianz!", "Das Licht ist mit mir."],
+        lose: ["Ich habe … versagt …", "Gut gekämpft, Fremder."]
+    },
+    Dwarf: {
+        greet: ["Bei meinem Bart, endlich ein Kampf!", "Eisenschmiede grüßt Euch – mit dem Hammer!"],
+        turn: ["Jetzt bin ich dran, Bursche!", "Aus dem Weg, ich hab zu tun!"],
+        think: ["Hmm … wo hab ich mein Bier hingestellt?", "Moment, Moment … ich rechne noch.", "Gut Ding will Weile haben."],
+        attack: ["Für Khaz Modan!", "Spürt meinen Hammer!", "Ha! Nehmt das!"],
+        big: ["Jetzt wird's ernst, Bursche!", "Frisch aus der Schmiede!"],
+        hurt: ["Ha! Das kitzelt nur!", "Mehr habt Ihr nicht drauf?"],
+        low: ["Bronzebart, gib mir Kraft …", "Nur noch … ein Krug …"],
+        win: ["Darauf trinken wir einen!", "Zwergenstahl siegt immer!"],
+        lose: ["Mein Bart … mein Stolz …", "Bringt mich … in die Taverne …"]
+    },
+    Gnome: {
+        greet: ["Zeit für Wissenschaft!", "Für Gnomeregan! Na ja, was davon übrig ist."],
+        turn: ["Testphase beginnt!", "Ah, mein Einsatz!"],
+        think: ["Berechne Wahrscheinlichkeiten …", "Moment, das Zahnrad klemmt.", "Hmm, Variante 42-B …"],
+        attack: ["Für Gnomeregan!", "Klein, aber gemein!", "Angriffsprotokoll aktiviert!"],
+        big: ["Mein neuestes Meisterwerk!", "Das hat Tüftler-Qualität!"],
+        hurt: ["Autsch! Das stand nicht im Bauplan!", "Kleine Fehlfunktion, nichts weiter."],
+        low: ["Notfallprotokoll aktivieren!", "Das ist … suboptimal."],
+        win: ["Brillant, wie berechnet.", "Wissenschaft triumphiert!"],
+        lose: ["Zurück ans Reißbrett …", "Ich hätte mehr Sprengstoff gebraucht."]
+    },
+    'Night Elf': {
+        greet: ["Elune wacht über uns.", "Der Wald hat Euch kommen hören."],
+        turn: ["Die Nacht gehört mir.", "Nun spricht die Wildnis."],
+        think: ["Die Sterne flüstern mir …", "Geduld ist eine Tugend der Kaldorei.", "Zehntausend Jahre … ich habe Zeit."],
+        attack: ["Für Teldrassil!", "Lautlos wie der Schatten!", "Elune führe meine Hand!"],
+        big: ["Die Wildnis antwortet meinem Ruf.", "Spürt die Macht der Natur!"],
+        hurt: ["Die Natur heilt alles.", "Ein Dorn im Fleisch, mehr nicht."],
+        low: ["Elune, verlass mich nicht …", "Der Traum ruft mich …"],
+        win: ["Ishnu-alah.", "Der Wald ist geschützt."],
+        lose: ["Ich kehre zum Smaragdgrünen Traum zurück …", "Mein Mondlicht … erlischt …"]
+    },
+    Orc: {
+        greet: ["Lok'tar ogar!", "Ihr werdet die Stärke der Horde spüren!"],
+        turn: ["Jetzt kämpfe ich!", "Zug zug."],
+        think: ["Hmm … ein Orc denkt nach. Selten.", "Zug zug … Moment.", "Grom hätte schon angegriffen …"],
+        attack: ["Für die Horde!", "Blut und Donner!", "Sterbt, Schwächling!"],
+        big: ["Spürt die Macht der Horde!", "Die Horde ist stark!"],
+        hurt: ["Schwach!", "Ist das alles?"],
+        low: ["Ein Orc gibt niemals auf!", "Mein Blut … kocht noch!"],
+        win: ["Lok'tar! Sieg!", "Die Horde siegt!"],
+        lose: ["Ein … ehrenvoller … Tod …", "Für … die … Horde …"]
+    },
+    Troll: {
+        greet: ["Ihr seid schon so gut wie Voodoo, Mann!", "Willkommen im Dschungel, Mann!"],
+        turn: ["Meine Zeit, Mann!", "Jetzt geht's los, Mann."],
+        think: ["Die Loa flüstern mir was, Mann …", "Langsam, langsam … der Troll denkt nach.", "Hmm … welcher Zauber, Mann?"],
+        attack: ["Zeit zum Jagen, Mann!", "Ihr entkommt mir nich'!", "Spürt den Speer!"],
+        big: ["Haltet euch fern vom Voodoo, Mann!", "Die Geister sind mit mir!"],
+        hurt: ["Hehe, das kitzelt, Mann.", "Ein Troll heilt sich wieder, Mann."],
+        low: ["Die Loa rufen mich, Mann …", "Nich' gut, Mann. Gar nich' gut."],
+        win: ["Wir Trolle siegen immer, Mann!", "Voodoo wirkt, Mann!"],
+        lose: ["Ich komm' wieder, Mann …", "Die Loa … holen mich …"]
+    },
+    Tauren: {
+        greet: ["Möge die Erdmutter über uns wachen.", "Ich spüre den Herzschlag der Erde."],
+        turn: ["Die Ahnen rufen.", "Nun bin ich an der Reihe."],
+        think: ["Geduld … wie die Ebenen von Mulgore.", "Die Ahnen beraten mich …", "Hmm … muuuh. Ich meine: hmm."],
+        attack: ["Für Donnerfels!", "Die Herde stürmt!", "Spürt die Kraft der Erde!"],
+        big: ["Die Erde bebt!", "Die Ahnen stehen mir bei!"],
+        hurt: ["Ich bin wie der Fels.", "Das spüre ich kaum."],
+        low: ["Erdmutter, gib mir Kraft …", "Die Ahnen … warten …"],
+        win: ["Die Ahnen sind zufrieden.", "Die Erde ist im Gleichgewicht."],
+        lose: ["Ich kehre zur Erde zurück …", "Die Ahnen … rufen mich heim …"]
+    },
+    Undead: {
+        greet: ["Der Tod ist erst der Anfang.", "Lebende … wie niedlich."],
+        turn: ["Meine Runde. Ich hab ja ewig Zeit.", "Die Verlassenen erheben sich."],
+        think: ["Hmm … ich hab Zeit. Ewig viel Zeit.", "Mein Gehirn … arbeitet noch. Teilweise.", "Lasst mich nachdenken … falls ich das noch kann."],
+        attack: ["Für die Dunkle Fürstin!", "Spürt die Kälte des Grabes!", "Euer Leben gehört mir!"],
+        big: ["Die Seuche breitet sich aus!", "Erhebt euch, meine Diener!"],
+        hurt: ["Ich spüre keinen Schmerz mehr.", "Da fiel nur ein Stück ab. Halb so wild."],
+        low: ["Mein Körper zerfällt … schon wieder.", "Noch bin ich nicht tot. Also … toter."],
+        win: ["Willkommen im Tod.", "Noch einer für die Gruft."],
+        lose: ["Sterben? Darin hab ich Übung.", "Zurück ins Grab … wie langweilig."]
+    }
+};
+const BANTER_ALWAYS = new Set(['greet', 'win', 'lose', 'low']);
+const _banter = { last: 0, saidLow: false };
+function heroRace(p) {
+    const t = (typeof OCR !== 'undefined' && OCR[p.hero.id]) ? OCR[p.hero.id][0] : '';
+    const m = t.match(/Hero—(.+?) (Druid|Hunter|Mage|Paladin|Priest|Rogue|Shaman|Warlock|Warrior)\b/);
+    return m && BANTER[m[1]] ? m[1] : 'Human';
+}
+// Sagt eine passende Zeile, wenn die letzte nicht zu kurz her ist (wichtige Anlässe immer)
+function cpuSay(kind, chance = 1) {
+    if (!G || !G.real) return false;
+    const now = Date.now();
+    if (!BANTER_ALWAYS.has(kind) && (now - _banter.last < 6000 || Math.random() > chance)) return false;
+    const lines = BANTER[heroRace(G.p2)][kind]; if (!lines) return false;
+    _banter.last = now;
+    showCpuBubble(lines[Math.floor(Math.random() * lines.length)]);
+    return true;
+}
+function showCpuBubble(text) {
+    document.querySelectorAll('.cpu-bubble').forEach(b => b.remove());
+    const hero = document.getElementById("top-hero-card-container"); if (!hero) return;
+    const r = hero.getBoundingClientRect();
+    const b = document.createElement('div'); b.className = 'cpu-bubble'; b.textContent = text;
+    // Neben den Helden, auf die Seite mit mehr Platz
+    if (r.left > window.innerWidth - r.right) b.style.right = (window.innerWidth - r.left + 14) + 'px';
+    else { b.style.left = (r.right + 14) + 'px'; b.classList.add('tail-left'); }
+    b.style.top = (r.top + r.height * 0.35) + 'px';
+    document.body.appendChild(b);
+    setTimeout(() => { b.classList.add('out'); setTimeout(() => b.remove(), 400); }, 2600 + text.length * 25);
+}
+// Reaktion auf das Geschehen: viel Schaden, wenig Leben, Spielende
+function cpuReact(dmgBefore) {
+    if (!G || !G.real) return;
+    if (G.gameOver) { if (!_banter.end) { _banter.end = true; cpuSay(G.winner === 2 ? 'win' : 'lose'); } return; }
+    const left = hpOf(G, G.p2.hero) - G.p2.hero.damage;
+    if (left <= 8 && !_banter.saidLow) { _banter.saidLow = true; cpuSay('low'); return; }
+    if (dmgBefore !== undefined && G.p2.hero.damage - dmgBefore >= 4) cpuSay('hurt', 0.7);
+}
+function resetBanter() { _banter.last = 0; _banter.saidLow = false; _banter.end = false; }
 
 // ---------------------------------------------------------------- Mulligan im Hearthstone-Stil
 // Starthand groß in der Mitte; angeklickte Karten werden markiert und bei "Keep" ersetzt
@@ -472,28 +613,130 @@ function renderPendingPanel() {
     const panel = document.getElementById("pending-panel"); if (!panel) return;
     const d = myPending();
     const chain = G.chain || [];
-    if (!d && !chain.length) { panel.style.display = 'none'; return; }
+    // Wahl zwischen sichtbaren Karten (Spielfeld, eigene Hand): direkt auf dem Feld, sonst mittiges Fenster
+    const board = boardChoice(d);
+    renderChoiceModal(board ? null : d);
+    if ((d && !board) || (!d && !chain.length)) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
     ch.innerHTML = chain.length ? `<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? 'Du' : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
     opts.innerHTML = '';
     if (!d) { title.textContent = 'Kette'; prompt.textContent = 'Die CPU reagiert …'; return; }
-    if (d.kind === 'priority') {
-        title.textContent = d.reason === 'combat' ? 'Kampf – Priorität' : (d.reason === 'end' ? 'Ende des Zuges – Priorität' : 'Priorität');
-        prompt.textContent = `${d.prompt} Du kannst Instants spielen, Kräfte nutzen oder Quests abschließen.`;
-        const b = document.createElement('button'); b.textContent = 'Passen'; b.className = 'success';
-        b.onclick = () => humanAct({ type: 'PASS' });
+    title.textContent = d.protect ? '🛡 Angriff! Protector einsetzen?' : (d.src || 'Entscheidung');
+    prompt.textContent = d.prompt + (d.protect ? ' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.' : ' Klicke eine blau markierte Karte an.');
+    d.opts.forEach(o => {
+        if (typeof o.v === 'string' && locate(G, o.v)) return;   // Karten wählt man auf dem Feld
+        const b = document.createElement('button'); b.textContent = o.label;
+        if (o.v === '__cancel' || (o.v === '__none' && d.protect)) b.className = 'danger';
+        b.onclick = () => chooseV(o.v);
         opts.appendChild(b);
+    });
+}
+function boardChoice(d) {
+    if (!d || d.kind !== 'choose') return false;
+    let cards = 0;
+    for (const o of d.opts) {
+        if (o.card !== undefined) return false;
+        const l = typeof o.v === 'string' ? locate(G, o.v) : null;
+        if (!l) continue;
+        if (!isInPlayZone(l.zone) && !(l.zone === 'hand' && l.pid === 1)) return false;
+        cards++;
+    }
+    return cards > 0;
+}
+
+// ---------------------------------------------------------------- Entscheidungsfenster (mittig, mit Kartenbildern)
+// Karte zu einem Verweis: Karteninstanz, uid (im Spiel, Hand, Friedhof, Ressourcen, Kette) oder Karten-ID
+function cardOfRef(ref) {
+    if (ref && typeof ref === 'object') return ref;
+    if (typeof ref === 'string') { const l = locate(G, ref); return l ? l.c : null; }
+    if (typeof ref === 'number' && CARDS[ref]) return { ...CARDS[ref], id: ref, uid: 'pv_' + ref };
+    return null;
+}
+function cardByName(name) {
+    if (!name) return null;
+    const e = inPlay(G).find(x => x.c.name === name); if (e) return e.c;
+    const id = Object.keys(CARDS).find(k => CARDS[k].name === name);
+    return id ? cardOfRef(Number(id)) : null;
+}
+function cardNode(card, cls, caption) {
+    const box = document.createElement("div"); box.className = cls;
+    const l = card.uid && locate(G, card.uid);
+    box.appendChild(createCardDOM({ ...card, exhausted: false }, !!l && (isInPlayZone(l.zone) || l.zone === 'chain')));
+    if (caption) { const c = document.createElement("div"); c.className = "cm-caption"; c.textContent = caption; box.appendChild(c); }
+    return box;
+}
+// Beteiligte Karten: Kette oben, sonst der laufende Kampf (Angreifer → Verteidiger)
+function chainContext() {
+    const top = G.chain[G.chain.length - 1];
+    if (top) {
+        if (top.kind === 'proposal') return [top.att, '→', top.def];
+        const c = top.card || cardOfRef(top.src) || cardOfRef(top.srcId);
+        const tg = (top.targets || []).flat().filter(u => locate(G, u));
+        return c ? [c, ...(tg.length ? ['→', ...tg] : [])] : [];
+    }
+    return G.battle ? [G.battle.att, '→', G.battle.def] : [];
+}
+function decisionContext(d) {
+    if (d.show) return d.show;
+    if ((d.protect || d.src === 'Waffenschlag') && G.battle) return [G.battle.att, '→', G.battle.def];
+    if (d.target) { const it = G.chainPrep; const c = it && (it.card || cardOfRef(it.src)); if (c) return [c]; }
+    const c = cardByName(d.src);
+    if (c && !d.opts.some(o => cardOfRef(o.card !== undefined ? o.card : o.v) === c)) return [c];
+    return [];
+}
+// Was der Spieler im Prioritätsfenster tun kann – je Quelle eine Karte
+function priorityChoices() {
+    const seen = new Set(), out = [];
+    for (const a of getPriorityActions(G, 1)) {
+        if (a.type === 'PLAY_CARD') {
+            const c = G.p1.hand[a.handIdx]; if (!c || seen.has(c.uid)) continue; seen.add(c.uid);
+            out.push({ card: c, caption: `Spielen (${getPlayCost(G, G.p1, c, a.x || 0)})`, run: () => openHandCardMenu(a.handIdx) });
+        } else if (a.type === 'ACTIVATE') {
+            const k = a.srcUid + '|' + a.key; if (seen.has(k)) continue; seen.add(k);
+            const c = findCharacter(G, a.srcUid), pw = c && getPower(G, c, a.key); if (!c || !pw) continue;
+            out.push({ card: c, caption: `${pw.flip ? '🔄 ' : ''}${pw.label}${pw.cost ? ` (${pw.cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: a.srcUid, key: a.key }) });
+        } else if (a.type === 'COMPLETE_QUEST') {
+            const r = G.p1.resources[a.resIdx]; if (!r || seen.has(r.card.uid)) continue; seen.add(r.card.uid);
+            out.push({ card: r.card, caption: 'Quest abschließen', run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
+        }
+    }
+    return out;
+}
+function optionCaption(o, card) {
+    const name = card.name || '';
+    if (o.label === name) return '';
+    if (o.label.startsWith(name)) return o.label.slice(name.length).trim().replace(/^\((.*)\)$/, '$1');
+    return o.label.replace(name, '').replace(/\s{2,}/g, ' ').trim();
+}
+function renderChoiceModal(d) {
+    const m = document.getElementById("choice-modal"); if (!m) return;
+    if (!d || UI.busy) { m.style.display = 'none'; return; }
+    m.style.display = 'flex';
+    const title = document.getElementById("cm-title"), ctx = document.getElementById("cm-context"), prompt = document.getElementById("cm-prompt"),
+        cards = document.getElementById("cm-cards"), btns = document.getElementById("cm-buttons");
+    ctx.innerHTML = cards.innerHTML = btns.innerHTML = '';
+    const fillContext = refs => refs.forEach(r => {
+        if (r === '→') { const a = document.createElement("div"); a.className = "cm-arrow"; a.textContent = "→"; ctx.appendChild(a); return; }
+        const c = cardOfRef(r); if (c) ctx.appendChild(cardNode(c, "cm-ctx-card"));
+    });
+    const addButton = (label, cls, fn) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; btns.appendChild(b); };
+    const addChoice = (card, caption, fn) => { const n = cardNode(card, "cm-card", caption); n.onclick = (e) => { e.stopPropagation(); fn(); }; cards.appendChild(n); };
+    if (d.kind === 'priority') {
+        title.textContent = d.reason === 'combat' ? '⚔ Kampf – reagieren?' : 'Reagieren?';
+        prompt.textContent = d.prompt;
+        fillContext(chainContext());
+        priorityChoices().forEach(ch => addChoice(ch.card, ch.caption, ch.run));
+        addButton('Passen', 'success', () => humanAct({ type: 'PASS' }));
         return;
     }
     title.textContent = d.protect ? '🛡 Angriff! Protector einsetzen?' : (d.src || 'Entscheidung');
-    prompt.textContent = d.prompt + (d.protect ? ' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.' : (choiceUids().size ? ' Du kannst auch die leuchtenden Karten anklicken.' : ''));
+    prompt.textContent = d.prompt;
+    fillContext(decisionContext(d));
     d.opts.forEach(o => {
-        const b = document.createElement('button'); b.textContent = o.label;
-        if (o.v === '__none' && d.protect) b.className = 'danger';
-        if (o.v === '__cancel') b.className = 'danger';
-        b.onclick = () => chooseV(o.v);
-        opts.appendChild(b);
+        const card = o.v !== '__none' && o.v !== '__cancel' && o.v !== '__done' ? cardOfRef(o.card !== undefined ? o.card : o.v) : null;
+        if (card) addChoice(card, optionCaption(o, card), () => chooseV(o.v));
+        else addButton(o.label, (o.v === '__cancel' || (o.v === '__none' && d.protect)) ? 'danger' : '', () => chooseV(o.v));
     });
 }
 

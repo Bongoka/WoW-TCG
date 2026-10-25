@@ -15,6 +15,11 @@
 .card-wrapper.is-dragging .card-visual { opacity: .4; }
 .card-wrapper.target-pulsing .card-visual { --bd: #ef4444; box-shadow: 0 0 5cqw 1.5cqw #ef4444 !important; }
 .card-wrapper.target-pulsing .card-visual.has-img::after { box-shadow: inset 0 0 0 0.7cqw #ef4444; }
+/* Wählbares Ziel einer Entscheidung: blauer Rahmen + Zielsymbol */
+.card-wrapper.choice-target .card-visual { --bd: #3b82f6; box-shadow: 0 0 0 0.9cqw #3b82f6, 0 0 5cqw 1.2cqw rgba(59,130,246,.8); animation: choicePulse 1.1s ease-in-out infinite; }
+.card-wrapper.choice-target .card-visual.has-img::after { box-shadow: inset 0 0 0 0.9cqw #3b82f6; }
+.card-wrapper.choice-target::before { content: '🎯'; position: absolute; top: -8%; right: -6%; z-index: 40; font-size: clamp(14px, 16cqw, 26px); filter: drop-shadow(0 0 4px #000); pointer-events: none; }
+@keyframes choicePulse { 50% { box-shadow: 0 0 0 0.9cqw #60a5fa, 0 0 7cqw 2cqw rgba(96,165,250,.95); } }
 .card-wrapper.target-drop-valid .card-visual { box-shadow: 0 0 4cqw 1cqw #22c55e; }
 .dropzone-active { outline: 2px dashed var(--gold, #c9a84c); outline-offset: -4px; }
 .card-image-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 3; object-fit: fill; opacity: 0; transition: opacity .15s; image-rendering: auto; -webkit-user-drag: none; user-select: none; }

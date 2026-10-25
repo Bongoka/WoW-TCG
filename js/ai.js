@@ -30,6 +30,8 @@ function evaluateState(s, pid) {
     if (myHp <= threat) score -= 50;
     score += me.hand.length * 3.5 - opp.hand.length * 2.5;
     score += me.resources.length * 1.5 + getReadyRes(me) * 0.2;
+    // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
+    if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });
     me.hero.armors.forEach(a => { score += 2 + defOf(s, a) * 1.2; if (!a.exhausted) score += 0.5; });
     opp.hero.weapons.forEach(w => { score -= 3.5 + weaponAtk(s, w, {}) * 1.8; });

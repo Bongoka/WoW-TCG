@@ -302,6 +302,38 @@ function runRuleTests() {
         const s2 = fresh(); dealOpeningHands(s2); const h2 = P(s2, 1).hand.slice();
         assert(doPartialMulligan(s2, 1, []) && P(s2, 1).hand.every((c, i) => c === h2[i]), 'Keep ohne Markierung verändert die Hand');
     });
+    test(43, 'Priorität: Mensch wird nur gefragt, wenn er auf das Geschehen reagieren kann', () => {
+        // Nur eine abschließbare Quest: kein Grund anzuhalten
+        const s = fresh('alliance_hunter', 'alliance_mage'); res(s, 1, 3); res(s, 2, 3); res(s, 2, 1, 344);
+        assert(getPriorityActions(s, 2).some(a => a.type === 'COMPLETE_QUEST'), 'Testaufbau: Quest nicht abschließbar');
+        s.humans = [2];
+        applyAction(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 33), targets: [[P(s, 2).hero.uid]], actorId: 1 }, true, 1);
+        assert(!s.pending && P(s, 2).hero.damage === 1, 'Angehalten, obwohl nur eine Quest möglich war');
+        // Counterspell kann den Link unterbrechen: anhalten
+        const s2 = fresh('alliance_hunter', 'alliance_mage'); res(s2, 1, 3); res(s2, 2, 3); hand(s2, 2, 51);
+        s2.humans = [2];
+        applyAction(s2, { type: 'PLAY_CARD', handIdx: hand(s2, 1, 33), targets: [[P(s2, 2).hero.uid]], actorId: 1 }, true, 1);
+        assert(s2.pending && s2.pending.kind === 'priority' && s2.pending.pid === 2, 'Nicht angehalten trotz Counterspell');
+        // Kampf: nur ein Halt (letztes Kampffenster), wenn ein Instant den Angreifer treffen kann
+        const s3 = fresh('alliance_mage', 'alliance_hunter'); res(s3, 2, 3); hand(s3, 2, 33); const a = put(s3, 1, 262);
+        s3.humans = [2];
+        applyAction(s3, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s3, 2).hero.uid, actorId: 1 }, true, 1);
+        let stops = 0, n = 0;
+        while (s3.pending && n++ < 50) {
+            const d = s3.pending;
+            if (d.kind === 'priority') { stops++; applyAction(s3, { type: 'PASS', actorId: 2 }, true, 2); }
+            else applyAction(s3, { type: 'CHOOSE', v: aiPick(s3, d), actorId: d.pid }, true, d.pid);
+        }
+        assert(stops === 1 && P(s3, 2).hero.damage === 5, `Kampf: ${stops} Halte, ${P(s3, 2).hero.damage} Schaden`);
+    });
+    test(44, 'KI: Held greift nicht mit 0 Angriff an', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter'); s.real = false;
+        assert(atkOf(s, P(s, 1).hero, { attacking: true }) === 0 && getLegalActions(s, 1).some(x => x.type === 'ATTACK'), 'Testaufbau');
+        const dec = searchBestAction(s, 1, 'normal');
+        assert(!dec || dec.action.type !== 'ATTACK', 'KI greift mit 0 ATK an');
+        const f = fastAiAction(s, 1);
+        assert(!f || f.action.type !== 'ATTACK', 'Schnelle KI greift mit 0 ATK an');
+    });
     return results;
 }
 

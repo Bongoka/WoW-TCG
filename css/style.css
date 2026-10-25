@@ -253,6 +253,33 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .pp-chain-item { font-size: 11px; padding: 3px 6px; border-radius: 3px; margin-bottom: 2px; background: #1a1512; border-left: 3px solid #60a5fa; }
 .pp-chain-item.opp { border-left-color: #f87171; }
 
+/* ===== Entscheidungsfenster (mittig, Kartenbilder) ===== */
+#choice-modal { position: fixed; inset: 0; z-index: 9500; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
+#choice-box { max-width: min(1100px, 92vw); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 18px 24px; }
+#cm-title { margin: 0; color: var(--gold); font-size: 18px; }
+#cm-prompt { font-size: 14px; line-height: 1.45; color: var(--text-main); max-width: 640px; }
+#cm-context { display: flex; align-items: center; justify-content: center; gap: 14px; }
+#cm-context:empty, #cm-cards:empty { display: none; }
+.cm-ctx-card .card-wrapper, .cm-ctx-card .card-wrapper.hand-card { --cw: clamp(110px, 11vw, 170px); cursor: default; }
+.cm-arrow { font-size: 34px; font-weight: 900; color: var(--gold-light); }
+#cm-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; padding-top: 6px; border-top: 1px solid var(--border); }
+.cm-card { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; transition: transform .15s; }
+.cm-card:hover { transform: translateY(-6px); }
+.cm-card .card-wrapper, .cm-card .card-wrapper.hand-card { --cw: clamp(100px, 9vw, 150px); }
+.cm-card:hover .card-visual { box-shadow: 0 0 0 0.9cqw #facc15, 0 0 4cqw rgba(250,204,21,.75); }
+.cm-caption { max-width: clamp(100px, 9vw, 150px); font-size: 11px; font-weight: bold; color: var(--gold-light); line-height: 1.3; }
+#cm-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+#cm-buttons button { padding: 8px 20px; font-size: 14px; }
+
+/* ===== Sprechblase der CPU ===== */
+.cpu-bubble { position: fixed; z-index: 9400; max-width: 260px; padding: 10px 14px; border-radius: 14px; pointer-events: none;
+    background: #f5ecd7; color: #2a1d10; font: italic bold 14px/1.35 Georgia, serif; border: 2px solid var(--gold-dark);
+    box-shadow: 0 6px 20px rgba(0,0,0,.6); animation: bubbleIn .25s ease-out; transition: opacity .35s, transform .35s; }
+.cpu-bubble::after { content: ''; position: absolute; right: -12px; top: 14px; border: 8px solid transparent; border-left: 12px solid #f5ecd7; border-right: 0; }
+.cpu-bubble.tail-left::after { right: auto; left: -12px; border-left: 0; border-right: 12px solid #f5ecd7; }
+.cpu-bubble.out { opacity: 0; transform: translateY(-6px); }
+@keyframes bubbleIn { from { opacity: 0; transform: scale(.6) translateX(20px); } to { opacity: 1; transform: none; } }
+
 /* ===== Mulligan im Hearthstone-Stil ===== */
 #hs-mulligan { position: fixed; inset: 0; z-index: 100000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
     background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 75%); }

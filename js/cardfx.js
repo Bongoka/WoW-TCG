@@ -67,7 +67,7 @@ EK.lookPick = (s, a) => {
     s._hidden = true;
     p.looking = ids;
     const ok = ids.map((id, i) => ({ id, i })).filter(x => !a.type || (a.type === 'Equipment' ? ['Weapon', 'Armor', 'Item'].includes(CARDS[x.id].type) : CARDS[x.id].type === a.type));
-    const opts = ok.map(x => ({ label: CARDS[x.id].name, v: x.i, ai: (CARDS[x.id].cost || 0) + 1 }));
+    const opts = ok.map(x => ({ label: CARDS[x.id].name, v: x.i, card: x.id, ai: (CARDS[x.id].cost || 0) + 1 }));
     if (!opts.length) { EK.lookPickDo(s, a, -1); return; }
     if (a.optional) opts.push({ label: 'Keine nehmen', v: -1, ai: 0 });
     ask(s, { pid: a.chooser || a.pid, prompt: `${a.src}: Wähle eine Karte für die Hand (${ids.map(id => CARDS[id].name).join(', ')})`, src: a.src, opts, k: 'E:lookPickDo', a, auto: !a.optional });
@@ -83,7 +83,7 @@ EK.search = (s, a) => {
     const p = me(s, a.pid);
     const seen = new Set();
     const opts = [];
-    p.deck.forEach(id => { const c = CARDS[id]; if (!a.pred(c)) return; if (seen.has(id)) return; seen.add(id); opts.push({ label: c.name, v: id, ai: (c.cost || 0) }); });
+    p.deck.forEach(id => { const c = CARDS[id]; if (!a.pred(c)) return; if (seen.has(id)) return; seen.add(id); opts.push({ label: c.name, v: id, card: id, ai: (c.cost || 0) }); });
     if (!opts.length) { shuffleInPlace(p); s._hidden = true; return; }
     opts.push({ label: 'Nichts nehmen', v: 0, ai: -1 });
     ask(s, { pid: p.id, prompt: `${a.src}: Wähle eine Karte aus deinem Deck`, src: a.src, opts, k: 'E:searchDo', a: { ...a, pred: undefined }, auto: false });
@@ -97,7 +97,7 @@ const PRED = {
 EK.searchStep = (s, a) => {
     const p = me(s, a.pid); const pred = PRED[a.predName];
     const seen = new Set(); const opts = [];
-    p.deck.forEach(id => { const c = CARDS[id]; if (!pred(c) || seen.has(id)) return; seen.add(id); opts.push({ label: c.name, v: id, ai: (c.cost || 0) }); });
+    p.deck.forEach(id => { const c = CARDS[id]; if (!pred(c) || seen.has(id)) return; seen.add(id); opts.push({ label: c.name, v: id, card: id, ai: (c.cost || 0) }); });
     s._hidden = true;
     if (!opts.length || a.n <= 0) { if (a.dest !== 'top') { shuffleInPlace(p); } return; }
     opts.push({ label: 'Nichts (mehr) nehmen', v: 0, ai: -1 });
@@ -254,7 +254,7 @@ FX[45] = { powers: [{ key: 'rayder', label: 'Allies +2 ATK beim Angreifen', act:
     resolve: (s, it) => alliesOf(me(s, it.pl)).forEach(a => addTM(a, { k: 'atk', v: 2, turn: s.turn, when: 'attacking' })) }] };
 FX[46] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 46, k: 'look', a: { pid } }); } },
     k: { look: (s, a) => { const p = me(s, a.pid); if (!p.deck.length) return; const top = CARDS[p.deck[p.deck.length - 1]]; s._hidden = true;
-            ask(s, { pid: a.pid, prompt: `Track Humanoids: Oberste Karte ist ${top.name}. Unter das Deck legen?`, src: 'Track Humanoids', opts: [{ label: 'Oben lassen', v: 0, ai: (top.cost || 0) <= getReadyRes(p) + 1 ? 1 : 0 }, { label: 'Unter das Deck', v: 1, ai: (top.cost || 0) > getReadyRes(p) + 1 ? 1 : 0 }], k: '46:do', a, auto: false }); },
+            ask(s, { pid: a.pid, prompt: `Track Humanoids: Oberste Karte ist ${top.name}. Unter das Deck legen?`, src: 'Track Humanoids', show: [top.id], opts: [{ label: 'Oben lassen', v: 0, ai: (top.cost || 0) <= getReadyRes(p) + 1 ? 1 : 0 }, { label: 'Unter das Deck', v: 1, ai: (top.cost || 0) > getReadyRes(p) + 1 ? 1 : 0 }], k: '46:do', a, auto: false }); },
         do: (s, a, v) => { const p = me(s, a.pid); if (v && p.deck.length) p.deck.unshift(p.deck.pop()); } } };
 // --- Magier
 FX[47] = { slots: (s, pid) => [{ label: 'Ziel-Held', cands: targetCands(s, pid, { hero: true }), harm: false }],
@@ -761,7 +761,7 @@ FX[353] = { questNoPay: true, questCond: () => null, questExtra: (s, pid) => { s
     reward: (s, pid, r) => { destroyResource(s, r.card.uid); drawCards(s, me(s, pid), 1); } };
 FX[354] = { reward: (s, pid) => q(s, { op: 'call', k: '354:look', a: { pid } }),
     k: { look: (s, a) => { const p = me(s, a.pid); const n = Math.min(3, p.deck.length); if (!n) return; const ids = p.deck.splice(p.deck.length - n, n).reverse(); p.looking = ids; s._hidden = true;
-            ask(s, { pid: a.pid, prompt: `It's a Secret to Everybody: Welche Karte oben auf das Deck? (${ids.map(id => CARDS[id].name).join(', ')})`, src: "It's a Secret to Everybody", opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, ai: CARDS[id].cost <= getReadyRes(p) + 1 ? CARDS[id].cost : -1 })), k: '354:do', a }); },
+            ask(s, { pid: a.pid, prompt: `It's a Secret to Everybody: Welche Karte oben auf das Deck? (${ids.map(id => CARDS[id].name).join(', ')})`, src: "It's a Secret to Everybody", opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: CARDS[id].cost <= getReadyRes(p) + 1 ? CARDS[id].cost : -1 })), k: '354:do', a }); },
         do: (s, a, i) => { const p = me(s, a.pid); const ids = p.looking; p.looking = null; const top = ids.splice(i, 1)[0]; p.deck.unshift(...ids.reverse()); p.deck.push(top); } } };
 FX[355] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ally', reveal: true, src: "Kibler's Exotic Pets" } }) };
 FX[356] = { questCond: (s, pid) => alliesOf(me(s, pid)).filter(a => !a.exhausted).length >= 2 ? null : 'Braucht 2 bereite Allies',

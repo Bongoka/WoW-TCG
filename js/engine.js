@@ -537,7 +537,10 @@ function priorityStep(s) {
     if (isHuman(s, pid) && humanAutoPass(s, w, pid)) { passPriority(s); return true; }
     const acts = getPriorityActions(s, pid);
     if (!acts.length) { passPriority(s); return true; }
-    if (isHuman(s, pid)) { s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason }; return false; }
+    if (isHuman(s, pid)) {
+        if (!humanStopActions(s, pid, acts).length) { passPriority(s); return true; }
+        s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason }; return false;
+    }
     const choice = aiRespond(s, pid, acts);
     if (choice) { if (isReal(s)) s._oppDecided = true; doAction(s, choice, pid); }
     else passPriority(s);
@@ -551,6 +554,48 @@ function humanAutoPass(s, w, pid) {
     if (w.reason === 'ready' || w.reason === 'draw') return true;
     if (w.reason === 'end' && s.activePlayer === pid) return true;
     return false;
+}
+// Bedienkomfort (kein Regelbestandteil – Passen ist immer erlaubt, CR 410): Der Mensch wird nur gefragt,
+// wenn er auf das aktuelle Geschehen tatsächlich reagieren kann. Alles, was er genauso gut später in der
+// eigenen Aktionsphase tun kann, ist kein Grund anzuhalten. Ist das Fenster offen, darf er weiterhin alles nutzen.
+//  - Quests abschließen hält nie an.
+//  - Kette: nur bei einem Link des Gegners. Relevant sind Karten/Kräfte, die den Link selbst als Ziel wählen
+//    können (z. B. Counterspell), einen beteiligten gegnerischen Gegenstand schädigend (Quelle, Ziele, Angreifer)
+//    oder einen beteiligten eigenen Gegenstand helfend (Ziel des Links, Verteidiger). Ungezielte Instants
+//    zählen, wenn der Link eigene Karten betrifft.
+//  - Kampf: nur im letzten Kampffenster (nach Protect Point und Verteidigung, CR 602) mit denselben Kriterien
+//    bezogen auf Angreifer und Verteidiger.
+//  - Ready-/Draw-/End-Fenster ohne Kette: nichts, worauf reagiert werden müsste.
+function humanStopActions(s, pid, acts) {
+    const involved = new Set(), link = new Set();
+    const top = s.chain[s.chain.length - 1];
+    if (top) {
+        if (top.pl === pid) return [];
+        [top.id, top.card && top.card.uid].forEach(u => { if (u) link.add(u); });
+        [top.src, top.att, top.def, ...(top.targets || []).flat()].forEach(u => { if (u) involved.add(u); });
+    } else if (s.battle) {
+        if (s.battle.step !== 'damage') return [];
+        involved.add(s.battle.att); involved.add(s.battle.def);
+    } else return [];
+    const useful = (u, harm) => {
+        if (link.has(u)) return true;
+        if (!involved.has(u)) return false;
+        if (harm === undefined) return true;
+        const mine = ctrlOf(s, findCharacter(s, u)) === pid;
+        return harm ? !mine : mine;
+    };
+    // Ungezielte Instants nur, wenn das Geschehen eigene Karten betrifft (Kampf, Angriff, eigenes Ziel)
+    const p = getPlayer(s, pid);
+    const hitsMe = [...involved].some(u => ctrlOf(s, findCharacter(s, u)) === pid);
+    return acts.filter(a => {
+        let f = null, src = null;
+        if (a.type === 'PLAY_CARD') { src = p.hand[a.handIdx]; f = src && fx(src); }
+        else if (a.type === 'ACTIVATE') { src = findCharacter(s, a.srcUid); f = src && getPower(s, src, a.key); }
+        if (!f) return false;
+        const slots = targetSlots(s, pid, f, src, { x: a.x, mode: a.mode });
+        if (!slots.length) return a.type === 'PLAY_CARD' && (!top || top.kind === 'proposal' || hitsMe);
+        return slots.some(sl => sl.cands.some(u => useful(u, sl.harm)));
+    });
 }
 function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = w.prio === 1 ? 2 : 1; }
 function priorityPrompt(s, pid) {
@@ -1345,7 +1390,7 @@ EK.circleOfLife = (s, a) => {
     const p = getPlayer(s, a.pid);
     const idx = p.deck.findIndex(id => isAllyCard(CARDS[id]) && CARDS[id].name === a.name);
     if (idx < 0) return;
-    ask(s, { pid: p.id, prompt: `Circle of Life: ${a.name} aus dem Deck erschöpft ins Spiel bringen?`, src: 'Circle of Life', opts: [{ label: 'Ja', v: 1, ai: 5 }, { label: 'Nein', v: 0, ai: 0 }], k: 'E:circleDo', a, auto: false });
+    ask(s, { pid: p.id, prompt: `Circle of Life: ${a.name} aus dem Deck erschöpft ins Spiel bringen?`, src: 'Circle of Life', show: [p.deck[idx]], opts: [{ label: 'Ja', v: 1, ai: 5 }, { label: 'Nein', v: 0, ai: 0 }], k: 'E:circleDo', a, auto: false });
 };
 EK.circleDo = (s, a, v) => {
     if (!v) return;
@@ -1379,7 +1424,7 @@ function fkDraw(s, pid) {
     const p = getPlayer(s, pid);
     if (!p.fk || !p.fk.length) { lose(s, pid, 'DECKOUT'); return; }
     const seen = new Set();
-    const opts = p.fk.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; }).map(id => ({ label: CARDS[id].name, v: id, ai: (CARDS[id].cost || 0) }));
+    const opts = p.fk.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; }).map(id => ({ label: CARDS[id].name, v: id, card: id, ai: (CARDS[id].cost || 0) }));
     ask(s, { pid, prompt: 'Forbidden Knowledge: Wähle eine entfernte Karte', src: 'Forbidden Knowledge', opts, k: 'E:fkPick', a: { pid } });
 }
 EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexOf(id); if (i >= 0) { p.fk.splice(i, 1); p.hand.push(makeCardInst(id, false, p.id)); } };

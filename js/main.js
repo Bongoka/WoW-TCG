@@ -65,6 +65,7 @@ function undoLastAction() {
     G = snap; G.real = true; G.humans = [1];
     UI.reset();
     UI.handSeen = new Set(G.p1.hand.map(c => c.uid));   // zurückgenommene Karten nicht "anfliegen" lassen
+    UI.oppSeen = new Set(G.p2.hand.map(c => c.uid));
     addLog(`↶ Rückgängig: ${desc}`, "log-turn");
     render();
 }
@@ -104,28 +105,32 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     addLog(`=== PARTIE: ${pDeck.name} vs ${oDeck.name} ===`, "log-turn");
     if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
     refreshDisplay(G);
+    resetBanter();
+    const startPlay = () => { showTurnBanner("Dein Zug!"); setTimeout(() => cpuSay('greet'), 1400); };
     if (mulliganMode() === 'hs') {
         // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
         UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
         render();
-        openHsMulligan(() => showTurnBanner("Dein Zug!"));
+        openHsMulligan(startPlay);
         return;
     }
     render();
     // Mulligan (CR 101.2: einmal)
     openDecisionModal("Starthand", "Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?", [
-        { label: "Behalten", cls: "success", action: () => { showTurnBanner("Dein Zug!"); } },
-        { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); showTurnBanner("Dein Zug!"); } }
+        { label: "Behalten", cls: "success", action: startPlay },
+        { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
     ]);
 }
 
 // Menschliche Aktion ausführen; danach ggf. die CPU weiterlaufen lassen
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
+    const dmgBefore = G.p2.hero.damage;
     const ok = applyAction(G, { ...action, actorId: 1 }, false, 1);
     UI.reset();
     render();
     playEventAnimations();
+    cpuReact(dmgBefore);
     if (ok) setTimeout(driveCpu, 30);
     return ok;
 }
@@ -150,9 +155,11 @@ async function driveCpu() {
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
             if (G.activePlayer !== 2) break;
-            if (!announced) { announced = true; showTurnBanner("CPU ist am Zug!"); UI.busy = true; render(); await sleep(700); }
+            if (!announced) { announced = true; showTurnBanner("CPU ist am Zug!"); UI.busy = true; render(); await sleep(700); cpuSay('turn', 0.35); }
             updateCpuStatus(true, "CPU analysiert...");
             await sleep(250);
+            // Ab und zu eine Denkpause mit Sprechblase
+            if (steps > 0 && Math.random() < 0.25) { cpuSay('think'); await sleep(900 + Math.random() * 900); }
             const dec = steps < 25 ? searchBestAction(G, 2, document.getElementById("cfg-difficulty").value) : null;
             if (!dec || !dec.action) {
                 updateCpuStatus(true, "CPU beendet Zug.");
@@ -164,11 +171,16 @@ async function driveCpu() {
             }
             updateCpuStatus(true, `CPU: ${dec.reason}`);
             addLog(`[CPU] ${dec.reason}`, "log-cpu");
+            const played = dec.action.type === 'PLAY_CARD' ? G.p2.hand[dec.action.handIdx] : null;
+            if (dec.action.type === 'ATTACK') cpuSay('attack', 0.35);
+            else if (played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
             await sleep(500);
             if (dec.action.type === 'ATTACK') await animateAttack(dec.action.attackerUid, dec.action.defenderUid);
+            const dmgBefore = G.p2.hero.damage;
             applyAction(G, dec.action, false, 2);
             steps++;
             render(); playEventAnimations();
+            cpuReact(dmgBefore);
             await sleep(350);
         }
     } catch (e) {
