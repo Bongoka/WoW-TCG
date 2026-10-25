@@ -103,6 +103,9 @@ function renderResourceTray(player, containerId, isHuman) {
 // ---------------------------------------------------------------- Hauptzeichnen
 function render() {
     if (!G) return;
+    // Positionen vor dem Neuzeichnen merken: Karten, die das Spiel verlassen, sterben an ihrem alten Platz
+    const prevRects = new Map();
+    if (G.fxq && G.fxq.length) document.querySelectorAll('#arena [data-uid]').forEach(n => prevRects.set(n.dataset.uid, n.getBoundingClientRect()));
     document.getElementById("turn-badge").textContent = `Zug ${G.turn}`;
     document.getElementById("btn-end-turn").disabled = !canMain();
     document.getElementById("btn-cancel-action").style.display = UI.attacker ? "block" : "none";
@@ -147,6 +150,96 @@ function render() {
     renderResourceTray(G.p1, "bot-resource-tray", true);
     renderPlayerHand(G.p1);
     renderPendingPanel();
+    playFxEvents(prevRects);
+}
+
+// ---------------------------------------------------------------- Schadenszahlen, Treffer-Effekte, Tod
+// Farbe und Symbol je Schadensart (CR: Melee, Ranged, Arcane, Fire, Frost, Holy, Nature, Shadow)
+const DMG_STYLE = {
+    Melee:  { c: ['#f8fafc', '#cbd5e1', '#94a3b8'], icon: '⚔' },
+    Ranged: { c: ['#fde68a', '#d6a35c', '#a16207'], icon: '🏹' },
+    Fire:   { c: ['#fde047', '#fb923c', '#ef4444'], icon: '🔥' },
+    Frost:  { c: ['#e0f2fe', '#7dd3fc', '#38bdf8'], icon: '❄' },
+    Arcane: { c: ['#f5d0fe', '#e879f9', '#a855f7'], icon: '✨' },
+    Nature: { c: ['#bbf7d0', '#4ade80', '#15803d'], icon: '🌿' },
+    Shadow: { c: ['#c4b5fd', '#7c3aed', '#3b0764'], icon: '🌑' },
+    Holy:   { c: ['#fffbeb', '#fde68a', '#facc15'], icon: '☀' }
+};
+const HEAL_STYLE = { c: ['#dcfce7', '#86efac', '#22c55e'], icon: '✚' };
+function fxCenter(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+function burstParticles(r, colors, n, delay, rise) {
+    const { x, y } = fxCenter(r);
+    for (let i = 0; i < n; i++) {
+        const p = document.createElement('div'); p.className = 'fx-particle';
+        const sz = 5 + Math.random() * 7;
+        p.style.width = p.style.height = sz + 'px'; p.style.left = (x - sz / 2) + 'px'; p.style.top = (y - sz / 2) + 'px';
+        p.style.background = colors[i % colors.length]; p.style.boxShadow = `0 0 8px ${colors[i % colors.length]}`;
+        document.body.appendChild(p);
+        const a = Math.random() * Math.PI * 2, d = r.width * (0.35 + Math.random() * 0.45);
+        const dx = rise ? (Math.random() - 0.5) * r.width * 0.7 : Math.cos(a) * d, dy = rise ? -r.height * (0.3 + Math.random() * 0.4) : Math.sin(a) * d;
+        p.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.2)`, opacity: 0 }],
+            { duration: 550 + Math.random() * 350, delay, easing: 'cubic-bezier(.15,.7,.3,1)', fill: 'backwards' }).finished.then(() => p.remove());
+    }
+}
+function floatNumber(r, text, color, icon, delay) {
+    const { x, y } = fxCenter(r);
+    const el = document.createElement('div'); el.className = 'dmg-number';
+    el.innerHTML = `<span class="dmg-icon">${icon}</span>${text}`;
+    el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.color = color;
+    document.body.appendChild(el);
+    el.animate([
+        { transform: 'translate(-50%, -50%) scale(.3)', opacity: 0 },
+        { transform: 'translate(-50%, -60%) scale(1.35)', opacity: 1, offset: .18 },
+        { transform: 'translate(-50%, -70%) scale(1)', opacity: 1, offset: .6 },
+        { transform: 'translate(-50%, -140%) scale(.9)', opacity: 0 }
+    ], { duration: 1300, delay, easing: 'ease-out', fill: 'backwards' }).finished.then(() => el.remove());
+}
+function hitFlash(node, color, delay) {
+    const v = node.querySelector('.card-visual') || node;
+    v.animate([{ filter: 'none' }, { filter: `brightness(1.9) drop-shadow(0 0 14px ${color})` }, { filter: 'none' }], { duration: 380, delay });
+    setTimeout(() => triggerShake(node), delay);
+}
+// Karte stirbt: färbt sich rot, zerfällt und fliegt verblassend auf den Friedhof ihres Besitzers
+function deathAnim(e, r, delay) {
+    const ghost = document.createElement('div'); ghost.className = 'fx-ghost';
+    ghost.style.left = r.left + 'px'; ghost.style.top = r.top + 'px'; ghost.style.width = r.width + 'px'; ghost.style.height = r.height + 'px';
+    const node = createCardDOM({ ...e.card, exhausted: false }, true, null, { noDamage: true });
+    node.classList.add('no-fx'); node.style.setProperty('--cw', r.width + 'px');
+    ghost.appendChild(node); document.body.appendChild(ghost);
+    const gy = document.getElementById(`p${e.owner}-deck-stack`);
+    const t = gy && gy.style.visibility !== 'hidden' ? gy.getBoundingClientRect() : null;
+    const dx = t ? t.left + t.width / 2 - (r.left + r.width / 2) : 0, dy = t ? t.top + t.height / 2 - (r.top + r.height / 2) : r.height * 0.3;
+    const sc = t ? Math.max(0.15, t.width / r.width) : 0.6;
+    ghost.animate([
+        { transform: 'none', filter: 'none', opacity: 1 },
+        { transform: 'translateX(-4px) rotate(-2deg)', filter: 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.9)', opacity: 1, offset: .12 },
+        { transform: 'translateX(4px) rotate(2deg)', filter: 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.8)', opacity: 1, offset: .22 },
+        { transform: 'scale(.92) rotate(0deg)', filter: 'grayscale(1) brightness(.55) blur(.5px)', opacity: .85, offset: .5 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(-12deg)`, filter: 'grayscale(1) brightness(.4) blur(1px)', opacity: 0 }
+    ], { duration: 1300, delay, easing: 'ease-in-out', fill: 'both' }).finished.then(() => ghost.remove());
+    burstParticles(r, ['#57534e', '#a8a29e', '#292524'], 16, delay + 450, true);
+}
+function playFxEvents(prevRects) {
+    const evs = G.fxq; if (!evs || !evs.length) return;
+    G.fxq = [];
+    let k = 0;
+    for (const e of evs) {
+        const node = document.querySelector(`#arena [data-uid="${e.uid}"]`);
+        const r = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
+        if (!r || !r.width) continue;
+        const delay = Math.min(k++, 6) * 90;
+        if (e.t === 'dmg') {
+            const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
+            burstParticles(r, st.c, 18, delay);
+            floatNumber(r, `−${e.amt}`, '#ef4444', st.icon, delay);
+            if (node) hitFlash(node, st.c[1], delay);
+        } else if (e.t === 'heal') {
+            burstParticles(r, HEAL_STYLE.c, 14, delay, true);
+            floatNumber(r, `+${e.amt}`, '#4ade80', HEAL_STYLE.icon, delay);
+        } else if (e.t === 'leave' && (e.dest === 'graveyard' || e.dest === 'removed' || e.dest === 'token') && !node) {
+            deathAnim(e, r, delay + 350);
+        }
+    }
 }
 
 // ---------------------------------------------------------------- Karten im Spiel

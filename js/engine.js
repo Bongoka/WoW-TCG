@@ -254,6 +254,8 @@ function exhaust(s, c) {
     if (c.id === 201 && active(s, c) && ctrlOf(s, c)) trig(s, { k: 'grayson', a: { uid: c.uid } });   // Lord Grayson
 }
 function readyCard(s, c) { if (c && c.exhausted) { c.exhausted = false; evt(s, 'readied', { uid: c.uid }); } }
+// Anzeige-Ereignisse für die Oberfläche (Schadenszahlen, Tod) – nur in echten Partien, ohne Einfluss auf die Regeln
+function fxEvent(s, e) { if (isReal(s)) (s.fxq || (s.fxq = [])).push(e); }
 function heal(s, healerUid, tgtUid, amt) {
     const t = findCharacter(s, tgtUid); if (!t || !isChar(t) || !isInPlayZone((locate(s, tgtUid) || {}).zone)) return 0;
     if (hasTM(s, t, 'noHeal')) return 0;                                                  // Mortal Strike
@@ -261,7 +263,7 @@ function heal(s, healerUid, tgtUid, amt) {
     if (healer && healer.type === 'Hero' && amt !== 'all') amt += countCtrl(s, ctrlOf(s, healer), 294); // Hide of the Wild
     const v = amt === 'all' ? (t.damage || 0) : Math.min(t.damage || 0, Math.max(0, amt));
     t.damage -= v;
-    if (v > 0) L(s, `💚 ${t.name} wird um ${v} geheilt.`, "log-heal");
+    if (v > 0) { L(s, `💚 ${t.name} wird um ${v} geheilt.`, "log-heal"); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); }
     return v;
 }
 function putDamage(s, c, n) { if (c && n > 0) { c.damage = (c.damage || 0) + n; } }
@@ -305,6 +307,8 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
         corruption: attachedTo(s, c.uid, 120).length };
     // An diese Karte angehängte Fähigkeiten gehen auf den Friedhof ihres Besitzers
     for (const pp of [s.p1, s.p2]) for (const o of [...pp.ongoing]) if (o.attachedTo === c.uid) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' });
+    fxEvent(s, { t: 'leave', uid: c.uid, dest: c.isToken ? 'token' : dest, owner: owner.id,
+        card: { id: c.id, uid: c.uid, name: c.name, type: c.type, cost: c.cost, text: c.text, atk: c.atk, hp: c.hp, damage: c.damage || 0, isTotem: c.isTotem } });
     resetInst(c); c.isTotem = false;
     if (c.isToken) { /* Tokens hören auf zu existieren */ }
     else if (dest === 'hand') owner.hand.push(c);
@@ -1242,6 +1246,7 @@ function dmgApply(s, st) {
         t.dmgTurn = s.turn;
         L(s, `💥 ${t.name} erhält ${amt} ${st.dt ? dtName(st.dt) + '-' : ''}Schaden${st.src ? ' von ' + nameOf(s, st.src) : ''}.`, "log-hit");
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('hit');
+        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat });
         const src = st.src ? findCharacter(s, st.src) : null;
         if (src && src.type === 'Hero' && st.dt === 'Fire') addPE(s, ctrlOf(s, src), { k: 'heroFire' });   // Eye of Flame
         if (t.type === 'Hero' && src && src.type === 'Ally' && ctrlOf(s, src) !== tl.pid) addPE(s, ctrlOf(s, src), { k: 'allyHitHero' }); // Torek's Assault

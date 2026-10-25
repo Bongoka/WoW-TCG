@@ -271,6 +271,14 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 #cm-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 #cm-buttons button { padding: 8px 20px; font-size: 14px; }
 
+/* ===== Schadenszahlen, Treffer-Partikel, Tod ===== */
+.fx-particle { position: fixed; z-index: 9800; border-radius: 50%; pointer-events: none; }
+.dmg-number { position: fixed; z-index: 9810; pointer-events: none; white-space: nowrap; font: 900 46px/1 Georgia, serif;
+    -webkit-text-stroke: 2px #1a0505; text-shadow: 0 0 12px rgba(0,0,0,.9), 0 4px 10px rgba(0,0,0,.9); transform: translate(-50%, -50%); }
+.dmg-number .dmg-icon { font-size: 26px; margin-right: 4px; vertical-align: middle; -webkit-text-stroke: 0; }
+.fx-ghost { position: fixed; z-index: 9700; pointer-events: none; }
+.fx-ghost .card-wrapper { width: 100%; }
+
 /* ===== Sprechblase der CPU ===== */
 .cpu-bubble { position: fixed; z-index: 9400; max-width: 260px; padding: 10px 14px; border-radius: 14px; pointer-events: none;
     background: #f5ecd7; color: #2a1d10; font: italic bold 14px/1.35 Georgia, serif; border: 2px solid var(--gold-dark);

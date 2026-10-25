@@ -55,7 +55,7 @@ function newGameState(heroId1, deck1, heroId2, deck2) {
 
 // Kopie für KI-Suche: niemals echt, niemand ist Mensch
 function cloneState(s) {
-    const c = structuredClone({ ...s, _undo: null });
+    const c = structuredClone({ ...s, _undo: null, fxq: null });
     c.real = false; c.humans = [];
     return c;
 }
