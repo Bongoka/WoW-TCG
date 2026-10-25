@@ -140,8 +140,14 @@ body {
 /* Spielbare Handkarten: gelber Rand und etwas größer */
 .hand-card-slot.playable { width: calc(var(--hand-w) * 1.1); height: calc(var(--hand-h) * 1.1); }
 .hand-card-slot.playable .card-wrapper.hand-card { --cw: calc(var(--hand-w) * 1.1); }
-.hand-card-slot.playable .card-visual.can-play { --bd: #facc15; box-shadow: 0 0 0 0.9cqw #facc15, 0 0 4cqw rgba(250,204,21,.75); }
-.hand-card-slot.playable .card-visual.can-play.has-img::after { box-shadow: inset 0 0 0 0.9cqw #facc15; }
+/* Einheitlicher gelber Rand für alles, was in diesem Zug noch etwas tun kann (Handkarten, Allies, Held, Ausrüstung, Quests) */
+.card-wrapper.can-act .card-visual { --bd: #facc15; box-shadow: 0 0 0 0.9cqw #facc15, 0 0 4cqw rgba(250,204,21,.75); }
+.card-wrapper.can-act .card-visual.has-img::after { box-shadow: inset 0 0 0 0.9cqw #facc15; }
+/* Gerade gespielte Allies schlafen: grau + 💤 */
+.card-wrapper.sleeping .card-visual { filter: grayscale(.75) brightness(.7); }
+.card-wrapper.sleeping::after { content: '💤'; position: absolute; top: -10%; left: -8%; z-index: 40; font-size: clamp(16px, 20cqw, 30px); pointer-events: none;
+    filter: drop-shadow(0 0 4px #000); animation: zzz 2.2s ease-in-out infinite; }
+@keyframes zzz { 0%, 100% { transform: translateY(0) rotate(-8deg); opacity: .85; } 50% { transform: translateY(-6px) rotate(6deg); opacity: 1; } }
 #btn-undo:not(:disabled) { color: #fde68a; border-color: #b45309; }
 
 /* Ongoing-Fähigkeiten neben der Ausrüstung */
@@ -161,7 +167,7 @@ body {
 .active-quests-row .quest-card-large { flex: 0 1 var(--hand-w); min-width: 28px; }
 .active-quests-row .quest-card-large:last-child { flex-shrink: 0; }
 .active-quests-row .quest-card-large:hover { z-index: 100; }
-.quest-card-large.quest-ready { box-shadow: 0 0 14px rgba(201,168,76,0.8); cursor: pointer; }
+.quest-card-large.quest-ready { cursor: pointer; }
 .res-mini { width: var(--res-w); height: var(--res-h); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); background: #1a1512; }
 .res-mini .card-back { width: 100%; height: 100%; box-shadow: none; }
 .res-mini.exhausted { transform: rotate(90deg); opacity: 0.7; }
@@ -182,7 +188,26 @@ body {
 .equip-row .card-wrapper + .card-wrapper { margin-left: -42px; }
 .equip-row .card-wrapper:hover { z-index: 100; }
 
-#battlefield-zone { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: 10px; min-height: 500px; }
+#battlefield-zone { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: 10px; min-height: 500px; position: relative; }
+
+/* Zuganzeige: Linie über das Spielfeld mit Plakette, leuchtender Held des aktiven Spielers */
+#turn-indicator { position: absolute; left: 0; right: 0; top: 50%; height: 0; z-index: 4; pointer-events: none; display: flex; align-items: center; justify-content: flex-start; }
+#turn-indicator::before { content: ''; position: absolute; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--ti-c) 15%, var(--ti-c) 85%, transparent); opacity: .55; }
+#turn-indicator span { position: relative; margin-left: 14px; padding: 5px 16px; border-radius: 999px; font: 900 13px/1 Georgia, serif; letter-spacing: 2px;
+    color: #1a1208; background: var(--ti-c); box-shadow: 0 0 18px var(--ti-c); transform: translateY(-50%); }
+#turn-indicator.me { --ti-c: #facc15; } #turn-indicator.cpu { --ti-c: #ef4444; }
+#turn-indicator.cpu span { color: #fff; }
+.hero-dock.turn-active .card-wrapper .card-visual { animation: turnGlow 1.6s ease-in-out infinite; }
+#bot-dock.turn-active { --tg: #facc15; } #top-dock.turn-active { --tg: #ef4444; }
+@keyframes turnGlow { 0%, 100% { box-shadow: 0 0 0 0.9cqw var(--tg), 0 0 4cqw var(--tg); } 50% { box-shadow: 0 0 0 1.2cqw var(--tg), 0 0 9cqw var(--tg); } }
+#btn-end-turn.cpu-turn { color: #fca5a5; border-color: #7a2d2d; }
+
+/* Großer End-Turn-Button, wenn nichts Sinnvolles mehr möglich ist */
+#big-end-turn { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; display: none;
+    padding: 16px 52px; font: 900 26px/1 Georgia, serif; letter-spacing: 2px; color: #1a1208; border: 3px solid #fde68a; border-radius: 40px;
+    background: linear-gradient(180deg, #fde047, #ca8a04); box-shadow: 0 0 30px rgba(250,204,21,.8), 0 8px 20px rgba(0,0,0,.7); animation: endPulse 1.4s ease-in-out infinite; }
+#big-end-turn:hover { filter: brightness(1.12); }
+@keyframes endPulse { 50% { box-shadow: 0 0 50px rgba(250,204,21,1), 0 8px 20px rgba(0,0,0,.7); transform: translate(-50%, -50%) scale(1.05); } }
 .battlefield-row { width: 100%; height: 230px; display: flex; justify-content: center; align-items: center; gap: 16px; position: relative; overflow: visible; }
 .row-watermark { position: absolute; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: rgba(201,168,76,0.08); bottom: -15px; }
 
@@ -288,6 +313,18 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 /* ===== CPU-Karte groß in der Mitte ===== */
 .fx-showcase { position: fixed; z-index: 9750; pointer-events: none; perspective: 900px; filter: drop-shadow(0 18px 40px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(201,168,76,.45)); }
 .fx-showcase .card-wrapper { width: 100%; }
+
+/* ===== Bild-Test-Szene ===== */
+#imgtest-modal { position: fixed; inset: 0; z-index: 100200; display: none; flex-direction: column; background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 80%); }
+.imgtest-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.4); }
+.imgtest-pick { cursor: pointer; padding: 7px 14px; border: 1px solid #0ea5e9; border-radius: 3px; background: #0c4a6e; color: #e0f2fe; font-weight: bold; font-size: 12px; }
+.imgtest-pick input { display: none; }
+#imgtest-grid { flex: 1; overflow: auto; display: flex; flex-wrap: wrap; gap: 26px; align-content: flex-start; justify-content: center; padding: 24px; }
+.imgtest-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#imgtest-grid .imgtest-item .card-wrapper { --cw: var(--it-w, 350px); }
+.imgtest-cap { font: 12px/1.35 Consolas, monospace; color: var(--text-main); text-align: center; max-width: max(180px, var(--it-w, 350px)); word-break: break-all; }
+.imgtest-cap b { color: var(--gold-light); }
+.imgtest-empty { color: var(--text-dim); margin-top: 20vh; font-size: 15px; }
 
 /* ===== Siegbildschirm ===== */
 #gameover { position: fixed; inset: 0; z-index: 100500; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2vh;

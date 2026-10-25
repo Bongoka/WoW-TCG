@@ -79,7 +79,7 @@ function renderResourceTray(player, containerId, isHuman) {
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
             if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
-                wrap.classList.add("quest-ready");
+                wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
                 wrap.title = "Klicken: Quest abschließen";
                 wrap.onclick = () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx });
             }
@@ -178,7 +178,114 @@ function render() {
     renderPendingPanel();
     playFxEvents(prevRects);
     syncAim();
+    renderTurnIndicator();
     checkGameOverScreen();
+}
+
+// ---------------------------------------------------------------- Wer ist am Zug? / Großer End-Turn-Button
+function renderTurnIndicator() {
+    const mine = G.activePlayer === 1, over = G.gameOver;
+    document.getElementById('bot-dock').classList.toggle('turn-active', mine && !over);
+    document.getElementById('top-dock').classList.toggle('turn-active', !mine && !over);
+    const ti = document.getElementById('turn-indicator');
+    ti.style.display = over ? 'none' : '';
+    ti.className = mine ? 'me' : 'cpu';
+    ti.firstElementChild.textContent = mine ? '⚔ DEIN ZUG' : '⏳ ZUG DER CPU';
+    const eb = document.getElementById('btn-end-turn');
+    eb.textContent = mine ? 'Zug beenden' : 'Gegnerischer Zug';
+    eb.classList.toggle('cpu-turn', !mine);
+    document.getElementById('big-end-turn').style.display = nothingLeftToDo() ? 'block' : 'none';
+}
+// Nichts Sinnvolles mehr möglich: keine bezahlbare Karte, Ressource, Quest, Kraft, kein Angriff mit Schaden
+function nothingLeftToDo() {
+    if (!canMain() || UI.attacker) return false;
+    return !getLegalActions(G, 1).some(a => {
+        if (a.type === 'END_TURN') return false;
+        if (a.type === 'ATTACK') {
+            const c = findCharacter(G, a.attackerUid);
+            return !!c && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true, target: findCharacter(G, a.defenderUid) })) > 0;
+        }
+        return true;
+    });
+}
+
+// ---------------------------------------------------------------- Keyword-Erklärungen (Hover-Zoom)
+// Texte wörtlich aus dem Glossar der Comprehensive Rules v7.4 (docs/wow_cr_v7.4.txt); bei „It means …“ nur die Bedeutung.
+// on: wo gesucht wird – 'text' (Regeltext, Standard), 'type' (Typzeile) oder 'both'.
+// Mehrdeutige Wörter (z. B. „Dark Portal“, „Warp Stalker“, „Trap cards“) zählen nur an Keyword-Position: KWPOS.
+const KWPOS = "(?:^|<p> |\\(|, |has |have |gains? |and )";
+const kwAt = w => new RegExp(KWPOS + w + "(?![\\w'-]| of\\b)");
+const KEYWORDS = [
+    { name: 'Ferocity', text: "This ally can be proposed as an attacker regardless of how long it’s been under your control. However, the activated powers of an ally with ferocity can’t be used unless that card has been in its current party continuously since the start of its controller’s most recent turn, as normal.", re: /\bFerocity\b/, flag: 'ferocity' },
+    { name: 'Elusive', text: 'This card can’t be proposed as a defender.', re: /\bElusive\b/, flag: 'elusive' },
+    { name: 'Protector', text: 'This character can protect. To protect with a character, exhaust it at the protect point of a combat step.', re: /\bProtector\b/, flag: 'protector' },
+    { name: 'Long-Range', text: 'While this character is attacking, defenders can’t deal combat damage. This is different from the ranged damage type. A character has long-range while associated with a weapon that has Long-Range.', re: /\bLong-Range\b/ },
+    { name: 'Stealth', text: 'While this character is attacking, characters can’t protect. A character has Stealth while associated with a weapon that has Stealth.', re: /\bStealth\b/, flag: 'stealth' },
+    { name: 'Untargetable', text: 'This card can’t be targeted. Such cards are untargetable only while in play. A target is illegal if it becomes untargetable.', re: /\bUntargetable\b/ },
+    { name: 'Spellshield', text: 'This card can’t be targeted by opponents. Such cards can’t be targeted by opponents only while in play.', re: /\bSpellshield\b/ },
+    { name: 'Finishing Move', text: 'As an additional cost to play, remove X [description] cards in your graveyard from the game, where X is 5 or less. If no [description] is specified, the default is “Combo.”', re: /\bFinishing Move\b/ },
+    { name: 'Bear Form', text: 'Your hero has both Protector and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bBear Form\b/, on: 'both' },
+    { name: 'Cat Form', text: 'Your hero has both “+1 ATK while attacking” and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bCat Form\b/, on: 'both' },
+    { name: 'Totem', text: 'Each Totem has an ATK and health value. Totems can’t be proposed as attackers. Totems are ability allies and count as both in all zones.', re: /\bTotem\b/, on: 'type' },
+    { name: 'Ongoing', text: 'An ongoing ability enters play as it resolves; a non-ongoing ability enters its owner’s graveyard as it resolves. An ongoing ability that loses its powers remains ongoing.', re: /(?:^|<p> )Ongoing:/ },
+    { name: 'Instant', text: 'A player can play an instant card any time he has priority. A player can play a non-instant card only during his non-combat action phase while the chain is empty and he has priority.', re: /\bInstant\b/, on: 'type' },
+    { name: 'Unique', text: 'Any time a player controls two or more unique cards in play with the same name, those cards are violating uniqueness.', re: /\bUnique\b/, on: 'type' },
+    { name: 'Flip', text: 'To flip a face-up hero, turn it face down, and vice versa. If a hero was ready before it flipped, it stays ready. If a hero was exhausted before it flipped, it stays exhausted.', re: /\bFlip\b/ },
+    { name: 'Aberration', text: 'Prevent all non-combat damage that would be dealt to this character.', re: /\bAberration\b/ },
+    { name: 'Absorb', text: 'When this character deals combat damage to a hero, it heals that much damage from your hero.', re: kwAt('Absorb') },
+    { name: 'Arcane Torrent', text: 'When this card enters play, target opposing card in play loses and can\'t have powers this turn.', re: /\bArcane Torrent\b/ },
+    { name: 'Artifact', text: 'You may play this card from your graveyard.', re: kwAt('Artifact') },
+    { name: 'Assault', text: 'Assault 1 means “This card has +1 ATK on your turn.”', re: /\bAssault \d/ },
+    { name: 'Berserking', text: 'This character has +1 ATK for each damage on it.', re: /\bBerserking\b/ },
+    { name: 'Conspicuous', text: 'Opposing heroes and allies can protect against this character.', re: /\bConspicuous\b/ },
+    { name: 'Death Rattle', text: 'When this card enters a graveyard from anywhere, [triggered effect]. A card’s Death Rattle power is active only while that card is in a graveyard and that power hasn’t been lost.', re: /\bDeath Rattle\b/ },
+    { name: 'Delve', text: 'Look at the top two cards of your deck. Put any number of them on top of your deck in any order, and the rest on the bottom.', re: kwAt('Delve') },
+    { name: 'Diplomacy', text: 'You pay (1) less to play [description] allies, to a minimum of (1).', re: /\bDiplomacy\b/ },
+    { name: 'Dual Shield', text: 'The controller of a hero with dual shield can have two Shields without violating uniqueness. Adding a Melee weapon or another Off-Hand equipment causes a uniqueness violation.', re: /\bDual Shield\b/i },
+    { name: 'Dual Wield', text: 'The controller of a hero with dual wield or Two-Handed dual wield can have certain combinations of equipment that would normally violate uniqueness without violating uniqueness, and strike with two Melee weapons per combat.', re: /\bDual Wield\b/i },
+    { name: 'Echo', text: 'When you play this ability, if you control two or more allies that share a [Horde] or [Alliance] race, copy this ability.', re: kwAt('Echo') },
+    { name: 'Enrage', text: 'As this card enters play, you may reveal the top card of your deck. One or more powers may be triggered based off the card you reveal this way.', re: kwAt('Enrage') },
+    { name: 'Escape Artist', text: 'When this card becomes targeted by an opposing link, you may put it into its owner\'s hand.', re: /\bEscape Artist\b/ },
+    { name: 'Eternal', text: 'When this card enters your graveyard from anywhere, you may shuffle it into your deck.', re: kwAt('Eternal') },
+    { name: 'Find Treasure', text: 'When this card enters play, you may draw a card. If you do, discard a card.', re: /\bFind Treasure\b/ },
+    { name: 'Hardiness', text: 'If this character would be dealt damage, prevent 1 of it.', re: /\bHardiness\b/ },
+    { name: 'Harmonize', text: 'You pay (1) less to play allies with printed cost 4 or more.', re: /\bHarmonize\b/ },
+    { name: 'Haste', text: 'Haste 1 means “You pay (1) less to play this card if an ally you controlled dealt damage to an opposing hero this turn.”', re: /\bHaste \d/ },
+    { name: 'Inspire', text: 'As each other player’s ready step starts, you may ready (an) exhausted [card(s)] in play you control. This doesn’t use the chain.', re: /(?:^|<p> )Inspire:/ },
+    { name: 'Inspiring Presence', text: 'If a hero or ally you control would deal non-combat damage, it deals that much +1 instead.', re: /\bInspiring Presence\b/ },
+    { name: 'Invincible', text: 'This card can\'t leave play, be targeted, or be dealt damage.', re: /\bInvincible\b/ },
+    { name: 'Irradiated', text: 'When this character deals combat damage to an ally that doesn’t have Irradiated, that ally has Irradiated.', re: /\bIrradiated\b/ },
+    { name: 'Mend', text: 'Mend 1 means “At the start of your turn, this character may heal 1 damage from target hero or ally.”', re: /\bMend \d/ },
+    { name: 'Portal', text: 'Reveal the top three cards of your deck. You may put a revealed Demon ally with cost less than this card’s cost into play. Put the remaining cards on the bottom of your deck.', re: kwAt('Portal') },
+    { name: 'Preparation', text: 'On your first turn, you may play this card without paying its cost.', re: /\bPreparation\b/ },
+    { name: 'Resistance', text: 'Prevent all damage with that [type] (regardless of any other types it has) that this character would be dealt.', re: /\bResistance\b/ },
+    { name: 'Rift', text: 'As you play this card, choose a [Horde] or [Alliance] race. This card costs (1) less to play for each ally you control of the chosen race.', re: kwAt('Rift') },
+    { name: 'Sabotage', text: 'Such a character can propose either a sabotage combat against a non-friendly [thing] or a normal combat against a nonfriendly character. As a sabotage combat concludes, no combat damage is dealt. If a character protects during a sabotage combat, it stops being a sabotage.', re: /(?:^|<p> )Sabotage:/ },
+    { name: 'Sentinel', text: 'When this card exhausts for the first time each turn, ready it.', re: kwAt('Sentinel') },
+    { name: 'Shadowmeld', text: 'This card has Elusive and Untargetable while ready.', re: /\bShadowmeld\b/ },
+    { name: 'Smash', text: 'If this character would deal more than fatal combat damage to a defending ally, it deals exactly fatal damage to that ally, and the rest to that ally’s controller’s hero instead.', re: kwAt('Smash') },
+    { name: 'Stash', text: 'As this card enters your resource row from anywhere, if it would enter face down, you may have it enter face up, then immediately turn it face down instead. When you do, [text].', re: kwAt('Stash') },
+    { name: 'Thrown', text: 'When you strike with this weapon, your hero has Long-Range this combat. At the end of this turn, put this weapon from play into its owner\'s hand.', re: kwAt('Thrown') },
+    { name: 'Time is Money', text: 'This ally can use [Activate] powers from the turn it enters your party.', re: /\bTime is Money\b/ },
+    { name: 'Trap', text: 'You may exhaust a defending hero you control rather than pay this card’s cost.', re: kwAt('Trap') },
+    { name: 'War Stomp', text: 'When this card attacks or defends, you may exhaust target opposing hero or ally.', re: /\bWar Stomp\b/ },
+    { name: 'Warp', text: 'As this card is revealed from your deck, you may remove it from the game. If you do, you may play it immediately without paying its cost.', re: kwAt('Warp') },
+    { name: 'Will of the Forsaken', text: 'This card can\'t leave play unless it has fatal damage or 0 health.', re: /\bWill of the Forsaken\b/ }
+];
+// CR 202.1: Tag mit Zahl in Klammern auf der Typzeile (z. B. „Pet (1)“, „Trinket (2)“)
+const TAG_LIMIT_TEXT = 'If a tag is followed by a number in parentheses, any player controlling more than that number of cards in play with that tag is violating uniqueness.';
+// Keywords einer Karte: aus Typzeile und Text der Card Reference, dazu im Spiel verliehene (z. B. Ferocity durch Into the Fray)
+function cardKeywords(uid, cardId) {
+    const ocr = (typeof OCR !== 'undefined' && OCR[cardId]) || null;
+    const type = ocr ? ocr[0] : '', text = ocr ? ocr[1] : ((CARDS[cardId] && CARDS[cardId].text) || '');
+    const inst = G && uid ? findCharacter(G, uid) : null;
+    const list = KEYWORDS.filter(k => {
+        const src = k.on === 'type' ? type : k.on === 'both' ? type + ' <p> ' + text : text;
+        return k.re.test(src) || (k.flag && inst && inst[k.flag]);
+    });
+    for (const m of type.matchAll(/(?:—|, )([A-Z][^,—()]*?) \((\d+)\)/g))
+        list.push({ name: m[1] + ' (' + m[2] + ')', text: TAG_LIMIT_TEXT });
+    return list;
 }
 
 // ---------------------------------------------------------------- Ziel-/Angriffspfeil
@@ -443,6 +550,9 @@ function decorateInPlay(node, c) {
     // 3) Eigene Karten: Angriff und Kräfte
     if (mine && !pend) {
         const bar = document.createElement("div"); bar.className = "card-action-bar";
+        // Gelber Rand (wie spielbare Handkarten): Angriff mit Schaden oder bezahlbare Kraft möglich
+        const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true })) > 0;
+        if (canHit || usablePowers(c).length) node.classList.add('can-act');
         if (canMain() && isChar(c) && canAttackNow(G, c, G.p1)) {
             const b = document.createElement("button"); b.textContent = "⚔ Angriff"; b.style.background = "#ea580c";
             b.onclick = (e) => { e.stopPropagation(); UI.attacker = UI.attacker === uid ? null : uid; render(); };
@@ -475,6 +585,13 @@ function renderHeroCard(p, containerId) {
     box.appendChild(h);
 }
 
+// "Schläft": Ally ist erst in diesem Zug seines Controllers ins Spiel gekommen und kann noch nicht angreifen
+// (Ferocity ist sofort bereit). Nur im Zug des Controllers angezeigt, sonst wäre es irreführend.
+function isAsleep(ally, pid) {
+    if (!ally || ally.type !== 'Ally' || ally.isTotem || G.activePlayer !== pid) return false;
+    if (hasFerocity(G, ally)) return false;
+    return !(ally.joinedTurn !== undefined && ally.joinedTurn < turnStartOf(G, pid));
+}
 // Schlachtfeld-Reihe: Allies (inkl. Totems) und daneben Ausrüstung + laufende Fähigkeiten.
 // Eigene Reihe: Ausrüstung baut sich von rechts nach links auf; Gegner gespiegelt (von links).
 function renderBattlefield(p, containerId, isOpponent) {
@@ -486,6 +603,7 @@ function renderBattlefield(p, containerId, isOpponent) {
     p.allies.forEach(ally => {
         const slot = document.createElement("div"); slot.className = "bf-slot" + (ally.exhausted ? " ex" : "");
         const node = createCardDOM(ally, true);
+        if (isAsleep(ally, p.id)) node.classList.add('sleeping');
         decorateInPlay(node, ally);
         slot.appendChild(node); allyZone.appendChild(slot);
     });
@@ -532,7 +650,7 @@ function renderPlayerHand(p) {
             node.onclick = (e) => { e.stopPropagation(); chooseV(card.uid); };
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
-            if (playable) { node.querySelector('.card-visual').classList.add("can-play"); slot.classList.add("playable"); }
+            if (playable) { node.classList.add("can-act"); slot.classList.add("playable"); }
             node.draggable = true;
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });

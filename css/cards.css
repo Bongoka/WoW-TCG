@@ -50,6 +50,12 @@
 .cfx-foil.f9 { background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.8) 50%, transparent 60%); background-size: 200% 200%; background-position: var(--mx, 50%) var(--my, 50%); mix-blend-mode: overlay; }
 #cfx-preview { position: fixed; z-index: 999999; margin: 0; pointer-events: none; opacity: 0; transition: opacity .12s; display: none; cursor: default; }
 #cfx-preview.show { opacity: 1; }
+/* Keyword-Kästen neben der Zoom-Karte */
+#kw-boxes { position: fixed; z-index: 999999; width: 240px; display: none; flex-direction: column; gap: 8px; pointer-events: none; opacity: 0; transition: opacity .12s; }
+#kw-boxes.show { opacity: 1; }
+.kw-box { background: linear-gradient(180deg, #2a2118, #120d09); border: 2px solid var(--gold-dark, #8a6d2b); border-radius: 6px; padding: 8px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.75); }
+.kw-name { font: 900 14px/1.2 Georgia, serif; color: var(--gold-light, #f5d77a); margin-bottom: 4px; }
+.kw-text { font-size: 12.5px; line-height: 1.4; color: var(--text-main, #e8dcc8); font-style: italic; }
 #cfx-preview .cfx-stats-bar { display: none !important; }
 #cfx-preview .card-visual { box-shadow: 0 2.5cqw 9cqw rgba(0,0,0,.85); }
 #cfx-preview.card-wrapper.is-exhausted, #cfx-preview .cfx-rot { margin: 0; transform: none; }

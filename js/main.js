@@ -210,6 +210,7 @@ function updateCpuStatus(active, text = "") {
 
 function bootGame() {
     document.getElementById("btn-end-turn").onclick = endTurn;
+    document.getElementById("big-end-turn").onclick = endTurn;
     document.getElementById("btn-cancel-action").onclick = cancelAction;
     document.getElementById("btn-undo").onclick = undoLastAction;
     document.getElementById("btn-test-setup").onclick = loadQuickTest;

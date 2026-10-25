@@ -58,7 +58,8 @@
             face.appendChild(statsBar);
         }
         
-        const cands = (typeof getImageCandidates === 'function') ? getImageCandidates(card.id, opts.imageMode || 'ea') : [`AZEROTH-${card.id}-EA.png`];
+        // opts.imgSrc: fest vorgegebenes Bild (Bild-Test-Szene)
+        const cands = opts.imgSrc ? [opts.imgSrc] : (typeof getImageCandidates === 'function') ? getImageCandidates(card.id, opts.imageMode || 'ea') : [`AZEROTH-${card.id}-EA.png`];
         const imgKey = card.id + '|' + cands[0];
         const img = new Image();
         img.className = 'card-image-layer';
@@ -158,7 +159,30 @@
         const y = clamp(r.top + r.height / 2 - H / 2, 8, window.innerHeight - H - 8);
         pv.style.left = x + 'px';
         pv.style.top = y + 'px';
+        placeKeywords(x, y, W, x >= r.right);
     }
+    // Keyword-Kästen neben der Zoom-Karte (auf der vom Original abgewandten Seite, sonst auf der anderen)
+    function ensureKw() {
+        let k = document.getElementById('kw-boxes');
+        if (!k) { k = el('div'); k.id = 'kw-boxes'; document.body.appendChild(k); }
+        return k;
+    }
+    function fillKeywords(meta) {
+        const k = ensureKw();
+        const list = typeof cardKeywords === 'function' ? cardKeywords(meta.uid, meta.cardId) : [];
+        k.innerHTML = list.map(kw => `<div class="kw-box"><div class="kw-name">${escH(kw.name)}</div><div class="kw-text">${escH(kw.text)}</div></div>`).join('');
+        k.style.display = list.length ? 'flex' : 'none';
+    }
+    function placeKeywords(x, y, W, previewRightOfCard) {
+        const k = document.getElementById('kw-boxes'); if (!k || k.style.display === 'none') return;
+        const KW = 240, gap = 12;
+        let kx = previewRightOfCard ? x + W + gap : x - gap - KW;
+        if (kx + KW > window.innerWidth - 8) kx = x - gap - KW;
+        if (kx < 8) kx = x + W + gap;
+        k.style.left = clamp(kx, 8, window.innerWidth - KW - 8) + 'px';
+        k.style.top = y + 'px';
+    }
+    function hideKeywords() { const k = document.getElementById('kw-boxes'); if (k) k.classList.remove('show'); }
     function localPos(wrap, e) {
         const r = wrap.getBoundingClientRect();
         if (wrap.classList.contains('is-exhausted')) {
@@ -178,7 +202,7 @@
         s.setProperty('--h', L.h.toFixed(3));
     }
     function clearFx(node) { if (!node) return; node.classList.remove('cfx-live'); VARS.forEach(v => node.style.removeProperty(v)); }
-    function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } } }
+    function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; hideKeywords(); if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } } }
     function tick(now) {
         const L = S.live;
         if (!L) { S.raf = 0; return; }
@@ -189,7 +213,7 @@
         if (L.releasing && L.h < 0.01) { finish(L); S.raf = 0; return; }
         S.raf = requestAnimationFrame(tick);
     }
-    function release() { const L = S.live; if (!L || L.releasing) return; L.releasing = true; L.tx = 0.5; L.ty = 0.5; if (S.pv) S.pv.classList.remove('show'); }
+    function release() { const L = S.live; if (!L || L.releasing) return; L.releasing = true; L.tx = 0.5; L.ty = 0.5; hideKeywords(); if (S.pv) S.pv.classList.remove('show'); }
     function enter(wrap) {
         if (S.live) finish(S.live);
         const tilt = wrap.querySelector('.cfx-tilt');
@@ -214,9 +238,11 @@
         pv.style.display = 'block';
         const L = { wrap, tilt, clone, x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, h: 0, spin, seed: meta.seed, t0: performance.now(), releasing: false, lift: wrap.classList.contains('hand-card') ? 14 : 8 };
         S.live = L;
+        fillKeywords(meta);
         placePreview(L);
         void pv.offsetWidth;
         pv.classList.add('show');
+        const kw = document.getElementById('kw-boxes'); if (kw && kw.style.display !== 'none') kw.classList.add('show');
         if (typeof sfx !== 'undefined' && sfx && sfx.play) sfx.play('hover');
         if (!S.raf) S.raf = requestAnimationFrame(tick);
     }

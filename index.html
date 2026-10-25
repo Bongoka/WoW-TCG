@@ -24,6 +24,8 @@
     </div>
 
     <div id="battlefield-zone">
+        <div id="turn-indicator"><span></span></div>
+        <button id="big-end-turn">End Turn</button>
         <div id="top-allies" class="battlefield-row"><span class="row-watermark">Gegnerische Diener</span></div>
         <div id="bot-allies" class="battlefield-row"><span class="row-watermark">Deine Diener (Dropzone)</span></div>
     </div>
@@ -82,6 +84,7 @@
     <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
     <button id="btn-test-setup">⚡ Test-Setup</button>
     <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
+    <button id="btn-img-test" style="border-color:#0ea5e9; background:#0c4a6e; color:#e0f2fe;">🖼 Bild-Test (Ordner „test“)</button>
     <div style="border-top:1px solid var(--border);padding-top:6px;">
         <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
         <input type="text" id="cfg-img-path" value="AZEROTH-{id}-EA.png" style="width:100%;font-size:10px;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px 5px;border-radius:3px;">
@@ -124,6 +127,25 @@
     <p id="decision-text" style="font-size:14px;line-height:1.5;"></p>
     <div id="decision-actions" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;"></div>
 </div></div>
+
+<div id="imgtest-modal">
+    <div class="imgtest-head">
+        <h2 style="margin:0;color:var(--gold);">Bild-Test</h2>
+        <label class="imgtest-pick">📁 Ordner „test“ wählen<input type="file" id="imgtest-input" webkitdirectory multiple accept="image/*"></label>
+        <label style="font-size:12px;color:var(--text-dim);">Anzeigegröße:
+            <select id="imgtest-size">
+                <option value="var(--hand-w)">Hand</option>
+                <option value="var(--field-w)">Spielfeld</option>
+                <option value="250px">250 px</option>
+                <option value="350px" selected>350 px</option>
+                <option value="orig">Original (1:1)</option>
+            </select>
+        </label>
+        <span id="imgtest-count" style="font-size:12px;color:var(--text-dim);"></span>
+        <button id="imgtest-close" class="danger" style="margin-left:auto;">Schließen</button>
+    </div>
+    <div id="imgtest-grid"><div class="imgtest-empty">Wähle oben den Ordner „test“ aus – alle Bilder darin erscheinen hier als Karten (ohne Foil und Schaden).</div></div>
+</div>
 
 <div id="gameover">
     <div id="go-title"></div>

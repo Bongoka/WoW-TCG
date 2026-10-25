@@ -13,3 +13,7 @@ node_modules/
 
 # Lokale Claude-Einstellungen
 .claude/settings.local.json
+
+# Testbilder für die Bild-Test-Szene (bleiben lokal)
+test/*
+!test/.gitkeep

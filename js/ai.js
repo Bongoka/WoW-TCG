@@ -29,7 +29,10 @@ function evaluateState(s, pid) {
     if (ow) threat += weaponAtk(s, ow, { attacking: true });
     if (myHp <= threat) score -= 50;
     score += me.hand.length * 3.5 - opp.hand.length * 2.5;
-    score += me.resources.length * 1.5 + getReadyRes(me) * 0.2;
+    // Ressourcen sind bis 8 sehr wertvoll – jede verlorene kostet dauerhaft Tempo (z. B. Twig of the World Tree);
+    // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
+    const nRes = me.resources.length;
+    score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1 + getReadyRes(me) * 0.2;
     // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
     if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });

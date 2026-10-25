@@ -334,6 +334,12 @@ function runRuleTests() {
         const f = fastAiAction(s, 1);
         assert(!f || f.action.type !== 'ATTACK', 'Schnelle KI greift mit 0 ATK an');
     });
+    test(45, 'KI: zerstört keine eigene Ressource für einen billigeren Schlag (Twig of the World Tree)', () => {
+        const s = fresh('alliance_paladin', 'alliance_hunter'); s.real = false; res(s, 1, 4); put(s, 1, 338);
+        assert(getLegalActions(s, 1).some(x => x.type === 'ACTIVATE'), 'Testaufbau: Twig-Kraft nicht nutzbar');
+        for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
+            assert(!d || d.action.type !== 'ACTIVATE', 'KI zerstört eine eigene Ressource: ' + (d && d.action.desc));
+    });
     return results;
 }
 
