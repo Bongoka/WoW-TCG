@@ -10,6 +10,7 @@ const UI = {
     attacker: null, drag: null, busy: false, shownProtect: 0,
     handSeen: new Set(), handFly: new Map(),   // Handkarten, die schon gezeigt wurden / gerade anfliegen (uid -> Startzeit)
     oppSeen: new Set(), oppFly: new Map(),     // dasselbe für die Kartenrücken der CPU-Hand
+    resPrev: {}, overFor: null,                // letzter Ressourcen-Zustand je Spieler; Partie, deren Endbildschirm schon lief
     reset() { this.attacker = null; this.drag = null; }
 };
 
@@ -69,11 +70,14 @@ function renderResourceTray(player, containerId, isHuman) {
     const box = document.getElementById(containerId); if (!box) return; box.innerHTML = "";
     const activeRow = document.createElement("div"); activeRow.className = "active-quests-row";
     const miniRow = document.createElement("div"); miniRow.className = "mini-resources-row";
+    const shown = [];   // [Ressource, Element, drehendes Element] für die Animation
     player.resources.forEach((r, idx) => {
         if (r.faceUp) {
             const wrap = document.createElement("div");
             wrap.className = "quest-card-large" + (r.exhausted ? " exhausted" : "");
-            wrap.appendChild(createCardDOM(r.card, false));
+            const cardNode = createCardDOM(r.card, false);
+            wrap.appendChild(cardNode);
+            shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
             if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
                 wrap.classList.add("quest-ready");
                 wrap.title = "Klicken: Quest abschließen";
@@ -84,10 +88,12 @@ function renderResourceTray(player, containerId, isHuman) {
             const mini = document.createElement("div"); mini.className = "res-mini" + (r.exhausted ? " exhausted" : "");
             const back = document.createElement("div"); back.className = "card-back"; back.style.width = "100%"; back.style.height = "100%"; back.style.margin = "0";
             mini.appendChild(back); miniRow.appendChild(mini);
+            shown.push([r, mini, mini]);
         }
     });
     if (activeRow.children.length > 0) box.appendChild(activeRow);
     if (miniRow.children.length > 0) box.appendChild(miniRow);
+    animateResources(player, shown);
     if (isHuman) {
         // Drop-Ziel: Karte als Ressource legen (Quest offen, sonst verdeckt)
         box.ondragover = (e) => { if (UI.drag && UI.drag.kind === 'hand' && canMain() && !G.placedResource) { e.preventDefault(); box.classList.add('dropzone-active'); } };
@@ -98,6 +104,26 @@ function renderResourceTray(player, containerId, isHuman) {
             if (d && d.kind === 'hand') humanAct({ type: 'PLACE_RESOURCE', handIdx: d.idx, faceUp: d.card.type === 'Quest' });
         };
     }
+}
+
+// Ressourcen: neu gelegte fliegen von der Hand heran; beim Bezahlen kippen sie sichtbar zur Seite,
+// beim Bereitmachen richten sie sich mit einem goldenen Aufleuchten wieder auf.
+function animateResources(player, shown) {
+    const prev = UI.resPrev[player.id], next = {};
+    const handBox = document.getElementById(player.id === 1 ? "bot-hand" : "top-hand");
+    let k = 0;
+    for (const [r, el, rot] of shown) {
+        const uid = r.card.uid; next[uid] = r.exhausted;
+        if (!prev) continue;                                 // erstes Zeichnen: nichts animieren
+        if (!(uid in prev)) {
+            if (handBox) flyFrom(el, handBox.getBoundingClientRect(), { delay: 60 * k++ });
+        } else if (prev[uid] !== r.exhausted) {
+            const a = r.exhausted ? ['rotate(0deg)', 'rotate(90deg)'] : ['rotate(90deg)', 'rotate(0deg)'];
+            rot.animate([{ transform: a[0] }, { transform: a[1] }], { duration: 380, easing: 'cubic-bezier(.3,.7,.3,1.2)' });
+            if (!r.exhausted) el.animate([{ boxShadow: '0 0 0 rgba(250,204,21,0)' }, { boxShadow: '0 0 16px 4px rgba(250,204,21,.85)' }, { boxShadow: '0 0 0 rgba(250,204,21,0)' }], { duration: 700, delay: 120 });
+        }
+    }
+    UI.resPrev[player.id] = next;
 }
 
 // ---------------------------------------------------------------- Hauptzeichnen
@@ -151,6 +177,149 @@ function render() {
     renderPlayerHand(G.p1);
     renderPendingPanel();
     playFxEvents(prevRects);
+    syncAim();
+    checkGameOverScreen();
+}
+
+// ---------------------------------------------------------------- Ziel-/Angriffspfeil
+// Geschwungener Pfeil von der Quelle zum Mauszeiger (Angriff, Zielwahl, Ziehen) bzw. zwischen zwei Karten (CPU-Angriff)
+const AIM = { srcUid: null, drag: false, x: 0, y: 0 };
+function aimSvg() {
+    let svg = document.getElementById('aim-arrow');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.id = 'aim-arrow';
+        svg.innerHTML = `<defs><linearGradient id="aim-grad" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fde68a" stop-opacity=".25"/><stop offset="1" stop-color="#f97316"/></linearGradient>
+            <marker id="aim-head" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 L2.5,5 z" fill="#f97316"/></marker></defs>
+            <path class="aim-glow"/><path class="aim-line" marker-end="url(#aim-head)"/>`;
+        document.body.appendChild(svg);
+    }
+    return svg;
+}
+function drawArrow(r, x, y) {
+    const svg = aimSvg(); svg.style.display = 'block';
+    const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
+    const dist = Math.hypot(x - sx, y - sy);
+    const cx = (sx + x) / 2, cy = Math.min(sy, y) - Math.max(40, dist * 0.35);
+    const d = `M${sx},${sy} Q${cx},${cy} ${x},${y}`;
+    svg.querySelector('.aim-line').setAttribute('d', d); svg.querySelector('.aim-glow').setAttribute('d', d);
+    const g = svg.querySelector('#aim-grad'); g.setAttribute('x1', sx); g.setAttribute('y1', sy); g.setAttribute('x2', x); g.setAttribute('y2', y);
+}
+function hideArrow() { const svg = document.getElementById('aim-arrow'); if (svg) svg.style.display = 'none'; }
+function updateAim() {
+    if (!AIM.srcUid) { hideArrow(); return; }
+    const n = document.querySelector(`#arena [data-uid="${AIM.srcUid}"]`);
+    if (!n) { hideArrow(); return; }
+    drawArrow(n.getBoundingClientRect(), AIM.x, AIM.y);
+}
+function startDragAim(uid, e) { AIM.srcUid = uid; AIM.drag = true; if (e) { AIM.x = e.clientX; AIM.y = e.clientY; } }
+function stopDragAim() { if (AIM.drag) { AIM.drag = false; AIM.srcUid = null; hideArrow(); } }
+// Nach jedem Zeichnen: Pfeil für "Angreifer gewählt" oder offene Zielwahl (Quelle = Kraft-Quelle bzw. eigener Held)
+function syncAim() {
+    if (AIM.drag) { updateAim(); return; }
+    const d = myPending('choose');
+    let src = null;
+    if (UI.attacker) src = UI.attacker;
+    else if (d && d.target && G.chainPrep) src = G.chainPrep.kind === 'power' ? G.chainPrep.src : G.p1.hero.uid;
+    AIM.srcUid = src;
+    updateAim();
+}
+document.addEventListener('mousemove', (e) => { AIM.x = e.clientX; AIM.y = e.clientY; if (AIM.srcUid) updateAim(); });
+document.addEventListener('dragover', (e) => { if (!AIM.drag) return; AIM.x = e.clientX; AIM.y = e.clientY; updateAim(); });
+// CPU-Angriff: Pfeil kurz vom Angreifer zum Ziel zeigen
+function flashArrow(attUid, defUid, ms = 650) {
+    const a = document.querySelector(`#arena [data-uid="${attUid}"]`), d = document.querySelector(`#arena [data-uid="${defUid}"]`);
+    if (!a || !d || AIM.srcUid) return Promise.resolve();
+    const dr = d.getBoundingClientRect();
+    drawArrow(a.getBoundingClientRect(), dr.left + dr.width / 2, dr.top + dr.height / 2);
+    return sleep(ms).then(() => { if (!AIM.srcUid) hideArrow(); });
+}
+
+// ---------------------------------------------------------------- Bildschirmwackeln
+function screenShake(strength = 1) {
+    const a = document.getElementById('arena'); if (!a) return;
+    const k = 7 * strength;
+    a.animate([
+        { transform: 'translate(0,0)' }, { transform: `translate(${-k}px, ${k * 0.6}px) rotate(-.3deg)` }, { transform: `translate(${k}px, ${-k * 0.4}px) rotate(.3deg)` },
+        { transform: `translate(${-k * 0.6}px, ${-k * 0.5}px)` }, { transform: `translate(${k * 0.4}px, ${k * 0.3}px)` }, { transform: 'translate(0,0)' }
+    ], { duration: 420, easing: 'ease-out' });
+}
+
+// ---------------------------------------------------------------- CPU spielt eine Karte: groß in der Mitte zeigen
+async function showcaseCpuCard(card, handIdx) {
+    const th = document.getElementById('top-hand');
+    const slot = th && th.children[handIdx];
+    const from = slot ? slot.getBoundingClientRect() : { left: window.innerWidth / 2 - 50, top: -160, width: 100, height: 140 };
+    if (slot) slot.style.visibility = 'hidden';
+    const w = Math.round(Math.min(300, window.innerHeight * 0.46 / 1.4));
+    const ghost = document.createElement('div'); ghost.className = 'fx-showcase';
+    ghost.style.width = w + 'px'; ghost.style.left = (window.innerWidth / 2 - w / 2) + 'px'; ghost.style.top = (window.innerHeight * 0.44 - w * 0.7) + 'px';
+    const node = createCardDOM({ ...card, exhausted: false }, false); node.classList.add('no-fx'); node.style.setProperty('--cw', w + 'px');
+    ghost.appendChild(node); document.body.appendChild(ghost);
+    const gr = ghost.getBoundingClientRect();
+    const dx = from.left + from.width / 2 - (gr.left + gr.width / 2), dy = from.top + from.height / 2 - (gr.top + gr.height / 2);
+    if (typeof sfx !== 'undefined') sfx.play('play');
+    await ghost.animate([
+        { transform: `translate(${dx}px, ${dy}px) scale(${Math.max(0.2, from.width / gr.width)}) rotateY(90deg)`, opacity: 0.3 },
+        { transform: 'translate(0,0) scale(1.06) rotateY(0deg)', opacity: 1, offset: 0.75 },
+        { transform: 'none', opacity: 1 }
+    ], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' }).finished;
+    return ghost;
+}
+// Danach fliegt sie an ihren Platz (Spielfeld) bzw. verblasst auf der Kette / im Friedhof
+async function landShowcase(ghost, uid) {
+    if (!ghost) return;
+    const target = uid && document.querySelector(`#arena [data-uid="${uid}"]`);
+    const gr = ghost.getBoundingClientRect();
+    if (target) {
+        target.style.opacity = '0';
+        const r = target.getBoundingClientRect();
+        const dx = r.left + r.width / 2 - (gr.left + gr.width / 2), dy = r.top + r.height / 2 - (gr.top + gr.height / 2);
+        await ghost.animate([{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${r.width / gr.width})` }],
+            { duration: 420, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' }).finished;
+        target.style.opacity = '';
+    } else {
+        await ghost.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: 350, fill: 'forwards' }).finished;
+    }
+    ghost.remove();
+}
+
+// ---------------------------------------------------------------- Spielende: Siegbildschirm mit der besten Karte
+// Beste Karte = meister Wert in dieser Partie (Schaden + Heilung + 2 + Kosten je besiegtem gegnerischen Ally)
+function bestCardOf(pid) {
+    const vals = Object.values(G.vals || {}).filter(v => v.pid === pid && v.v > 0).sort((a, b) => b.v - a.v);
+    return vals.find(v => CARDS[v.id] && CARDS[v.id].type !== 'Hero') || vals[0] || null;
+}
+function showGameOver() {
+    const ov = document.getElementById('gameover'); if (!ov || !G) return;
+    const won = G.winner === 1, draw = !G.winner;
+    const title = document.getElementById('go-title');
+    title.textContent = draw ? 'UNENTSCHIEDEN' : (won ? 'SIEG!' : 'NIEDERLAGE');
+    title.className = draw ? '' : (won ? 'win' : 'lose');
+    const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
+    document.getElementById('go-sub').textContent = draw ? 'Beide Helden sind gefallen.' : `${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
+    const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
+    box.innerHTML = ''; cap.textContent = '';
+    const best = draw ? null : bestCardOf(G.winner);
+    if (best) {
+        const n = createCardDOM({ ...CARDS[best.id], uid: 'go_' + best.uid }, false);
+        n.classList.add('no-fx'); box.appendChild(n);
+        const parts = [];
+        if (best.dmg) parts.push(`${best.dmg} Schaden`);
+        if (best.heal) parts.push(`${best.heal} Heilung`);
+        if (best.kills) parts.push(`${best.kills} ${best.kills === 1 ? 'Ally besiegt' : 'Allies besiegt'}`);
+        cap.innerHTML = `<div class="go-best">Beste Karte von ${esc(winner.hero.name)}</div><div class="go-name">${esc(best.name)}</div><div class="go-stats">${esc(parts.join(' · '))}</div>`;
+    }
+    ov.style.display = 'flex';
+    ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+    if (best) box.animate([{ transform: 'rotate(-7deg) scale(.3) translateY(200px)', opacity: 0 }, { transform: 'rotate(-7deg) scale(1.08)', opacity: 1, offset: .7 }, { transform: 'rotate(-7deg) scale(1)', opacity: 1 }],
+        { duration: 900, delay: 250, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    if (won) screenShake(0.6);
+}
+function hideGameOver() { const ov = document.getElementById('gameover'); if (ov) ov.style.display = 'none'; }
+function checkGameOverScreen() {
+    if (!G || !G.gameOver || !G.real || UI.overFor === G) return;
+    UI.overFor = G;
+    setTimeout(showGameOver, 1500);
 }
 
 // ---------------------------------------------------------------- Schadenszahlen, Treffer-Effekte, Tod
@@ -224,6 +393,7 @@ function playFxEvents(prevRects) {
     G.fxq = [];
     let k = 0;
     for (const e of evs) {
+        if (e.t === 'play') { if (e.pid === 1 && e.cost >= 7) screenShake(1.2); continue; }   // CPU-Karten wackeln beim Landen (landShowcase)
         const node = document.querySelector(`#arena [data-uid="${e.uid}"]`);
         const r = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
         if (!r || !r.width) continue;
@@ -233,6 +403,7 @@ function playFxEvents(prevRects) {
             burstParticles(r, st.c, 18, delay);
             floatNumber(r, `−${e.amt}`, '#ef4444', st.icon, delay);
             if (node) hitFlash(node, st.c[1], delay);
+            if (e.hero && e.amt >= 5) setTimeout(() => screenShake(Math.min(2, e.amt / 5)), delay);
         } else if (e.t === 'heal') {
             burstParticles(r, HEAL_STYLE.c, 14, delay, true);
             floatNumber(r, `+${e.amt}`, '#4ade80', HEAL_STYLE.icon, delay);
@@ -257,7 +428,7 @@ function decorateInPlay(node, c) {
         node.onclick = (e) => { e.stopPropagation(); chooseV(uid); };
         if (pend.protect) {
             node.draggable = true;
-            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'protect', uid }; e.dataTransfer.setData('text/plain', uid); markDropTargets(); });
+            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'protect', uid }; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { UI.drag = null; clearDragHighlights(); });
         }
     }
@@ -277,7 +448,7 @@ function decorateInPlay(node, c) {
             b.onclick = (e) => { e.stopPropagation(); UI.attacker = UI.attacker === uid ? null : uid; render(); };
             bar.appendChild(b);
             node.draggable = true;
-            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'attack', uid }; e.dataTransfer.setData('text/plain', uid); markDropTargets(); });
+            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'attack', uid }; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { UI.drag = null; clearDragHighlights(); });
         }
         usablePowers(c).forEach(pw => {
@@ -363,7 +534,7 @@ function renderPlayerHand(p) {
             const playable = handPlayable(card);
             if (playable) { node.querySelector('.card-visual').classList.add("can-play"); slot.classList.add("playable"); }
             node.draggable = true;
-            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); markDropTargets(); });
+            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });
             node.addEventListener('click', (e) => { if (e.target.closest('button')) return; openHandCardMenu(idx); });
             const bar = document.createElement("div"); bar.className = "card-action-bar";
@@ -655,7 +826,11 @@ function markDropTargets() {
     }
     document.querySelectorAll("#arena [data-uid]").forEach(el => { if (dropAllowedOn(el.dataset.uid)) el.classList.add("target-drop-valid"); });
 }
+// Beim Angreifen/Schützen ersetzt der Pfeil das Ziehbild
+const _noDragImg = new Image(); _noDragImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+function hideDragImage(e) { try { e.dataTransfer.setDragImage(_noDragImg, 0, 0); } catch (err) {} }
 function clearDragHighlights() {
+    stopDragAim();
     document.querySelectorAll(".dropzone-active").forEach(el => el.classList.remove("dropzone-active"));
     document.querySelectorAll(".target-drop-valid").forEach(el => el.classList.remove("target-drop-valid"));
 }

@@ -256,6 +256,26 @@ function exhaust(s, c) {
 function readyCard(s, c) { if (c && c.exhausted) { c.exhausted = false; evt(s, 'readied', { uid: c.uid }); } }
 // Anzeige-Ereignisse für die Oberfläche (Schadenszahlen, Tod) – nur in echten Partien, ohne Einfluss auf die Regeln
 function fxEvent(s, e) { if (isReal(s)) (s.fxq || (s.fxq = [])).push(e); }
+// Wert je Karte für den Siegbildschirm (nur echte Partien): Schaden, Heilung, besiegte gegnerische Allies.
+// Schaden/Heilung "durch den Helden" aus einer gerade aufgelösten Fähigkeit zählt für diese Fähigkeit,
+// Kampfschaden mit Waffe für die Waffe.
+function valueCredit(s, srcUid, combat, weaponUid) {
+    if (combat && weaponUid) return weaponUid;
+    const src = srcUid ? findCharacter(s, srcUid) : null;
+    if (src && src.type === 'Hero' && !combat && s.lastCard) {
+        const lc = findCharacter(s, s.lastCard);
+        if (lc && ctrlOf(s, lc) === ctrlOf(s, src)) return s.lastCard;
+    }
+    return srcUid || null;
+}
+function addValue(s, uid, kind, n, val = n, victimPid = null) {
+    if (!isReal(s) || !uid || !(n > 0)) return;
+    const c = findCharacter(s, uid); if (!c) return;
+    const pid = ctrlOf(s, c);
+    if (victimPid && victimPid === pid) return;
+    const v = (s.vals || (s.vals = {}))[uid] || (s.vals[uid] = { uid, id: c.id, name: c.name, pid, dmg: 0, heal: 0, kills: 0, v: 0 });
+    v[kind] += n; v.v += val;
+}
 function heal(s, healerUid, tgtUid, amt) {
     const t = findCharacter(s, tgtUid); if (!t || !isChar(t) || !isInPlayZone((locate(s, tgtUid) || {}).zone)) return 0;
     if (hasTM(s, t, 'noHeal')) return 0;                                                  // Mortal Strike
@@ -263,7 +283,7 @@ function heal(s, healerUid, tgtUid, amt) {
     if (healer && healer.type === 'Hero' && amt !== 'all') amt += countCtrl(s, ctrlOf(s, healer), 294); // Hide of the Wild
     const v = amt === 'all' ? (t.damage || 0) : Math.min(t.damage || 0, Math.max(0, amt));
     t.damage -= v;
-    if (v > 0) { L(s, `💚 ${t.name} wird um ${v} geheilt.`, "log-heal"); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); }
+    if (v > 0) { L(s, `💚 ${t.name} wird um ${v} geheilt.`, "log-heal"); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); addValue(s, valueCredit(s, healerUid, false), 'heal', v); }
     return v;
 }
 function putDamage(s, c, n) { if (c && n > 0) { c.damage = (c.damage || 0) + n; } }
@@ -289,7 +309,6 @@ function lose(s, pid, why) {
     s.gameOver = true; s.winner = pid === 1 ? 2 : 1;
     const p = getPlayer(s, pid);
     L(s, `☠ ${why || ''} ${p.hero.name} verliert!`, "log-hit");
-    if (isReal(s)) setTimeout(() => alert(`SPIEL BEENDET!\n${s.winner === 1 ? 'Du gewinnst!' : 'Die CPU gewinnt!'}`), 50);
 }
 function shuffleInPlace(p) { p.deck = shuffleDeck(p.deck); }
 
@@ -326,7 +345,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     return true;
 }
 function resetInst(c) {
-    c.damage = 0; c.exhausted = false; c.tm = []; c.counters = {}; delete c.attachedTo; delete c.joinedTurn;
+    c.damage = 0; c.exhausted = false; c.tm = []; c.counters = {}; delete c.attachedTo; delete c.joinedTurn; delete c.lastHitBy;
     delete c.isTotemInPlay;
     if (c.b) { c.atk = c.b.atk; c.hp = c.b.hp; c.def = c.b.def; }
 }
@@ -336,6 +355,7 @@ function destroy(s, c, info = {}) {
     if (isAllyLike(c) && hasTM(s, c, 'indestructible')) { L(s, `${c.name} kann in diesem Zug nicht zerstört werden.`); return false; } // Noggenfogger
     if (c.type === 'Hero') return false;
     L(s, `💀 ${c.name} wird zerstört.`, "log-hit");
+    if (isAllyLike(c)) addValue(s, s.lastCard, 'kills', 1, 2 + (c.cost || 0), l.pid);
     return leavePlay(s, c, 'graveyard', { ...info, destroyed: true });
 }
 function removeFromGame(s, c) { return leavePlay(s, c, 'removed', { destroyed: false }); }
@@ -471,7 +491,7 @@ function stateBased(s) {
     let changed = false;
     for (const p of [s.p1, s.p2]) {
         const dead = p.allies.filter(a => (a.damage || 0) >= hpOf(s, a));
-        for (const a of dead) { L(s, `💀 ${a.name} erliegt seinen Wunden.`, "log-hit"); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
+        for (const a of dead) { L(s, `💀 ${a.name} erliegt seinen Wunden.`, "log-hit"); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
     const heroDead = [s.p1, s.p2].filter(p => p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)));
@@ -908,6 +928,7 @@ function finishPrep(s) {
         s.chain.push(it);
         L(s, `▶ [${p.hero.name}] spielt ${it.card.name}${it.x !== undefined && it.x !== null ? ` (X=${it.x})` : ''}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
+        fxEvent(s, { t: 'play', uid: it.card.uid, pid: p.id, cost: it.card.cost || 0 });
         statPlayed(s, p.id, it.card.id);
         evt(s, 'cardPlayed', { pid: p.id, card: it.card });
     } else {
@@ -924,6 +945,7 @@ EK.finishPrep = (s) => finishPrep(s);
 function resolveTop(s) {
     const it = s.chain.pop(); if (!it) return;
     const p = getPlayer(s, it.pl);
+    s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
     if (it.kind === 'trigger') {
         if (it.interrupted) { L(s, `✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         it.steps.forEach(st => q(s, st));
@@ -1246,7 +1268,8 @@ function dmgApply(s, st) {
         t.dmgTurn = s.turn;
         L(s, `💥 ${t.name} erhält ${amt} ${st.dt ? dtName(st.dt) + '-' : ''}Schaden${st.src ? ' von ' + nameOf(s, st.src) : ''}.`, "log-hit");
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('hit');
-        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat });
+        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero' });
+        if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; }
         const src = st.src ? findCharacter(s, st.src) : null;
         if (src && src.type === 'Hero' && st.dt === 'Fire') addPE(s, ctrlOf(s, src), { k: 'heroFire' });   // Eye of Flame
         if (t.type === 'Hero' && src && src.type === 'Ally' && ctrlOf(s, src) !== tl.pid) addPE(s, ctrlOf(s, src), { k: 'allyHitHero' }); // Torek's Assault

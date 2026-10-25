@@ -91,6 +91,7 @@ function pickDeck(key) {
     }
     return d;
 }
+let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
 function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     UNDO.stack = [];
     const keys = GAME_DECKS.map(d => d.id);
@@ -98,6 +99,8 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     let oKey = seedOppDeck || keys[Math.floor(Math.random() * keys.length)];
     if (oKey === pKey && keys.length > 1 && !seedOppDeck) oKey = keys[(keys.indexOf(pKey) + 1) % keys.length];
     const pDeck = pickDeck(pKey) || GAME_DECKS[0], oDeck = pickDeck(oKey) || GAME_DECKS[1];
+    _lastDecks = [pDeck.id, oDeck.id];
+    hideGameOver();
     G = newGameState(pDeck.hero, pDeck.cards, oDeck.hero, oDeck.cards);
     G.real = true; G.humans = [1];
     UI.reset();
@@ -174,12 +177,17 @@ async function driveCpu() {
             const played = dec.action.type === 'PLAY_CARD' ? G.p2.hand[dec.action.handIdx] : null;
             if (dec.action.type === 'ATTACK') cpuSay('attack', 0.35);
             else if (played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
-            await sleep(500);
-            if (dec.action.type === 'ATTACK') await animateAttack(dec.action.attackerUid, dec.action.defenderUid);
+            // Gespielte Karte groß in der Mitte zeigen, Angriffe mit Pfeil ankündigen
+            let show = null;
+            if (played) { show = await showcaseCpuCard(played, dec.action.handIdx); await sleep(950); }
+            else await sleep(500);
+            if (dec.action.type === 'ATTACK') { await flashArrow(dec.action.attackerUid, dec.action.defenderUid); await animateAttack(dec.action.attackerUid, dec.action.defenderUid); }
             const dmgBefore = G.p2.hero.damage;
             applyAction(G, dec.action, false, 2);
             steps++;
-            render(); playEventAnimations();
+            render();
+            if (show) { await landShowcase(show, played.uid); if ((played.cost || 0) >= 7) screenShake(1.2); }
+            playEventAnimations();
             cpuReact(dmgBefore);
             await sleep(350);
         }
@@ -237,6 +245,9 @@ function bootGame() {
         _cfgImgPath = imgPathInput.value.trim() || "AZEROTH-{id}-EA.png";
         imgPathInput.onchange = (e) => { _cfgImgPath = e.target.value.trim() || "AZEROTH-{id}-EA.png"; render(); };
     }
+    document.getElementById("go-again").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(..._lastDecks); };
+    document.getElementById("go-new").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(); };
+    document.getElementById("go-close").onclick = hideGameOver;
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
     document.getElementById("btn-sound").onclick = (e) => {

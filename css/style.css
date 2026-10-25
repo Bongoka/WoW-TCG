@@ -279,6 +279,32 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .fx-ghost { position: fixed; z-index: 9700; pointer-events: none; }
 .fx-ghost .card-wrapper { width: 100%; }
 
+/* ===== Ziel-/Angriffspfeil ===== */
+#aim-arrow { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9900; pointer-events: none; display: none; overflow: visible; }
+#aim-arrow .aim-line { fill: none; stroke: url(#aim-grad); stroke-width: 9; stroke-linecap: round; stroke-dasharray: 18 10; animation: aimDash .6s linear infinite; }
+#aim-arrow .aim-glow { fill: none; stroke: rgba(249,115,22,.35); stroke-width: 20; stroke-linecap: round; filter: blur(4px); }
+@keyframes aimDash { to { stroke-dashoffset: -28; } }
+
+/* ===== CPU-Karte groß in der Mitte ===== */
+.fx-showcase { position: fixed; z-index: 9750; pointer-events: none; perspective: 900px; filter: drop-shadow(0 18px 40px rgba(0,0,0,.85)) drop-shadow(0 0 24px rgba(201,168,76,.45)); }
+.fx-showcase .card-wrapper { width: 100%; }
+
+/* ===== Siegbildschirm ===== */
+#gameover { position: fixed; inset: 0; z-index: 100500; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2vh;
+    background: radial-gradient(ellipse at center, rgba(40,30,18,.94) 0%, rgba(5,3,2,.97) 70%); }
+#go-title { font: 900 clamp(48px, 9vw, 110px)/1 Georgia, serif; letter-spacing: 6px; color: var(--gold-light); text-shadow: 0 0 30px rgba(201,168,76,.7), 0 6px 0 #3b2a10; }
+#go-title.win { color: #fde68a; } #go-title.lose { color: #fca5a5; text-shadow: 0 0 30px rgba(239,68,68,.6), 0 6px 0 #3b1010; }
+#go-sub { color: var(--text-main); font-size: 17px; }
+#go-main { display: flex; align-items: center; gap: 4vw; margin: 2vh 0; }
+#go-card { transform: rotate(-7deg); filter: drop-shadow(0 0 30px rgba(250,204,21,.55)) drop-shadow(0 20px 40px rgba(0,0,0,.9)); }
+#go-card .card-wrapper { --cw: min(300px, 26vw, 34vh); }
+#go-caption { max-width: 300px; }
+.go-best { color: var(--text-dim); font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+.go-name { color: var(--gold-light); font: 900 30px/1.2 Georgia, serif; margin: 6px 0 10px; }
+.go-stats { color: #fca5a5; font-size: 16px; font-weight: bold; }
+#go-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#go-buttons button { padding: 10px 22px; font-size: 15px; }
+
 /* ===== Sprechblase der CPU ===== */
 .cpu-bubble { position: fixed; z-index: 9400; max-width: 260px; padding: 10px 14px; border-radius: 14px; pointer-events: none;
     background: #f5ecd7; color: #2a1d10; font: italic bold 14px/1.35 Georgia, serif; border: 2px solid var(--gold-dark);
