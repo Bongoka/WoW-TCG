@@ -84,6 +84,14 @@ function toggleMulliganMode() {
     try { localStorage.setItem(MULLIGAN_KEY, mulliganMode() === 'hs' ? 'standard' : 'hs'); } catch (e) {}
     updateMulliganButton();
 }
+function updateRulesTextButton() {
+    const b = document.getElementById("btn-rules-text");
+    if (b) b.textContent = rulesTextMode() === 'expert' ? "📜 Regeltexte: Expert" : "💬 Regeltexte: Casual";
+}
+function toggleRulesTextMode() {
+    try { localStorage.setItem(RULES_TEXT_KEY, rulesTextMode() === 'expert' ? 'casual' : 'expert'); } catch (e) {}
+    updateRulesTextButton();
+}
 function pickDeck(key) {
     let d = GAME_DECKS.find(x => x.id === key);
     if (!d && key && String(key).startsWith('custom_')) {
@@ -251,6 +259,8 @@ function bootGame() {
     document.getElementById("go-close").onclick = hideGameOver;
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
+    document.getElementById("btn-rules-text").onclick = toggleRulesTextMode;
+    updateRulesTextButton();
     document.getElementById("btn-sound").onclick = (e) => {
         sfx.muted = !sfx.muted;
         e.target.textContent = sfx.muted ? "🔇 Sound Aus" : "🔊 Sound An";

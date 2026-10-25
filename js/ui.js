@@ -210,67 +210,68 @@ function nothingLeftToDo() {
 }
 
 // ---------------------------------------------------------------- Keyword-Erklärungen (Hover-Zoom)
-// Texte wörtlich aus dem Glossar der Comprehensive Rules v7.4 (docs/wow_cr_v7.4.txt); bei „It means …“ nur die Bedeutung.
+// easy: kurze, einfache Fassung für den Casual-Modus (eigene Formulierung, keine Regelquelle).
+// text: wörtlich aus dem Glossar der Comprehensive Rules v7.4 (docs/wow_cr_v7.4.txt); bei „It means …“ nur die Bedeutung.
 // on: wo gesucht wird – 'text' (Regeltext, Standard), 'type' (Typzeile) oder 'both'.
 // Mehrdeutige Wörter (z. B. „Dark Portal“, „Warp Stalker“, „Trap cards“) zählen nur an Keyword-Position: KWPOS.
 const KWPOS = "(?:^|<p> |\\(|, |has |have |gains? |and )";
 const kwAt = w => new RegExp(KWPOS + w + "(?![\\w'-]| of\\b)");
 const KEYWORDS = [
-    { name: 'Ferocity', text: "This ally can be proposed as an attacker regardless of how long it’s been under your control. However, the activated powers of an ally with ferocity can’t be used unless that card has been in its current party continuously since the start of its controller’s most recent turn, as normal.", re: /\bFerocity\b/, flag: 'ferocity' },
-    { name: 'Elusive', text: 'This card can’t be proposed as a defender.', re: /\bElusive\b/, flag: 'elusive' },
-    { name: 'Protector', text: 'This character can protect. To protect with a character, exhaust it at the protect point of a combat step.', re: /\bProtector\b/, flag: 'protector' },
-    { name: 'Long-Range', text: 'While this character is attacking, defenders can’t deal combat damage. This is different from the ranged damage type. A character has long-range while associated with a weapon that has Long-Range.', re: /\bLong-Range\b/ },
-    { name: 'Stealth', text: 'While this character is attacking, characters can’t protect. A character has Stealth while associated with a weapon that has Stealth.', re: /\bStealth\b/, flag: 'stealth' },
-    { name: 'Untargetable', text: 'This card can’t be targeted. Such cards are untargetable only while in play. A target is illegal if it becomes untargetable.', re: /\bUntargetable\b/ },
-    { name: 'Spellshield', text: 'This card can’t be targeted by opponents. Such cards can’t be targeted by opponents only while in play.', re: /\bSpellshield\b/ },
-    { name: 'Finishing Move', text: 'As an additional cost to play, remove X [description] cards in your graveyard from the game, where X is 5 or less. If no [description] is specified, the default is “Combo.”', re: /\bFinishing Move\b/ },
-    { name: 'Bear Form', text: 'Your hero has both Protector and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bBear Form\b/, on: 'both' },
-    { name: 'Cat Form', text: 'Your hero has both “+1 ATK while attacking” and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bCat Form\b/, on: 'both' },
-    { name: 'Totem', text: 'Each Totem has an ATK and health value. Totems can’t be proposed as attackers. Totems are ability allies and count as both in all zones.', re: /\bTotem\b/, on: 'type' },
-    { name: 'Ongoing', text: 'An ongoing ability enters play as it resolves; a non-ongoing ability enters its owner’s graveyard as it resolves. An ongoing ability that loses its powers remains ongoing.', re: /(?:^|<p> )Ongoing:/ },
-    { name: 'Instant', text: 'A player can play an instant card any time he has priority. A player can play a non-instant card only during his non-combat action phase while the chain is empty and he has priority.', re: /\bInstant\b/, on: 'type' },
-    { name: 'Unique', text: 'Any time a player controls two or more unique cards in play with the same name, those cards are violating uniqueness.', re: /\bUnique\b/, on: 'type' },
-    { name: 'Flip', text: 'To flip a face-up hero, turn it face down, and vice versa. If a hero was ready before it flipped, it stays ready. If a hero was exhausted before it flipped, it stays exhausted.', re: /\bFlip\b/ },
-    { name: 'Aberration', text: 'Prevent all non-combat damage that would be dealt to this character.', re: /\bAberration\b/ },
-    { name: 'Absorb', text: 'When this character deals combat damage to a hero, it heals that much damage from your hero.', re: kwAt('Absorb') },
-    { name: 'Arcane Torrent', text: 'When this card enters play, target opposing card in play loses and can\'t have powers this turn.', re: /\bArcane Torrent\b/ },
-    { name: 'Artifact', text: 'You may play this card from your graveyard.', re: kwAt('Artifact') },
-    { name: 'Assault', text: 'Assault 1 means “This card has +1 ATK on your turn.”', re: /\bAssault \d/ },
-    { name: 'Berserking', text: 'This character has +1 ATK for each damage on it.', re: /\bBerserking\b/ },
-    { name: 'Conspicuous', text: 'Opposing heroes and allies can protect against this character.', re: /\bConspicuous\b/ },
-    { name: 'Death Rattle', text: 'When this card enters a graveyard from anywhere, [triggered effect]. A card’s Death Rattle power is active only while that card is in a graveyard and that power hasn’t been lost.', re: /\bDeath Rattle\b/ },
-    { name: 'Delve', text: 'Look at the top two cards of your deck. Put any number of them on top of your deck in any order, and the rest on the bottom.', re: kwAt('Delve') },
-    { name: 'Diplomacy', text: 'You pay (1) less to play [description] allies, to a minimum of (1).', re: /\bDiplomacy\b/ },
-    { name: 'Dual Shield', text: 'The controller of a hero with dual shield can have two Shields without violating uniqueness. Adding a Melee weapon or another Off-Hand equipment causes a uniqueness violation.', re: /\bDual Shield\b/i },
-    { name: 'Dual Wield', text: 'The controller of a hero with dual wield or Two-Handed dual wield can have certain combinations of equipment that would normally violate uniqueness without violating uniqueness, and strike with two Melee weapons per combat.', re: /\bDual Wield\b/i },
-    { name: 'Echo', text: 'When you play this ability, if you control two or more allies that share a [Horde] or [Alliance] race, copy this ability.', re: kwAt('Echo') },
-    { name: 'Enrage', text: 'As this card enters play, you may reveal the top card of your deck. One or more powers may be triggered based off the card you reveal this way.', re: kwAt('Enrage') },
-    { name: 'Escape Artist', text: 'When this card becomes targeted by an opposing link, you may put it into its owner\'s hand.', re: /\bEscape Artist\b/ },
-    { name: 'Eternal', text: 'When this card enters your graveyard from anywhere, you may shuffle it into your deck.', re: kwAt('Eternal') },
-    { name: 'Find Treasure', text: 'When this card enters play, you may draw a card. If you do, discard a card.', re: /\bFind Treasure\b/ },
-    { name: 'Hardiness', text: 'If this character would be dealt damage, prevent 1 of it.', re: /\bHardiness\b/ },
-    { name: 'Harmonize', text: 'You pay (1) less to play allies with printed cost 4 or more.', re: /\bHarmonize\b/ },
-    { name: 'Haste', text: 'Haste 1 means “You pay (1) less to play this card if an ally you controlled dealt damage to an opposing hero this turn.”', re: /\bHaste \d/ },
-    { name: 'Inspire', text: 'As each other player’s ready step starts, you may ready (an) exhausted [card(s)] in play you control. This doesn’t use the chain.', re: /(?:^|<p> )Inspire:/ },
-    { name: 'Inspiring Presence', text: 'If a hero or ally you control would deal non-combat damage, it deals that much +1 instead.', re: /\bInspiring Presence\b/ },
-    { name: 'Invincible', text: 'This card can\'t leave play, be targeted, or be dealt damage.', re: /\bInvincible\b/ },
-    { name: 'Irradiated', text: 'When this character deals combat damage to an ally that doesn’t have Irradiated, that ally has Irradiated.', re: /\bIrradiated\b/ },
-    { name: 'Mend', text: 'Mend 1 means “At the start of your turn, this character may heal 1 damage from target hero or ally.”', re: /\bMend \d/ },
-    { name: 'Portal', text: 'Reveal the top three cards of your deck. You may put a revealed Demon ally with cost less than this card’s cost into play. Put the remaining cards on the bottom of your deck.', re: kwAt('Portal') },
-    { name: 'Preparation', text: 'On your first turn, you may play this card without paying its cost.', re: /\bPreparation\b/ },
-    { name: 'Resistance', text: 'Prevent all damage with that [type] (regardless of any other types it has) that this character would be dealt.', re: /\bResistance\b/ },
-    { name: 'Rift', text: 'As you play this card, choose a [Horde] or [Alliance] race. This card costs (1) less to play for each ally you control of the chosen race.', re: kwAt('Rift') },
-    { name: 'Sabotage', text: 'Such a character can propose either a sabotage combat against a non-friendly [thing] or a normal combat against a nonfriendly character. As a sabotage combat concludes, no combat damage is dealt. If a character protects during a sabotage combat, it stops being a sabotage.', re: /(?:^|<p> )Sabotage:/ },
-    { name: 'Sentinel', text: 'When this card exhausts for the first time each turn, ready it.', re: kwAt('Sentinel') },
-    { name: 'Shadowmeld', text: 'This card has Elusive and Untargetable while ready.', re: /\bShadowmeld\b/ },
-    { name: 'Smash', text: 'If this character would deal more than fatal combat damage to a defending ally, it deals exactly fatal damage to that ally, and the rest to that ally’s controller’s hero instead.', re: kwAt('Smash') },
-    { name: 'Stash', text: 'As this card enters your resource row from anywhere, if it would enter face down, you may have it enter face up, then immediately turn it face down instead. When you do, [text].', re: kwAt('Stash') },
-    { name: 'Thrown', text: 'When you strike with this weapon, your hero has Long-Range this combat. At the end of this turn, put this weapon from play into its owner\'s hand.', re: kwAt('Thrown') },
-    { name: 'Time is Money', text: 'This ally can use [Activate] powers from the turn it enters your party.', re: /\bTime is Money\b/ },
-    { name: 'Trap', text: 'You may exhaust a defending hero you control rather than pay this card’s cost.', re: kwAt('Trap') },
-    { name: 'War Stomp', text: 'When this card attacks or defends, you may exhaust target opposing hero or ally.', re: /\bWar Stomp\b/ },
-    { name: 'Warp', text: 'As this card is revealed from your deck, you may remove it from the game. If you do, you may play it immediately without paying its cost.', re: kwAt('Warp') },
-    { name: 'Will of the Forsaken', text: 'This card can\'t leave play unless it has fatal damage or 0 health.', re: /\bWill of the Forsaken\b/ }
+    { name: 'Ferocity', easy: 'Can attack the turn it comes into play.', text: "This ally can be proposed as an attacker regardless of how long it’s been under your control. However, the activated powers of an ally with ferocity can’t be used unless that card has been in its current party continuously since the start of its controller’s most recent turn, as normal.", re: /\bFerocity\b/, flag: 'ferocity' },
+    { name: 'Elusive', easy: 'Can\'t be attacked.', text: 'This card can’t be proposed as a defender.', re: /\bElusive\b/, flag: 'elusive' },
+    { name: 'Protector', easy: 'Can jump in and block an attack aimed at someone else on your side.', text: 'This character can protect. To protect with a character, exhaust it at the protect point of a combat step.', re: /\bProtector\b/, flag: 'protector' },
+    { name: 'Long-Range', easy: 'When it attacks, the defender can\'t hit back.', text: 'While this character is attacking, defenders can’t deal combat damage. This is different from the ranged damage type. A character has long-range while associated with a weapon that has Long-Range.', re: /\bLong-Range\b/ },
+    { name: 'Stealth', easy: 'When it attacks, nobody can jump in to protect.', text: 'While this character is attacking, characters can’t protect. A character has Stealth while associated with a weapon that has Stealth.', re: /\bStealth\b/, flag: 'stealth' },
+    { name: 'Untargetable', easy: 'Can\'t be targeted by anything.', text: 'This card can’t be targeted. Such cards are untargetable only while in play. A target is illegal if it becomes untargetable.', re: /\bUntargetable\b/ },
+    { name: 'Spellshield', easy: 'Your opponent can\'t target it.', text: 'This card can’t be targeted by opponents. Such cards can’t be targeted by opponents only while in play.', re: /\bSpellshield\b/ },
+    { name: 'Finishing Move', easy: 'Remove up to 5 Combo cards from your graveyard to make it stronger.', text: 'As an additional cost to play, remove X [description] cards in your graveyard from the game, where X is 5 or less. If no [description] is specified, the default is “Combo.”', re: /\bFinishing Move\b/ },
+    { name: 'Bear Form', easy: 'Your hero gets Protector. Ends when you strike with a weapon or play a non-Feral ability.', text: 'Your hero has both Protector and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bBear Form\b/, on: 'both' },
+    { name: 'Cat Form', easy: 'Your hero gets +1 ATK when attacking. Ends when you strike with a weapon or play a non-Feral ability.', text: 'Your hero has both “+1 ATK while attacking” and “When you play a non-Feral ability or strike with a weapon, destroy each ability that’s the source of a modifier granting your hero bear or cat form.”', re: /\bCat Form\b/, on: 'both' },
+    { name: 'Totem', easy: 'Counts as an ally, but can\'t attack.', text: 'Each Totem has an ATK and health value. Totems can’t be proposed as attackers. Totems are ability allies and count as both in all zones.', re: /\bTotem\b/, on: 'type' },
+    { name: 'Ongoing', easy: 'Stays in play after it resolves.', text: 'An ongoing ability enters play as it resolves; a non-ongoing ability enters its owner’s graveyard as it resolves. An ongoing ability that loses its powers remains ongoing.', re: /(?:^|<p> )Ongoing:/ },
+    { name: 'Instant', easy: 'Can be played anytime, even on the enemy turn.', text: 'A player can play an instant card any time he has priority. A player can play a non-instant card only during his non-combat action phase while the chain is empty and he has priority.', re: /\bInstant\b/, on: 'type' },
+    { name: 'Unique', easy: 'You can only have one with this name in play.', text: 'Any time a player controls two or more unique cards in play with the same name, those cards are violating uniqueness.', re: /\bUnique\b/, on: 'type' },
+    { name: 'Flip', easy: 'Turn your hero face down to use its power. Usable once.', text: 'To flip a face-up hero, turn it face down, and vice versa. If a hero was ready before it flipped, it stays ready. If a hero was exhausted before it flipped, it stays exhausted.', re: /\bFlip\b/ },
+    { name: 'Aberration', easy: 'Only takes damage in combat.', text: 'Prevent all non-combat damage that would be dealt to this character.', re: /\bAberration\b/ },
+    { name: 'Absorb', easy: 'Combat damage it deals to a hero heals your hero.', text: 'When this character deals combat damage to a hero, it heals that much damage from your hero.', re: kwAt('Absorb') },
+    { name: 'Arcane Torrent', easy: 'When it comes into play, an enemy card loses its powers this turn.', text: 'When this card enters play, target opposing card in play loses and can\'t have powers this turn.', re: /\bArcane Torrent\b/ },
+    { name: 'Artifact', easy: 'Can be played from your graveyard.', text: 'You may play this card from your graveyard.', re: kwAt('Artifact') },
+    { name: 'Assault', easy: 'Extra ATK on your turn.', text: 'Assault 1 means “This card has +1 ATK on your turn.”', re: /\bAssault \d/ },
+    { name: 'Berserking', easy: '+1 ATK for each damage on it.', text: 'This character has +1 ATK for each damage on it.', re: /\bBerserking\b/ },
+    { name: 'Conspicuous', easy: 'Enemies can protect against it.', text: 'Opposing heroes and allies can protect against this character.', re: /\bConspicuous\b/ },
+    { name: 'Death Rattle', easy: 'Does something when it goes to the graveyard.', text: 'When this card enters a graveyard from anywhere, [triggered effect]. A card’s Death Rattle power is active only while that card is in a graveyard and that power hasn’t been lost.', re: /\bDeath Rattle\b/ },
+    { name: 'Delve', easy: 'Look at your top 2 cards, keep any on top, put the rest on the bottom.', text: 'Look at the top two cards of your deck. Put any number of them on top of your deck in any order, and the rest on the bottom.', re: kwAt('Delve') },
+    { name: 'Diplomacy', easy: 'Certain allies cost (1) less.', text: 'You pay (1) less to play [description] allies, to a minimum of (1).', re: /\bDiplomacy\b/ },
+    { name: 'Dual Shield', easy: 'Your hero can use two shields.', text: 'The controller of a hero with dual shield can have two Shields without violating uniqueness. Adding a Melee weapon or another Off-Hand equipment causes a uniqueness violation.', re: /\bDual Shield\b/i },
+    { name: 'Dual Wield', easy: 'Your hero can use two weapons and hit with both.', text: 'The controller of a hero with dual wield or Two-Handed dual wield can have certain combinations of equipment that would normally violate uniqueness without violating uniqueness, and strike with two Melee weapons per combat.', re: /\bDual Wield\b/i },
+    { name: 'Echo', easy: 'Gets copied if you control two allies of the same race.', text: 'When you play this ability, if you control two or more allies that share a [Horde] or [Alliance] race, copy this ability.', re: kwAt('Echo') },
+    { name: 'Enrage', easy: 'When it comes into play, you may reveal your top card for a bonus.', text: 'As this card enters play, you may reveal the top card of your deck. One or more powers may be triggered based off the card you reveal this way.', re: kwAt('Enrage') },
+    { name: 'Escape Artist', easy: 'When an enemy targets it, you can return it to your hand.', text: 'When this card becomes targeted by an opposing link, you may put it into its owner\'s hand.', re: /\bEscape Artist\b/ },
+    { name: 'Eternal', easy: 'When it goes to your graveyard, you may shuffle it back into your deck.', text: 'When this card enters your graveyard from anywhere, you may shuffle it into your deck.', re: kwAt('Eternal') },
+    { name: 'Find Treasure', easy: 'When it comes into play, you may draw a card, then discard one.', text: 'When this card enters play, you may draw a card. If you do, discard a card.', re: /\bFind Treasure\b/ },
+    { name: 'Hardiness', easy: 'Takes 1 less damage each time.', text: 'If this character would be dealt damage, prevent 1 of it.', re: /\bHardiness\b/ },
+    { name: 'Harmonize', easy: 'Allies costing 4 or more cost (1) less.', text: 'You pay (1) less to play allies with printed cost 4 or more.', re: /\bHarmonize\b/ },
+    { name: 'Haste', easy: 'Cheaper if your allies hit the enemy hero this turn.', text: 'Haste 1 means “You pay (1) less to play this card if an ally you controlled dealt damage to an opposing hero this turn.”', re: /\bHaste \d/ },
+    { name: 'Inspire', easy: 'Can ready a card during the enemy\'s turn.', text: 'As each other player’s ready step starts, you may ready (an) exhausted [card(s)] in play you control. This doesn’t use the chain.', re: /(?:^|<p> )Inspire:/ },
+    { name: 'Inspiring Presence', easy: 'Your non-combat damage is +1.', text: 'If a hero or ally you control would deal non-combat damage, it deals that much +1 instead.', re: /\bInspiring Presence\b/ },
+    { name: 'Invincible', easy: 'Can\'t leave play, be targeted or take damage.', text: 'This card can\'t leave play, be targeted, or be dealt damage.', re: /\bInvincible\b/ },
+    { name: 'Irradiated', easy: 'Spreads to allies it hits in combat.', text: 'When this character deals combat damage to an ally that doesn’t have Irradiated, that ally has Irradiated.', re: /\bIrradiated\b/ },
+    { name: 'Mend', easy: 'At the start of your turn, heals some damage.', text: 'Mend 1 means “At the start of your turn, this character may heal 1 damage from target hero or ally.”', re: /\bMend \d/ },
+    { name: 'Portal', easy: 'Reveal your top 3 cards and maybe summon a cheaper Demon.', text: 'Reveal the top three cards of your deck. You may put a revealed Demon ally with cost less than this card’s cost into play. Put the remaining cards on the bottom of your deck.', re: kwAt('Portal') },
+    { name: 'Preparation', easy: 'Free to play on your first turn.', text: 'On your first turn, you may play this card without paying its cost.', re: /\bPreparation\b/ },
+    { name: 'Resistance', easy: 'Immune to that type of damage.', text: 'Prevent all damage with that [type] (regardless of any other types it has) that this character would be dealt.', re: /\bResistance\b/ },
+    { name: 'Rift', easy: 'Cheaper for each ally of the race you pick.', text: 'As you play this card, choose a [Horde] or [Alliance] race. This card costs (1) less to play for each ally you control of the chosen race.', re: kwAt('Rift') },
+    { name: 'Sabotage', easy: 'Can attack certain cards instead of characters. Deals no damage.', text: 'Such a character can propose either a sabotage combat against a non-friendly [thing] or a normal combat against a nonfriendly character. As a sabotage combat concludes, no combat damage is dealt. If a character protects during a sabotage combat, it stops being a sabotage.', re: /(?:^|<p> )Sabotage:/ },
+    { name: 'Sentinel', easy: 'Readies again the first time it exhausts each turn.', text: 'When this card exhausts for the first time each turn, ready it.', re: kwAt('Sentinel') },
+    { name: 'Shadowmeld', easy: 'While ready, can\'t be attacked or targeted.', text: 'This card has Elusive and Untargetable while ready.', re: /\bShadowmeld\b/ },
+    { name: 'Smash', easy: 'Extra combat damage to an ally spills over to its hero.', text: 'If this character would deal more than fatal combat damage to a defending ally, it deals exactly fatal damage to that ally, and the rest to that ally’s controller’s hero instead.', re: kwAt('Smash') },
+    { name: 'Stash', easy: 'Get a bonus when you place it as a resource.', text: 'As this card enters your resource row from anywhere, if it would enter face down, you may have it enter face up, then immediately turn it face down instead. When you do, [text].', re: kwAt('Stash') },
+    { name: 'Thrown', easy: 'Your hero attacks from range, then the weapon returns to your hand.', text: 'When you strike with this weapon, your hero has Long-Range this combat. At the end of this turn, put this weapon from play into its owner\'s hand.', re: kwAt('Thrown') },
+    { name: 'Time is Money', easy: 'Can use its powers right away.', text: 'This ally can use [Activate] powers from the turn it enters your party.', re: /\bTime is Money\b/ },
+    { name: 'Trap', easy: 'Can be paid for by exhausting your defending hero.', text: 'You may exhaust a defending hero you control rather than pay this card’s cost.', re: kwAt('Trap') },
+    { name: 'War Stomp', easy: 'When it attacks or defends, you may exhaust an enemy.', text: 'When this card attacks or defends, you may exhaust target opposing hero or ally.', re: /\bWar Stomp\b/ },
+    { name: 'Warp', easy: 'When revealed from your deck, you may play it for free.', text: 'As this card is revealed from your deck, you may remove it from the game. If you do, you may play it immediately without paying its cost.', re: kwAt('Warp') },
+    { name: 'Will of the Forsaken', easy: 'Only leaves play when it dies.', text: 'This card can\'t leave play unless it has fatal damage or 0 health.', re: /\bWill of the Forsaken\b/ }
 ];
 // CR 202.1: Tag mit Zahl in Klammern auf der Typzeile (z. B. „Pet (1)“, „Trinket (2)“)
 const TAG_LIMIT_TEXT = 'If a tag is followed by a number in parentheses, any player controlling more than that number of cards in play with that tag is violating uniqueness.';
@@ -279,14 +280,18 @@ function cardKeywords(uid, cardId) {
     const ocr = (typeof OCR !== 'undefined' && OCR[cardId]) || null;
     const type = ocr ? ocr[0] : '', text = ocr ? ocr[1] : ((CARDS[cardId] && CARDS[cardId].text) || '');
     const inst = G && uid ? findCharacter(G, uid) : null;
+    const easy = rulesTextMode() === 'casual';
     const list = KEYWORDS.filter(k => {
         const src = k.on === 'type' ? type : k.on === 'both' ? type + ' <p> ' + text : text;
         return k.re.test(src) || (k.flag && inst && inst[k.flag]);
-    });
+    }).map(k => ({ name: k.name, text: easy ? k.easy : k.text }));
     for (const m of type.matchAll(/(?:—|, )([A-Z][^,—()]*?) \((\d+)\)/g))
-        list.push({ name: m[1] + ' (' + m[2] + ')', text: TAG_LIMIT_TEXT });
+        list.push({ name: m[1] + ' (' + m[2] + ')', text: easy ? 'You can have at most ' + m[2] + ' ' + m[1] + ' in play.' : TAG_LIMIT_TEXT });
     return list;
 }
+// Regeltexte der Kästen: 'casual' (kurz & einfach, Standard) oder 'expert' (CR-Glossar)
+const RULES_TEXT_KEY = 'wow_tcg_rules_text';
+function rulesTextMode() { try { return localStorage.getItem(RULES_TEXT_KEY) === 'expert' ? 'expert' : 'casual'; } catch (e) { return 'casual'; } }
 
 // ---------------------------------------------------------------- Ziel-/Angriffspfeil
 // Geschwungener Pfeil von der Quelle zum Mauszeiger (Angriff, Zielwahl, Ziehen) bzw. zwischen zwei Karten (CPU-Angriff)
