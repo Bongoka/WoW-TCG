@@ -64,6 +64,7 @@ function undoLastAction() {
     const { snap, desc } = UNDO.stack.pop();
     G = snap; G.real = true; G.humans = [1];
     UI.reset();
+    UI.handSeen = new Set(G.p1.hand.map(c => c.uid));   // zurückgenommene Karten nicht "anfliegen" lassen
     addLog(`↶ Rückgängig: ${desc}`, "log-turn");
     render();
 }
@@ -71,6 +72,17 @@ function undoLastAction() {
 // ============================================================================
 // SPIELSTART
 // ============================================================================
+// Mulligan-Art: 'standard' (ganze Hand neu, CR 101.2) oder 'hs' (Hearthstone-Stil, Hausregel)
+const MULLIGAN_KEY = 'wow_tcg_mulligan_mode';
+function mulliganMode() { try { return localStorage.getItem(MULLIGAN_KEY) === 'hs' ? 'hs' : 'standard'; } catch (e) { return 'standard'; } }
+function updateMulliganButton() {
+    const b = document.getElementById("btn-mulligan-mode");
+    if (b) b.textContent = mulliganMode() === 'hs' ? "🃏 Mulligan: Hearthstone" : "🔄 Mulligan: Standard";
+}
+function toggleMulliganMode() {
+    try { localStorage.setItem(MULLIGAN_KEY, mulliganMode() === 'hs' ? 'standard' : 'hs'); } catch (e) {}
+    updateMulliganButton();
+}
 function pickDeck(key) {
     let d = GAME_DECKS.find(x => x.id === key);
     if (!d && key && String(key).startsWith('custom_')) {
@@ -92,6 +104,13 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     addLog(`=== PARTIE: ${pDeck.name} vs ${oDeck.name} ===`, "log-turn");
     if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
     refreshDisplay(G);
+    if (mulliganMode() === 'hs') {
+        // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
+        UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
+        render();
+        openHsMulligan(() => showTurnBanner("Dein Zug!"));
+        return;
+    }
     render();
     // Mulligan (CR 101.2: einmal)
     openDecisionModal("Starthand", "Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?", [
@@ -206,6 +225,8 @@ function bootGame() {
         _cfgImgPath = imgPathInput.value.trim() || "AZEROTH-{id}-EA.png";
         imgPathInput.onchange = (e) => { _cfgImgPath = e.target.value.trim() || "AZEROTH-{id}-EA.png"; render(); };
     }
+    document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
+    updateMulliganButton();
     document.getElementById("btn-sound").onclick = (e) => {
         sfx.muted = !sfx.muted;
         e.target.textContent = sfx.muted ? "🔇 Sound Aus" : "🔊 Sound An";

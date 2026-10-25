@@ -1928,6 +1928,24 @@ function doMulligan(s, pid) {
     L(s, `🔄 ${p.hero.name} nimmt einen Mulligan.`, "log-turn");
     return true;
 }
+// Hausregel (nicht in den CR, per Menü wählbar): Mulligan im Hearthstone-Stil. Die markierten
+// Karten werden ersetzt: erst Ersatz ziehen, dann die markierten ins Deck zurückmischen
+// (man kann sie also nicht sofort wiederziehen). Ersatzkarten nehmen den Platz der getauschten
+// ein. Zählt wie der normale Mulligan nur einmal (vgl. CR 101.2).
+function doPartialMulligan(s, pid, uids) {
+    const p = getPlayer(s, pid);
+    if (p.mulliganed) return false;
+    p.mulliganed = true;
+    const old = p.hand, swap = old.filter(c => uids.includes(c.uid));
+    if (!swap.length) return true;
+    p.hand = [];
+    drawCards(s, p, swap.length);
+    const fresh = p.hand;
+    p.hand = old.map(c => uids.includes(c.uid) ? fresh.shift() : c).filter(Boolean);
+    p.deck = shuffleDeck(p.deck.concat(swap.map(c => c.id)));
+    L(s, `🔄 ${p.hero.name} tauscht ${swap.length} Karte${swap.length === 1 ? '' : 'n'}.`, "log-turn");
+    return true;
+}
 function aiWantsMulligan(s, pid) {
     const p = getPlayer(s, pid);
     const playable = p.hand.filter(c => c.type !== 'Quest' && cardMatchesPlayer(c, p));

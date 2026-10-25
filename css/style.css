@@ -252,3 +252,19 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .pp-chain-head { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
 .pp-chain-item { font-size: 11px; padding: 3px 6px; border-radius: 3px; margin-bottom: 2px; background: #1a1512; border-left: 3px solid #60a5fa; }
 .pp-chain-item.opp { border-left-color: #f87171; }
+
+/* ===== Mulligan im Hearthstone-Stil ===== */
+#hs-mulligan { position: fixed; inset: 0; z-index: 100000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
+    background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 75%); }
+#hs-mull-hint { color: var(--text-dim); font-size: 14px; letter-spacing: 1px; }
+#hs-mull-cards { display: flex; gap: 1.2vw; justify-content: center; align-items: center; }
+.hs-mull-card { position: relative; cursor: pointer; transition: transform .18s; }
+.hs-mull-card .card-wrapper.hand-card { --cw: min(12vw, 27vh); }
+.hs-mull-card:hover { transform: translateY(-10px); }
+.hs-mull-card.marked { transform: translateY(16px); }
+.hs-mull-card .card-visual { transition: filter .18s; }
+.hs-mull-card.marked .card-visual { filter: grayscale(.85) brightness(.45); }
+.hs-mull-x { position: absolute; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; pointer-events: none;
+    color: #ef4444; font-size: min(7vw, 15vh); font-weight: 900; text-shadow: 0 0 18px #000, 0 0 8px #7f1d1d; }
+.hs-mull-card.marked .hs-mull-x { display: flex; }
+#hs-mull-keep { padding: 12px 64px; font-size: 20px; }

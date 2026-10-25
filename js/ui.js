@@ -8,6 +8,7 @@
 // ============================================================================
 const UI = {
     attacker: null, drag: null, busy: false, shownProtect: 0,
+    handSeen: new Set(), handFly: new Map(),   // Handkarten, die schon gezeigt wurden / gerade anfliegen (uid -> Startzeit)
     reset() { this.attacker = null; this.drag = null; }
 };
 
@@ -251,7 +252,7 @@ function renderBattlefield(p, containerId, isOpponent) {
 // ---------------------------------------------------------------- Hand
 function renderPlayerHand(p) {
     const box = document.getElementById("bot-hand"); box.innerHTML = "";
-    if (p.hand.length === 0) return;
+    if (p.hand.length === 0) { UI.handSeen = new Set(); UI.handFly.clear(); return; }
     const total = p.hand.length, mid = (total - 1) / 2;
     const choices = choiceUids();
     p.hand.forEach((card, idx) => {
@@ -286,6 +287,7 @@ function renderPlayerHand(p) {
         }
         slot.appendChild(node); box.appendChild(slot);
     });
+    flyNewHandCards(p, box);
 }
 function openHandCardMenu(idx) {
     const card = G.p1.hand[idx]; if (!card) return;
@@ -298,6 +300,100 @@ function openHandCardMenu(idx) {
     const err = canPlayCard(G, 1, card);
     if (err) { addLog(`${card.name}: ${err}`, "log-hit"); render(); return; }
     humanAct({ type: 'PLAY_CARD', handIdx: idx });
+}
+
+// ---------------------------------------------------------------- Karten fliegen auf die Hand
+// Jede Karte, die neu auf der Hand ist (gezogen, zurück auf die Hand, gesucht …), fliegt vom
+// Deck heran. Startzeiten stehen in UI.handFly, damit ein render() mitten im Flug die Animation
+// an derselben Stelle fortsetzt statt sie abzubrechen.
+const FLY_MS = 520, FLY_GAP = 130;
+function deckRect() {
+    const d = document.getElementById("p1-deck-stack");
+    return d ? d.getBoundingClientRect() : { left: 0, top: window.innerHeight, width: 50, height: 70 };
+}
+function flyFrom(node, from, { delay = 0, elapsed = 0, angle = 0 } = {}) {
+    const r = node.getBoundingClientRect(); if (!r.width) return null;
+    const sx = from.left + from.width / 2 - (r.left + r.width / 2), sy = from.top + from.height / 2 - (r.top + r.height / 2);
+    // Der Slot ist im Fächer gedreht: Bildschirm-Versatz ins gedrehte Koordinatensystem umrechnen
+    const a = -angle * Math.PI / 180, dx = sx * Math.cos(a) - sy * Math.sin(a), dy = sx * Math.sin(a) + sy * Math.cos(a);
+    const sc = Math.max(0.2, from.width / r.width);
+    const anim = node.animate([
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(${-angle - 25}deg)`, opacity: 0.3 },
+        { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 }
+    ], { duration: FLY_MS, delay, easing: 'cubic-bezier(.2,.75,.25,1)', fill: 'backwards' });
+    if (elapsed > 0) anim.currentTime = elapsed;
+    return anim;
+}
+function flyTo(node, to, delay = 0) {
+    const r = node.getBoundingClientRect(); if (!r.width) return Promise.resolve();
+    const dx = to.left + to.width / 2 - (r.left + r.width / 2), dy = to.top + to.height / 2 - (r.top + r.height / 2);
+    const sc = Math.max(0.2, to.width / r.width);
+    return node.animate([
+        { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(-25deg)`, opacity: 0 }
+    ], { duration: 420, delay, easing: 'cubic-bezier(.5,0,.75,.4)', fill: 'forwards' }).finished;
+}
+function flyNewHandCards(p, box) {
+    const now = performance.now();
+    let k = 0;
+    for (const c of p.hand) if (!UI.handSeen.has(c.uid)) UI.handFly.set(c.uid, now + FLY_GAP * k++);
+    UI.handSeen = new Set(p.hand.map(c => c.uid));
+    for (const uid of UI.handFly.keys()) if (!UI.handSeen.has(uid)) UI.handFly.delete(uid);
+    const from = deckRect(), mid = (p.hand.length - 1) / 2;
+    p.hand.forEach((c, idx) => {
+        const t0 = UI.handFly.get(c.uid); if (t0 === undefined) return;
+        const el = now - t0;
+        if (el >= FLY_MS) { UI.handFly.delete(c.uid); return; }
+        const node = box.children[idx] && box.children[idx].firstChild;
+        if (node) flyFrom(node, from, { delay: Math.max(0, -el), elapsed: el, angle: (idx - mid) * 6 });
+    });
+}
+
+// ---------------------------------------------------------------- Mulligan im Hearthstone-Stil
+// Starthand groß in der Mitte; angeklickte Karten werden markiert und bei "Keep" ersetzt
+// (doPartialMulligan). Ersatzkarten fliegen vom Deck an den Platz der getauschten Karte.
+function openHsMulligan(onDone) {
+    const ov = document.getElementById("hs-mulligan"), row = document.getElementById("hs-mull-cards"), keep = document.getElementById("hs-mull-keep");
+    const marked = new Set();
+    const makeSlot = (card) => {
+        const slot = document.createElement("div"); slot.className = "hs-mull-card";
+        slot.appendChild(createCardDOM(card, false));
+        const x = document.createElement("div"); x.className = "hs-mull-x"; x.textContent = "✖"; slot.appendChild(x);
+        slot.onclick = () => {
+            if (keep.disabled) return;
+            if (marked.has(card.uid)) marked.delete(card.uid); else marked.add(card.uid);
+            slot.classList.toggle("marked", marked.has(card.uid));
+        };
+        return slot;
+    };
+    row.innerHTML = ""; keep.disabled = false;
+    ov.style.display = "flex";
+    const slots = G.p1.hand.map(c => { const s = makeSlot(c); row.appendChild(s); return s; });
+    const from = deckRect();
+    slots.forEach((s, i) => flyFrom(s.firstChild, from, { delay: 150 + i * FLY_GAP }));
+    if (typeof sfx !== 'undefined') sfx.play('draw');
+    keep.onclick = async () => {
+        keep.disabled = true;
+        const uids = [...marked];
+        if (uids.length) {
+            await Promise.all(slots.filter(s => s.classList.contains("marked")).map((s, i) => flyTo(s.firstChild, deckRect(), i * 80)));
+            const swapped = G.p1.hand.map(c => uids.includes(c.uid));
+            doPartialMulligan(G, 1, uids);
+            refreshDisplay(G);
+            let k = 0;
+            G.p1.hand.forEach((c, i) => {
+                if (!swapped[i] || !slots[i]) return;
+                const s = makeSlot(c); row.replaceChild(s, slots[i]); slots[i] = s;
+                flyFrom(s.firstChild, deckRect(), { delay: k++ * FLY_GAP });
+            });
+            await sleep(FLY_MS + k * FLY_GAP + 600);
+        }
+        await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250 }).finished;
+        ov.style.display = "none";
+        UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
+        render();
+        if (onDone) onDone();
+    };
 }
 
 // ---------------------------------------------------------------- Drag & Drop

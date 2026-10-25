@@ -72,6 +72,7 @@
             <option value="easy">Einfach</option><option value="normal" selected>Normal</option><option value="hard">Schwer</option>
         </select>
     </div>
+    <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
     <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
     <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
     <button id="btn-new-game">🎲 Neues Spiel (Zufällig)</button>
@@ -115,6 +116,12 @@
     <p id="decision-text" style="font-size:14px;line-height:1.5;"></p>
     <div id="decision-actions" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;"></div>
 </div></div>
+
+<div id="hs-mulligan">
+    <div id="hs-mull-hint">Klicke Karten an, die du tauschen willst</div>
+    <div id="hs-mull-cards"></div>
+    <button id="hs-mull-keep" class="success">Keep</button>
+</div>
 
 <div id="sim-modal"><div id="sim-box" class="modal-box">
     <h2 id="sim-title" style="margin-top:0;color:var(--gold);">Simulation</h2>

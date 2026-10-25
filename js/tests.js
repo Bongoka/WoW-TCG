@@ -290,6 +290,18 @@ function runRuleTests() {
         const r = simulateOneGame(deck('alliance_hunter'), deck('horde_shaman'));
         assert(r.winner === 1 || r.winner === 2, 'Kein Sieger');
     });
+    test(42, 'Hearthstone-Mulligan: markierte Karten ersetzen, zurückmischen, nur einmal', () => {
+        const s = fresh(); dealOpeningHands(s);
+        const p = P(s, 1), before = p.hand.slice(), deckN = p.deck.length;
+        const swap = [before[1].uid, before[4].uid];
+        const top = p.deck.slice(-2).reverse();                          // diese beiden werden gezogen
+        assert(doPartialMulligan(s, 1, swap) && !doPartialMulligan(s, 1, []) && !doMulligan(s, 1), 'Nicht nur einmal');
+        assert(p.hand.length === 7 && p.deck.length === deckN, 'Hand/Deck-Größe falsch');
+        assert(p.hand.every((c, i) => (i === 1 || i === 4) ? !swap.includes(c.uid) : c === before[i]), 'Behaltene Karten verändert');
+        assert(p.hand[1].id === top[0] && p.hand[4].id === top[1], 'Ersatz nicht vom Deck gezogen');
+        const s2 = fresh(); dealOpeningHands(s2); const h2 = P(s2, 1).hand.slice();
+        assert(doPartialMulligan(s2, 1, []) && P(s2, 1).hand.every((c, i) => c === h2[i]), 'Keep ohne Markierung verändert die Hand');
+    });
     return results;
 }
 
