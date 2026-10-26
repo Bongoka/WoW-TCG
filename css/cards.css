@@ -37,6 +37,7 @@
     -webkit-text-stroke: 3.4cqw #000; paint-order: stroke fill; text-shadow: 0 0 1.5cqw #000, 0 0 3cqw #000; }
 .cfx-stat-badge.lean span { left: 42%; top: 58%; }
 .cfx-stat-badge.hp-badge span { left: 57%; }
+.cfx-stat-badge.def-badge { margin-left: auto; }
 .card-action-bar { position: absolute; left: 0; right: 0; bottom: -32px; z-index: 20; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; pointer-events: auto; }
 .card-wrapper:hover .card-action-bar { opacity: 1; }
 .card-action-bar button { flex: 1; padding: 5px 0; font-size: 10px; border-radius: 3px; border: 1px solid var(--gold-dark, #8a6d2b); font-weight: bold; color: #fff; cursor: pointer; background: linear-gradient(180deg, #3d3530, #1a1512); }

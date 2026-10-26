@@ -1309,7 +1309,9 @@ function renderChoiceModal(d) {
     prompt.textContent = d.prompt;
     fillContext(decisionContext(d));
     d.opts.forEach(o => {
-        const card = o.v !== '__none' && o.v !== '__cancel' && o.v !== '__done' ? cardOfRef(o.card !== undefined ? o.card : o.v) : null;
+        // Zahlen als Wert sind keine Karten-IDs (Ja/Nein = 1/0, Modi, X …) – Karten aus dem Deck tragen ihre ID in o.card
+        const ref = o.card !== undefined ? o.card : (typeof o.v === 'number' ? null : o.v);
+        const card = o.v !== '__none' && o.v !== '__cancel' && o.v !== '__done' ? cardOfRef(ref) : null;
         if (card) addChoice(card, optionCaption(o, card), () => chooseV(o.v));
         else addButton(o.label, (o.v === '__cancel' || (o.v === '__none' && d.protect)) ? 'danger' : '', () => chooseV(o.v));
     });

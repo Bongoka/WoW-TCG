@@ -56,7 +56,7 @@
                 strikeEl.innerHTML = `<img src="Bottom Icons/Strike.png" alt="STRIKE"><span>${card.strike || 0}</span>`;
                 statsBar.appendChild(strikeEl);
             } else if (card.type === 'Armor') {
-                const defEl = el('div', 'cfx-stat-badge');
+                const defEl = el('div', 'cfx-stat-badge def-badge');                       // Rüstung: DEF unten rechts
                 defEl.innerHTML = `<img src="Bottom Icons/Armor.png" alt="DEF"><span>${card.def || 0}</span>`;
                 statsBar.appendChild(defEl);
             }
