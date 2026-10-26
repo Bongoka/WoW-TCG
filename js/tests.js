@@ -340,6 +340,129 @@ function runRuleTests() {
         for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
             assert(!d || d.action.type !== 'ACTIVATE', 'KI zerstört eine eigene Ressource: ' + (d && d.action.desc));
     });
+
+    // ---------------- Set 2 / Set 3 (Through the Dark Portal, Fires of Outland)
+    // Zustand mit beliebigen Helden (Deck aus Set-1-Karten, nur als Füllung)
+    const freshH = (h1, h2, pid = 1) => {
+        const s = newGameState(h1, deck('alliance_hunter').cards, h2, deck('horde_warrior').cards);
+        s.turn = 6; s.activePlayer = pid; s.lastTurnOf = { 1: pid === 1 ? 6 : 5, 2: pid === 2 ? 6 : 5 }; s.placedResource = true; s.phase = 'main';
+        return s;
+    };
+    test(46, '"This turn"-Keywords bleiben nicht dauerhaft (gedruckt vs. Anzeige)', () => {
+        const s = fresh(); const a = put(s, 1, 262); res(s, 1, 3);
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 152), targets: [[a.uid]] }, 1);   // Sneak: Elusive this turn
+        assert(hasElusive(s, a), 'Sneak wirkt nicht'); refreshDisplay(s);
+        s.turn += 2; refreshDisplay(s);
+        assert(!hasElusive(s, a), 'Elusive bleibt nach dem Zug bestehen');
+    });
+    test(47, 'Cat Form: Held +1 ATK beim Angreifen, zerstört durch Nicht-Feral-Fähigkeit', () => {
+        const s = freshH(1007, 9); const cf = put(s, 1, 1019); res(s, 1, 3);
+        assert(atkOf(s, P(s, 1).hero, { attacking: true }) === 1 && hasCatForm(s, 1), 'Cat Form gibt kein +1 ATK');
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 1030), targets: [[P(s, 2).hero.uid]] }, 1);   // Wrath (Balance) ist keine Feral-Fähigkeit
+        assert(!P(s, 1).ongoing.includes(cf), 'Cat Form wurde nicht zerstört');
+    });
+    test(48, 'Stealth bei Allies: Angriff kann nicht geschützt werden (602.2a)', () => {
+        const s = fresh('alliance_hunter', 'alliance_warrior'); const a = put(s, 1, 1156); put(s, 2, 180);
+        act(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s, 2).hero.uid }, 1);
+        assert(P(s, 2).hero.damage === 5, `Held hat ${P(s, 2).hero.damage} statt 5 Schaden – Protector hat geschützt`);
+    });
+    test(49, 'Long-Range bei Allies: Verteidiger macht keinen Kampfschaden', () => {
+        const s = fresh(); const a = put(s, 1, 1235); const d = put(s, 2, 1213);   // Tanwa (4 ATK, Long-Range) gegen Guardian Steppestrider (5/5)
+        act(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: d.uid }, 1);
+        assert(a.damage === 0 && d.damage === 4, `Angreifer ${a.damage}, Verteidiger ${d.damage} Schaden`);
+    });
+    test(50, 'Untargetable: auch eigene Karten können den Ally nicht als Ziel wählen', () => {
+        const s = fresh(); const m = put(s, 1, 1153); res(s, 1, 3);
+        assert(!targetCands(s, 1, { ally: true }).includes(m.uid) && !targetCands(s, 2, { ally: true }).includes(m.uid), 'Apprentice Merry ist Ziel');
+    });
+    test(51, 'Trap: verteidigenden Helden erschöpfen statt zu bezahlen (Frost Trap)', () => {
+        const s = freshH(3, 9, 2); const a = put(s, 2, 262); const h = P(s, 1).hero; const i = hand(s, 1, 1033);
+        s.battle = { id: 'bt', att: a.uid, def: h.uid, orig: h.uid, apid: 2, dpid: 1, step: 'damage', strikeA: null, strikeD: null, longRange: false };
+        s.win = { prio: 1, passes: 0, reason: 'combat' };
+        assert(!canPlayCard(s, 1, P(s, 1).hand[i]), 'Frost Trap ohne Ressourcen nicht spielbar: ' + canPlayCard(s, 1, P(s, 1).hand[i]));
+        applyAction(s, { type: 'PLAY_CARD', handIdx: i, actorId: 1 }, true, 1); autoResolve(s);
+        assert(h.exhausted && !s.battle && h.damage === 0, 'Trap nicht korrekt: Held erschöpft ' + h.exhausted + ', Kampf ' + !!s.battle);
+        assert(!canAttackNow(s, a, P(s, 2)), 'Gegner kann trotz Frost Trap angreifen');
+    });
+    test(52, '"<Rasse> Hero Required": Spielen und Deckbau', () => {
+        const s = freshH(8, 9); res(s, 1, 6);   // Warrax (Zwerg)
+        assert(!canPlayCard(s, 1, P(s, 1).hand[hand(s, 1, 1166)]), 'Gustaf Trueshot mit Zwerg-Held nicht spielbar');
+        const s2 = freshH(3, 9); res(s2, 1, 6);   // Elendril (Nachtelf)
+        assert(!!canPlayCard(s2, 1, P(s2, 1).hand[hand(s2, 1, 1166)]), 'Gustaf Trueshot ohne Zwerg-Held spielbar');
+        assert(legalCardsFor(8).includes(1166) && !legalCardsFor(3).includes(1166), 'Deckbau prüft "Hero Required" nicht');
+    });
+    test(53, 'Wird ein Held zerstört, verliert sein Spieler (CR 102.1a)', () => {
+        const s = fresh(); destroy(s, P(s, 2).hero);
+        assert(s.gameOver && s.winner === 1, 'Spiel nicht verloren');
+    });
+    test(54, 'Blessing of Sacrifice: Schaden am Ally geht an den eigenen Helden', () => {
+        const s = fresh(); const a = put(s, 1, 262); put(s, 1, 1056, { attachedTo: a.uid });
+        dealDamage(s, { src: P(s, 2).hero.uid, tgt: a.uid, amt: 3, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(a.damage === 0 && P(s, 1).hero.damage === 3, `Ally ${a.damage}, Held ${P(s, 1).hero.damage}`);
+    });
+    test(55, 'Power Word: Shield verhindert allen Schaden und wird danach zerstört', () => {
+        const s = fresh(); const a = put(s, 1, 262); const pws = put(s, 1, 1076, { attachedTo: a.uid });
+        dealDamage(s, { src: P(s, 2).hero.uid, tgt: a.uid, amt: 4, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(a.damage === 0, 'Schaden nicht verhindert');
+        assert(!P(s, 1).ongoing.includes(pws), 'Power Word: Shield nicht zerstört');
+    });
+    test(56, 'Dual Wield: Held schlägt mit zwei Einhand-Nahkampfwaffen zu (406.2)', () => {
+        const s = freshH(9, 3); res(s, 1, 6); put(s, 1, 1127); put(s, 1, 1286); put(s, 1, 1286);
+        assert(!findLimitViolation(s, P(s, 1)), 'Zwei Einhandwaffen trotz Dual Wield verboten');
+        act(s, { type: 'ATTACK', attackerUid: P(s, 1).hero.uid, defenderUid: P(s, 2).hero.uid }, 1);
+        assert(P(s, 2).hero.damage === 2, `Schaden ${P(s, 2).hero.damage} statt 2 (zwei Waffen je 1 ATK)`);
+    });
+    test(57, 'Diplomacy: Allies kosten (1) weniger, mindestens (1)', () => {
+        const s = freshH(4, 9); put(s, 1, 1128);
+        assert(getPlayCost(s, P(s, 1), CARDS[262]) === 3 && getPlayCost(s, P(s, 1), CARDS[1153]) === 1, 'Kostenrechnung falsch');
+    });
+    test(58, 'Dramla Lifebender: Allies aus dem Friedhof spielen, zerstörte Allies werden entfernt', () => {
+        const s = freshH(12, 9); res(s, 1, 6); put(s, 1, 1207); const g = makeCardInst(262, false, 1); P(s, 1).graveyard.push(g);
+        const a = getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.gyUid === g.uid);
+        assert(a, 'Ally im Friedhof nicht spielbar'); act(s, a, 1);
+        assert(P(s, 1).allies.includes(g), 'Ally nicht ins Spiel gekommen');
+        destroy(s, g); assert(P(s, 1).removed.includes(g) && !P(s, 1).graveyard.includes(g), 'Zerstörter Ally nicht entfernt');
+    });
+    test(59, 'Koringar the Heavy: nutzt die Kräfte anderer Allies', () => {
+        const s = fresh(); res(s, 1, 6); const k = put(s, 1, 1219); put(s, 2, 1189);   // Scaramanga: (2), Destroy this ally >>> Draw a card.
+        act(s, { type: 'ACTIVATE', srcUid: k.uid, key: 'kor' }, 1);
+        assert(getPowers(s, k).some(pw => pw.borrowed && pw.borrowed.id === 1189), 'Kraft von Scaramanga fehlt');
+    });
+    test(60, 'Miandra: Divine-Shield-Zähler verhindert den ersten Schaden', () => {
+        const s = fresh(); res(s, 1, 6); const i = hand(s, 1, 2130);
+        act(s, { type: 'PLAY_CARD', handIdx: i }, 1); const m = P(s, 1).allies.find(x => x.id === 2130);
+        dealDamage(s, { src: P(s, 2).hero.uid, tgt: m.uid, amt: 3, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(m.damage === 0 && !m.counters.divine, `Schaden ${m.damage}, Zähler ${m.counters.divine}`);
+        dealDamage(s, { src: P(s, 2).hero.uid, tgt: m.uid, amt: 2, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(m.damage === 2, 'Zweiter Schaden auch verhindert');
+    });
+    test(61, 'Spell Reflection: Fähigkeit gegen deinen Helden trifft den eigenen Helden', () => {
+        const s = fresh('alliance_mage', 'alliance_warrior'); res(s, 1, 3); res(s, 2, 3); s.humans = [1, 2];
+        const iR = hand(s, 2, 2097);
+        applyAction(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 52), targets: [[P(s, 2).hero.uid]], actorId: 1 }, true, 1);   // Fireball: 2 Feuer
+        const it = s.chain[s.chain.length - 1];
+        assert(it && s.pending && s.pending.pid === 2, 'Spieler 2 bekommt keine Priorität');
+        applyAction(s, { type: 'PLAY_CARD', handIdx: iR, targets: [[it.card.uid]], actorId: 2 }, true, 2);
+        let n = 0; while (s.pending && n++ < 30) { const d = s.pending; applyAction(s, d.kind === 'priority' ? { type: 'PASS', actorId: d.pid } : { type: 'CHOOSE', v: aiPick(s, d), actorId: d.pid }, true, d.pid); }
+        assert(P(s, 2).hero.damage === 0 && P(s, 1).hero.damage === 2, `Held 1: ${P(s, 1).hero.damage}, Held 2: ${P(s, 2).hero.damage}`);
+    });
+    test(62, 'Readiness: Fähigkeiten aus dem Friedhof spielen, danach aus dem Spiel entfernt', () => {
+        const s = freshH(2003, 9); res(s, 1, 6); act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 2033) }, 1);
+        const g = makeCardInst(33, false, 1); P(s, 1).graveyard.push(g);   // Arcane Shot (Jäger)
+        const a = getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.gyUid === g.uid);
+        assert(a, 'Fähigkeit im Friedhof nicht spielbar'); act(s, { ...a, targets: [[P(s, 2).hero.uid]] }, 1);
+        assert(P(s, 1).removed.includes(g) && P(s, 1).removed.some(c => c.id === 2033), 'Fähigkeiten nicht aus dem Spiel entfernt');
+    });
+    test(64, '"Choose one": spielbar, wenn ein Modus Ziele hat; KI findet X passend zum Ziel', () => {
+        const s = freshH(9, 1); res(s, 1, 8); const w = put(s, 2, 1286); const i = hand(s, 1, 1120);   // Crushing Blow: nur eine Waffe im Spiel
+        assert(!canPlayCard(s, 1, P(s, 1).hand[i]), 'Crushing Blow ohne Rüstung nicht spielbar: ' + canPlayCard(s, 1, P(s, 1).hand[i]));
+        const s2 = freshH(1001, 9); res(s2, 1, 8); put(s2, 2, 1118);   // Kalinna gegen Commanding Shout (Kosten 3)
+        assert(getLegalActions(s2, 1).some(a => a.type === 'ACTIVATE' && a.x === 3), 'Kalinna: kein X = 3 angeboten');
+    });
+    test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
+        const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
+        for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
+    });
     return results;
 }
 

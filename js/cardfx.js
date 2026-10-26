@@ -64,9 +64,12 @@ EK.lookPick = (s, a) => {
     const n = Math.min(a.n, p.deck.length);
     const ids = p.deck.splice(p.deck.length - n, n).reverse();   // ids[0] = oberste Karte
     if (a.reveal) L(s, `👁 ${p.hero.name} deckt auf: ${ids.map(id => CARDS[id].name).join(', ') || '–'}`);
+    // "When this ally is revealed from your deck by a quest, draw a card." (Jubilee Arcspark, CR 703.3b)
+    if (a.reveal && a.byQuest) ids.forEach(id => { if (FX[id] && FX[id].revealedByQuest) pushTrig(s, a.pid, id, [{ op: 'call', k: 'E:drawOne', a: { pid: a.pid } }]); });
     s._hidden = true;
     p.looking = ids;
-    const ok = ids.map((id, i) => ({ id, i })).filter(x => !a.type || (a.type === 'Equipment' ? ['Weapon', 'Armor', 'Item'].includes(CARDS[x.id].type) : CARDS[x.id].type === a.type));
+    const costOk = c => (a.minCost === undefined || (c.cost || 0) >= a.minCost) && (a.maxCost === undefined || (c.cost || 0) <= a.maxCost);
+    const ok = ids.map((id, i) => ({ id, i })).filter(x => costOk(CARDS[x.id]) && (!a.type || (a.type === 'Equipment' ? ['Weapon', 'Armor', 'Item'].includes(CARDS[x.id].type) : CARDS[x.id].type === a.type)));
     const opts = ok.map(x => ({ label: CARDS[x.id].name, v: x.i, card: x.id, ai: (CARDS[x.id].cost || 0) + 1 }));
     if (!opts.length) { EK.lookPickDo(s, a, -1); return; }
     if (a.optional) opts.push({ label: 'Keine nehmen', v: -1, ai: 0 });
@@ -290,7 +293,7 @@ FX[65] = { slots: (s, pid) => [{ label: 'Eigener Held oder Ally', cands: targetC
     k: { pick: (s, a) => { const att = attachedTo(s, a.host).map(o => o.uid); if (!att.length) return; askMany(s, a.pid, 'Cleanse: Angehängte Fähigkeit zerstören', 'Cleanse', att, '65:do', a, u => ctrlOf(s, findCharacter(s, u)) !== a.pid ? 5 : -5); },
         do: (s, a, v) => { if (v === '__done') return; destroy(s, findCharacter(s, v)); q(s, { op: 'call', k: '65:pick', a }); } } };
 FX[66] = {};
-FX[67] = { resolve: (s, it) => { const h = heroOf(s, it.pl); addTM(h, { k: 'preventAll', turn: s.turn }); addTM(h, { k: 'untargetable', turn: s.turn }); q(s, { op: 'call', k: '65:pick', a: { pid: it.pl, host: h.uid } }); } };
+FX[67] = { resolve: (s, it) => { const h = heroOf(s, it.pl); addTM(h, { k: 'preventAll', turn: s.turn }); addTM(h, { k: 'spellshield', turn: s.turn }); q(s, { op: 'call', k: '65:pick', a: { pid: it.pl, host: h.uid } }); } };
 FX[68] = { slots: slotChar('Erschöpfe Ziel', true), resolve: (s, it) => { const t = T1(s, it); if (t) { exhaust(s, t); addTM(t, { k: 'noReady' }); } drawCards(s, me(s, it.pl), 1); } };
 FX[69] = { slots: slotChar('Heile 5', false), resolve: (s, it) => { const t = T(it)[0]; if (t) heroHeal(s, it.pl, t, 5); drawCards(s, me(s, it.pl), 1); } };
 FX[70] = { slots: slotChar('Schadensquelle (Held oder Ally)', true), resolve: (s, it) => { const t = T(it)[0]; if (t) addTM(heroOf(s, it.pl), { k: 'shield', v: 5, turn: s.turn, srcUid: t, reflect: true }); } };
@@ -344,7 +347,8 @@ FX[94] = { slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; },
         do: (s, a, v) => { const h = findCharacter(s, a.host); if (!h) return; if (v && payRes(me(s, ctrlOf(s, h)), 3)) return; exhaust(s, h); } } };
 FX[95] = { slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(2, 'Nature') };
 FX[96] = { slots: (s, pid) => [{ label: 'Ziel-Ausrüstung', cands: targetCands(s, pid, { equipment: true }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }], resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
-const combosInGy = (s, pid) => me(s, pid).graveyard.filter(c => (c.subtypes || []).includes('Combo'));
+// Combos im Friedhof: gedruckt "Combo", Tyler Falconbridge ("also a Combo while in a graveyard"), Filthy Tricks ("Cards in your graveyard are Combos")
+const combosInGy = (s, pid) => { const all = me(s, pid).ongoing.some(o => o.id === 2067); return me(s, pid).graveyard.filter(c => all || (c.subtypes || []).includes('Combo') || c.id === 2147); };
 function removeCombos(s, it) { const p = me(s, it.pl); let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } finishPrep(s); }
 FX[97] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), slots: slotChar('Ziel', true),
     addCost: (s, it) => removeCombos(s, it), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2 + (it.x || 0), 'Melee'); } };
@@ -358,7 +362,7 @@ FX[100].slots = (s, pid) => [{ label: 'Ziel-Ressource', cands: [...me(s, pid).re
 FX[101] = { resolve: (s, it) => searchDeck(s, it.pl, 'Premeditation', 'combo', 2) };
 FX[102] = { slots: slotChar('Ziel', true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1 + bestWeaponAtk(s, it.pl, w => w.slot === 'Melee'), 'Melee'); } };
 FX[103] = { leave: payReturnOnDestroy(103), k: retK(103) };
-FX[104] = { resolve: (s, it) => addTM(heroOf(s, it.pl), { k: 'untargetable', turn: s.turn }) };
+FX[104] = { resolve: (s, it) => addTM(heroOf(s, it.pl), { k: 'spellshield', turn: s.turn }) };
 FX[105] = { slots: slotAlly('Ziel-Ally', true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; exhaust(s, t); if (hasStealth(s, heroOf(s, it.pl))) heroDmg(s, it.pl, t.uid, hpOf(s, t), 'Melee'); } };
 // --- Schamane
 FX[106] = { slots: (s, pid) => [{ label: 'Bis zu 3 Ziele (3, 2, 1 Natur in Reihenfolge)', cands: targetCands(s, pid, CH), min: 1, max: 3, harm: true }],
@@ -751,7 +755,7 @@ FX[347] = { questCond: (s, pid) => me(s, pid).graveyard.filter(c => isAllyCard(c
     k: { pick: (s, a) => { if (a.left <= 0) { q(s, { op: 'call', k: 'E:questPay', a: {} }); return; } const g = gyCands(s, a.pid, c => isAllyCard(c));
             ask(s, { pid: a.pid, prompt: `Battle of Darrowshire: Ally aus dem Friedhof entfernen (noch ${a.left})`, src: 'Battle of Darrowshire', opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: -(findCharacter(s, u).cost || 0) })), k: '347:do', a }); },
         do: (s, a, v) => { gyRemove(s, v); q(s, { op: 'call', k: '347:pick', a: { ...a, left: a.left - 1 } }); } } };
-FX[348] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 4, type: 'Equipment', reveal: true, src: 'Big Game Hunter' } }) };
+FX[348] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 4, type: 'Equipment', reveal: true, byQuest: true, src: 'Big Game Hunter' } }) };
 FX[349] = { reward: (s, pid) => { const p = me(s, pid); p.deck.push(...p.graveyard.filter(c => !c.isToken).map(c => c.id)); p.graveyard = []; shuffleInPlace(p); s._hidden = true; } };
 FX[350] = { reward: (s, pid) => { const g = gyCands(s, pid, c => isAllyCard(c)); if (!g.length) return; ask(s, { pid, prompt: 'Chasing A-Me 01: Ziel-Ally aus deinem Friedhof auf die Hand', src: 'Chasing A-Me 01', opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: findCharacter(s, u).cost || 0 })), k: '350:do', a: {} }); },
     k: { do: (s, a, v) => fromGyToHand(s, v) } };
@@ -763,20 +767,20 @@ FX[354] = { reward: (s, pid) => q(s, { op: 'call', k: '354:look', a: { pid } }),
     k: { look: (s, a) => { const p = me(s, a.pid); const n = Math.min(3, p.deck.length); if (!n) return; const ids = p.deck.splice(p.deck.length - n, n).reverse(); p.looking = ids; s._hidden = true;
             ask(s, { pid: a.pid, prompt: `It's a Secret to Everybody: Welche Karte oben auf das Deck? (${ids.map(id => CARDS[id].name).join(', ')})`, src: "It's a Secret to Everybody", opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: CARDS[id].cost <= getReadyRes(p) + 1 ? CARDS[id].cost : -1 })), k: '354:do', a }); },
         do: (s, a, i) => { const p = me(s, a.pid); const ids = p.looking; p.looking = null; const top = ids.splice(i, 1)[0]; p.deck.unshift(...ids.reverse()); p.deck.push(top); } } };
-FX[355] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ally', reveal: true, src: "Kibler's Exotic Pets" } }) };
+FX[355] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ally', reveal: true, byQuest: true, src: "Kibler's Exotic Pets" } }) };
 FX[356] = { questCond: (s, pid) => alliesOf(me(s, pid)).filter(a => !a.exhausted).length >= 2 ? null : 'Braucht 2 bereite Allies',
     questExtra: (s, pid) => q(s, { op: 'call', k: '356:pick', a: { pid, left: 2 } }), reward: Qd(1),
     k: { pick: (s, a) => { if (a.left <= 0) { q(s, { op: 'call', k: 'E:questPay', a: {} }); return; } const al = alliesOf(me(s, a.pid)).filter(x => !x.exhausted);
             ask(s, { pid: a.pid, prompt: `The Love Potion: Ally erschöpfen (noch ${a.left})`, src: 'The Love Potion', opts: al.map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), k: '356:do', a }); },
         do: (s, a, v) => { exhaust(s, findCharacter(s, v)); q(s, { op: 'call', k: '356:pick', a: { ...a, left: a.left - 1 } }); } } };
-FX[357] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 2, reveal: true, chooser: pid === 1 ? 2 : 1, src: 'The Princess Trapped', showTaken: true } }) };
+FX[357] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 2, reveal: true, byQuest: true, chooser: pid === 1 ? 2 : 1, src: 'The Princess Trapped', showTaken: true } }) };
 FX[358] = { reward: (s, pid) => { const g = gyCands(s, pid, c => ['Weapon', 'Armor', 'Item'].includes(c.type)); if (!g.length) return; ask(s, { pid, prompt: 'Sunken Treasure: Ziel-Ausrüstung aus deinem Friedhof auf die Hand', src: 'Sunken Treasure', opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: findCharacter(s, u).cost || 0 })), k: '358:do', a: {} }); },
     k: { do: (s, a, v) => fromGyToHand(s, v) } };
 FX[359] = { questCond: (s, pid) => s.activePlayer === pid ? null : 'Nur in deinem Zug', reward: (s, pid) => makeToken(s, 9002, pid) };
 FX[9002] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.joinedTurn < s.turn) trig(s, { id: 9002, k: 'go', a: { uid: c.uid, pid } }); } },
     k: { go: (s, a) => { const c = findCharacter(s, a.uid); if (c && removeFromGame(s, c)) drawCards(s, me(s, a.pid), 2); } } };
 FX[360] = { reward: Qd(1) };
-FX[361] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ability', reveal: true, src: 'Zapped Giants' } }) };
+FX[361] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ability', reveal: true, byQuest: true, src: 'Zapped Giants' } }) };
 
 // Karten ohne eigene Skripte trotzdem eintragen (für Vollständigkeits-Tests)
 Object.keys(CARDS).forEach(id => { if (!FX[id]) FX[id] = {}; });

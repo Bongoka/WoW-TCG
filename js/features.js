@@ -32,76 +32,292 @@ document.getElementById("imgtest-input").addEventListener('change', (e) => loadI
 document.getElementById("imgtest-size").addEventListener('change', applyImageTestSize);
 
 // --- DECK BUILDER ---
-let currentDeckBuilder = { heroId: null, cards: [] };
-function openDeckBuilder() {
+// Deck = { id, hero, faction, class, name, cards: [Karten-IDs] }. Eigene Decks liegen im Browser (localStorage).
+// Größe frei (unter/über 60 erlaubt, nur farblich markiert); max. 4 Kopien je Karte außer "Unlimited".
+const DB_KEY = 'wow_tcg_custom_decks';
+const DB_TYPES = [
+    { k: 'Ally', label: 'Allies', color: '#3b82f6', is: c => c.type === 'Ally' },
+    { k: 'Ability', label: 'Fähigkeiten', color: '#a855f7', is: c => c.type === 'Ability' },
+    { k: 'Equipment', label: 'Ausrüstung', color: '#d97706', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
+    { k: 'Quest', label: 'Quests', color: '#10b981', is: c => c.type === 'Quest' },
+];
+const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
+let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
+const DBF = { type: 'All', cost: 'all' };
+function loadCustomDecks() { try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch (e) { return []; } }
+function saveCustomDecks(list) { try { localStorage.setItem(DB_KEY, JSON.stringify(list)); return true; } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); return false; } }
+const dbHero = () => CARDS[currentDeckBuilder.heroId];
+const dbLegal = (card, hero = dbHero()) => !!hero && cardMatchesPlayer(card, hero) && (!card.talentReq || card.talentReq === hero.talent);
+const dbMax = card => card.unlimited ? Infinity : 4;
+const dbCount = id => currentDeckBuilder.cards.filter(x => x === id).length;
+
+// Öffnen: leer, mit einem bestehenden Deck (bearbeiten) oder als Kopie eines Start-Decks
+function openDeckBuilder(deck = null, asCopy = false) {
     document.getElementById("deck-builder-modal").style.display = "flex";
-    const heroSelect = document.getElementById("db-hero-select"); heroSelect.innerHTML = "";
-    Object.values(CARDS).filter(c => c.type === 'Hero').forEach(h => {
-        const opt = document.createElement("option"); opt.value = h.id; opt.textContent = `${h.name} (${h.class}, ${h.faction})`; heroSelect.appendChild(opt);
-    });
-    currentDeckBuilder = { heroId: parseInt(heroSelect.value), cards: [] };
-    renderDBPool(); renderDBDeck();
+    const sel = document.getElementById("db-hero-select"); sel.innerHTML = "";
+    const groups = {};
+    Object.values(CARDS).filter(c => c.type === 'Hero').forEach(h => { const g = `${['', 'Heroes of Azeroth', 'Through the Dark Portal', 'Fires of Outland'][h.set || 1]} – ${h.faction}`; (groups[g] = groups[g] || []).push(h); });
+    Object.entries(groups).forEach(([g, hs]) => { const og = document.createElement('optgroup'); og.label = g;
+        hs.sort((a, b) => a.class.localeCompare(b.class)).forEach(h => { const o = document.createElement('option'); o.value = h.id; o.textContent = `${h.class} – ${h.name} (${h.talent})`; og.appendChild(o); });
+        sel.appendChild(og); });
+    if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? `${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
+    else currentDeckBuilder = { id: null, heroId: currentDeckBuilder.heroId || parseInt(sel.value), name: '', cards: [] };
+    sel.value = currentDeckBuilder.heroId;
+    document.getElementById("db-name").value = currentDeckBuilder.name;
+    renderDBAll();
 }
-document.getElementById("db-hero-select").addEventListener('change', (e) => {
-    currentDeckBuilder.heroId = parseInt(e.target.value); currentDeckBuilder.cards = [];
-    renderDBPool(); renderDBDeck();
-});
+function renderDBAll() { renderDBHero(); renderDBPool(); renderDBDeck(); }
+function renderDBHero() {
+    const box = document.getElementById("db-hero-thumb"); box.innerHTML = '';
+    const h = dbHero(); if (!h) return;
+    const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false); n.classList.add('db-hero-card'); box.appendChild(n);
+}
+document.getElementById("db-hero-select").addEventListener('change', (e) => { currentDeckBuilder.heroId = parseInt(e.target.value); renderDBAll(); });
+document.getElementById("db-name").addEventListener('input', (e) => { currentDeckBuilder.name = e.target.value; });
 document.getElementById("db-search").addEventListener('input', renderDBPool);
-document.getElementById("db-type-filter").addEventListener('change', renderDBPool);
+document.getElementById("db-set-filter").addEventListener('change', renderDBPool);
+document.getElementById("db-sort").addEventListener('change', renderDBPool);
+['db-type-chips', 'db-cost-chips'].forEach(id => document.getElementById(id).addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.type) DBF.type = b.dataset.type; else DBF.cost = b.dataset.cost;
+    b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    renderDBPool();
+}));
+
 function renderDBPool() {
-    const hero = CARDS[currentDeckBuilder.heroId];
-    const search = document.getElementById("db-search").value.toLowerCase();
-    const filterType = document.getElementById("db-type-filter").value;
+    const hero = dbHero(); if (!hero) return;
+    const search = document.getElementById("db-search").value.trim().toLowerCase();
+    const set = document.getElementById("db-set-filter").value, sort = document.getElementById("db-sort").value;
     const poolBox = document.getElementById("db-pool-cards"); poolBox.innerHTML = "";
-    Object.values(CARDS).forEach(card => {
-        if (card.type === 'Hero' || card.isToken) return;
-        if (!cardMatchesPlayer(card, hero)) return;
-        if (card.talentReq && card.talentReq !== hero.talent) return;              // "… Hero Required" (Deckbau)
-        if (filterType !== 'All' && card.type !== filterType) return;
-        if (search && !card.name.toLowerCase().includes(search)) return;
-        const node = createCardDOM({...card, uid: 'db_'+card.id}, false);
-        node.classList.add('db-card');
-        node.onclick = () => addCardToBuilder(card.id);
-        poolBox.appendChild(node);
+    const list = Object.values(CARDS).filter(card => {
+        if (card.type === 'Hero' || card.isToken || !dbLegal(card, hero)) return false;
+        if (DBF.type !== 'All' && dbTypeOf(card).k !== DBF.type) return false;
+        if (DBF.cost !== 'all') { const c = card.type === 'Quest' ? -1 : (card.cost || 0); if (DBF.cost === '7' ? c < 7 : c !== +DBF.cost) return false; }
+        if (set !== 'all' && String(card.set || 1) !== set) return false;
+        if (search && !card.name.toLowerCase().includes(search) && !(card.text || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+    const typeIdx = c => DB_TYPES.indexOf(dbTypeOf(c));
+    list.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
+        : ((a.type === 'Quest' ? 99 : a.cost || 0) - (b.type === 'Quest' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
+    document.getElementById("db-pool-count").textContent = `${list.length} Karten`;
+    list.forEach(card => {
+        const tile = document.createElement('div'); tile.className = 'db-tile'; tile.dataset.id = card.id;
+        const node = createCardDOM({ ...card, uid: 'db_' + card.id }, false); node.classList.add('db-card');
+        tile.appendChild(node);
+        const n = dbCount(card.id);
+        const badge = document.createElement('div'); badge.className = 'db-tile-count' + (n ? ' has' : '') + (n >= dbMax(card) ? ' full' : '');
+        badge.textContent = n ? `${n}${card.unlimited ? '' : '/4'}` : '';
+        tile.appendChild(badge);
+        tile.onclick = () => dbAdd(card.id);
+        tile.oncontextmenu = (e) => { e.preventDefault(); dbRemove(card.id); };
+        poolBox.appendChild(tile);
     });
 }
-function renderDBDeck() {
-    const deckBox = document.getElementById("db-deck-cards"); deckBox.innerHTML = "";
-    const counts = {};
-    currentDeckBuilder.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
-    const sortedIds = Object.keys(counts).sort((a, b) => (CARDS[a].cost||0) - (CARDS[b].cost||0));
-    sortedIds.forEach(id => {
-        const card = CARDS[id]; const count = counts[id];
-        const node = createCardDOM({...card, uid: 'db_deck_'+id}, false);
-        node.classList.add('db-deck-item');
-        const badge = document.createElement("div");
-        badge.style.cssText = "position:absolute;top:-5px;right:-5px;background:var(--gold);color:#000;font-weight:900;font-size:14px;padding:2px 8px;border-radius:10px;z-index:100;box-shadow: 0 2px 4px rgba(0,0,0,0.8);border: 1px solid #000;";
-        badge.textContent = `x${count}`;
-        node.appendChild(badge);
-        node.onclick = () => { const idx = currentDeckBuilder.cards.indexOf(parseInt(id)); if (idx !== -1) currentDeckBuilder.cards.splice(idx, 1); renderDBDeck(); };
-        deckBox.appendChild(node);
+// Zähler auf einer Kachel aktualisieren, ohne den Pool neu zu zeichnen (Scrollposition bleibt)
+function dbUpdateTile(id) {
+    const t = document.querySelector(`#db-pool-cards .db-tile[data-id="${id}"]`); if (!t) return;
+    const n = dbCount(id), b = t.querySelector('.db-tile-count'), card = CARDS[id];
+    b.className = 'db-tile-count' + (n ? ' has' : '') + (n >= dbMax(card) ? ' full' : '');
+    b.textContent = n ? `${n}${card.unlimited ? '' : '/4'}` : '';
+    t.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)' }, { transform: 'scale(1)' }], { duration: 180 });
+}
+function dbAdd(id) {
+    const card = CARDS[id];
+    if (dbCount(id) >= dbMax(card)) { dbFlash(`Maximal 4 Kopien von „${card.name}“`); return; }
+    currentDeckBuilder.cards.push(id); dbUpdateTile(id); renderDBDeck(id);
+}
+function dbRemove(id) {
+    const i = currentDeckBuilder.cards.lastIndexOf(id); if (i < 0) return;
+    currentDeckBuilder.cards.splice(i, 1); dbUpdateTile(id); renderDBDeck();
+}
+function dbFlash(msg) {
+    const w = document.getElementById('db-warnings'); const d = document.createElement('div'); d.className = 'db-flash'; d.textContent = msg; w.prepend(d);
+    setTimeout(() => d.remove(), 2200);
+}
+function renderDBDeck(highlightId) {
+    const cards = currentDeckBuilder.cards, n = cards.length, hero = dbHero();
+    // Fortschritt bis 60: gelb darunter, grün genau 60, rot darüber (erlaubt)
+    const fill = document.getElementById('db-progress-fill');
+    fill.style.width = Math.min(100, n / 60 * 100) + '%';
+    fill.className = n < 60 ? 'under' : n === 60 ? 'exact' : 'over';
+    const cnt = document.getElementById('db-count'); cnt.textContent = `${n} / 60`; cnt.className = fill.className;
+    // Manakurve (ohne Quests), gestapelt nach Typ
+    const curve = document.getElementById('db-curve'); curve.innerHTML = '';
+    const buckets = Array.from({ length: 8 }, () => ({}));
+    cards.forEach(id => { const c = CARDS[id]; if (c.type === 'Quest') return; const b = Math.min(7, c.cost || 0); const k = dbTypeOf(c).k; buckets[b][k] = (buckets[b][k] || 0) + 1; });
+    const maxB = Math.max(4, ...buckets.map(b => Object.values(b).reduce((x, y) => x + y, 0)));
+    buckets.forEach((b, i) => {
+        const tot = Object.values(b).reduce((x, y) => x + y, 0);
+        const col = document.createElement('div'); col.className = 'db-curve-col'; col.title = `Kosten ${i === 7 ? '7+' : i}: ${tot} Karten`;
+        const stack = document.createElement('div'); stack.className = 'db-curve-stack'; stack.style.height = (tot / maxB * 100) + '%';
+        DB_TYPES.forEach(t => { if (b[t.k]) { const seg = document.createElement('div'); seg.style.flex = b[t.k]; seg.style.background = t.color; stack.appendChild(seg); } });
+        col.innerHTML = `<div class="db-curve-n">${tot || ''}</div>`; col.appendChild(stack);
+        const lab = document.createElement('div'); lab.className = 'db-curve-l'; lab.textContent = i === 7 ? '7+' : i; col.appendChild(lab);
+        curve.appendChild(col);
     });
-    const countEl = document.getElementById("db-count");
-    countEl.textContent = `${currentDeckBuilder.cards.length} / 60 Karten`;
-    countEl.style.color = currentDeckBuilder.cards.length >= 60 ? "#4ade80" : "var(--gold)";
+    // Typverteilung
+    const tb = document.getElementById('db-typebar'), tl = document.getElementById('db-typelegend'); tb.innerHTML = ''; tl.innerHTML = '';
+    DB_TYPES.forEach(t => {
+        const k = cards.filter(id => t.is(CARDS[id])).length;
+        if (k) { const seg = document.createElement('div'); seg.style.flex = k; seg.style.background = t.color; seg.title = `${t.label}: ${k}`; tb.appendChild(seg); }
+        tl.insertAdjacentHTML('beforeend', `<div><i style="background:${t.color}"></i>${t.label}<b>${k}</b><span>${n ? Math.round(k / n * 100) : 0}%</span></div>`);
+    });
+    if (!n) tb.innerHTML = '<div class="db-empty-bar">leer</div>';
+    // Warnungen: Karten, die der gewählte Held nicht spielen kann
+    const warn = document.getElementById('db-warnings'); warn.querySelectorAll('.db-warn').forEach(x => x.remove());
+    const bad = [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero));
+    if (bad.length) { const w = document.createElement('div'); w.className = 'db-warn';
+        w.innerHTML = `⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
+        w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
+    // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
+    const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
+    if (!n) { box.innerHTML = '<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>📥 Import</b> eine Kartenliste ein.</div>'; return; }
+    const counts = {}; cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
+    DB_TYPES.forEach(t => {
+        const ids = Object.keys(counts).map(Number).filter(id => t.is(CARDS[id])).sort((a, b) => (CARDS[a].cost || 0) - (CARDS[b].cost || 0) || CARDS[a].name.localeCompare(CARDS[b].name));
+        if (!ids.length) return;
+        const tot = ids.reduce((x, id) => x + counts[id], 0);
+        box.insertAdjacentHTML('beforeend', `<div class="db-group" style="--tc:${t.color}">${t.label}<span>${tot}</span></div>`);
+        ids.forEach(id => {
+            const c = CARDS[id]; const row = document.createElement('div');
+            row.className = 'db-row' + (dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
+            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${esc(c.name)}</span>`
+                + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
+            row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
+            row.querySelector('[data-a="+"]').onclick = (e) => { e.stopPropagation(); dbAdd(id); };
+            row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
+            box.appendChild(row);
+        });
+    });
 }
-function addCardToBuilder(id) {
-    const count = currentDeckBuilder.cards.filter(cid => cid === id).length;
-    if (count >= 4 && !CARDS[id].unlimited) { alert("Maximal 4 Kopien!"); return; }
-    currentDeckBuilder.cards.push(id); renderDBDeck();
+// Vorschau beim Überfahren einer Deck-Zeile (links neben der Liste)
+function dbHoverShow(id, row) {
+    const h = document.getElementById('db-hover'); h.innerHTML = '';
+    h.appendChild(createCardDOM({ ...CARDS[id], uid: 'db_hover_' + id }, false));
+    const r = row.getBoundingClientRect();
+    h.style.display = 'block'; h.style.left = (r.left - 236) + 'px'; h.style.top = Math.max(10, Math.min(window.innerHeight - 330, r.top - 140)) + 'px';
 }
+function dbHoverHide() { document.getElementById('db-hover').style.display = 'none'; }
+
+// Speichern: neues Deck oder das bearbeitete überschreiben
+function dbSave() {
+    const hero = dbHero(); if (!hero) return null;
+    const name = (currentDeckBuilder.name || '').trim() || `${hero.class} – ${hero.name}`;
+    const list = loadCustomDecks();
+    const deck = { id: currentDeckBuilder.id || 'custom_' + Date.now(), hero: hero.id, faction: hero.faction, class: hero.class, name, cards: [...currentDeckBuilder.cards] };
+    const i = list.findIndex(d => d.id === deck.id);
+    if (i >= 0) list[i] = deck; else list.push(deck);
+    if (!saveCustomDecks(list)) return null;
+    currentDeckBuilder.id = deck.id; currentDeckBuilder.name = name; document.getElementById('db-name').value = name;
+    dbFlash(`„${name}“ gespeichert (${deck.cards.length} Karten)`);
+    return deck;
+}
+document.getElementById("db-save-only-btn").onclick = () => dbSave();
 document.getElementById("db-save-btn").onclick = () => {
-    if (currentDeckBuilder.cards.length < 60) { alert("Dein Deck braucht mindestens 60 Karten!"); return; }
-    const hero = CARDS[currentDeckBuilder.heroId];
-    const newDeck = { id: 'custom_' + Date.now(), hero: currentDeckBuilder.heroId, faction: hero.faction, class: hero.class, name: `Custom ${hero.class}`, cards: [...currentDeckBuilder.cards] };
-    let customDecks = [];
-    try { customDecks = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]'); } catch (e) {}
-    customDecks.push(newDeck);
-    localStorage.setItem('wow_tcg_custom_decks', JSON.stringify(customDecks));
+    if (!currentDeckBuilder.cards.length) { dbFlash('Das Deck ist leer.'); return; }
+    const d = dbSave(); if (!d) return;
     document.getElementById("deck-builder-modal").style.display = "none";
-    initGame(newDeck.id, null);
+    initGame(d.id, null);
 };
-document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; };
+document.getElementById("db-new-btn").onclick = () => { if (currentDeckBuilder.cards.length && !confirm('Aktuelles Deck verwerfen und neu beginnen?')) return; openDeckBuilder(); };
+document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); };
+
+// --- IMPORT / EXPORT als Textliste: "4 Weeble" (Anzahl Leerzeichen Name), optional "Hero: Name" ---
+function dbExportText() {
+    const hero = dbHero(); const counts = {}; currentDeckBuilder.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
+    const lines = [`# ${currentDeckBuilder.name || 'Deck'}`, `Hero: ${hero ? hero.name : ''}`, ''];
+    DB_TYPES.forEach(t => { const ids = Object.keys(counts).map(Number).filter(id => t.is(CARDS[id])).sort((a, b) => (CARDS[a].cost || 0) - (CARDS[b].cost || 0) || CARDS[a].name.localeCompare(CARDS[b].name));
+        if (!ids.length) return; lines.push(`# ${t.label}`); ids.forEach(id => lines.push(`${counts[id]} ${CARDS[id].name}`)); lines.push(''); });
+    return lines.join('\n').trim() + '\n';
+}
+// Namen vergleichbar machen: Groß/klein, Apostrophe/Anführungszeichen, Satzzeichen und Leerzeichen egal
+const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„]/g, '"').replace(/[^a-z0-9äöüß'"!?.,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
+const DB_SET_CODES = { azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3 };
+// Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
+//  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
+//  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
+//  · Zeilen ohne gültigen Kartennamen werden ignoriert.
+function dbParseList(text, heroId) {
+    const byName = {};
+    Object.values(CARDS).forEach(c => { if (c.isToken) return; (byName[dbNorm(c.name)] = byName[dbNorm(c.name)] || []).push(c); });
+    const bySetNum = (set, num) => Object.values(CARDS).find(c => (c.set || 1) === set && (c.set ? c.num : c.id) === num && !c.isToken);
+    const out = { heroId, name: null, cards: [], report: [] };
+    let wantHero = false;
+    const lookup = (rawName) => {
+        // Set-Angabe in Klammern ("(AZEROTH 32/361)", "(Dark Portal-12)") zur Zuordnung
+        let exact = null;
+        const sm = rawName.match(/\(\s*([a-z][a-z ]*?)[\s-]*(\d+)\s*(?:\/\s*\d+)?\s*[a-z]?\s*\)/i);
+        if (sm && DB_SET_CODES[sm[1].trim().toLowerCase()]) exact = bySetNum(DB_SET_CODES[sm[1].trim().toLowerCase()], parseInt(sm[2]));
+        const name = rawName.replace(/\([^)]*\)/g, ' ').replace(/\s+-\s+(tdp|foo|hoa)$/i, '').trim();
+        const list = byName[dbNorm(name)] || [];
+        if (exact && dbNorm(exact.name) === dbNorm(name)) return [exact];
+        return list;
+    };
+    for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim(); if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+        const nm = line.match(/^(name|deck|deckname)\s*:\s*(.+)$/i);
+        if (nm) { out.name = nm[2].trim(); continue; }
+        const hm = line.match(/^(hero|held)\s*:?\s*(.*)$/i);
+        if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) out.heroId = h.id; else out.report.push({ bad: true, msg: `Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
+        const m = line.match(/^(\d+)\s*[x×*]?\s*(.+)$/i);
+        const n = m ? parseInt(m[1]) : 1, rawName = m ? m[2] : line;
+        const cands = lookup(rawName);
+        if (!cands.length) { if (m && !/^\d+$/.test(rawName.trim())) out.report.push({ bad: true, msg: `„${rawName.replace(/\([^)]*\)/g, '').trim()}“ nicht gefunden` }); continue; }
+        const hero = cands.find(c => c.type === 'Hero');
+        if (hero && (!m || wantHero)) { out.heroId = hero.id; wantHero = false; continue; }   // Zeile ohne Zahl kann der Held sein
+        const nonHero = cands.filter(c => c.type !== 'Hero');
+        if (!nonHero.length) continue;
+        wantHero = false;
+        out.cards.push({ n, cands: nonHero, name: rawName });
+    }
+    // Karten zuordnen: bei gleichnamigen Karten die, die der Held spielen kann
+    const hero = CARDS[out.heroId];
+    const res = [];
+    out.cards.forEach(({ n, cands, name }) => {
+        const c = cands.find(x => hero && dbLegal(x, hero)) || cands[0];
+        const have = res.filter(x => x === c.id).length; const room = c.unlimited ? n : Math.max(0, 4 - have);
+        if (room < n) out.report.push({ bad: true, msg: `„${c.name}“: nur 4 Kopien erlaubt (${n} angegeben)` });
+        if (hero && !dbLegal(c, hero)) out.report.push({ bad: true, msg: `„${c.name}“ passt nicht zu ${hero.name}` });
+        for (let i = 0; i < Math.min(n, room); i++) res.push(c.id);
+    });
+    out.cards = res;
+    return out;
+}
+let DB_IO_MODE = 'import';
+function openDbIO(mode) {
+    DB_IO_MODE = mode;
+    const ta = document.getElementById('db-io-text');
+    document.getElementById('db-io-title').textContent = mode === 'import' ? '📥 Deck importieren' : '📤 Deck exportieren';
+    document.getElementById('db-io-help').innerHTML = mode === 'import'
+        ? 'Eine Karte pro Zeile, z. B. <code>4 Weeble</code>, <code>4x Weeble</code> oder <code>4Weeble</code>. Ohne Zahl zählt die Karte einmal; ein Heldenname wird zum Helden. <code>Name: …</code> setzt den Decknamen. Alles andere wird ignoriert. Das aktuelle Deck wird ersetzt.'
+        : 'Diese Liste kannst du kopieren und später wieder importieren.';
+    ta.value = mode === 'import' ? '' : dbExportText(); ta.readOnly = mode !== 'import';
+    document.getElementById('db-io-report').innerHTML = '';
+    document.getElementById('db-io-ok').style.display = mode === 'import' ? '' : 'none';
+    document.getElementById('db-io-copy').style.display = mode === 'import' ? 'none' : '';
+    document.getElementById('db-io-modal').style.display = 'flex';
+    setTimeout(() => { ta.focus(); if (mode !== 'import') ta.select(); }, 30);
+}
+document.getElementById('db-import-btn').onclick = () => openDbIO('import');
+document.getElementById('db-export-btn').onclick = () => openDbIO('export');
+document.getElementById('db-io-cancel').onclick = () => { document.getElementById('db-io-modal').style.display = 'none'; };
+document.getElementById('db-io-copy').onclick = () => { const ta = document.getElementById('db-io-text'); ta.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject()).then(() => dbIoReport([{ msg: 'In die Zwischenablage kopiert.' }]), () => { document.execCommand('copy'); dbIoReport([{ msg: 'Kopiert.' }]); }); };
+// Live-Vorschau beim Tippen: wie viele Karten erkannt wurden, was fehlt
+document.getElementById('db-io-text').addEventListener('input', () => { if (DB_IO_MODE !== 'import') return; const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
+    dbIoReport([{ msg: `${r.cards.length} Karten erkannt${r.heroId !== currentDeckBuilder.heroId ? ` · Held: ${CARDS[r.heroId].name}` : ''}` }, ...r.report]); });
+function dbIoReport(items) { document.getElementById('db-io-report').innerHTML = items.map(x => `<div class="${x.bad ? 'bad' : 'ok'}">${x.bad ? '⚠' : '✔'} ${esc(x.msg)}</div>`).join(''); }
+document.getElementById('db-io-ok').onclick = () => {
+    const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
+    if (!r.cards.length) { dbIoReport([{ bad: true, msg: 'Keine Karten erkannt.' }, ...r.report]); return; }
+    currentDeckBuilder.heroId = r.heroId; currentDeckBuilder.cards = r.cards;
+    if (r.name) { currentDeckBuilder.name = r.name; document.getElementById('db-name').value = r.name; }
+    document.getElementById('db-hero-select').value = r.heroId;
+    document.getElementById('db-io-modal').style.display = 'none';
+    renderDBAll();
+    dbFlash(`${r.cards.length} Karten importiert${r.report.length ? ` – ${r.report.length} Hinweis(e)` : ''}`);
+};
 
 // --- BOOSTER ---
 let boosterActive = false;
@@ -128,10 +344,11 @@ document.getElementById("btn-booster").onclick = () => {
 function generateBoosterCards() {
     const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken);
     const heroes = pool.filter(id => CARDS[id].type === 'Hero');
-    const commons = pool.filter(id => RARITIES[id] === 'Common' && CARDS[id].type !== 'Hero');
-    const uncommons = pool.filter(id => RARITIES[id] === 'Uncommon' && CARDS[id].type !== 'Hero');
-    const rares = pool.filter(id => RARITIES[id] === 'Rare' && CARDS[id].type !== 'Hero');
-    const epics = pool.filter(id => RARITIES[id] === 'Epic' && CARDS[id].type !== 'Hero');
+    const rar = id => RARITIES[id] || CARDS[id].rarity;                                   // Set 2/3: Seltenheit steht in den Kartendaten
+    const commons = pool.filter(id => rar(id) === 'Common' && CARDS[id].type !== 'Hero');
+    const uncommons = pool.filter(id => rar(id) === 'Uncommon' && CARDS[id].type !== 'Hero');
+    const rares = pool.filter(id => rar(id) === 'Rare' && CARDS[id].type !== 'Hero');
+    const epics = pool.filter(id => rar(id) === 'Epic' && CARDS[id].type !== 'Hero');
     let availablePool = [...pool].filter(id => CARDS[id].type !== 'Hero');
     let shuffledCommons = shuffleDeck(commons), shuffledUncommons = shuffleDeck(uncommons), shuffledRares = shuffleDeck(rares), shuffledEpics = shuffleDeck(epics), shuffledHeroes = shuffleDeck(heroes);
     const boosterCards = [];
@@ -185,32 +402,40 @@ document.getElementById("booster-close-btn").onclick = () => { document.getEleme
 // --- DECK OVERVIEW ---
 function openDeckOverview() {
     const grid = document.getElementById("deck-overview-grid"); grid.innerHTML = "";
-    GAME_DECKS.forEach(deck => {
+    const tile = (deck, custom) => {
         const btn = document.createElement("div");
-        btn.className = `deck-btn ${deck.faction.toLowerCase()}`;
-        btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name">${esc(deck.class)}</div>`;
+        const n = deck.cards.length, hero = CARDS[deck.hero];
+        btn.className = `deck-btn ${(deck.faction || 'alliance').toLowerCase()}${custom ? ' custom' : ''}`;
+        btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name">${esc(custom ? deck.name : deck.class)}</div>`
+            + `<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
         btn.onclick = () => openDeckView(deck.id);
-        grid.appendChild(btn);
-    });
-    try {
-        const customDecks = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]');
-        customDecks.forEach(deck => {
-            const btn = document.createElement("div");
-            btn.className = `deck-btn ${deck.faction ? deck.faction.toLowerCase() : 'alliance'}`;
-            btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name">Custom ${esc(deck.class)}</div>`;
-            btn.onclick = () => openDeckView(deck.id);
-            grid.appendChild(btn);
-        });
-    } catch(e) {}
+        return btn;
+    };
+    grid.insertAdjacentHTML('beforeend', '<div class="deck-grid-head">Deine Decks</div>');
+    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = '<div class="deck-plus">✚</div><div class="deck-name">Neues Deck</div>';
+    nb.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(); };
+    grid.appendChild(nb);
+    loadCustomDecks().forEach(d => grid.appendChild(tile(d, true)));
+    grid.insertAdjacentHTML('beforeend', '<div class="deck-grid-head">Start-Decks</div>');
+    GAME_DECKS.filter(d => !String(d.id).startsWith('t_')).forEach(d => grid.appendChild(tile(d, false)));
     document.getElementById("deck-overview-modal").style.display = "flex";
 }
 function openDeckView(deckId) {
-    let deck = GAME_DECKS.find(d => d.id === deckId);
-    if (!deck) { try { const customDecks = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]'); deck = customDecks.find(d => d.id === deckId); } catch(e) {} }
+    const custom = String(deckId).startsWith('custom_');
+    const deck = custom ? loadCustomDecks().find(d => d.id === deckId) : GAME_DECKS.find(d => d.id === deckId);
     if (!deck) return;
     const title = document.getElementById("deck-view-title");
     title.textContent = `${deck.name} – ${deck.cards.length} Karten`;
     title.style.color = deck.faction === 'Alliance' ? '#60a5fa' : '#f87171';
+    // Aktionen: Spielen, Bearbeiten (eigene) bzw. als Kopie bearbeiten (Start-Decks), Löschen
+    let acts = document.getElementById('deck-view-actions');
+    if (!acts) { acts = document.createElement('div'); acts.id = 'deck-view-actions'; title.after(acts); }
+    acts.innerHTML = '';
+    const mk = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; acts.appendChild(b); };
+    const closeAll = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "none"; };
+    mk('▶ Spielen', 'success', () => { closeAll(); initGame(deck.id, null); });
+    mk(custom ? '✎ Bearbeiten' : '✎ Als Kopie bearbeiten', '', () => { closeAll(); openDeckBuilder(deck, !custom); });
+    if (custom) mk('🗑 Löschen', 'danger', () => { if (!confirm(`„${deck.name}“ löschen?`)) return; saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); });
     const content = document.getElementById("deck-view-content"); content.innerHTML = "";
     const counts = {}; deck.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     const sortedIds = [...new Set(deck.cards)].sort((a, b) => (CARDS[a].cost||0) - (CARDS[b].cost||0));

@@ -797,11 +797,14 @@ const OCR = {
 360:["Quest","Pay (3) to complete this quest. Reward: Draw a card."],
 361:["Quest","Pay (2) to complete this quest. Reward: Reveal the top three cards of your deck. Put a revealed ability into your hand and the rest on the bottom of your deck."]
 };
-(function applyOCR() {
-    for (const id in OCR) {
+// Typzeile und Text der Card Reference übernehmen (auch für Set 2/3: js/cards2.js, js/cards3.js)
+function applyOCR(map) {
+    for (const id in map) {
         const c = CARDS[id]; if (!c) continue;
-        const [tl, tx] = OCR[id];
-        c.typeLine = tl; c.text = tx;
+        const [tl, tx] = map[id];
+        c.typeLine = tl; c.text = tx.replace(/ <p> /g, ' ');
+        if (/Your hero has Cat Form/.test(tx)) c.catForm = true;
+        if (/Your hero has Bear Form/.test(tx)) c.bearForm = true;
         if (c.type === 'Hero') { const m = tl.match(/\(([^)]+)\)/); if (m) c.talent = m[1]; const r = tl.match(/Hero—(.+?) \w+ \(/); if (r) c.race = r[1]; continue; }
         c.instant = /^Instant/.test(tl);
         c.talentCard = /\bTalent\b/.test(tl);
@@ -816,6 +819,8 @@ const OCR = {
             const rest = c.school ? after.slice(c.school.length).trim() : after;
             c.subtypes = rest.split(' ').filter(w => w && w !== 'Talent');
             if (rest.includes('Bear Form')) c.subtypes = c.subtypes.filter(w => w !== 'Bear' && w !== 'Form').concat(['Bear Form']);
+            if (rest.includes('Cat Form')) c.subtypes = c.subtypes.filter(w => w !== 'Cat' && w !== 'Form').concat(['Cat Form']);
         }
     }
-})();
+}
+applyOCR(OCR);

@@ -61,7 +61,15 @@ function openGraveyard(player) {
     if (!player.graveyard.length) return;
     document.getElementById("graveyard-title").textContent = `Friedhof – ${player.id === 1 ? 'Du' : 'CPU'} (${player.graveyard.length} Karten)`;
     const box = document.getElementById("graveyard-content"); box.innerHTML = "";
-    player.graveyard.forEach(c => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false)); box.appendChild(wrap); });
+    // Set 2/3: Karten, die du gerade aus diesem Friedhof spielen darfst (Dramla Lifebender, Readiness, Greed Before Need)
+    const playable = new Set(getLegalActions(G, 1).filter(a => a.type === 'PLAY_CARD' && a.gyUid).map(a => a.gyUid));
+    player.graveyard.forEach(c => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false));
+        if (playable.has(c.uid)) {
+            const b = document.createElement("button"); b.textContent = "▶ Spielen"; b.className = "gy-play-btn";
+            b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'PLAY_CARD', handIdx: -1, gyUid: c.uid }); };
+            wrap.appendChild(b);
+        }
+        box.appendChild(wrap); });
     document.getElementById("graveyard-modal").style.display = "flex";
 }
 
@@ -126,6 +134,33 @@ function animateResources(player, shown) {
     UI.resPrev[player.id] = next;
 }
 
+// ---------------------------------------------------------------- Untere Reihe: Hand ein-/ausfahren
+// Die eigenen Allies weichen seitlich dem Deck (links) und Ressourcen + Held (rechts) aus, die über dem Spielfeld liegen.
+function layoutBottomRow() {
+    const row = document.getElementById('bot-allies'); if (!row) return;
+    const bf = document.getElementById('battlefield-zone');
+    row.style.paddingLeft = row.style.paddingRight = '0px'; bf.style.paddingBottom = '';
+    const rr = row.getBoundingClientRect();
+    // Block unten rechts (Ressourcen, Held, Ausrüstung über dem Helden) und Deck unten links
+    const rects = ['bot-resource-tray', 'bot-dock', 'bot-equipment-container'].map(id => document.getElementById(id)).filter(e => e && e.getBoundingClientRect().height > 0).map(e => e.getBoundingClientRect());
+    const deck = document.querySelector('.bottom-row .deck-zone'); const dr = deck && deck.getBoundingClientRect();
+    if (!rects.length) return;
+    const over = rects.filter(r => r.top < rr.bottom - 10);
+    const padR = over.length ? Math.round(rr.right - Math.min(...over.map(r => r.left)) + 12) : 0;
+    const padL = dr && dr.top < rr.bottom - 10 ? Math.round(dr.right - rr.left + 8) : 0;
+    // Passen die Allies neben den Block? Sonst bleibt die Reihe in voller Breite über dem Block.
+    const need = [...row.querySelectorAll('.bf-slot')].reduce((n, e) => n + parseFloat(getComputedStyle(e).flexBasis || 0), 0) + 16 * row.querySelectorAll('.bf-slot').length;
+    if (need <= rr.width - padL - padR) { row.style.paddingLeft = padL + 'px'; row.style.paddingRight = padR + 'px'; return; }
+    const top = Math.min(...rects.map(r => r.top), dr ? dr.top : Infinity);
+    const bfr = bf.getBoundingClientRect();
+    bf.style.paddingBottom = Math.max(0, Math.round(bfr.bottom - top + 8)) + 'px';
+}
+// Hand fährt hoch, wenn die Maus im unteren Viertel des Bildschirms ist
+document.addEventListener('mousemove', e => {
+    const h = document.getElementById('bot-hand'); if (!h) return;
+    h.classList.toggle('hand-up', e.clientY > window.innerHeight * 0.75 || h.contains(e.target));
+});
+
 // ---------------------------------------------------------------- Hauptzeichnen
 function render() {
     if (!G) return;
@@ -141,10 +176,12 @@ function render() {
         undoBtn.disabled = !ok;
         undoBtn.title = ok ? `Rückgängig: ${UNDO.stack[UNDO.stack.length - 1].desc}` : "Letzte eigene Aktion rückgängig machen";
     }
-    document.getElementById("p1-deck-count").textContent = G.p1.deck.length;
+    // Fortune Telling: umgedrehtes Deck – oberste Karte ist offen
+    const deckTxt = p => p.deck.length + (p.deckFaceUp && p.deck.length ? ` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
+    document.getElementById("p1-deck-count").textContent = deckTxt(G.p1);
     document.getElementById("p1-grave-count").textContent = G.p1.graveyard.length;
     document.getElementById("p1-res-count").textContent = `${getReadyRes(G.p1)}/${G.p1.resources.length}`;
-    document.getElementById("p2-deck-count").textContent = G.p2.deck.length;
+    document.getElementById("p2-deck-count").textContent = deckTxt(G.p2);
     document.getElementById("p2-grave-count").textContent = G.p2.graveyard.length;
     document.getElementById("p2-res-count").textContent = `${getReadyRes(G.p2)}/${G.p2.resources.length}`;
     document.getElementById("bot-deck-label").textContent = G.p1.className + ":";
@@ -165,8 +202,10 @@ function render() {
         wrapper.className = "opp-hand-card-wrapper";
         wrapper.style.transform = `translateY(${Math.abs(offset) * 10}px) rotate(${offset * 5}deg)`;
         wrapper.style.zIndex = i;
-        const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.className = "opp-hand-card-img";
-        wrapper.appendChild(img); th.appendChild(wrapper);
+        if (typeof handRevealed === 'function' && handRevealed(G, 2)) {   // Mind Vision: Hand offen
+            const node = createCardDOM(G.p2.hand[i], false); node.classList.add('opp-hand-card-img'); wrapper.appendChild(node);
+        } else { const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.className = "opp-hand-card-img"; wrapper.appendChild(img); }
+        th.appendChild(wrapper);
     }
     flyNewOppCards(G.p2, th);
 
@@ -175,6 +214,7 @@ function render() {
     renderHeroCard(G.p1, "bot-hero-card-container");
     renderResourceTray(G.p1, "bot-resource-tray", true);
     renderPlayerHand(G.p1);
+    layoutBottomRow();
     renderPendingPanel();
     playFxEvents(prevRects);
     syncAim();
@@ -585,9 +625,40 @@ function decorateInPlay(node, c) {
 
 function renderHeroCard(p, containerId) {
     const box = document.getElementById(containerId); box.innerHTML = "";
+    box.classList.add('hero-with-hp');
     const h = createCardDOM(p.hero, true, null, { imageMode: p.hero.flipped ? 'back' : 'ea' });
     decorateInPlay(h, p.hero);
     box.appendChild(h);
+    box.appendChild(heroHpBar(p));
+}
+
+// ---------------------------------------------------------------- Lebensbalken neben dem Helden
+// Senkrechter Balken: aktuelles Leben / maximales Leben. Schaden: Balken sinkt, ein heller Rest folgt verzögert;
+// Heilung: grünes Aufleuchten. Wenig Leben: rot und pulsierend (ab 30 %), kritisch (≤ 5) stärker.
+const HP_PREV = {};
+function heroHpBar(p) {
+    const max = Math.max(1, hpOf(G, p.hero)), cur = Math.max(0, max - (p.hero.damage || 0));
+    const r = Math.min(1, cur / max), prev = HP_PREV[p.id] !== undefined ? HP_PREV[p.id] : r;
+    HP_PREV[p.id] = r;
+    const bar = document.createElement('div');
+    bar.className = 'hp-bar' + (r <= 0.3 ? ' low' : '') + (cur <= 5 ? ' critical' : '');
+    bar.title = `Leben: ${cur} / ${max}`;
+    bar.style.setProperty('--hpc', r > 0.6 ? '#22c55e' : r > 0.3 ? '#eab308' : '#ef4444');
+    const track = document.createElement('div'); track.className = 'hp-track';
+    const trail = document.createElement('div'); trail.className = 'hp-trail';
+    const fill = document.createElement('div'); fill.className = 'hp-fill';
+    trail.style.height = fill.style.height = (prev * 100) + '%';
+    track.append(trail, fill);
+    const txt = document.createElement('div'); txt.className = 'hp-num'; txt.innerHTML = `<b>${cur}</b><span>${max}</span>`;
+    bar.append(track, txt);
+    if (prev !== r) {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            fill.style.height = (r * 100) + '%';
+            if (r < prev) { setTimeout(() => { trail.style.height = (r * 100) + '%'; }, 450); bar.classList.add('hit'); }
+            else { trail.style.height = (r * 100) + '%'; bar.classList.add('healed'); }
+        }));
+    } else trail.style.height = fill.style.height = (r * 100) + '%';
+    return bar;
 }
 
 // "Schläft": Ally ist erst in diesem Zug seines Controllers ins Spiel gekommen und kann noch nicht angreifen

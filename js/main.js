@@ -1,5 +1,14 @@
 let _cfgImgPath = "AZEROTH-{id}-EA.png";
+// Set 2/3: Bilder heißen nach Set und Kartennummer, z. B. cards/DARKPORTAL-12-EA.png, cards/OUTLAND-7-EA.png
+const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND' };
 function getImageCandidates(id, mode = 'ea') {
+    const cd = CARDS[id];
+    if (cd && SET_IMG_PREFIX[cd.set]) {
+        const n = `${SET_IMG_PREFIX[cd.set]}-${cd.num}`;
+        if (mode === 'back') return [`cards/${n}-Back.png`, `${n}-Back.png`, ...getImageCandidates(id, 'ea')];
+        if (mode === 'full') return [`cards/${n}.png`, `${n}.png`];
+        return [`cards/${n}-EA.png`, `cards/${n}.png`, `${n}-EA.png`, `${n}.png`];
+    }
     if (mode === 'back') return [`cards/AZEROTH-${id}-Back.png`, `AZEROTH-${id}-Back.png`, ...getImageCandidates(id, 'ea')];   // umgedrehter Held
     if (mode === 'full') return [`AZEROTH-${id}.png`, `cards/AZEROTH-${id}.png`];
     return [_cfgImgPath.replace("{id}", id), `AZEROTH-${id}-EA.png`, `AZEROTH-${id}.png`, `cards/AZEROTH-${id}-EA.png`, `cards/AZEROTH-${id}.png`];
@@ -231,7 +240,7 @@ function bootGame() {
     document.getElementById("graveyard-close-btn").onclick = () => { document.getElementById("graveyard-modal").style.display = "none"; };
     document.getElementById("graveyard-modal").onclick = (e) => { if (e.target.id === "graveyard-modal") e.target.style.display = "none"; };
     document.getElementById("deck-view-close-btn").onclick = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "flex"; };
-    document.getElementById("btn-deck-builder").onclick = openDeckBuilder;
+    document.getElementById("btn-deck-builder").onclick = () => openDeckBuilder();
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
     document.getElementById("btn-simulate").onclick = async () => {
