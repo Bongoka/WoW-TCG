@@ -106,6 +106,13 @@ body {
 @keyframes dbFlash { 0% { opacity: 0; transform: translateY(-4px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 /* Deckliste */
 .db-deck-list { flex: 1; overflow-y: auto; padding: 6px 10px 12px; }
+/* Deck Builder: schlanke Scrollleiste – nur der Griff, ohne Hintergrund und Pfeile */
+#deck-builder-modal ::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+#deck-builder-modal ::-webkit-scrollbar-track, #deck-builder-modal ::-webkit-scrollbar-corner { background: transparent; }
+#deck-builder-modal ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+#deck-builder-modal ::-webkit-scrollbar-thumb { background: rgba(201,168,76,.45); border-radius: 8px; }
+#deck-builder-modal ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,.75); }
+@supports (-moz-appearance: none) { #deck-builder-modal * { scrollbar-width: thin; scrollbar-color: rgba(201,168,76,.5) transparent; } }
 .db-group { display: flex; justify-content: space-between; margin: 10px 0 4px; padding: 2px 6px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; color: var(--tc); border-bottom: 1px solid color-mix(in srgb, var(--tc) 45%, transparent); }
 .db-row { display: grid; grid-template-columns: 34px 1fr 22px 22px 22px; align-items: center; gap: 4px; padding: 3px 4px 3px 2px; border-radius: 4px; font-size: 13px; cursor: default; }
 .db-row:hover { background: rgba(201,168,76,.1); }

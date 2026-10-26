@@ -353,10 +353,9 @@ function bootGame() {
     const styleSel = document.getElementById("cfg-img-style");
     styleSel.value = useScans() ? 'scans' : useHQ() ? 'hq' : 'edited';
     styleSel.onchange = () => { try { localStorage.setItem(IMG_STYLE_KEY, styleSel.value); } catch (e) {} rerenderImgs(); };
-    // Untermenü "Einstellungen & Tests": offen/zu merken
+    // Untermenü "Einstellungen & Tests"
     const more = document.getElementById("side-more");
-    try { more.open = localStorage.getItem('wow_tcg_side_more') === 'open'; } catch (e) {}
-    more.addEventListener('toggle', () => { try { localStorage.setItem('wow_tcg_side_more', more.open ? 'open' : 'closed'); } catch (e) {} });
+    more.open = false;                                                                  // startet immer eingeklappt
     document.getElementById("btn-sound").onclick = (e) => {
         sfx.muted = !sfx.muted;
         e.target.textContent = sfx.muted ? "🔇 Sound Aus" : "🔊 Sound An";
