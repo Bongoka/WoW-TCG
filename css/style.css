@@ -15,12 +15,12 @@ body {
     color: var(--text-main); font-family: 'Georgia', 'Times New Roman', serif;
     display: flex; overflow: hidden;
 }
-/* Spielfeld-Hintergrund (js/backgrounds.js): blass, unscharf, abgedunkelt – die Karten stehen davor klar im Fokus */
+/* Spielfeld-Hintergrund (js/backgrounds.js): etwas gedämpft und leicht weich, Rand abgedunkelt – die Karten stehen davor im Fokus */
 #match-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
 #match-bg.on { opacity: 1; }
-#match-bg .mbg-layer { position: absolute; inset: -40px; background: center / cover no-repeat; will-change: transform;
-    filter: blur(5px) saturate(.45) brightness(.42) contrast(.95); }
-#match-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10,7,5,.15) 0%, rgba(10,7,5,.55) 70%, rgba(5,3,2,.85) 100%); }
+#match-bg .mbg-layer { position: absolute; inset: 0; background: center / cover no-repeat;
+    filter: blur(1.5px) saturate(.7) brightness(.58); }
+#match-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10,7,5,0) 0%, rgba(10,7,5,.35) 70%, rgba(5,3,2,.7) 100%); }
 #error-banner { display: none; position: fixed; top: 0; left: 0; right: 0; background: #7f1d1d; color: #fff; padding: 8px 12px; font-weight: bold; text-align: center; z-index: 1000000; border-bottom: 2px solid var(--gold); }
 
 .shake { animation: shakeAnim 0.35s cubic-bezier(.36,.07,.19,.97) both; }

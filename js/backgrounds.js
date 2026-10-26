@@ -1,7 +1,6 @@
 // ============================================================================
 // SPIELFELD-HINTERGRUND: je Partie ein zufälliges Bild aus dem Ordner "backgrounds",
-// davon ein zufälliger Ausschnitt – blass und unscharf, damit die Karten klar hervorstechen.
-// Parallax: das Bild verschiebt sich leicht mit der Maus (wirkt räumlich).
+// davon ein zufälliger Ausschnitt – etwas gedämpft und leicht weich, damit die Karten klar hervorstechen.
 // Ein Browser darf bei direkt geöffneter index.html keinen Ordner auflisten – daher diese Liste.
 // Über einen Webserver (http) kommen neue Bilder im Ordner automatisch dazu. Fehlt ein Bild
 // (oder der ganze Ordner), wird ein anderes probiert bzw. der normale Hintergrund bleibt.
@@ -40,8 +39,7 @@ const BG_FILES = [
     'Through_the_Dark_Portal_release_-_TCG_Playmat.webp',
     'Zy%27lah_Manslayer_-_TCG_Playmat.webp',
 ];
-const MATCH_BG = { layer: null, tx: 0, ty: 0, cx: 0, cy: 0, raf: 0, files: BG_FILES.slice(), scale: 1.4 };
-const BG_PARALLAX = { x: 26, y: 18 };                      // maximale Verschiebung in px
+const MATCH_BG = { layer: null, files: BG_FILES.slice() };
 
 function initMatchBackground() {
     if (MATCH_BG.layer) return;
@@ -49,25 +47,13 @@ function initMatchBackground() {
     const layer = document.createElement('div'); layer.className = 'mbg-layer';
     wrap.appendChild(layer); document.body.prepend(wrap);
     MATCH_BG.layer = layer;
-    window.addEventListener('mousemove', e => {
-        MATCH_BG.tx = (e.clientX / window.innerWidth) * 2 - 1;
-        MATCH_BG.ty = (e.clientY / window.innerHeight) * 2 - 1;
-        if (!MATCH_BG.raf) MATCH_BG.raf = requestAnimationFrame(matchBgTick);
-    });
     // Über http: Ordnerliste des Servers lesen, damit neue Bilder ohne Listenänderung dazukommen
     if (/^https?:/.test(location.protocol)) fetch('backgrounds/').then(r => r.ok ? r.text() : '').then(html => {
         const found = [...html.matchAll(/href="([^"?#]+\.(?:webp|jpe?g|png))"/gi)].map(m => decodeURIComponent(m[1].split('/').pop()));
         found.forEach(f => { if (!MATCH_BG.files.includes(f)) MATCH_BG.files.push(f); });
     }).catch(() => {});
 }
-// Weiches Nachziehen zur Mausposition (Gegenrichtung = Tiefe)
-function matchBgTick() {
-    const m = MATCH_BG;
-    m.cx += (m.tx - m.cx) * 0.06; m.cy += (m.ty - m.cy) * 0.06;
-    if (m.layer) m.layer.style.transform = `translate3d(${(-m.cx * BG_PARALLAX.x).toFixed(2)}px, ${(-m.cy * BG_PARALLAX.y).toFixed(2)}px, 0) scale(${m.scale})`;
-    m.raf = (Math.abs(m.tx - m.cx) + Math.abs(m.ty - m.cy) > 0.002) ? requestAnimationFrame(matchBgTick) : 0;
-}
-// Neues Bild für eine Partie: zufälliges Bild, zufälliger Ausschnitt (Vergrößerung + Bezugspunkt)
+// Neues Bild für eine Partie: zufälliges Bild, zufälliger Ausschnitt (leichte Vergrößerung + Bezugspunkt)
 function pickMatchBackground() {
     initMatchBackground();
     const pool = MATCH_BG.files.slice();
@@ -78,11 +64,10 @@ function pickMatchBackground() {
         const img = new Image();
         img.onload = () => {
             const l = MATCH_BG.layer;
-            MATCH_BG.scale = 1.25 + Math.random() * 0.45;
+            l.style.transform = `scale(${(1.05 + Math.random() * 0.2).toFixed(3)})`;
             l.style.transformOrigin = `${(10 + Math.random() * 80).toFixed(1)}% ${(10 + Math.random() * 80).toFixed(1)}%`;
             l.style.backgroundImage = `url("${url}")`;
             l.parentNode.classList.add('on');
-            matchBgTick();
         };
         img.onerror = () => tryNext(left - 1);
         img.src = url;
