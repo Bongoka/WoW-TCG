@@ -178,8 +178,9 @@ function layoutRows() {
         const row = document.getElementById(rowId); if (!row) continue;
         row.style.paddingLeft = row.style.paddingRight = '0px';
         const rr = row.getBoundingClientRect(), mid = rr.left + rr.width / 2;
-        // Ausrüstung + laufende Fähigkeiten liegen beim Helden (absolut in der Reihe) – Allies weichen auch ihnen aus
-        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel), row.querySelector('.bf-equip-zone')].filter(Boolean);
+        // Ausrüstung + laufende Fähigkeiten liegen beim Helden (absolut in der Reihe) – Allies weichen auch ihnen aus,
+        // auch den zusätzlichen Reihen der Gegenseite, die über die Mittellinie ragen
+        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel), ...document.querySelectorAll('#top-allies .bf-equip-zone, #bot-allies .bf-equip-zone')].filter(Boolean);
         let padL = 0, padR = 0;
         for (const e of els) {
             const r = e.getBoundingClientRect();
@@ -775,6 +776,7 @@ function renderBattlefield(p, containerId, isOpponent) {
     });
     if (isOpponent) { if (equip.length) row.appendChild(equipZone); row.appendChild(allyZone); }
     else { row.appendChild(allyZone); if (equip.length) row.appendChild(equipZone); }
+    layoutEquipZone(row, equipZone, isOpponent);
     if (!isOpponent) {
         row.ondragover = (e) => { if (UI.drag && UI.drag.kind === 'hand' && handPlayable(UI.drag.card) && UI.drag.card.type !== 'Quest') e.preventDefault(); };
         row.ondrop = (e) => {
@@ -783,6 +785,33 @@ function renderBattlefield(p, containerId, isOpponent) {
             if (d && d.kind === 'hand' && d.card.type !== 'Quest') humanAct({ type: 'PLAY_CARD', handIdx: d.idx });
         };
     }
+}
+
+// Ausrüstung + laufende Fähigkeiten: höchstens wenige Spalten breit (Allies sind wichtiger und brauchen den Platz).
+// Weitere Karten kommen in eine neue Reihe – eigene darüber, gegnerische darunter –, leicht versetzt überlappend.
+// Höchstens EQUIP_COLS Kartenbreiten und EQUIP_MAX_ROWS Reihen; sind es noch mehr, überlappen die Karten einer Reihe.
+const EQUIP_COLS = 3, EQUIP_MAX_ROWS = 3, EQUIP_ROW_STEP = 0.5;                           // Reihenabstand in Kartenhöhen
+function layoutEquipZone(row, zone, isOpponent) {
+    const slots = [...zone.children]; if (!slots.length) return;
+    const fw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150;
+    const cardH = fw * 1.4, base = fw + 16, wide = fw * 1.4 + 16;
+    const cols = Math.max(EQUIP_COLS, Math.ceil(slots.length / EQUIP_MAX_ROWS));
+    const rows = Math.ceil(slots.length / cols), step = cardH * EQUIP_ROW_STEP, maxRowW = EQUIP_COLS * base;
+    let maxW = 0;
+    for (let r = 0; r < rows; r++) {
+        const inRow = slots.slice(r * cols, (r + 1) * cols);
+        const dx = inRow.length > 1 ? Math.min(base, (maxRowW - base) / (inRow.length - 1)) : base;   // bei Platzmangel überlappen
+        inRow.forEach((s, i) => {
+            const w = s.classList.contains('ex') ? wide : base;
+            s.style.position = 'absolute'; s.style.width = w + 'px';
+            s.style[isOpponent ? 'left' : 'right'] = (i * dx) + 'px';
+            s.style[isOpponent ? 'top' : 'bottom'] = (r * step) + 'px';
+            s.style.zIndex = (rows - r) * 10 + (inRow.length - i);                       // vordere Reihe (beim Helden) liegt oben
+            maxW = Math.max(maxW, i * dx + w);
+        });
+    }
+    zone.style.width = maxW + 'px';
+    zone.style.height = (cardH + (rows - 1) * step) + 'px';
 }
 
 // ---------------------------------------------------------------- Hand

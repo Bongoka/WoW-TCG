@@ -642,6 +642,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 #bot-allies .bf-equip-zone { right: 0; bottom: calc(var(--field-w) * 1.4 + 30px); flex-direction: row-reverse; }
 #top-allies .bf-equip-zone { left: 0; top: calc(var(--field-w) * 1.4 + 30px); flex-direction: row; }
 #top-allies .bf-equip-zone .bf-slot { justify-content: flex-start; }
+/* Mehrere Reihen (js/ui.js layoutEquipZone): Karten absolut gesetzt, Zone so groß wie ihr Inhalt */
+#bot-allies .bf-equip-zone, #top-allies .bf-equip-zone { display: block; max-width: none; }
+.bf-equip-zone .bf-slot:hover { z-index: 100 !important; }
 /* Mana-Juwel: verfügbare Ressourcen (eigenes über den Ressourcen, gegnerisches darunter) */
 .top-row .resource-tray { position: relative; }
 .mana-badge { position: absolute; left: 0; bottom: calc(100% + 10px); display: flex; align-items: center; gap: 8px; pointer-events: auto; z-index: 5; }
