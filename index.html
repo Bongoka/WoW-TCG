@@ -85,6 +85,12 @@
             <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">⏩ Auto-Zugende: An</button>
             <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
             <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:11px;color:var(--text-dim);">Kartenbilder:</label>
+                <select id="cfg-img-style" title="Normal: bearbeitete Bilder, scharf, verbesserte Texte, mit Extended Art. Original-Scans: fotografierte Originalkarten (ohne Extended Art – im Booster gibt es dafür eine Foil-Karte). Normal + High Resolution: wie Normal, die große Kartenansicht in sehr hoher Auflösung." style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
+                    <option value="edited">Normal</option><option value="scans">Original-Scans</option><option value="hq">Normal + High Resolution</option>
+                </select>
+            </div>
             <div class="side-more-head">Tests</div>
             <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
             <button id="btn-simulate-tourney" title="Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007">🏆 Turnierdeck-Simulation</button>
@@ -211,24 +217,19 @@
 </div></div>
 
 <div id="deck-builder-modal"><div class="modal-box">
-    <div class="db-header">
-        <div class="db-title">
-            <h2>🛠 Deck Builder</h2>
-            <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
-        </div>
+    <!-- Kopf in einer Zeile: Titel, Deckname, Klassen-Icons, Aktionen. Das Heldenfeld steht oben in der Deckliste (rechts). -->
+    <div class="db-top">
+        <h2>🛠 Deck Builder</h2>
+        <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
+        <div id="db-class-bar"></div>
         <div class="db-actions">
             <button id="db-new-btn" title="Leeres Deck beginnen">✚ Neu</button>
             <button id="db-import-btn" title="Kartenliste einfügen">📥 Import</button>
             <button id="db-export-btn" title="Deck als Kartenliste">📤 Export</button>
-            <button id="db-save-only-btn" class="success">💾 Speichern</button>
-            <button id="db-save-btn" class="success">▶ Speichern &amp; Spielen</button>
-            <button id="db-close-btn" class="danger">✖</button>
+            <button id="db-save-only-btn" class="success" title="Speichern">💾 Speichern</button>
+            <button id="db-save-btn" class="success" title="Speichern und mit diesem Deck spielen">▶ Spielen</button>
+            <button id="db-close-btn" class="danger" title="Schließen">✖</button>
         </div>
-    </div>
-    <!-- Klassen-Filter links, Held rechts oben: Klick öffnet die Auswahl aller (passenden) Helden mit Bildern -->
-    <div class="db-pickers">
-        <div id="db-class-bar"></div>
-        <div id="db-hero-slot" title="Held wählen"></div>
     </div>
     <div id="db-hero-picker"><div class="db-hp-box">
         <div class="db-hp-head"><b id="db-hp-title">Held wählen</b><span id="db-hp-tools"></span><button id="db-hp-close" class="danger">✖</button></div>
@@ -270,6 +271,8 @@
             <div class="db-scroll" id="db-pool-cards"></div>
         </div>
         <div class="db-deck">
+            <!-- Held: Klick öffnet die Auswahl aller (passenden) Helden mit Bildern -->
+            <div id="db-hero-slot" title="Held wählen"></div>
             <div class="db-stats">
                 <div class="db-progress-row">
                     <div class="db-progress"><div id="db-progress-fill"></div><div class="db-progress-mark"></div></div>

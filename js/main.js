@@ -1,7 +1,53 @@
 let _cfgImgPath = "AZEROTH-{id}-EA.png";
-// Set 2–5: Bilder heißen nach Set und Kartennummer, z. B. cards/DARKPORTAL-12-EA.png, cards/OUTLAND-7-EA.png,
-// Raid-Loot cards/ONYXIA-21.png, cards/MOLTENCORE-30.png
-const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };
+// Kartenbilder je Set in cards/<set>…: "<set> big" (sehr hoch aufgelöst), "<set>" (Zoom, 716 px), "<set> small"
+// (Hand/Spielfeld/Deck Builder, 358 px) – bearbeitet, Dateien <PRÄFIX>-<Nr>[-EA|-Back]_ergebnis.webp (big auch .png).
+// "<set> scans" / "<set> scans small": fotografierte Originalkarten, benannt nach Kartenname (' → _, : → ' -',
+// Heldenrückseite " - Backside"); Scans haben keine Extended Art.
+const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia', 'ONYXIA'], 5: ['molten core', 'MOLTEN CORE'] };
+const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };   // alte Ablage cards/<PRÄFIX>-<Nr>.png (Rückfall)
+// Einstellung Kartenbilder: 'edited' Normal, 'scans' Original-Scans, 'hq' Normal + High Resolution (Zoom aus "<set> big").
+// Nötig ist nur der Ordner "<set>" – alle anderen sind optional, fehlende Bilder fallen auf die vorhandenen zurück.
+const IMG_STYLE_KEY = 'wow_tcg_img_style';
+const imgStyle = () => { try { return localStorage.getItem(IMG_STYLE_KEY) || 'edited'; } catch (e) { return 'edited'; } };
+const useScans = () => imgStyle() === 'scans';
+const useHQ = () => imgStyle() === 'hq';
+// Scan-Dateinamen: Akzente weg, " und ? weg, ' → _, : → ' -', " . . ." → "..."; dazu Tippfehler/Abweichungen der Dateien
+const SCAN_NAME_FIX = { 'Nerra Lifeboon': 'Nerra Lifeboom', 'Deacon Johanna': 'Decon Johanna', 'Valthak Spiritdrinker': 'Valthak Spiritdinker',
+    'Stronghold Gauntlets': 'Stronghold Guantlets', 'Nathressa Darkstrider': 'Nathressa Darksrider', 'Operation Recombobulation': 'Opertation Recombobulation',
+    'Tanwa the Marksman': 'Tanwa Marksman', 'Wanted: "Hogger"': 'Wanted Hogger', 'Broan Charges-the-Fight': 'Broan Charges-the-Flight',
+    'Gauntlets of Vindication': 'Guantlets of Vindication', 'Tempest, Son-of-Storms': 'Tempest, Son-of-Storms_' };
+const scanName = c => SCAN_NAME_FIX[c.name] || c.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/["?]/g, '')
+    .replace(/[’']/g, '_').replace(/:/g, ' -').replace(/ \. \. \./g, '...').trim();
+// Optionale Ordner, die es nicht gibt (beim Start einmal geprüft): werden dann gar nicht erst angefragt
+const IMG_DIR_MISSING = new Set();
+function probeImageDirs(done) {
+    let open = 0;
+    const finish = () => { if (--open === 0 && done) done(); };
+    for (const [set, [dir, pre]] of Object.entries(SET_IMG)) {
+        const first = Object.values(CARDS).find(c => !c.isToken && (c.set || 1) === +set && (c.set ? c.num : c.id) === 1); if (!first) continue;
+        const ed = [`${pre}-1_ergebnis.webp`, `${pre}-1.png`];
+        const tries = { [dir]: ed, [dir + ' small']: ed, [dir + ' big']: ed,
+            [dir + ' scans']: [`${scanName(first)}_ergebnis.webp`], [dir + ' scans small']: [`${scanName(first)}_ergebnis.webp`] };
+        for (const [folder, files] of Object.entries(tries)) {
+            open++; let k = 0; const img = new Image();
+            img.onload = finish;
+            img.onerror = () => { if (++k < files.length) img.src = encodeURI(`cards/${folder}/${files[k]}`); else { IMG_DIR_MISSING.add(folder); finish(); } };
+            img.src = encodeURI(`cards/${folder}/${files[0]}`);
+        }
+    }
+}
+// Menü: Optionen ohne Bilder sperren (Grundlage: Set 1). Ist die gewählte Option nicht installiert, gilt "Normal".
+function updateImgStyleOptions() {
+    const sel = document.getElementById("cfg-img-style"); if (!sel) return;
+    const miss = f => IMG_DIR_MISSING.has(f);
+    const avail = { scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: !miss('azeroth big') };
+    for (const o of sel.options) {
+        if (!(o.value in avail)) continue;
+        o.disabled = !avail[o.value];
+        o.textContent = o.textContent.replace(/ \(nicht installiert\)$/, '') + (avail[o.value] ? '' : ' (nicht installiert)');
+    }
+    if (avail[imgStyle()] === false) { try { localStorage.setItem(IMG_STYLE_KEY, 'edited'); } catch (e) {} sel.value = 'edited'; if (G) render(); }
+}
 // Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.png" (große Vorschau)
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
     9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton' };
@@ -11,19 +57,26 @@ function getImageCandidates(id, mode = 'ea') {
         const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.png`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
         return mode === 'full' || mode === 'eaBig' ? [big, small] : [small, big];
     }
-    if (cd && SET_IMG_PREFIX[cd.set]) {
-        const n = `${SET_IMG_PREFIX[cd.set]}-${cd.num}`;
-        if (mode === 'back') return [`cards/${n}-Back.png`, `${n}-Back.png`, ...getImageCandidates(id, 'ea')];
-        if (mode === 'full') return [`cards/${n}.png`, `${n}.png`];
-        return [`cards/${n}-EA.png`, `cards/${n}.png`, `${n}-EA.png`, `${n}.png`];
+    const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
+    const [dir, pre] = si, num = cd.set ? cd.num : id;
+    const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${pre}-${num}${suf}_ergebnis.webp`), encodeURI(`cards/${folder}/${pre}-${num}${suf}.png`)];
+    const small = suf => ed(dir + ' small', suf), norm = suf => ed(dir, suf), big = suf => ed(dir + ' big', suf);
+    const zoom = suf => useHQ() ? [...big(suf), ...norm(suf)] : [...norm(suf), ...big(suf)];
+    const old = SET_IMG_PREFIX[cd.set] ? [`cards/${SET_IMG_PREFIX[cd.set]}-${num}-EA.png`, `cards/${SET_IMG_PREFIX[cd.set]}-${num}.png`] : [_cfgImgPath.replace("{id}", id)];
+    // Modi: 'ea' Hand/Spielfeld (Extended Art bevorzugt), 'full' Zoom/Booster (normales Bild), 'back' Heldenrückseite,
+    // 'eaCard' / 'eaBig' Extended-Art-Karte aus dem Booster – die gibt es nur bearbeitet, auch wenn Scans gewählt sind
+    if (mode === 'eaBig') return [...zoom('-EA'), ...zoom(''), ...old];
+    const sc = (folder, back) => IMG_DIR_MISSING.has(`${dir} ${folder}`) ? [] : [encodeURI(`cards/${dir} ${folder}/${scanName(cd)}${back ? ' - Backside' : ''}_ergebnis.webp`)];
+    const scans = back => [...sc('scans small', back), ...sc('scans', back)];                // letzter Rückfall, falls keine bearbeiteten Bilder da sind
+    if (mode === 'eaCard') return [...small('-EA'), ...norm('-EA'), ...small(''), ...norm(''), ...scans(false), ...old];
+    if (useScans()) {
+        if (mode === 'full') return [...sc('scans', false), ...sc('scans small', false), ...zoom(''), ...small(''), ...old];
+        const back = mode === 'back';                                                          // ohne Scan: bearbeitetes Bild
+        return [...scans(back), ...(back ? [...small('-Back'), ...norm('-Back')] : []), ...small(''), ...norm(''), ...old];
     }
-    // Set 1: cards/azeroth small/*.webp (358 px, Hand/Spielfeld), cards/azeroth/*.webp (716 px, große Vorschau),
-    // cards/azeroth big/*.png (Originale, nur als Rückfall)
-    const w = (dir, suf) => encodeURI(`cards/${dir}/AZEROTH-${id}${suf}_ergebnis.webp`), big = suf => encodeURI(`cards/azeroth big/AZEROTH-${id}${suf}.png`);
-    if (mode === 'back') return [w('azeroth small', '-Back'), big('-Back'), ...getImageCandidates(id, 'ea')];   // umgedrehter Held
-    if (mode === 'full') return [w('azeroth', ''), big('')];
-    if (mode === 'eaBig') return [w('azeroth', '-EA'), w('azeroth', ''), big('-EA'), big('')];                 // Vorschau mit Extended Art
-    return [w('azeroth small', '-EA'), w('azeroth small', ''), big('-EA'), big(''), _cfgImgPath.replace("{id}", id)];
+    if (mode === 'back') return [...small('-Back'), ...norm('-Back'), ...scans(true), ...getImageCandidates(id, 'ea')];
+    if (mode === 'full') return [...zoom(''), ...small(''), ...sc('scans', false), ...sc('scans small', false), ...old];
+    return [...small('-EA'), ...small(''), ...norm('-EA'), ...norm(''), ...big(''), ...scans(false), ...old];
 }
 function getCardColor(card) {
     if (card.type === 'Weapon' || card.type === 'Armor' || card.type === 'Item') return '#a89880';
@@ -294,6 +347,12 @@ function bootGame() {
     const updAuto = () => { autoBtn.textContent = autoEndTurn() ? "⏩ Auto-Zugende: An" : "⏸ Auto-Zugende: Aus"; };
     autoBtn.onclick = () => { try { localStorage.setItem(AUTO_END_KEY, autoEndTurn() ? 'off' : 'on'); } catch (e) {} updAuto(); if (G) render(); };
     updAuto();
+    probeImageDirs(updateImgStyleOptions);
+    // Kartenbilder: Normal, Original-Scans oder Normal + High Resolution
+    const rerenderImgs = () => { if (G) render(); const db = document.getElementById("deck-builder-modal"); if (db && db.style.display === 'flex') renderDBAll(); };
+    const styleSel = document.getElementById("cfg-img-style");
+    styleSel.value = useScans() ? 'scans' : useHQ() ? 'hq' : 'edited';
+    styleSel.onchange = () => { try { localStorage.setItem(IMG_STYLE_KEY, styleSel.value); } catch (e) {} rerenderImgs(); };
     // Untermenü "Einstellungen & Tests": offen/zu merken
     const more = document.getElementById("side-more");
     try { more.open = localStorage.getItem('wow_tcg_side_more') === 'open'; } catch (e) {}

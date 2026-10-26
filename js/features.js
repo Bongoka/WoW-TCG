@@ -92,7 +92,7 @@ function renderDBHero() {
         const card = document.createElement('div'); card.className = 'db-hs-card';
         const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false, null, { stats: false, noDamage: true }); n.style.setProperty('--cw', '100%');
         card.appendChild(n); slot.appendChild(card);
-    } else slot.innerHTML = '<div class="db-hs-card empty">Held</div>';
+    } else slot.innerHTML = '<div class="db-hs-card empty">Held</div><div class="db-hs-info"><b>Held wählen</b><span class="db-hs-hint">Klicken: alle Helden mit Bild.<br>Der Held legt Klasse, Fraktion und Talent fest.</span></div>';
     slot.onclick = () => openDBHeroPicker(!!DBF.cls);
 }
 // Auswahl aller Helden mit Bildern (bei aktivem Klassenfilter nur diese Klasse, umschaltbar)
@@ -385,6 +385,7 @@ const BOOSTER_RAR = {
     hero: { label: 'Held', n: 22, notes: [440, 554] },                                        // jeder Booster hat einen Helden
     herofoil: { label: 'Foil-Held', n: 60, notes: [392, 523, 659, 784], big: true },          // 10 % der Helden sind Foil
     ea: { label: 'Extended Art', n: 60, notes: [587, 740, 880, 1175], big: true },
+    foil: { label: 'Foil', n: 60, notes: [587, 740, 880, 1175], big: true },                  // statt Extended Art, wenn Scans gewählt sind
 };
 // Booster je Set: nur Karten aus diesem Set
 const BOOSTER_SETS = [
@@ -536,7 +537,10 @@ function generateBoosterCards() {
     else { if(shuffledRares.length) { let id = shuffledRares.pop(); boosterCards.push({cardId:id,rarity:'Rare'}); availablePool = availablePool.filter(cid=>cid!==id); } }
     if(shuffledHeroes.length) { let id = shuffledHeroes.pop(); const foil = Math.random() < 0.1;   // 10 %: Foil-Held
         boosterCards.push({ cardId: id, rarity: foil ? 'HeroFoil' : 'Hero', forceFoil: foil ? randomFoil() : null }); }
-    if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)]; const eaFoil = Math.random()<0.1 ? randomFoil() : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); }
+    if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)];
+        // Scans haben keine Extended Art: dann wird es eine normale Karte, als Ausgleich immer Foil
+        if (useScans()) boosterCards.push({ cardId: eaCardId, rarity: 'Foil', forceFoil: randomFoil() });
+        else { const eaFoil = Math.random()<0.1 ? randomFoil() : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); } }
     shuffleDeck(boosterCards);
     const box = document.getElementById("booster-cards-container");
     box.style.display = "block"; box.innerHTML = "";
@@ -552,7 +556,7 @@ function generateBoosterCards() {
         let forceFoil = data.forceFoil || null;
         if (!data.isEA && card.isFoil && card.type !== 'Hero') forceFoil = randomFoil();   // Helden: Foil nur über die 10 %-Würfel oben
         // stats: false -> im Booster keine Werte-Symbole; no-fx bis zum Aufdecken (keine Vorschau verdeckter Karten)
-        const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', previewMode: data.isEA ? 'ea' : null, noDamage: true, stats: false });
+        const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'eaCard' : 'full', previewMode: data.isEA ? 'ea' : null, noDamage: true, stats: false });
         node.style.setProperty('--cw', '100%'); node.classList.add('no-fx');
         front.appendChild(node);
         const back = document.createElement("div"); back.className = "flip-face flip-back";

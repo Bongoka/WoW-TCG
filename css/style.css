@@ -41,10 +41,12 @@ body {
 #deck-builder-modal .modal-box { width: 96vw; height: 92vh; display: flex; flex-direction: column; padding: 14px 16px; }
 #deck-builder-modal input, #deck-builder-modal select, #db-io-modal textarea { background: #0a0705; border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: 4px; font-family: inherit; }
 #deck-builder-modal input:focus, #deck-builder-modal select:focus, #db-io-modal textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,168,76,.25); }
-.db-header { display: flex; align-items: center; gap: 18px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.db-title { display: flex; flex-direction: column; gap: 6px; min-width: 240px; }
-.db-title h2 { margin: 0; color: var(--gold); font-size: 20px; }
-#db-name { font-size: 15px; font-weight: bold; width: 260px; }
+/* Kopf in einer Zeile: Titel · Deckname · Klassen-Icons · Aktionen (bei schmalem Fenster bricht er um) */
+.db-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.db-top h2 { margin: 0; color: var(--gold); font-size: 18px; white-space: nowrap; }
+#db-name { font-size: 14px; font-weight: bold; width: 210px; padding: 5px 8px; }
+.db-top .db-actions { margin-left: auto; flex-wrap: nowrap; gap: 6px; }
+.db-top .db-actions button { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
 .db-hero-pick { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
 .db-hero-pick label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
 #db-hero-select { max-width: 340px; font-size: 13px; }
@@ -200,10 +202,10 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .flip-back img { width: 100%; height: 100%; object-fit: fill; border-radius: 6px; border: 2px solid var(--gold-dark); box-shadow: 0 10px 22px rgba(0,0,0,.8); transition: box-shadow .25s; user-select: none; }
 .booster-card-wrapper.glow-common { --gc: 190,190,190; } .booster-card-wrapper.glow-uncommon { --gc: 74,222,128; }
 .booster-card-wrapper.glow-rare { --gc: 96,165,250; } .booster-card-wrapper.glow-epic { --gc: 168,85,247; }
-.booster-card-wrapper.glow-hero { --gc: 245,158,11; } .booster-card-wrapper.glow-ea { --gc: 251,191,36; }
+.booster-card-wrapper.glow-hero { --gc: 245,158,11; } .booster-card-wrapper.glow-ea { --gc: 251,191,36; } .booster-card-wrapper.glow-foil { --gc: 244,114,182; }
 /* Rahmen sitzt auf der Kartenfläche selbst (in .cfx-tilt) – er folgt dem Kippen und Anheben beim Hover */
 .booster-card-wrapper.flipped .card-visual { box-shadow: 0 0 0 0.9cqw rgb(var(--gc)), 0 0 7cqw 1.5cqw rgba(var(--gc), .55), 0 2cqw 5cqw rgba(0,0,0,.7); }
-.booster-card-wrapper.flipped:is(.glow-rare, .glow-epic, .glow-hero, .glow-ea) .card-visual { animation: bGlow 2.2s ease-in-out infinite; }
+.booster-card-wrapper.flipped:is(.glow-rare, .glow-epic, .glow-hero, .glow-ea, .glow-foil) .card-visual { animation: bGlow 2.2s ease-in-out infinite; }
 @keyframes bGlow { 0%, 100% { box-shadow: 0 0 0 0.9cqw rgb(var(--gc)), 0 0 6cqw 1cqw rgba(var(--gc), .45), 0 2cqw 5cqw rgba(0,0,0,.7); }
     50% { box-shadow: 0 0 0 0.9cqw rgb(var(--gc)), 0 0 12cqw 3cqw rgba(var(--gc), .8), 0 2cqw 5cqw rgba(0,0,0,.7); } }
 /* Lichtstrahlen hinter epischen Karten, Helden und Extended Art */
@@ -686,19 +688,21 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .booster-card-wrapper.glow-herofoil { --gc: 245,158,11; }
 .booster-card-wrapper.flipped.glow-herofoil .card-visual { animation: bGlow 2.2s ease-in-out infinite; }
 /* Deck Builder: Klassen-Leiste (Filter) und Helden-Streifen mit Bildern */
-.db-pickers { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 10px; }
-#db-class-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: stretch; flex: 1; min-width: 0; }
-/* Heldenfeld rechts oben */
-#db-hero-slot { flex: none; display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 6px; border-radius: 10px; transition: background .15s; }
-#db-hero-slot:hover { background: rgba(201,168,76,.08); }
-.db-hs-info { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 3px; max-width: 220px; }
-.db-hs-info b { color: var(--gold-light); font-size: 16px; }
+#db-class-bar { display: flex; gap: 4px; flex-wrap: wrap; align-items: stretch; min-width: 0; }
+/* Heldenfeld oben in der Deckliste (rechte Spalte): Karte links, Angaben daneben */
+#db-hero-slot { display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 10px 12px; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; transition: background .15s;
+    background: radial-gradient(ellipse at 15% 50%, rgba(201,168,76,.16), transparent 65%), #1a1512; }
+#db-hero-slot:hover { background: radial-gradient(ellipse at 15% 50%, rgba(201,168,76,.26), transparent 70%), #1f1914; }
+.db-hs-info { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.db-hs-info b { color: var(--gold-light); font-size: 17px; }
 .db-hs-info span { color: var(--text-main); font-size: 12px; }
 .db-hs-info small { color: var(--text-dim); font-size: 10px; margin-top: 4px; }
-.db-hs-card { width: 130px; flex: none; border-radius: 8px; transition: transform .15s, box-shadow .15s; }
+.db-hs-hint { color: var(--text-dim); font-size: 12px; line-height: 1.4; }
+.db-hs-card { order: -1; width: 92px; flex: none; border-radius: 8px; transition: transform .15s, box-shadow .15s; }
 .db-hs-card .card-wrapper { width: 100%; }
 #db-hero-slot:hover .db-hs-card { transform: translateY(-3px); box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(250,204,21,.45); }
-.db-hs-card.empty { height: 182px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--gold-dark); background: rgba(0,0,0,.35); color: var(--gold); font-size: 20px; font-weight: bold; letter-spacing: 1px; }
+#db-hero-slot + .db-stats { border-radius: 0; }
+.db-hs-card.empty { height: 128px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--gold-dark); background: rgba(0,0,0,.35); color: var(--gold); font-size: 20px; font-weight: bold; letter-spacing: 1px; }
 /* Auswahl-Fenster */
 #db-hero-picker { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.72); align-items: center; justify-content: center; }
 .db-hp-box { width: min(1180px, 94vw); max-height: 90vh; display: flex; flex-direction: column; background: #0d0907; border: 1px solid var(--gold-dark); border-radius: 10px; box-shadow: 0 10px 50px rgba(0,0,0,.8); overflow: hidden; }
@@ -710,14 +714,14 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .db-hp-cls img { width: 24px; height: 24px; object-fit: contain; }
 .db-hp-grid .db-hero-tile { width: auto; }
 .db-hero-sub { font-size: 9px; text-align: center; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.db-class { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 8px 4px; min-width: 70px; border-radius: 8px; background: #120e0b; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: transform .15s, border-color .15s, background .15s; }
-.db-class img { width: 38px; height: 38px; object-fit: contain; filter: grayscale(.6) brightness(.8); transition: filter .15s; }
-.db-class small { font-size: 10px; font-weight: bold; letter-spacing: .3px; }
+.db-class { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 4px 2px; min-width: 54px; border-radius: 8px; background: #120e0b; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: transform .15s, border-color .15s, background .15s; }
+.db-class img { width: 28px; height: 28px; object-fit: contain; filter: grayscale(.6) brightness(.8); transition: filter .15s; }
+.db-class small { font-size: 9px; font-weight: bold; letter-spacing: .2px; }
 .db-class:hover { transform: translateY(-2px); border-color: var(--gold-dark); color: var(--gold-light); }
 .db-class:hover img { filter: none; }
 .db-class.on { background: linear-gradient(180deg, #3a2c12, #1a1208); border-color: var(--gold); color: var(--gold-light); box-shadow: 0 0 12px rgba(201,168,76,.45); }
 .db-class.on img { filter: drop-shadow(0 0 6px rgba(250,204,21,.6)); }
-.db-class-all { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--gold); }
+.db-class-all { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--gold); }
 #db-hero-strip { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; padding: 6px 4px 8px; align-items: center; border-radius: 6px; background: rgba(0,0,0,.3); border: 1px solid var(--border); scrollbar-width: thin; }
 .db-hero-hint { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; min-width: 150px; max-width: 190px; padding: 0 8px; gap: 3px; }
 .db-hero-hint b { color: var(--gold-light); font-size: 14px; }
