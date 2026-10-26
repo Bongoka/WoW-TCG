@@ -1,37 +1,3 @@
-// --- BILD-TEST: alle Bilder aus dem Ordner "test" als Karten (ohne Foil und Schaden) ---
-// Bei direkt geöffneter index.html darf der Browser Ordner nicht selbst auflisten – daher die Ordnerauswahl.
-let _imgTestUrls = [];
-function openImageTest() { document.getElementById("imgtest-modal").style.display = "flex"; }
-function loadImageTest(files) {
-    _imgTestUrls.forEach(u => URL.revokeObjectURL(u)); _imgTestUrls = [];
-    const grid = document.getElementById("imgtest-grid"); grid.innerHTML = "";
-    const imgs = [...files].filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|avif)$/i.test(f.name))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    document.getElementById("imgtest-count").textContent = `${imgs.length} Bilder`;
-    if (!imgs.length) { grid.innerHTML = '<div class="imgtest-empty">Im gewählten Ordner sind keine Bilder.</div>'; return; }
-    imgs.forEach(f => {
-        const url = URL.createObjectURL(f); _imgTestUrls.push(url);
-        const item = document.createElement("div"); item.className = "imgtest-item";
-        const card = createCardDOM({ id: 'imgtest', uid: 'imgtest_' + f.name, name: f.name, type: 'Bild', isFoil: false }, false, null, { imgSrc: url, stats: false, noDamage: true });
-        const cap = document.createElement("div"); cap.className = "imgtest-cap";
-        cap.innerHTML = `<b>${esc(f.webkitRelativePath || f.name)}</b><br>… px · ${(f.size / 1024).toFixed(0)} KB`;
-        const probe = new Image();
-        probe.onload = () => { item.dataset.w = probe.naturalWidth; cap.innerHTML = `<b>${esc(f.webkitRelativePath || f.name)}</b><br>${probe.naturalWidth} × ${probe.naturalHeight} px · ${(f.size / 1024).toFixed(0)} KB`; applyImageTestSize(); };
-        probe.src = url;
-        item.appendChild(card); item.appendChild(cap); grid.appendChild(item);
-    });
-    applyImageTestSize();
-}
-function applyImageTestSize() {
-    const v = document.getElementById("imgtest-size").value;
-    document.querySelectorAll("#imgtest-grid .imgtest-item").forEach(it => it.style.setProperty('--it-w', v === 'orig' ? (it.dataset.w ? it.dataset.w + 'px' : '350px') : v));
-}
-document.getElementById("btn-img-test").onclick = openImageTest;
-
-document.getElementById("imgtest-close").onclick = () => { document.getElementById("imgtest-modal").style.display = "none"; };
-document.getElementById("imgtest-input").addEventListener('change', (e) => loadImageTest(e.target.files));
-document.getElementById("imgtest-size").addEventListener('change', applyImageTestSize);
-
 // --- DECK BUILDER ---
 // Deck = { id, hero, faction, class, name, cards: [Karten-IDs] }. Eigene Decks liegen im Browser (localStorage).
 // Größe frei (unter/über 60 erlaubt, nur farblich markiert); max. 4 Kopien je Karte außer "Unlimited".

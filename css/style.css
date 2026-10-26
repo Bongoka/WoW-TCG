@@ -519,16 +519,6 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .fx-showcase .card-wrapper { width: 100%; }
 
 /* ===== Bild-Test-Szene ===== */
-#imgtest-modal { position: fixed; inset: 0; z-index: 100200; display: none; flex-direction: column; background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 80%); }
-.imgtest-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.4); }
-.imgtest-pick { cursor: pointer; padding: 7px 14px; border: 1px solid #0ea5e9; border-radius: 3px; background: #0c4a6e; color: #e0f2fe; font-weight: bold; font-size: 12px; }
-.imgtest-pick input { display: none; }
-#imgtest-grid { flex: 1; overflow: auto; display: flex; flex-wrap: wrap; gap: 26px; align-content: flex-start; justify-content: center; padding: 24px; }
-.imgtest-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-#imgtest-grid .imgtest-item .card-wrapper { --cw: var(--it-w, 350px); }
-.imgtest-cap { font: 12px/1.35 Consolas, monospace; color: var(--text-main); text-align: center; max-width: max(180px, var(--it-w, 350px)); word-break: break-all; }
-.imgtest-cap b { color: var(--gold-light); }
-.imgtest-empty { color: var(--text-dim); margin-top: 20vh; font-size: 15px; }
 
 /* ===== Siegbildschirm ===== */
 #gameover { position: fixed; inset: 0; z-index: 100500; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2vh;
