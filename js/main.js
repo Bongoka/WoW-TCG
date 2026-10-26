@@ -271,6 +271,14 @@ function bootGame() {
     updateMulliganButton();
     document.getElementById("btn-rules-text").onclick = toggleRulesTextMode;
     updateRulesTextButton();
+    const autoBtn = document.getElementById("btn-auto-end");
+    const updAuto = () => { autoBtn.textContent = autoEndTurn() ? "⏩ Auto-Zugende: An" : "⏸ Auto-Zugende: Aus"; };
+    autoBtn.onclick = () => { try { localStorage.setItem(AUTO_END_KEY, autoEndTurn() ? 'off' : 'on'); } catch (e) {} updAuto(); if (G) render(); };
+    updAuto();
+    // Untermenü "Einstellungen & Tests": offen/zu merken
+    const more = document.getElementById("side-more");
+    try { more.open = localStorage.getItem('wow_tcg_side_more') === 'open'; } catch (e) {}
+    more.addEventListener('toggle', () => { try { localStorage.setItem('wow_tcg_side_more', more.open ? 'open' : 'closed'); } catch (e) {} });
     document.getElementById("btn-sound").onclick = (e) => {
         sfx.muted = !sfx.muted;
         e.target.textContent = sfx.muted ? "🔇 Sound Aus" : "🔊 Sound An";

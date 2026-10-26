@@ -30,16 +30,16 @@ document.getElementById("btn-img-test").onclick = openImageTest;
 
 // --- FOIL-TEST: 10 neue Foil-Effekte (css/cards.css .cfx-foil.n1 … n10) nebeneinander ansehen ---
 const FOIL_TESTS = [
-    { k: 'n1', name: 'Prisma-Holo', desc: 'Regenbogenbänder wandern mit der Maus, feine Holo-Linien darüber.' },
-    { k: 'n2', name: 'Sternenstaub', desc: 'Drei Glitzerschichten mit Parallaxe, eine davon funkelt.' },
-    { k: 'n3', name: 'Chrom', desc: 'Karte wird metallisch entsättigt, gebürstete Linien und ein Lichtstreifen.' },
-    { k: 'n4', name: 'Arkaner Zirkel', desc: 'Zwei gegenläufig drehende Runenringe kreisen um die Maus.' },
-    { k: 'n5', name: 'Glut', desc: 'Funken steigen auf, Hitzeschein von unten, leichtes Flackern.' },
-    { k: 'n6', name: 'Frost', desc: 'Eisrisse, Raureif am Rand und ein kalter Lichtstreifen.' },
-    { k: 'n7', name: 'Galaxie', desc: 'Nebelwolken bewegen sich gegen die Maus, Sterne funkeln.' },
-    { k: 'n8', name: 'Sonnengold', desc: 'Drehende Goldstrahlen aus der Mausposition, Karte leicht vergoldet.' },
-    { k: 'n9', name: 'Wasser', desc: 'Wellenringe breiten sich von der Maus aus, Lichtflecken wandern.' },
+    { k: 'n1', name: 'Prisma-Holo (sanfter)', desc: 'Regenbogenbänder wandern mit der Maus, nahe der Maus am stärksten.' },
     { k: 'n10', name: 'Drachenschuppen', desc: 'Schuppenmuster schimmert in Smaragd- und Goldtönen.' },
+    { k: 'n2', name: 'Base-Set-Holo', desc: 'Wie Pokémon 1999: nur das Bild glänzt, senkrechte Regenbogenschlieren.' },
+    { k: 'n3', name: 'Cosmos-Holo', desc: 'Kreise verschiedener Größe im Bild, durch die der Regenbogen läuft.' },
+    { k: 'n4', name: 'Reverse-Holo', desc: 'Alles glänzt außer dem Bild.' },
+    { k: 'n5', name: 'Magic-Foil 1999', desc: 'Weicher Regenbogen-Schleier über der ganzen Karte, dazu ein Glanzstreifen.' },
+    { k: 'n6', name: 'Cracked Ice', desc: 'Das Bild zerfällt in Splitter, jeder spiegelt eine andere Farbe.' },
+    { k: 'n7', name: 'Secret Rare', desc: 'Feines Kreuzgitter aus Linien, durch das der Regenbogen wandert.' },
+    { k: 'n8', name: 'Starlight-Holo', desc: 'Funkelnde vierzackige Sterne im Bild, nahe der Maus am hellsten.' },
+    { k: 'n9', name: 'Linien-Holo', desc: 'Senkrechte Regenbogenlinien im Bild, die bei Bewegung durchlaufen.' },
 ];
 const FOILT = { ids: [], raf: 0 };
 function foilTestPick(n) {

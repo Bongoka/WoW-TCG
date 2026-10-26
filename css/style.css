@@ -568,3 +568,60 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
     color: #ef4444; font-size: min(7vw, 15vh); font-weight: 900; text-shadow: 0 0 18px #000, 0 0 8px #7f1d1d; }
 .hs-mull-card.marked .hs-mull-x { display: flex; }
 #hs-mull-keep { padding: 12px 64px; font-size: 20px; }
+
+/* ===== Symmetrisches Brett =====
+   Spielfeld über die volle Höhe, zwei gleich große Hälften, Zuglinie genau in der Mitte.
+   Beide Spielerreihen liegen in den Ecken darüber: unten Ressourcen ab der linken Ecke, Friedhof + Held rechts;
+   oben gespiegelt (Held + Friedhof links, Ressourcen ab der rechten Ecke). Die Ally-Reihen weichen seitlich aus (layoutRows). */
+#arena { position: relative; padding: 0; }
+#battlefield-zone { position: absolute; inset: 0; min-height: 0; padding: 0 10px !important; display: flex; flex-direction: column; justify-content: stretch; gap: 0; }
+#battlefield-zone .battlefield-row { flex: 1 1 0; height: auto; min-height: 0; }
+.player-row { position: absolute; left: 10px; right: 10px; width: auto; min-height: 0; margin: 0; pointer-events: none; z-index: 800; gap: 12px; }
+.player-row > * { pointer-events: auto; }
+.top-row { top: 8px; align-items: flex-start; }
+.bottom-row { bottom: 8px; align-items: flex-end; }
+.bottom-row .resource-tray { order: 0; margin: 0 auto 0 0; }
+.bottom-row .deck-zone { order: 1; }
+.bottom-row .hero-dock { order: 2; }
+.top-row .hero-dock { order: 0; }
+.top-row .deck-zone { order: 1; }
+.top-row .resource-tray { order: 2; margin: 0 0 0 auto; }
+
+/* Ressourcen: eine Reihe aus der Ecke heraus – verdeckte Karten (Kartenrücken, überlappend), daneben offene Quests */
+.resource-tray, .bottom-row .resource-tray { flex-direction: row; align-items: flex-end; gap: 10px; max-width: 32%; min-width: 0; }
+.top-row .resource-tray { flex-direction: row-reverse; align-items: flex-start; }
+.res-stack { display: flex; min-width: 0; flex: 0 1 auto; }
+.top-row .res-stack { flex-direction: row-reverse; }
+.res-card { position: relative; flex: 0 1 calc(var(--hand-w) * .26); min-width: 8px; height: var(--hand-h); }
+.res-card:last-child { flex: 0 0 var(--hand-w); }
+.res-card img { position: absolute; top: 0; left: 0; width: var(--hand-w); height: var(--hand-h); border-radius: 6px; border: 1px solid var(--gold-dark);
+    box-shadow: 0 4px 12px rgba(0,0,0,.75); transition: transform .3s, filter .3s; user-select: none; }
+.top-row .res-card img { left: auto; right: 0; }
+.res-card.exhausted img { transform: rotate(90deg) scale(.82); filter: brightness(.55) saturate(.7); }
+.res-card:hover { z-index: 5; }
+.active-quests-row { flex: 0 1 auto; }
+.top-row .active-quests-row { flex-direction: row-reverse; }
+
+/* Friedhof: kartengroße Ablage neben dem Helden */
+.deck-zone { width: calc(var(--field-w) * .8); }
+.deck-stack { position: relative; width: 100%; height: auto; aspect-ratio: 5 / 7; padding: 0; background: rgba(0,0,0,.25); border: 2px dashed rgba(201,168,76,.25); border-radius: 6px; visibility: visible !important; }
+.deck-stack.grave-btn { border: none; background: none; cursor: pointer; }
+.deck-stack .card-wrapper { position: absolute; inset: 0; width: 100%; filter: grayscale(.35) brightness(.85); }
+.deck-stack.grave-btn:hover .card-wrapper { filter: none; }
+.grave-label { color: rgba(201,168,76,.35); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.grave-count { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); z-index: 30; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    background: #1a1512; border: 1px solid var(--gold-dark); color: var(--gold-light); font-size: 11px; font-weight: 900; pointer-events: none; }
+.top-row .grave-count { bottom: auto; top: -10px; }
+/* Eingefahrene Hand liegt hinter Ressourcen, Friedhof und Held; hochgefahren wieder davor */
+#bot-hand { z-index: 700; }
+#bot-hand.hand-up { z-index: 900; }
+.bottom-row > .resource-tray, .bottom-row > .deck-zone, .bottom-row > .hero-dock { position: relative; z-index: 800; }
+/* Seitenleiste: Untermenü "Einstellungen & Tests" */
+#side-more { border: 1px solid var(--border); border-radius: 4px; background: rgba(0,0,0,.3); }
+#side-more > summary { cursor: pointer; list-style: none; padding: 7px 10px; font-size: 12px; font-weight: bold; color: var(--gold-light); user-select: none; }
+#side-more > summary::-webkit-details-marker { display: none; }
+#side-more > summary::after { content: '▸'; float: right; transition: transform .2s; }
+#side-more[open] > summary::after { transform: rotate(90deg); }
+#side-more > summary:hover { color: var(--gold); }
+.side-more-body { display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 10px; max-height: 46vh; overflow-y: auto; }
+.side-more-head { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); padding: 4px 0 2px; }

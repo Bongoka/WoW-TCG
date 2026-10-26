@@ -66,31 +66,40 @@
             <span>· Friedhof <b id="p2-grave-count">0</b></span>
             <span>· Res <b id="p2-res-count">0/0</b></span>
         </div>
-        <button id="btn-draw" style="font-size:10px;padding:3px;">+1 Karte ziehen (Debug)</button>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-        <label style="font-size:11px;color:var(--text-dim);">Schwierigkeit:</label>
-        <select id="cfg-difficulty" style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
-            <option value="easy">Einfach</option><option value="normal" selected>Normal</option><option value="hard">Schwer</option>
-        </select>
-    </div>
-    <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
-    <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
-    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
-    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
     <button id="btn-new-game">🎲 Neues Spiel (Zufällig)</button>
     <button id="btn-decks" style="border-color:#8a6d2b;">📖 Deck Übersicht</button>
-    <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
-    <button id="btn-simulate-all">🎯 All-Cards Test</button>
-    <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
-    <button id="btn-test-setup">⚡ Test-Setup</button>
-    <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
-    <button id="btn-img-test" style="border-color:#0ea5e9; background:#0c4a6e; color:#e0f2fe;">🖼 Bild-Test (Ordner „test“)</button>
-    <button id="btn-foil-test" style="border-color:#f472b6; background:#831843; color:#fce7f3;">✨ Foil-Test (10 neue Effekte)</button>
-    <div style="border-top:1px solid var(--border);padding-top:6px;">
-        <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
-        <input type="text" id="cfg-img-path" value="AZEROTH-{id}-EA.png" style="width:100%;font-size:10px;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px 5px;border-radius:3px;">
-    </div>
+    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
+    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
+    <!-- Selten gebraucht: Einstellungen und Tests (aufklappbar, Zustand wird gemerkt) -->
+    <details id="side-more">
+        <summary>⚙ Einstellungen &amp; Tests</summary>
+        <div class="side-more-body">
+            <div class="side-more-head">Einstellungen</div>
+            <div style="display:flex;gap:6px;align-items:center;">
+                <label style="font-size:11px;color:var(--text-dim);">Schwierigkeit:</label>
+                <select id="cfg-difficulty" style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
+                    <option value="easy">Einfach</option><option value="normal" selected>Normal</option><option value="hard">Schwer</option>
+                </select>
+            </div>
+            <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">⏩ Auto-Zugende: An</button>
+            <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
+            <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
+            <div class="side-more-head">Tests</div>
+            <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
+            <button id="btn-simulate-all">🎯 All-Cards Test</button>
+            <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
+            <button id="btn-test-setup">⚡ Test-Setup</button>
+            <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
+            <button id="btn-img-test" style="border-color:#0ea5e9; background:#0c4a6e; color:#e0f2fe;">🖼 Bild-Test (Ordner „test“)</button>
+            <button id="btn-foil-test" style="border-color:#f472b6; background:#831843; color:#fce7f3;">✨ Foil-Test</button>
+            <button id="btn-draw" style="font-size:10px;padding:3px;">+1 Karte ziehen (Debug)</button>
+            <div>
+                <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
+                <input type="text" id="cfg-img-path" value="AZEROTH-{id}-EA.png" style="width:100%;font-size:10px;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px 5px;border-radius:3px;">
+            </div>
+        </div>
+    </details>
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">Log:</span>
         <button id="btn-sound" style="padding:2px 8px;font-size:10px;">🔊 Sound An</button>

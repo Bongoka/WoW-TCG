@@ -50,11 +50,14 @@ function renderDeckZone(player, prefix) {
     if (!st) return;
     st.innerHTML = "";
     const n = player.graveyard.length;
-    if (n === 0) { st.style.visibility = "hidden"; st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); return; }
-    st.style.visibility = "visible"; st.classList.add("grave-btn"); st.title = "Friedhof ansehen";
-    const icon = document.createElement("div"); icon.textContent = "🪦"; icon.style.fontSize = "20px";
-    const cnt = document.createElement("div"); cnt.textContent = n; cnt.style.fontSize = "12px"; cnt.style.fontWeight = "900"; cnt.style.color = "var(--gold)";
-    st.appendChild(icon); st.appendChild(cnt);
+    // Kartengroße Ablage neben dem Helden: oberste Karte offen, Anzahl als Plakette; leer = gestrichelter Platz
+    st.classList.toggle("empty", n === 0);
+    if (n === 0) { st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); st.innerHTML = '<span class="grave-label">Friedhof</span>'; return; }
+    st.classList.add("grave-btn"); st.title = "Friedhof ansehen";
+    const top = player.graveyard[n - 1];
+    const node = createCardDOM({ ...top, uid: 'gy_top_' + top.uid, damage: 0, exhausted: false, hasDamageMask: false, isFoil: false }, true, null, { noDamage: true, stats: false });
+    node.style.setProperty('--cw', '100%'); st.appendChild(node);
+    const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = `🪦 ${n}`; st.appendChild(cnt);
     st.onclick = () => openGraveyard(player);
 }
 function openGraveyard(player) {
@@ -77,7 +80,8 @@ function openGraveyard(player) {
 function renderResourceTray(player, containerId, isHuman) {
     const box = document.getElementById(containerId); if (!box) return; box.innerHTML = "";
     const activeRow = document.createElement("div"); activeRow.className = "active-quests-row";
-    const miniRow = document.createElement("div"); miniRow.className = "mini-resources-row";
+    // Verdeckte Ressourcen: normal große Kartenrückseiten, überlappend (rücken bei Platzmangel enger zusammen)
+    const miniRow = document.createElement("div"); miniRow.className = "res-stack";
     const shown = [];   // [Ressource, Element, drehendes Element] für die Animation
     player.resources.forEach((r, idx) => {
         if (r.faceUp) {
@@ -93,14 +97,14 @@ function renderResourceTray(player, containerId, isHuman) {
             }
             activeRow.appendChild(wrap);
         } else {
-            const mini = document.createElement("div"); mini.className = "res-mini" + (r.exhausted ? " exhausted" : "");
-            const back = document.createElement("div"); back.className = "card-back"; back.style.width = "100%"; back.style.height = "100%"; back.style.margin = "0";
-            mini.appendChild(back); miniRow.appendChild(mini);
-            shown.push([r, mini, mini]);
+            const slot = document.createElement("div"); slot.className = "res-card" + (r.exhausted ? " exhausted" : "");
+            const back = document.createElement("img"); back.src = "cards/Card Back.png"; back.alt = ""; back.draggable = false;
+            slot.appendChild(back); miniRow.appendChild(slot);
+            shown.push([r, slot, back]);
         }
     });
-    if (activeRow.children.length > 0) box.appendChild(activeRow);
     if (miniRow.children.length > 0) box.appendChild(miniRow);
+    if (activeRow.children.length > 0) box.appendChild(activeRow);
     animateResources(player, shown);
     if (isHuman) {
         // Drop-Ziel: Karte als Ressource legen (Quest offen, sonst verdeckt)
@@ -124,7 +128,10 @@ function animateResources(player, shown) {
         const uid = r.card.uid; next[uid] = r.exhausted;
         if (!prev) continue;                                 // erstes Zeichnen: nichts animieren
         if (!(uid in prev)) {
-            if (handBox) flyFrom(el, handBox.getBoundingClientRect(), { delay: 60 * k++ });
+            if (handBox) {   // Start: eine Karte in Handgröße in der Mitte der Hand (nicht die ganze Handbreite – sonst fliegt sie riesig heran)
+                const hb = handBox.getBoundingClientRect(), w = el.getBoundingClientRect().width || 140;
+                flyFrom(el, { left: hb.left + hb.width / 2 - w / 2, top: hb.top, width: w, height: w * 1.4 }, { delay: 60 * k++ });
+            }
         } else if (prev[uid] !== r.exhausted) {
             const a = r.exhausted ? ['rotate(0deg)', 'rotate(90deg)'] : ['rotate(90deg)', 'rotate(0deg)'];
             rot.animate([{ transform: a[0] }, { transform: a[1] }], { duration: 380, easing: 'cubic-bezier(.3,.7,.3,1.2)' });
@@ -135,25 +142,24 @@ function animateResources(player, shown) {
 }
 
 // ---------------------------------------------------------------- Untere Reihe: Hand ein-/ausfahren
-// Die eigenen Allies weichen seitlich dem Deck (links) und Ressourcen + Held (rechts) aus, die über dem Spielfeld liegen.
-function layoutBottomRow() {
-    const row = document.getElementById('bot-allies'); if (!row) return;
-    const bf = document.getElementById('battlefield-zone');
-    row.style.paddingLeft = row.style.paddingRight = '0px'; bf.style.paddingBottom = '';
-    const rr = row.getBoundingClientRect();
-    // Block unten rechts (Ressourcen, Held, Ausrüstung über dem Helden) und Deck unten links
-    const rects = ['bot-resource-tray', 'bot-dock', 'bot-equipment-container'].map(id => document.getElementById(id)).filter(e => e && e.getBoundingClientRect().height > 0).map(e => e.getBoundingClientRect());
-    const deck = document.querySelector('.bottom-row .deck-zone'); const dr = deck && deck.getBoundingClientRect();
-    if (!rects.length) return;
-    const over = rects.filter(r => r.top < rr.bottom - 10);
-    const padR = over.length ? Math.round(rr.right - Math.min(...over.map(r => r.left)) + 12) : 0;
-    const padL = dr && dr.top < rr.bottom - 10 ? Math.round(dr.right - rr.left + 8) : 0;
-    // Passen die Allies neben den Block? Sonst bleibt die Reihe in voller Breite über dem Block.
-    const need = [...row.querySelectorAll('.bf-slot')].reduce((n, e) => n + parseFloat(getComputedStyle(e).flexBasis || 0), 0) + 16 * row.querySelectorAll('.bf-slot').length;
-    if (need <= rr.width - padL - padR) { row.style.paddingLeft = padL + 'px'; row.style.paddingRight = padR + 'px'; return; }
-    const top = Math.min(...rects.map(r => r.top), dr ? dr.top : Infinity);
-    const bfr = bf.getBoundingClientRect();
-    bf.style.paddingBottom = Math.max(0, Math.round(bfr.bottom - top + 8)) + 'px';
+// Das Brett ist symmetrisch: beide Spielerreihen liegen in den Ecken über dem Spielfeld (unten: Ressourcen links,
+// Friedhof + Held rechts; oben gespiegelt). Jede Ally-Reihe weicht seitlich den Blöcken aus, die in ihre Höhe ragen.
+function layoutRows() {
+    const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone'], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone']];
+    for (const [rowId, ids, gySel] of sides) {
+        const row = document.getElementById(rowId); if (!row) continue;
+        row.style.paddingLeft = row.style.paddingRight = '0px';
+        const rr = row.getBoundingClientRect(), mid = rr.left + rr.width / 2;
+        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel)].filter(Boolean);
+        let padL = 0, padR = 0;
+        for (const e of els) {
+            const r = e.getBoundingClientRect();
+            if (!r.width || r.bottom < rr.top + 10 || r.top > rr.bottom - 10) continue;   // ragt nicht in die Reihe
+            if (r.left + r.width / 2 < mid) padL = Math.max(padL, Math.round(r.right - rr.left + 12));
+            else padR = Math.max(padR, Math.round(rr.right - r.left + 12));
+        }
+        row.style.paddingLeft = padL + 'px'; row.style.paddingRight = padR + 'px';
+    }
 }
 // Hand fährt hoch, wenn die Maus im unteren Viertel des Bildschirms ist
 document.addEventListener('mousemove', e => {
@@ -214,7 +220,7 @@ function render() {
     renderHeroCard(G.p1, "bot-hero-card-container");
     renderResourceTray(G.p1, "bot-resource-tray", true);
     renderPlayerHand(G.p1);
-    layoutBottomRow();
+    layoutRows();
     renderPendingPanel();
     playFxEvents(prevRects);
     syncAim();
@@ -234,7 +240,25 @@ function renderTurnIndicator() {
     const eb = document.getElementById('btn-end-turn');
     eb.textContent = mine ? 'Zug beenden' : 'Gegnerischer Zug';
     eb.classList.toggle('cpu-turn', !mine);
-    document.getElementById('big-end-turn').style.display = nothingLeftToDo() ? 'block' : 'none';
+    const done = nothingLeftToDo();
+    document.getElementById('big-end-turn').style.display = done && !autoEndTurn() ? 'block' : 'none';
+    scheduleAutoEnd(done);
+}
+// Auto-Zugende (Einstellung, Standard an): ist nichts mehr möglich, endet der Zug nach kurzer Pause von selbst
+const AUTO_END_KEY = 'wow_tcg_auto_end_turn', AUTO_END_MS = 1100;
+function autoEndTurn() { try { return localStorage.getItem(AUTO_END_KEY) !== 'off'; } catch (e) { return true; } }
+let _autoEndTimer = null;
+function scheduleAutoEnd(done) {
+    if (!done || !autoEndTurn() || G.gameOver) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } return; }
+    document.querySelector('#turn-indicator span').textContent = '⏩ ZUG ENDET …';
+    if (_autoEndTimer) return;
+    const turn = G.turn;
+    _autoEndTimer = setTimeout(() => {
+        _autoEndTimer = null;
+        if (!G || G.turn !== turn || G.activePlayer !== 1 || !autoEndTurn()) return;
+        if (UI.busy) { scheduleAutoEnd(nothingLeftToDo()); return; }   // Animationen erst abwarten
+        if (nothingLeftToDo()) endTurn();
+    }, AUTO_END_MS);
 }
 // Nichts Sinnvolles mehr möglich: keine bezahlbare Karte, Ressource, Quest, Kraft, kein Angriff mit Schaden
 function nothingLeftToDo() {
