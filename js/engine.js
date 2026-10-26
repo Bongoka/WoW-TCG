@@ -811,11 +811,13 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
     if (minOne > 0) cost = Math.max(Math.min(cost, 1), cost - minOne);                    // "… to a minimum of (1)"
     return Math.max(0, cost);
 }
-function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length; }
+// Münze (nur Simulationstest, kein Teil der WoW-TCG-Regeln): p.coin = noch nicht benutzt, p.coinMana = +1 Mana bis Zugende
+function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length + (p.coinMana || 0); }
 function payRes(p, n) {
     if (n <= 0) return true;
     if (getReadyRes(p) < n) return false;
     let paid = 0;
+    if (p.coinMana > 0) { paid = Math.min(n, p.coinMana); p.coinMana -= paid; }              // Münz-Mana zuerst (verfällt sonst)
     // Erst verdeckte Ressourcen, dann offene Quests
     for (const r of p.resources) if (!r.exhausted && !r.faceUp && paid < n) { r.exhausted = true; paid++; }
     for (const r of p.resources) if (!r.exhausted && paid < n) { r.exhausted = true; paid++; }
@@ -934,6 +936,9 @@ function validateAction(s, a, pid) {
             if (a.faceUp && c.type !== 'Quest') return 'Nur Quests werden offen gelegt';
             return null;
         }
+        case 'USE_COIN':
+            if (!canActMain(s, pid)) return 'Münze nur in deiner Aktionsphase';
+            return p.coin ? null : 'Keine Münze';
         case 'COMPLETE_QUEST': {
             const r = p.resources[a.resIdx];
             if (!r || !r.faceUp || r.card.type !== 'Quest') return 'Keine offene Quest';
@@ -1012,6 +1017,7 @@ function doAction(s, a, pid) {
             flushBatch(s);
             return;
         }
+        case 'USE_COIN': p.coin = false; p.coinMana = (p.coinMana || 0) + 1; p.coinUsedTurn = s.turn; L(s, `🪙 ${p.hero.name} benutzt die Münze (+1 Mana in diesem Zug)`); return;
         case 'COMPLETE_QUEST': startQuest(s, p, a.resIdx); break;
         case 'PLAY_CARD': startPlay(s, p, a); break;
         case 'ACTIVATE': startPower(s, p, a); break;
@@ -2087,6 +2093,7 @@ function turnStep(s, step) {
         while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, `⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
         s.activePlayer = next; s.turn++; s.placedResource = false; s.phase = 'start';
         s.lastTurnOf[next] = s.turn;
+        s.p1.coinMana = 0; s.p2.coinMana = 0;                                             // Münze (Test): Mana gilt nur einen Zug
         s.pe = (s.pe || []).filter(m => m.until === 'game' || m.turn >= s.turn - 1 || (m.untilTurn && m.untilTurn >= s.turn));
         // Alte "this turn"-Modifikatoren aufräumen (nur Speicher – tms() wertet ohnehin nur den aktuellen Zug)
         for (const pl of [s.p1, s.p2]) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);
@@ -2101,9 +2108,12 @@ function turnStep(s, step) {
         const cards = [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...p.ongoing];   // CR 411: alle eigenen Karten im Spiel
         const helwens = [];
         for (const c of cards) {
-            if (!c.exhausted) continue;
+            // "can't ready during your next ready step" gilt genau für diesen Schritt – auch wenn die Karte
+            // inzwischen anders bereit wurde, verfällt das Verbot jetzt (sonst blockierte es später einen anderen Schritt)
             const once = (c.tm || []).find(m => m.k === 'noReady');
-            if (once) { c.tm = c.tm.filter(m => m !== once); continue; }                  // Hammer/Gouge/Iceblade/Leeroy
+            if (once) c.tm = c.tm.filter(m => m !== once);
+            if (!c.exhausted) continue;
+            if (once) continue;                                                           // Hammer/Gouge/Iceblade/Leeroy
             if (isAllyLike(c) && attachedTo(s, c.uid, 20).length) continue;           // Entangling Roots
             if (isAllyLike(c) && earthbind) continue;
             if (c.id === 126 && active(s, c)) { helwens.push(c.uid); continue; }          // Helwen: darf nicht readien
@@ -2296,6 +2306,7 @@ function getLegalActions(s, pid) {
         });
     }
     p.resources.forEach((r, i) => { if (r.faceUp && r.card.type === 'Quest' && !checkQuestCondition(s, p, r)) acts.push({ type: 'COMPLETE_QUEST', resIdx: i, actorId: pid, desc: `Quest: ${r.card.name}` }); });
+    if (p.coin) acts.push({ type: 'USE_COIN', actorId: pid, desc: 'Münze: +1 Mana in diesem Zug' });
     const seen = new Set();
     p.hand.forEach((c, i) => { if (seen.has(c.id)) return; seen.add(c.id); acts.push(...playVariants(s, pid, c, i, false)); });
     gyPlayables(s, pid).forEach(c => acts.push(...playVariants(s, pid, c, -1, false, c.uid)));

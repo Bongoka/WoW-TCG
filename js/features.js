@@ -854,24 +854,34 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
     const pairStats = {}, factionStats = {}, classStats = {}, deckStats = {};
     const matchups = [];
     for (const a of decks) for (const b of decks) matchups.push([a, b]);
-    const totalPlanned = matchups.length * gamesPerMatchup;
+    // Jedes Spiel doppelt: gleiche Decks, gleicher Zufall (Mischen, Starthände) – einmal ohne, einmal mit Münze für Spieler 2
+    const totalPlanned = matchups.length * gamesPerMatchup * 2;
+    const coinCmp = { plain: { games: 0, p1: 0 }, coin: { games: 0, p1: 0 }, flipTo2: 0, flipTo1: 0, used: 0, usedTurns: {}, pairs: 0 };
     const bump = (o, k, won) => { const e = o[k] || (o[k] = { games: 0, wins: 0 }); e.games++; if (won) e.wins++; };
     for (let mi = 0; mi < matchups.length; mi++) {
         const [deckA, deckB] = matchups[mi];
         let aWins = 0, bWins = 0, sumP1Hp = 0, sumP2Hp = 0;
         for (let g = 0; g < gamesPerMatchup; g++) {
-            let res;
-            try { res = simulateOneGame(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
-            totalGames++; sumP1Hp += res.p1Hp; sumP2Hp += res.p2Hp; if (res.timeout) timeouts++;
-            if (res.winner === 1) { firstWins++; aWins++; } else { secondWins++; bWins++; }
-            bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
-            bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
-            bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
-            recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
+            let pair;
+            try { pair = simulateMatchPair(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
+            coinCmp.pairs++;
+            for (const [kind, r] of [['plain', pair.plain], ['coin', pair.coin]]) { coinCmp[kind].games++; if (r.winner === 1) coinCmp[kind].p1++; }
+            if (pair.plain.winner === 1 && pair.coin.winner === 2) coinCmp.flipTo2++;
+            if (pair.plain.winner === 2 && pair.coin.winner === 1) coinCmp.flipTo1++;
+            if (pair.coin.coinTurn) { coinCmp.used++; const t = Math.ceil(pair.coin.coinTurn / 2); coinCmp.usedTurns[t] = (coinCmp.usedTurns[t] || 0) + 1; }
+            for (const res of [pair.plain, pair.coin]) {
+                totalGames++; sumP1Hp += res.p1Hp; sumP2Hp += res.p2Hp; if (res.timeout) timeouts++;
+                if (res.winner === 1) { firstWins++; aWins++; } else { secondWins++; bWins++; }
+                bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
+                bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
+                bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
+                recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
+            }
             ui.step(totalGames, totalPlanned);
             await simYield();
         }
-        pairStats[`${deckA.id}_vs_${deckB.id}_${mi}`] = { a: deckA, b: deckB, aWins, bWins, mirror: deckA.id === deckB.id, avgP1Hp: sumP1Hp / gamesPerMatchup, avgP2Hp: sumP2Hp / gamesPerMatchup };
+        const ng = gamesPerMatchup * 2;
+        pairStats[`${deckA.id}_vs_${deckB.id}_${mi}`] = { a: deckA, b: deckB, aWins, bWins, mirror: deckA.id === deckB.id, avgP1Hp: sumP1Hp / ng, avgP2Hp: sumP2Hp / ng };
     }
     ui.progress.textContent = `Fertig – ${totalGames} Spiele in ${((performance.now() - ui.t0) / 1000).toFixed(1)}s${timeouts ? ` (${timeouts} nach Zug-/Zeitlimit gewertet)` : ''}.`; ui.bar.style.width = "100%";
     const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
@@ -883,6 +893,18 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
     const sorted = o => Object.entries(o).sort((a, b) => (b[1].wins / b[1].games) - (a[1].wins / a[1].games));
     let html = `<h3 style="color:var(--gold);">Startspieler-Winchance</h3>`;
     html += `<table><tr><th>Rolle</th><th>Siege</th><th>Winrate</th></tr><tr><td>Spieler 1 (beginnt)</td><td>${firstWins}</td><td style="color:#4ade80;font-weight:bold;">${pct(firstWins, totalGames)}</td></tr><tr><td>Spieler 2</td><td>${secondWins}</td><td style="color:#f87171;font-weight:bold;">${pct(secondWins, totalGames)}</td></tr><tr><td>Gesamt</td><td>${totalGames}</td><td>–</td></tr></table>`;
+    // Münz-Test: jedes Match zweimal mit gleichem Zufall – Winrate des Startspielers ohne und mit Münze für Spieler 2
+    const cp = coinCmp, wr = k => pct(cp[k].p1, cp[k].games);
+    const used = Object.keys(cp.usedTurns).map(Number).sort((a, b) => a - b).map(t => `Runde ${t}: ${cp.usedTurns[t]}`).join(' · ');
+    html += `<h3 style="color:var(--gold);">Münz-Test: Startspieler ohne / mit Münze für Spieler 2</h3>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Jedes Match wurde zweimal direkt hintereinander gespielt – gleiche Decks, gleiche Mischung und Starthände. Beim zweiten Mal bekommt Spieler 2 die Münze (einmal pro Spiel: +1 Mana für einen Zug).</div>
+        <table><tr><th>Variante</th><th>Spiele</th><th>Siege Startspieler</th><th>Winrate Startspieler</th></tr>
+        <tr><td>Ohne Münze</td><td>${cp.plain.games}</td><td>${cp.plain.p1}</td><td style="font-weight:bold;">${wr('plain')}</td></tr>
+        <tr><td>Mit Münze für Spieler 2</td><td>${cp.coin.games}</td><td>${cp.coin.p1}</td><td style="font-weight:bold;">${wr('coin')}</td></tr></table>
+        <table><tr><th>Gleiches Match, anderer Ausgang</th><th>Anzahl</th></tr>
+        <tr><td>Ohne Münze Spieler 1 gewinnt → mit Münze Spieler 2</td><td>${cp.flipTo2} (${pct(cp.flipTo2, cp.pairs)})</td></tr>
+        <tr><td>Ohne Münze Spieler 2 gewinnt → mit Münze Spieler 1</td><td>${cp.flipTo1} (${pct(cp.flipTo1, cp.pairs)})</td></tr>
+        <tr><td>Münze benutzt</td><td>${cp.used} von ${cp.pairs} (${pct(cp.used, cp.pairs)})${used ? `<br><span style="font-size:11px;color:var(--text-dim);">${used}</span>` : ''}</td></tr></table>`;
     html += wrTable('Decks', sorted(deckStats), 'Deck');
     html += wrTable('Fraktionen', sorted(factionStats), 'Fraktion');
     html += wrTable('Klassen', sorted(classStats), 'Klasse');

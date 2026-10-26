@@ -572,6 +572,111 @@ function runRuleTests() {
         for (let i = 0; i < 10 && !s.gameOver; i++) { const x = fastAiAction(s, 1); if (!x || !x.action) break; applyAction(s, x.action, true, 1); autoResolve(s); }
         assert(s.gameOver && s.winner === 1, 'Angriffe über den Protector hinweg nicht tödlich zu Ende gespielt');
     });
+    // ---------------- Karten mit auffälligen Simulationswerten (Turnierdecks Batow/Jeudon/McMurry, Leeroy)
+    const byName = n => Object.values(CARDS).find(c => c.name === n && !c.isToken);
+    const warrior = () => { const s = fresh('horde_warrior', 'alliance_hunter'); s.real = false; return s; };
+    test(78, 'Cruelty: Held +1 ATK nur solange er eine Waffe kontrolliert', () => {
+        const s = warrior(); const h = P(s, 1).hero; put(s, 1, 1119);
+        assert(atkOf(s, h, {}) === 0, `ohne Waffe ATK ${atkOf(s, h, {})}`);
+        const w = put(s, 1, byName('Wraith Scythe').id);
+        assert(atkOf(s, h, { weapon: w, attacking: true }) === weaponAtk(s, w, { attacking: true }) + 1, 'kein +1 mit Waffe');
+        P(s, 1).ongoing = [];
+        assert(atkOf(s, h, { weapon: w, attacking: true }) === weaponAtk(s, w, { attacking: true }), 'Bonus ohne Cruelty');
+    });
+    test(79, 'Doomplate Legguards: Waffen +3 ATK erst ab fünf Ausrüstungen', () => {
+        const s = warrior(); const w = put(s, 1, byName('Wraith Scythe').id); const base = weaponAtk(s, w);
+        put(s, 1, 2195); put(s, 1, byName('Girdle of Uther').id); put(s, 1, byName('Lionheart Helm').id);  // 4 Ausrüstungen
+        assert(weaponAtk(s, w) === base, `bei 4 Ausrüstungen ${weaponAtk(s, w)} statt ${base}`);
+        put(s, 1, byName('Skullflame Shield').id);                                                          // 5
+        assert(weaponAtk(s, w) === base + 3, `bei 5 Ausrüstungen ${weaponAtk(s, w)} statt ${base + 3}`);
+    });
+    test(80, 'Deathdealer Breastplate: eigene Waffen +2 ATK, gegnerische nicht', () => {
+        const s = warrior(); const w = put(s, 1, byName('Wraith Scythe').id); const w2 = put(s, 2, byName('Wraith Scythe').id);
+        const b1 = weaponAtk(s, w), b2 = weaponAtk(s, w2); put(s, 1, 283);
+        assert(weaponAtk(s, w) === b1 + 2 && weaponAtk(s, w2) === b2, `eigene ${weaponAtk(s, w)}, gegnerische ${weaponAtk(s, w2)}`);
+    });
+    test(81, 'Girdle of Uther: (4), erschöpfen → Held und eine Nahkampfwaffe bereit (Fernkampfwaffe nicht)', () => {
+        const s = warrior(); const p = P(s, 1); res(s, 1, 4);
+        const g = put(s, 1, 289); p.hero.exhausted = true;
+        const m = put(s, 1, byName('Wraith Scythe').id, { exhausted: true }), r = put(s, 1, byName("Striker's Mark").id, { exhausted: true });
+        act(s, { type: 'ACTIVATE', srcUid: g.uid, key: 'girdle' }, 1);
+        assert(!p.hero.exhausted && !m.exhausted, 'Held oder Nahkampfwaffe nicht bereit');
+        assert(r.exhausted, 'Fernkampfwaffe wurde bereit');
+        assert(g.exhausted && p.resources.filter(x => x.exhausted).length === 4, 'Kosten (4 + Erschöpfen) nicht bezahlt');
+    });
+    test(82, 'Lionheart Helm: Schaden des eigenen Helden ist unverhinderbar (gegnerische Rüstung greift nicht)', () => {
+        const run = helm => {
+            const s = warrior(); res(s, 1, 4); const w = put(s, 1, byName('Wraith Scythe').id); if (helm) put(s, 1, 297);
+            const h2 = P(s, 2).hero; put(s, 2, byName('Girdle of Uther').id);                         // 2 DEF beim Gegner
+            act(s, { type: 'ATTACK', attackerUid: P(s, 1).hero.uid, defenderUid: h2.uid }, 1);
+            return { dmg: h2.damage, atk: weaponAtk(s, w, { attacking: true }) };
+        };
+        const a = run(false), b = run(true);
+        assert(a.dmg === Math.max(0, a.atk - 2), `ohne Helm: ${a.dmg} Schaden (Rüstung sollte 2 verhindern)`);
+        assert(b.dmg === b.atk, `mit Helm: ${b.dmg} statt ${b.atk} Schaden`);
+    });
+    test(83, 'Skullflame Shield: verteidigt der eigene Held, 1 Feuerschaden an jeden gegnerischen Helden und Ally', () => {
+        const s = fresh('alliance_hunter', 'horde_warrior'); s.real = false;
+        put(s, 2, 299); const a = put(s, 1, byName('Kor Cindervein').id); const b = put(s, 1, byName('Kor Cindervein').id);
+        const own = put(s, 2, byName('Kor Cindervein').id, { exhausted: true });
+        act(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s, 2).hero.uid }, 1);
+        assert(P(s, 1).hero.damage === 1, `gegnerischer Held hat ${P(s, 1).hero.damage} statt 1 Schaden`);
+        assert(b.damage === 1, `anderer gegnerischer Ally hat ${b.damage} statt 1 Schaden`);
+        assert(own.damage === 0, 'eigener Ally hat Schaden bekommen');
+    });
+    test(84, 'In Dreams: (8) zahlen, drei Karten ziehen; mit 7 Ressourcen nicht abschließbar', () => {
+        const s = warrior(); const p = P(s, 1);
+        res(s, 1, 1, 352); res(s, 1, 6);
+        assert(!getLegalActions(s, 1).some(a => a.type === 'COMPLETE_QUEST'), 'mit 7 Ressourcen abschließbar');
+        res(s, 1, 1); const before = p.hand.length;
+        assert(act(s, { type: 'COMPLETE_QUEST', resIdx: 0 }, 1), 'mit 8 Ressourcen nicht abschließbar');
+        assert(p.hand.length === before + 3, `${p.hand.length - before} statt 3 Karten gezogen`);
+        assert(p.resources.filter(x => x.exhausted).length === 8, 'nicht 8 Ressourcen bezahlt');
+    });
+    test(85, 'Leeroy Jenkins: andere eigene Allies erschöpft, bleiben im nächsten eigenen Bereitmachen erschöpft, danach wieder bereit', () => {
+        const s = fresh('alliance_warrior', 'horde_warrior'); s.real = false; res(s, 1, 4);
+        const x = put(s, 1, byName('Kor Cindervein').id), y = put(s, 1, byName('Kor Cindervein').id, { exhausted: true });
+        const opp = put(s, 2, byName('Kor Cindervein').id);
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 198) }, 1);
+        const lee = P(s, 1).allies.find(a => a.id === 198);
+        assert(lee && !lee.exhausted && x.exhausted && y.exhausted && !opp.exhausted, 'falsche Allies erschöpft');
+        advanceTurn(s, true); advanceTurn(s, true);                                              // Gegnerzug, dann eigener Zug
+        assert(x.exhausted && y.exhausted, 'Allies im nächsten eigenen Bereitmachen bereit geworden');
+        advanceTurn(s, true); advanceTurn(s, true);
+        assert(!x.exhausted && !y.exhausted, 'Allies auch im übernächsten Zug nicht bereit');
+    });
+    test(86, 'Leeroy Jenkins: Verbot verfällt im nächsten eigenen Bereitmachen, auch wenn der Ally inzwischen bereit gemacht wurde', () => {
+        const s = fresh('alliance_warrior', 'horde_warrior'); s.real = false; res(s, 1, 4);
+        const x = put(s, 1, byName('Kor Cindervein').id);
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 198) }, 1);
+        assert(x.exhausted, 'Testaufbau: Ally nicht erschöpft');
+        x.exhausted = false;                                                                     // z. B. durch einen Effekt bereit gemacht
+        advanceTurn(s, true); advanceTurn(s, true);                                              // nächster eigener Zug: Verbot verfällt
+        x.exhausted = true;                                                                      // später wieder erschöpft
+        advanceTurn(s, true); advanceTurn(s, true);
+        assert(!x.exhausted, 'altes Leeroy-Verbot hat einen späteren Bereitmach-Schritt blockiert');
+    });
+    test(87, 'Münz-Test: gleicher Seed ergibt dasselbe Spiel; Münze gibt einmal +1 Mana für einen Zug', () => {
+        const A = deck('alliance_mage'), B = deck('horde_warrior'), orig = Math.random;
+        let r1, r2;
+        try { Math.random = seededRandom(42); r1 = simulateOneGame(A, B); Math.random = seededRandom(42); r2 = simulateOneGame(A, B); } finally { Math.random = orig; }
+        assert(r1.winner === r2.winner && r1.turns === r2.turns && r1.p1Hp === r2.p1Hp && r1.p2Hp === r2.p2Hp, 'gleicher Seed, anderes Spiel');
+        // Münze: 2 Ressourcen + Münze → 3er-Karte spielbar; Münze danach weg, Münz-Mana verfällt am Zugende
+        const s = fresh('alliance_mage', 'horde_warrior', 2); s.real = false; res(s, 2, 2); const p = P(s, 2); p.hand = []; p.coin = true;
+        const three = Object.values(CARDS).find(c => c.type === 'Ally' && !c.set && !c.text && c.cost === 3 && c.faction !== 'Alliance' && cardMatchesPlayer(c, p));
+        assert(three, 'Testaufbau: keine 3er-Ally'); hand(s, 2, three.id);
+        assert(!getLegalActions(s, 2).some(a => a.type === 'PLAY_CARD'), 'ohne Münze spielbar');
+        const d = fastAiAction(s, 2);
+        assert(d && d.action.type === 'USE_COIN', 'KI nutzt die Münze nicht: ' + (d && d.action ? d.action.desc : '–'));
+        act(s, { type: 'USE_COIN' }, 2);
+        assert(!p.coin && getReadyRes(p) === 3, `nach Münze ${getReadyRes(p)} Mana`);
+        assert(!getLegalActions(s, 2).some(a => a.type === 'USE_COIN'), 'Münze zweimal nutzbar');
+        act(s, { type: 'PLAY_CARD', handIdx: 0 }, 2);
+        assert(p.allies.some(a => a.id === three.id) && getReadyRes(p) === 0, 'Karte nicht mit Münz-Mana bezahlt');
+        const s2 = fresh('alliance_mage', 'horde_warrior', 2); s2.real = false; res(s2, 2, 1); P(s2, 2).coin = true; P(s2, 2).hand = [];
+        act(s2, { type: 'USE_COIN' }, 2); advanceTurn(s2, true);
+        assert(P(s2, 2).coinMana === 0, 'Münz-Mana nicht verfallen');
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
