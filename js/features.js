@@ -600,7 +600,7 @@ function loadMaskTest() {
     document.getElementById("decision-modal").style.display = "none";
     const forceMask = (arr) => arr.forEach(c => {
         c.hasDamageMask = true;
-        c.maskId = Math.floor(Math.random() * 6) + 1;
+        c.maskId = randomMaskId();
         c.maskStyle = Math.random() < 0.5 ? 'scaleX(-1)' : '';
         c.maskOpacity = 1;
     });

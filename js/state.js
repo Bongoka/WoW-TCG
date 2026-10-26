@@ -5,10 +5,13 @@ let G = null;
 
 // Anteil der Spielkarten mit Damaged-Maske (1 = alle). Booster-Karten schalten die Maske selbst ab.
 const DAMAGE_MASK_CHANCE = 1;
+// Vorhandene Masken-Bilder cards/damaged<N>.png
+const DAMAGE_MASKS = [1, 3, 4, 5, 6, 7, 10, 12];
+const randomMaskId = () => DAMAGE_MASKS[Math.floor(Math.random() * DAMAGE_MASKS.length)];
 function applyRandomDamage(card, force = false) {
     if (Math.random() < DAMAGE_MASK_CHANCE || force) {
         card.hasDamageMask = true;
-        card.maskId = Math.floor(Math.random() * 6) + 1; // Zufällige Maske 1-6
+        card.maskId = randomMaskId();
         const flips = [];
         if (Math.random() < 0.5) flips.push('scaleX(-1)');
         if (Math.random() < 0.5) flips.push('scaleY(-1)');
