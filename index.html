@@ -241,11 +241,15 @@
             <button id="db-close-btn" class="danger">✖</button>
         </div>
     </div>
-    <!-- Erst Klasse (Filter), dann Held per Bild: Held wählt die Klasse mit, Klasse zeigt nur passende Helden -->
+    <!-- Klassen-Filter links, Held rechts oben: Klick öffnet die Auswahl aller (passenden) Helden mit Bildern -->
     <div class="db-pickers">
         <div id="db-class-bar"></div>
-        <div id="db-hero-strip"></div>
+        <div id="db-hero-slot" title="Held wählen"></div>
     </div>
+    <div id="db-hero-picker"><div class="db-hp-box">
+        <div class="db-hp-head"><b id="db-hp-title">Held wählen</b><span id="db-hp-tools"></span><button id="db-hp-close" class="danger">✖</button></div>
+        <div class="db-hp-grid" id="db-hp-grid"></div>
+    </div></div>
     <div class="db-content">
         <div class="db-pool">
             <div class="db-filters">

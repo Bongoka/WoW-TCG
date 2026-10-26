@@ -143,23 +143,45 @@ function renderDBHero() {
         };
         bar.appendChild(b);
     });
-    const strip = document.getElementById("db-hero-strip"); strip.innerHTML = '';
-    const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && (!DBF.cls || c.class === DBF.cls))
-        .sort((a, b) => (a.set || 1) - (b.set || 1) || a.class.localeCompare(b.class) || a.name.localeCompare(b.name));
-    const hint = document.createElement('div'); hint.className = 'db-hero-hint';
-    hint.innerHTML = dbHero() ? `<b>${esc(dbHero().name)}</b><span>${esc(DB_CLASS_DE[dbHero().class] || dbHero().class)} · ${esc(dbHero().faction)} · ${esc(dbHero().talent || '')}</span>`
-        : `<b>Held wählen</b><span>${heroes.length} Helden${DBF.cls ? ' · ' + esc(DB_CLASS_DE[DBF.cls]) : ''}</span>`;
-    strip.appendChild(hint);
-    heroes.forEach(h => {
-        const t = document.createElement('div'); t.className = 'db-hero-tile' + (h.id === currentDeckBuilder.heroId ? ' on' : '');
+    // Heldenfeld rechts oben: leer = Feld „Held“, sonst das Heldenbild; Klick öffnet die Auswahl
+    const slot = document.getElementById("db-hero-slot"); slot.innerHTML = ''; const h = dbHero();
+    slot.className = h ? 'has' : '';
+    if (h) {
+        slot.insertAdjacentHTML('beforeend', `<div class="db-hs-info"><b>${esc(h.name)}</b><span>${esc(DB_CLASS_DE[h.class] || h.class)}</span><span>${esc(h.faction)}${h.talent ? ' · ' + esc(h.talent) : ''}</span><small>Klicken zum Wechseln</small></div>`);
+        const card = document.createElement('div'); card.className = 'db-hs-card';
         const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false, null, { stats: false, noDamage: true }); n.style.setProperty('--cw', '100%');
-        t.appendChild(n);
-        t.insertAdjacentHTML('beforeend', `<div class="db-hero-name">${esc(h.name)}</div>`); t.title = `${h.name} – ${DB_CLASS_DE[h.class] || h.class}, ${h.faction}, ${h.talent || ''}`;
-        t.onclick = () => { if (currentDeckBuilder.heroId === h.id) currentDeckBuilder.heroId = null; else { currentDeckBuilder.heroId = h.id; DBF.cls = h.class; } renderDBAll(); };
-        strip.appendChild(t);
-    });
-    const on = strip.querySelector('.db-hero-tile.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
+        card.appendChild(n); slot.appendChild(card);
+    } else slot.innerHTML = '<div class="db-hs-card empty">Held</div>';
+    slot.onclick = () => openDBHeroPicker(!!DBF.cls);
 }
+// Auswahl aller Helden mit Bildern (bei aktivem Klassenfilter nur diese Klasse, umschaltbar)
+function openDBHeroPicker(byClass) {
+    const pk = document.getElementById('db-hero-picker'), grid = document.getElementById('db-hp-grid'); grid.innerHTML = '';
+    const cls = byClass ? DBF.cls : null;
+    const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && (!cls || c.class === cls))
+        .sort((a, b) => a.class.localeCompare(b.class) || (a.set || 1) - (b.set || 1) || a.name.localeCompare(b.name));
+    document.getElementById('db-hp-title').textContent = `Held wählen · ${heroes.length} Helden${cls ? ' · ' + (DB_CLASS_DE[cls] || cls) : ''}`;
+    const tools = document.getElementById('db-hp-tools'); tools.innerHTML = '';
+    if (DBF.cls) { const b = document.createElement('button'); b.textContent = cls ? 'Alle Klassen zeigen' : `Nur ${DB_CLASS_DE[DBF.cls]}`; b.onclick = () => openDBHeroPicker(!cls); tools.appendChild(b); }
+    if (dbHero()) { const b = document.createElement('button'); b.textContent = 'Kein Held'; b.onclick = () => { currentDeckBuilder.heroId = null; closeDBHeroPicker(); renderDBAll(); }; tools.appendChild(b); }
+    let lastCls = null;
+    heroes.forEach(h => {
+        if (!cls && h.class !== lastCls) { lastCls = h.class; grid.insertAdjacentHTML('beforeend', `<div class="db-hp-cls"><img src="${CLASS_ICONS[h.class]}" alt="">${esc(DB_CLASS_DE[h.class] || h.class)}</div>`); }
+        const t = document.createElement('div'); t.className = 'db-hero-tile' + (h.id === currentDeckBuilder.heroId ? ' on' : '');
+        const n = createCardDOM({ ...h, uid: 'db_hp_' + h.id }, false, null, { stats: false, noDamage: true }); n.style.setProperty('--cw', '100%');
+        t.appendChild(n);
+        t.insertAdjacentHTML('beforeend', `<div class="db-hero-name">${esc(h.name)}</div><div class="db-hero-sub">${esc(h.faction)}${h.talent ? ' · ' + esc(h.talent) : ''}</div>`);
+        t.title = `${h.name} – ${DB_CLASS_DE[h.class] || h.class}, ${h.faction}, ${h.talent || ''}`;
+        t.onclick = () => { currentDeckBuilder.heroId = h.id; DBF.cls = h.class; closeDBHeroPicker(); renderDBAll(); };
+        grid.appendChild(t);
+    });
+    pk.style.display = 'flex';
+    const on = grid.querySelector('.db-hero-tile.on'); if (on) on.scrollIntoView({ block: 'center' });
+}
+function closeDBHeroPicker() { document.getElementById('db-hero-picker').style.display = 'none'; }
+document.getElementById('db-hp-close').onclick = closeDBHeroPicker;
+document.getElementById('db-hero-picker').addEventListener('click', e => { if (e.target.id === 'db-hero-picker') closeDBHeroPicker(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('db-hero-picker').style.display === 'flex') closeDBHeroPicker(); });
 document.getElementById("db-name").addEventListener('input', (e) => { currentDeckBuilder.name = e.target.value; });
 document.getElementById("db-search").addEventListener('input', renderDBPool);
 document.getElementById("db-set-filter").addEventListener('change', renderDBPool);
@@ -293,7 +315,7 @@ function dbHoverHide() { document.getElementById('db-hover').style.display = 'no
 // Speichern: neues Deck oder das bearbeitete überschreiben
 function dbSave() {
     const hero = dbHero();
-    if (!hero) { dbFlash('Wähle zuerst oben einen Helden.'); document.getElementById('db-hero-strip').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
+    if (!hero) { dbFlash('Wähle zuerst rechts oben einen Helden.'); document.getElementById('db-hero-slot').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
     const name = (currentDeckBuilder.name || '').trim() || `${hero.class} – ${hero.name}`;
     const list = loadCustomDecks();
     const deck = { id: currentDeckBuilder.id || 'custom_' + Date.now(), hero: hero.id, faction: hero.faction, class: hero.class, name, cards: [...currentDeckBuilder.cards] };
@@ -312,7 +334,7 @@ document.getElementById("db-save-btn").onclick = () => {
     initGame(d.id, null);
 };
 document.getElementById("db-new-btn").onclick = () => { if (currentDeckBuilder.cards.length && !confirm('Aktuelles Deck verwerfen und neu beginnen?')) return; openDeckBuilder(); };
-document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); };
+document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); closeDBHeroPicker(); };
 
 // --- IMPORT / EXPORT als Textliste: "4 Weeble" (Anzahl Leerzeichen Name), optional "Hero: Name" ---
 function dbExportText() {
