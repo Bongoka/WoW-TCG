@@ -103,7 +103,11 @@ const DB_TYPES = [
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
-const DBF = { type: 'All', cost: 'all' };
+const DBF = { type: 'All', cost: 'all', cls: null };
+const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
+const DB_CLASS_DE = { Druid: 'Druide', Hunter: 'Jäger', Mage: 'Magier', Paladin: 'Paladin', Priest: 'Priester', Rogue: 'Schurke', Shaman: 'Schamane', Warlock: 'Hexenmeister', Warrior: 'Krieger' };
+// Karte für eine Klasse spielbar (ohne Held: Fraktion/Talent noch offen)
+const dbClassOk = (c, cls) => !c.allowedClasses || !c.allowedClasses.length || c.allowedClasses.includes(cls);
 function loadCustomDecks() { try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch (e) { return []; } }
 function saveCustomDecks(list) { try { localStorage.setItem(DB_KEY, JSON.stringify(list)); return true; } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); return false; } }
 const dbHero = () => CARDS[currentDeckBuilder.heroId];
@@ -114,25 +118,48 @@ const dbCount = id => currentDeckBuilder.cards.filter(x => x === id).length;
 // Öffnen: leer, mit einem bestehenden Deck (bearbeiten) oder als Kopie eines Start-Decks
 function openDeckBuilder(deck = null, asCopy = false) {
     document.getElementById("deck-builder-modal").style.display = "flex";
-    const sel = document.getElementById("db-hero-select"); sel.innerHTML = "";
-    const groups = {};
-    Object.values(CARDS).filter(c => c.type === 'Hero').forEach(h => { const g = `${['', 'Heroes of Azeroth', 'Through the Dark Portal', 'Fires of Outland'][h.set || 1]} – ${h.faction}`; (groups[g] = groups[g] || []).push(h); });
-    Object.entries(groups).forEach(([g, hs]) => { const og = document.createElement('optgroup'); og.label = g;
-        hs.sort((a, b) => a.class.localeCompare(b.class)).forEach(h => { const o = document.createElement('option'); o.value = h.id; o.textContent = `${h.class} – ${h.name} (${h.talent})`; og.appendChild(o); });
-        sel.appendChild(og); });
+    // Neues Deck: weder Klasse noch Held gewählt – alle Karten sichtbar
     if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? `${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
-    else currentDeckBuilder = { id: null, heroId: currentDeckBuilder.heroId || parseInt(sel.value), name: '', cards: [] };
-    sel.value = currentDeckBuilder.heroId;
+    else currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
+    DBF.cls = dbHero() ? dbHero().class : null;
     document.getElementById("db-name").value = currentDeckBuilder.name;
     renderDBAll();
 }
 function renderDBAll() { renderDBHero(); renderDBPool(); renderDBDeck(); }
+// Klassen-Leiste und Helden-Bilder
 function renderDBHero() {
-    const box = document.getElementById("db-hero-thumb"); box.innerHTML = '';
-    const h = dbHero(); if (!h) return;
-    const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false); n.classList.add('db-hero-card'); box.appendChild(n);
+    const bar = document.getElementById("db-class-bar"); bar.innerHTML = '';
+    const all = document.createElement('button'); all.className = 'db-class all' + (DBF.cls ? '' : ' on');
+    all.innerHTML = '<span class="db-class-all">✦</span><small>Alle</small>'; all.title = 'Alle Klassen';
+    all.onclick = () => { DBF.cls = null; currentDeckBuilder.heroId = null; renderDBAll(); };
+    bar.appendChild(all);
+    DB_CLASSES.forEach(cls => {
+        const b = document.createElement('button'); b.className = 'db-class' + (DBF.cls === cls ? ' on' : ''); b.title = DB_CLASS_DE[cls];
+        b.innerHTML = `<img src="${CLASS_ICONS[cls]}" alt=""><small>${DB_CLASS_DE[cls]}</small>`;
+        b.onclick = () => {
+            DBF.cls = DBF.cls === cls ? null : cls;                                   // nochmal klicken: Filter aus
+            const h = dbHero(); if (h && h.class !== DBF.cls) currentDeckBuilder.heroId = null;
+            renderDBAll();
+        };
+        bar.appendChild(b);
+    });
+    const strip = document.getElementById("db-hero-strip"); strip.innerHTML = '';
+    const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && (!DBF.cls || c.class === DBF.cls))
+        .sort((a, b) => (a.set || 1) - (b.set || 1) || a.class.localeCompare(b.class) || a.name.localeCompare(b.name));
+    const hint = document.createElement('div'); hint.className = 'db-hero-hint';
+    hint.innerHTML = dbHero() ? `<b>${esc(dbHero().name)}</b><span>${esc(DB_CLASS_DE[dbHero().class] || dbHero().class)} · ${esc(dbHero().faction)} · ${esc(dbHero().talent || '')}</span>`
+        : `<b>Held wählen</b><span>${heroes.length} Helden${DBF.cls ? ' · ' + esc(DB_CLASS_DE[DBF.cls]) : ''}</span>`;
+    strip.appendChild(hint);
+    heroes.forEach(h => {
+        const t = document.createElement('div'); t.className = 'db-hero-tile' + (h.id === currentDeckBuilder.heroId ? ' on' : '');
+        const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false, null, { stats: false, noDamage: true }); n.style.setProperty('--cw', '100%');
+        t.appendChild(n);
+        t.insertAdjacentHTML('beforeend', `<div class="db-hero-name">${esc(h.name)}</div>`); t.title = `${h.name} – ${DB_CLASS_DE[h.class] || h.class}, ${h.faction}, ${h.talent || ''}`;
+        t.onclick = () => { if (currentDeckBuilder.heroId === h.id) currentDeckBuilder.heroId = null; else { currentDeckBuilder.heroId = h.id; DBF.cls = h.class; } renderDBAll(); };
+        strip.appendChild(t);
+    });
+    const on = strip.querySelector('.db-hero-tile.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
-document.getElementById("db-hero-select").addEventListener('change', (e) => { currentDeckBuilder.heroId = parseInt(e.target.value); renderDBAll(); });
 document.getElementById("db-name").addEventListener('input', (e) => { currentDeckBuilder.name = e.target.value; });
 document.getElementById("db-search").addEventListener('input', renderDBPool);
 document.getElementById("db-set-filter").addEventListener('change', renderDBPool);
@@ -145,12 +172,13 @@ document.getElementById("db-sort").addEventListener('change', renderDBPool);
 }));
 
 function renderDBPool() {
-    const hero = dbHero(); if (!hero) return;
+    const hero = dbHero();
     const search = document.getElementById("db-search").value.trim().toLowerCase();
     const set = document.getElementById("db-set-filter").value, sort = document.getElementById("db-sort").value;
     const poolBox = document.getElementById("db-pool-cards"); poolBox.innerHTML = "";
     const list = Object.values(CARDS).filter(card => {
-        if (card.type === 'Hero' || card.isToken || !dbLegal(card, hero)) return false;
+        if (card.type === 'Hero' || card.isToken) return false;
+        if (hero ? !dbLegal(card, hero) : DBF.cls && !dbClassOk(card, DBF.cls)) return false;   // Held > Klasse > alle Karten
         if (DBF.type !== 'All' && dbTypeOf(card).k !== DBF.type) return false;
         if (DBF.cost !== 'all') { const c = card.type === 'Quest' ? -1 : (card.cost || 0); if (DBF.cost === '7' ? c < 7 : c !== +DBF.cost) return false; }
         if (set !== 'all' && String(card.set || 1) !== set) return false;
@@ -228,7 +256,7 @@ function renderDBDeck(highlightId) {
     if (!n) tb.innerHTML = '<div class="db-empty-bar">leer</div>';
     // Warnungen: Karten, die der gewählte Held nicht spielen kann
     const warn = document.getElementById('db-warnings'); warn.querySelectorAll('.db-warn').forEach(x => x.remove());
-    const bad = [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero));
+    const bad = hero ? [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero)) : [];
     if (bad.length) { const w = document.createElement('div'); w.className = 'db-warn';
         w.innerHTML = `⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
         w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
@@ -243,7 +271,7 @@ function renderDBDeck(highlightId) {
         box.insertAdjacentHTML('beforeend', `<div class="db-group" style="--tc:${t.color}">${t.label}<span>${tot}</span></div>`);
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
-            row.className = 'db-row' + (dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
+            row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
             row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${esc(c.name)}</span>`
                 + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
             row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
@@ -264,7 +292,8 @@ function dbHoverHide() { document.getElementById('db-hover').style.display = 'no
 
 // Speichern: neues Deck oder das bearbeitete überschreiben
 function dbSave() {
-    const hero = dbHero(); if (!hero) return null;
+    const hero = dbHero();
+    if (!hero) { dbFlash('Wähle zuerst oben einen Helden.'); document.getElementById('db-hero-strip').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
     const name = (currentDeckBuilder.name || '').trim() || `${hero.class} – ${hero.name}`;
     const list = loadCustomDecks();
     const deck = { id: currentDeckBuilder.id || 'custom_' + Date.now(), hero: hero.id, faction: hero.faction, class: hero.class, name, cards: [...currentDeckBuilder.cards] };
@@ -376,7 +405,7 @@ document.getElementById('db-io-ok').onclick = () => {
     if (!r.cards.length) { dbIoReport([{ bad: true, msg: 'Keine Karten erkannt.' }, ...r.report]); return; }
     currentDeckBuilder.heroId = r.heroId; currentDeckBuilder.cards = r.cards;
     if (r.name) { currentDeckBuilder.name = r.name; document.getElementById('db-name').value = r.name; }
-    document.getElementById('db-hero-select').value = r.heroId;
+    if (CARDS[r.heroId]) DBF.cls = CARDS[r.heroId].class;
     document.getElementById('db-io-modal').style.display = 'none';
     renderDBAll();
     dbFlash(`${r.cards.length} Karten importiert${r.report.length ? ` – ${r.report.length} Hinweis(e)` : ''}`);
@@ -390,10 +419,17 @@ const BOOSTER_RAR = {
     uncommon: { label: 'Ungewöhnlich', n: 22, notes: [523, 659] },
     rare: { label: 'Selten', n: 40, notes: [523, 659, 784] },
     epic: { label: 'Episch', n: 70, notes: [523, 659, 784, 1047], big: true },
-    hero: { label: 'Held', n: 55, notes: [392, 523, 659, 784], big: true },
+    hero: { label: 'Held', n: 22, notes: [440, 554] },                                        // jeder Booster hat einen Helden
+    herofoil: { label: 'Foil-Held', n: 60, notes: [392, 523, 659, 784], big: true },          // 10 % der Helden sind Foil
     ea: { label: 'Extended Art', n: 60, notes: [587, 740, 880, 1175], big: true },
 };
-const BOOSTER = { busy: false, cards: [], focus: null };
+// Booster je Set: nur Karten aus diesem Set
+const BOOSTER_SETS = [
+    { set: 1, name: 'Heroes of Azeroth', imgs: ['booster/booster1.png', 'booster/booster2.jpg'] },
+    { set: 2, name: 'Through the Dark Portal', imgs: ['booster/booster 7.jpg', 'booster/booster 8.jpg'] },
+    { set: 3, name: 'Fires of Outland', imgs: ['booster/booster 4.jpg', 'booster/booster 5.jpg'] },
+];
+const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const bModal = () => document.getElementById("booster-modal");
 // Kleine Klänge (WebAudio, wie sfx in utils.js)
 function boosterTone(freq, dur = 0.25, type = 'sine', vol = 0.05, delay = 0) {
@@ -461,14 +497,35 @@ function boosterFlash(rgb = '255,236,180', ms = 450) {
 }
 
 // ---- Öffnen
-document.getElementById("btn-booster").onclick = () => { bModal().style.display = "flex"; boosterReset(); };
-function boosterReset() {
+document.getElementById("btn-booster").onclick = () => { bModal().style.display = "flex"; boosterPicker(); };
+// Auswahl: welcher Booster? (je Set ein Pack, Bild zufällig aus den Bildern des Sets)
+function boosterPicker() {
+    BOOSTER.busy = false; BOOSTER.cards = []; BOOSTER.focus = null;
+    document.getElementById("booster-pack-container").style.display = 'none';
+    const cards = document.getElementById("booster-cards-container"); cards.style.display = "none"; cards.innerHTML = "";
+    document.getElementById('booster-hint').classList.remove('show');
+    document.getElementById('booster-actions').classList.remove('show');
+    bModal().classList.remove('has-focus', 'opened');
+    const pk = document.getElementById('booster-picker'); pk.innerHTML = '<div class="bp-title">Welchen Booster möchtest du öffnen?</div>';
+    const row = document.createElement('div'); row.className = 'bp-row'; pk.appendChild(row);
+    BOOSTER_SETS.forEach((b, i) => {
+        const img = b.imgs[Math.floor(Math.random() * b.imgs.length)];
+        const el = document.createElement('div'); el.className = 'bp-pack' + (b.set === BOOSTER.set ? ' last' : ''); el.style.animationDelay = (i * 0.12) + 's';
+        el.innerHTML = `<img src="${encodeURI(img)}" alt="" draggable="false"><div class="bp-name">${esc(b.name)}</div>`;
+        el.onmouseenter = () => boosterTone(500 + i * 90, 0.06, 'triangle', 0.02);
+        el.onclick = (e) => { e.stopPropagation(); BOOSTER.set = b.set; pk.style.display = 'none'; boosterReset(img); };
+        row.appendChild(el);
+    });
+    pk.style.display = 'flex';
+    boosterWhoosh(0.035, 0.45);
+}
+function boosterReset(img) {
     BOOSTER.busy = false; BOOSTER.cards = []; BOOSTER.focus = null;
     const pack = document.getElementById("booster-pack-container");
     const cards = document.getElementById("booster-cards-container");
     pack.className = 'booster-pack-container enter'; pack.style.display = 'flex'; pack.style.removeProperty('--px'); pack.style.removeProperty('--py');
     cards.style.display = "none"; cards.innerHTML = "";
-    document.getElementById("booster-pack-img").src = Math.random() < 0.5 ? "booster/booster1.png" : "booster/booster2.jpg";
+    document.getElementById("booster-pack-img").src = encodeURI(img);
     document.getElementById('booster-hint').classList.add('show');
     document.getElementById('booster-actions').classList.remove('show');
     bModal().classList.remove('has-focus', 'opened');
@@ -500,7 +557,7 @@ document.getElementById("booster-pack-container").onclick = () => {
     }, 850);
 };
 function generateBoosterCards() {
-    const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken && (CARDS[id].set || 1) <= 3);   // Raid-Loot (Set 4/5) gab es nicht in Boostern
+    const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken && (CARDS[id].set || 1) === BOOSTER.set);   // nur das gewählte Set
     const heroes = pool.filter(id => CARDS[id].type === 'Hero');
     const rar = id => RARITIES[id] || CARDS[id].rarity;                                   // Set 2/3: Seltenheit steht in den Kartendaten
     const commons = pool.filter(id => rar(id) === 'Common' && CARDS[id].type !== 'Hero');
@@ -514,7 +571,8 @@ function generateBoosterCards() {
     for(let i=0;i<2;i++) if(shuffledUncommons.length) { let id = shuffledUncommons.pop(); boosterCards.push({cardId:id,rarity:'Uncommon'}); availablePool = availablePool.filter(cid=>cid!==id); }
     if (Math.random() < 0.125) { if(shuffledEpics.length) { let id = shuffledEpics.pop(); boosterCards.push({cardId:id,rarity:'Epic'}); availablePool = availablePool.filter(cid=>cid!==id); } }
     else { if(shuffledRares.length) { let id = shuffledRares.pop(); boosterCards.push({cardId:id,rarity:'Rare'}); availablePool = availablePool.filter(cid=>cid!==id); } }
-    if(shuffledHeroes.length) { let id = shuffledHeroes.pop(); boosterCards.push({cardId:id,rarity:'Hero'}); }
+    if(shuffledHeroes.length) { let id = shuffledHeroes.pop(); const foil = Math.random() < 0.1;   // 10 %: Foil-Held
+        boosterCards.push({ cardId: id, rarity: foil ? 'HeroFoil' : 'Hero', forceFoil: foil ? 'f' + [2, 5, 9][Math.floor(Math.random() * 3)] : null }); }
     if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)]; const eaFoil = Math.random()<0.1 ? 'f'+[2,5,9][Math.floor(Math.random()*3)] : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); }
     shuffleDeck(boosterCards);
     const box = document.getElementById("booster-cards-container");
@@ -529,9 +587,9 @@ function generateBoosterCards() {
         const card = makeCardInst(data.cardId);
         card.hasDamageMask = false; delete card.maskStyle;
         let forceFoil = data.forceFoil || null;
-        if (!data.isEA && card.isFoil) forceFoil = 'f' + [2, 5, 9][Math.floor(Math.random() * 3)];
+        if (!data.isEA && card.isFoil && card.type !== 'Hero') forceFoil = 'f' + [2, 5, 9][Math.floor(Math.random() * 3)];   // Helden: Foil nur über die 10 %-Würfel oben
         // stats: false -> im Booster keine Werte-Symbole; no-fx bis zum Aufdecken (keine Vorschau verdeckter Karten)
-        const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', noDamage: true, stats: false });
+        const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', previewMode: data.isEA ? 'ea' : null, noDamage: true, stats: false });
         node.style.setProperty('--cw', '100%'); node.classList.add('no-fx');
         front.appendChild(node);
         const back = document.createElement("div"); back.className = "flip-face flip-back";
@@ -606,7 +664,7 @@ document.getElementById('booster-reveal-all').onclick = (e) => {
     e.stopPropagation();
     BOOSTER.cards.filter(c => !c.flipped).forEach((c, i) => setTimeout(() => boosterFlip(c), i * 170));
 };
-document.getElementById('booster-again').onclick = (e) => { e.stopPropagation(); boosterReset(); };
+document.getElementById('booster-again').onclick = (e) => { e.stopPropagation(); boosterPicker(); };
 bModal().addEventListener('click', () => { if (BOOSTER.focus) boosterFocus(BOOSTER.focus); });
 addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || bModal().style.display === 'none') return;
@@ -655,7 +713,11 @@ function openDeckOverview() {
         const btn = document.createElement("div");
         const n = deck.cards.length, hero = CARDS[deck.hero];
         btn.className = `deck-btn ${(deck.faction || 'alliance').toLowerCase()}${custom ? ' custom' : ''}`;
-        btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name">${esc(custom ? deck.name : deck.class)}</div>`
+        // Lange Namen "Platz 1 · Spieler · Turnier": Titel = Platz + Spieler, Turnier klein darunter
+        const parts = custom ? deck.name.split(' · ') : [deck.class];
+        const title = parts.length > 2 ? parts.slice(0, 2).join(' · ') : parts.join(' · '), event = parts.length > 2 ? parts.slice(2).join(' · ') : '';
+        btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name" title="${esc(deck.name)}">${esc(title)}</div>`
+            + (event ? `<div class="deck-event">${esc(event)}</div>` : '')
             + `<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
         btn.onclick = () => openDeckView(deck.id);
         return btn;
@@ -763,12 +825,13 @@ function simProgressUI(title) {
     return ui;
 }
 
-async function runSimulation(gamesPerMatchup) {
-    const ui = simProgressUI("CPU vs CPU – Deck-Simulation");
+// Jedes Deck gegen jedes (beide Reihenfolgen, inkl. Spiegel). decks: Start-Decks oder Turnier-Decks
+async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU vs CPU – Deck-Simulation") {
+    const ui = simProgressUI(title);
     const cardStats = {}; let firstWins = 0, secondWins = 0, totalGames = 0, timeouts = 0;
     const pairStats = {}, factionStats = {}, classStats = {}, deckStats = {};
     const matchups = [];
-    for (const a of GAME_DECKS) for (const b of GAME_DECKS) matchups.push([a, b]);
+    for (const a of decks) for (const b of decks) matchups.push([a, b]);
     const totalPlanned = matchups.length * gamesPerMatchup;
     const bump = (o, k, won) => { const e = o[k] || (o[k] = { games: 0, wins: 0 }); e.games++; if (won) e.wins++; };
     for (let mi = 0; mi < matchups.length; mi++) {
@@ -806,7 +869,22 @@ async function runSimulation(gamesPerMatchup) {
     for (const k in pairStats) { const p = pairStats[k]; html += `<tr><td>${p.mirror ? "🪞 " : ""}${esc(p.a.name)}</td><td>${esc(p.b.name)}</td><td>${p.aWins}</td><td>${p.bWins}</td><td style="color:#60a5fa;">${p.avgP1Hp.toFixed(1)}</td><td style="color:#f87171;">${p.avgP2Hp.toFixed(1)}</td></tr>`; }
     html += `</table>`;
     ui.content.innerHTML = html;
-    addLog(`🧪 Deck-Simulation: ${totalGames} Spiele.`, "log-turn");
+    addLog(`🧪 ${title}: ${totalGames} Spiele.`, "log-turn");
+}
+// Turnier-Decks (js/tourneydecks.js) für die Simulation: direkt aus den Listen, unabhängig von "Deine Decks"
+function tourneySimDecks() {
+    const shortEvent = e => e.replace(/World Championship[^,]*, [^0-9]*(\d{4})/, 'Worlds $1').replace(/DMF: ([^,]+), [^0-9]*(\d{4})/, 'DMF $1 $2');
+    return TOURNEY_DECKS.map((text, i) => {
+        const head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+        const r = dbParseList(text, null), hero = CARDS[r.heroId];
+        if (!hero || !r.cards.length) return null;
+        const name = head ? `#${head[1]} ${head[2].trim().split(' ').slice(-1)[0]} · ${shortEvent(head[3].trim())}` : `Turnier-Deck ${i + 1}`;
+        return { id: `tourney_sim_${i + 1}`, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards };
+    }).filter(Boolean);
+}
+async function runTourneySimulation(gamesPerMatchup) {
+    const decks = tourneySimDecks();
+    await runSimulation(gamesPerMatchup, decks, `Turnierdeck-Simulation (${decks.length} Decks)`);
 }
 
 // All-Cards-Test: jedes Spiel zwei zufällige Helden mit Zufallsdecks aus allen für sie legalen Karten

@@ -160,6 +160,7 @@ FX[2] = { powers: [{ key: 'flip', label: 'Umdrehen: X Schattenschaden an Ally', 
     selfCost: (s, it, src) => putDamage(s, src, it.x || 0),
     resolve: (s, it) => { const t = T(it)[0]; if (t) dealDamage(s, { src: heroOf(s, it.pl).uid, tgt: t, amt: it.x || 0, dt: 'Shadow' }); } }] };
 FX[3] = { powers: [{ key: 'flip', label: 'Umdrehen: Fernkampfwaffen +3 ATK', flip: true, cost: 1,
+    aiSkip: (s, pid) => !me(s, pid).hero.weapons.some(w => w.slot === 'Ranged'),   // ohne Fernkampfwaffe wirkungslos (blockiert auch kein Auto-Zugende)
     resolve: (s, it) => me(s, it.pl).hero.weapons.filter(w => w.slot === 'Ranged').forEach(w => addTM(w, { k: 'atk', v: 3, turn: s.turn })) }] };
 FX[4] = { powers: [{ key: 'flip', label: 'Umdrehen: Verhindere nächste 3', flip: true, cost: 3,
     slots: (s, pid) => [{ label: 'Ziel', cands: targetCands(s, pid, CH), harm: false }],

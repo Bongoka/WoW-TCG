@@ -514,6 +514,37 @@ function runRuleTests() {
             simulateOneGame(d, randomLegalDeck(9));
         }
     });
+    test(73, 'Elendril: Flip wird nur mit eigener Fernkampfwaffe als sinnvolle Aktion angeboten', () => {
+        const s = freshH(3, 9); res(s, 1, 2);
+        const flip = () => getLegalActions(s, 1).some(a => a.type === 'ACTIVATE' && a.key === 'flip' && a.srcUid === P(s, 1).hero.uid);
+        assert(!flip(), 'Flip ohne Fernkampfwaffe angeboten');
+        put(s, 1, Object.values(CARDS).find(c => c.type === 'Weapon' && c.slot === 'Ranged' && !c.set).id);
+        assert(flip(), 'Flip mit Fernkampfwaffe nicht angeboten');
+    });
+    test(74, 'Heartseeker: +2 ATK gilt während des Angriffs auch für Backstab und die Anzeige', () => {
+        const s = freshH(2007, 9); const w = put(s, 1, 326); const h2 = P(s, 2).hero;
+        h2.damage = 2; h2.dmgTurn = s.turn; h2.exhausted = true;
+        assert(weaponAtk(s, w) === 1, 'Ohne Kampf schon erhöht');
+        s.battle = { id: 'b_test', att: P(s, 1).hero.uid, def: h2.uid, apid: 1, dpid: 2 };
+        assert(weaponAtk(s, w) === 3, `Heartseeker im Angriff ${weaponAtk(s, w)} statt 3`);
+        refreshDisplay(s); assert(w.atk === 3, `Anzeige ${w.atk} statt 3`);
+        FX[91].resolve(s, { pl: 1, targets: [[h2.uid]] }); process(s); autoResolve(s);
+        assert(h2.damage === 2 + 6, `Backstab machte ${h2.damage - 2} statt 6 Schaden`);
+    });
+    test(75, 'KI-Ressourcen: früh teure Karten, spät billige; keine Ressource, wenn nichts Teures mehr kommt', () => {
+        const pick = (resN, ids, deckIds) => {
+            const s = fresh('alliance_mage', 'horde_warrior'); s.real = false; s.placedResource = false; res(s, 1, resN); const p = P(s, 1);
+            p.hand = []; ids.forEach(id => hand(s, 1, id)); if (deckIds) p.deck = deckIds.slice();
+            const a = chooseResourceAction(s, 1, getLegalActions(s, 1));
+            return a ? p.hand[a.handIdx].id : null;
+        };
+        const mageCards = Object.values(CARDS).filter(c => !c.set && c.type !== 'Quest' && c.type !== 'Hero' && cardMatchesPlayer(c, { hero: CARDS[deck('alliance_mage').hero], faction: 'Alliance', className: 'Mage' }) && !c.xCost);
+        const cheap = mageCards.find(c => c.cost === 1), mid = mageCards.find(c => c.cost === 6), big = mageCards.find(c => c.cost >= 7);
+        assert(cheap && mid && big, 'Testaufbau: Karten fehlen');
+        assert(pick(2, [cheap.id, big.id]) === big.id, 'Früh nicht die teure Karte als Ressource');
+        assert(pick(6, [cheap.id, mid.id]) === cheap.id, 'Spät nicht die billige Karte als Ressource');
+        assert(pick(5, [cheap.id, cheap.id], [cheap.id, cheap.id, cheap.id]) === null, 'Ressource gelegt, obwohl nur noch billige Karten kommen');
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));

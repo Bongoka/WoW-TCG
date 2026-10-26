@@ -79,7 +79,7 @@
             <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:11px;color:var(--text-dim);">Schwierigkeit:</label>
                 <select id="cfg-difficulty" style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
-                    <option value="easy">Einfach</option><option value="normal" selected>Normal</option><option value="hard">Schwer</option>
+                    <option value="easy">Einfach</option><option value="normal">Normal</option><option value="hard" selected>Schwer</option>
                 </select>
             </div>
             <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">⏩ Auto-Zugende: An</button>
@@ -87,6 +87,7 @@
             <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
             <div class="side-more-head">Tests</div>
             <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
+            <button id="btn-simulate-tourney" title="Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007">🏆 Turnierdeck-Simulation</button>
             <button id="btn-simulate-all">🎯 All-Cards Test</button>
             <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
             <button id="btn-test-setup">⚡ Test-Setup</button>
@@ -231,10 +232,6 @@
             <h2>🛠 Deck Builder</h2>
             <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
         </div>
-        <div class="db-hero-pick">
-            <div id="db-hero-thumb"></div>
-            <label>Held<select id="db-hero-select"></select></label>
-        </div>
         <div class="db-actions">
             <button id="db-new-btn" title="Leeres Deck beginnen">✚ Neu</button>
             <button id="db-import-btn" title="Kartenliste einfügen">📥 Import</button>
@@ -243,6 +240,11 @@
             <button id="db-save-btn" class="success">▶ Speichern &amp; Spielen</button>
             <button id="db-close-btn" class="danger">✖</button>
         </div>
+    </div>
+    <!-- Erst Klasse (Filter), dann Held per Bild: Held wählt die Klasse mit, Klasse zeigt nur passende Helden -->
+    <div class="db-pickers">
+        <div id="db-class-bar"></div>
+        <div id="db-hero-strip"></div>
     </div>
     <div class="db-content">
         <div class="db-pool">
@@ -322,6 +324,7 @@
         <button id="booster-close-btn" class="danger">✕ Schließen</button>
     </div>
     <div id="booster-stage">
+        <div id="booster-picker"></div>
         <div id="booster-pack-container" class="booster-pack-container">
             <div class="booster-pack-aura"></div>
             <img id="booster-pack-img" class="booster-pack-img" src="booster/booster1.png" alt="Booster" draggable="false">

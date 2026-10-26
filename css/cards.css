@@ -139,3 +139,5 @@
     display: block !important;
     transition: opacity 0.1s ease-out; /* NEU: Sanfter Übergang beim Scrollen */
 }
+/* Erhöhter ATK-Wert (z. B. Heartseeker im Kampf, "+1 ATK this turn"): grün */
+.cfx-stat-badge.buffed span { color: #4ade80; }

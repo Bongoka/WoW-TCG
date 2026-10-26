@@ -135,8 +135,18 @@ function pes(s, pid, k) { return (s.pe || []).filter(m => m.k === k && (pid === 
 function isHordeAlly(c) { return isAllyLike(c) && c.faction === 'Horde'; }
 function faceDownRes(p) { return p.resources.filter(r => !r.faceUp).length; }
 
+// "while attacking / while defending" ist ein Dauereffekt: Ohne ausdrückliche Angabe gilt der laufende Kampf
+// (Heartseeker mit Backstab, Anzeige der Werte während des Kampfes …). Ausdrückliche Angaben (Kampfschaden,
+// KI-Vorschau eines Angriffs) bleiben unverändert.
+function combatCtx(s, uid, ctx) {
+    if (ctx.attacking !== undefined || ctx.defending !== undefined || !s.battle) return ctx;
+    if (s.battle.att === uid) return { ...ctx, attacking: true, target: findCharacter(s, s.battle.def) };
+    if (s.battle.def === uid) return { ...ctx, defending: true };
+    return ctx;
+}
 function atkOf(s, c, ctx = {}) {
     if (!c) return 0;
+    ctx = combatCtx(s, c.uid, ctx);
     const pid = ctrlOf(s, c); if (!pid) return c.b ? c.b.atk || 0 : c.atk || 0;
     const p = getPlayer(s, pid), o = getOpponent(s, pid);
     const att = !!ctx.attacking, def = !!ctx.defending;
@@ -184,6 +194,7 @@ function inCombat(s, uid) { const t = s.battle; return !!t && (t.att === uid || 
 
 function weaponAtk(s, w, ctx = {}) {
     const pid = ctrlOf(s, w); const p = pid ? getPlayer(s, pid) : null;
+    if (p) ctx = combatCtx(s, p.hero.uid, ctx);                                           // Waffe greift mit ihrem Helden an
     let v = w.b ? w.b.atk || 0 : w.atk || 0;
     tms(s, w, 'atk').forEach(m => v += m.v);
     if (p) {

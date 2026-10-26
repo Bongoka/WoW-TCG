@@ -28,11 +28,16 @@ function evaluateState(s, pid) {
     const ow = opp.hero.weapons.find(w => !w.exhausted);
     if (ow) threat += weaponAtk(s, ow, { attacking: true });
     if (myHp <= threat) score -= 50;
-    score += me.hand.length * 3.5 - opp.hand.length * 2.5;
+    // Eigene Handkarten nach Nutzen (spielbare, gute Karten mehr wert als tote); gegnerische Hand ist verdeckt: pauschal
+    me.hand.forEach(c => score += handCardValue(s, me, c));
+    score -= opp.hand.length * 2.5;
     // Ressourcen sind bis 8 sehr wertvoll – jede verlorene kostet dauerhaft Tempo (z. B. Twig of the World Tree);
     // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
     const nRes = me.resources.length;
-    score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1 + getReadyRes(me) * 0.2;
+    score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
+    // Ungenutztes Mana ist nichts wert – außer man hält ein Instant für den gegnerischen Zug bereit
+    const ready = getReadyRes(me);
+    if (ready > 0 && me.hand.some(c => c.type !== 'Quest' && c.instant && (c.cost || 0) <= ready && cardMatchesPlayer(c, me))) score += 1.5;
     // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
     if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });
@@ -45,12 +50,95 @@ function evaluateState(s, pid) {
     return score;
 }
 
+// ---------------------------------------------------------------- Handkarten und Ressourcen
+// Wert einer eigenen Handkarte: bald spielbar und teurer (meist stärker) = mehr wert; unspielbar = fast nichts
+function handCardValue(s, p, c) {
+    if (!c) return 0;
+    if (c.type === 'Quest') return 2.5;
+    if (!cardMatchesPlayer(c, p) || (c.talentReq && c.talentReq !== p.hero.talent)) return 0.5;
+    const R = p.resources.length, cost = c.xCost ? 4 : (c.cost || 0);
+    let v = 2.6 + Math.min(cost, 8) * 0.18;
+    if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4);        // noch lange nicht spielbar
+    if (R >= 5 && cost <= 2) v -= 0.6;                                   // im Lategame wenig Wirkung
+    return Math.max(0.8, v);
+}
+// Teuerste nützliche Karte in Hand und Deck (X-Kosten zählen wie 6): so viele Ressourcen braucht man höchstens
+function maxUsefulCost(p) {
+    let m = 0;
+    const look = c => { if (!c || c.type === 'Quest' || !cardMatchesPlayer(c, p)) return; m = Math.max(m, c.xCost ? 6 : (c.cost || 0)); };
+    p.hand.forEach(look); p.deck.forEach(id => look(CARDS[id]));
+    return Math.min(m, 10);
+}
+// Soll in diesem Zug noch eine Ressource gelegt werden? Grundsätzlich jeden Zug – außer man hat schon genug
+// für die teuerste Karte, die noch kommen kann (mit etwas Reserve für zwei Karten pro Zug bei voller Hand).
+function wantResource(s, p) {
+    const R = p.resources.length, need = maxUsefulCost(p);
+    if (R < need) return true;
+    return R < need + 2 && p.hand.length >= 5;
+}
+// Welche Handkarte wird verdeckte Ressource? Die mit dem geringsten Nutzen jetzt:
+// früh sind sehr teure Karten (7–8 bei 2–3 Ressourcen) nutzlos, spät (ab 5 Ressourcen) billige Karten.
+function resourceKeepValue(s, p, c) {
+    if (!c) return 0;
+    if (!cardMatchesPlayer(c, p) || (c.talentReq && c.talentReq !== p.hero.talent)) return -10;   // unspielbar: zuerst weg
+    const R = p.resources.length + 1, cost = c.xCost ? 4 : (c.cost || 0);
+    let v = 5 + cost * 0.3 + (c.type === 'Ally' ? 0.8 : 0);
+    if (cost > R + 2) v -= (cost - R - 2) * 1.5;                         // zu teuer für die nächsten Züge
+    if (R >= 5 && cost <= 2) v -= (R - 3) * 0.8;                          // zu billig für das Lategame
+    v -= (p.hand.filter(x => x.id === c.id).length - 1) * 1.5;           // Duplikate
+    return v;
+}
+// Ressourcen-Aktion für diesen Zug (oder null): Quest offen, wenn bald abschließbar, sonst die nutzloseste Karte verdeckt
+function chooseResourceAction(s, pid, legal) {
+    const p = getPlayer(s, pid);
+    const res = legal.filter(a => a.type === 'PLACE_RESOURCE');
+    if (!res.length || !wantResource(s, p)) return null;
+    const qUp = res.find(a => a.faceUp && (p.hand[a.handIdx].questCost || 0) <= p.resources.length + 1);
+    if (qUp) return qUp;
+    const down = res.filter(a => !a.faceUp);
+    if (!down.length) return res[0];
+    down.sort((a, b) => resourceKeepValue(s, p, p.hand[a.handIdx]) - resourceKeepValue(s, p, p.hand[b.handIdx]));
+    return down[0];
+}
+// Schneller Vorab-Wert einer Aktion (für die Reihenfolge in der Suche): ein Schritt simulieren und bewerten
+// Zeitbudget der Suche (ms): danach die einfachere Variante (erste Aktionen, nur Einzel-Gegenaktionen)
+const AI_BUDGET = { hard: 2500, normal: 1200 };
+let _aiDeadline = Infinity;
+const aiTimeLeft = () => performance.now() < _aiDeadline;
+function quickOrder(s, pid, acts, keep) {
+    if (acts.length <= keep) return acts;
+    if (!aiTimeLeft()) return acts.slice(0, keep);
+    const scored = [];
+    for (const a of acts.slice(0, 40)) { if (!aiTimeLeft()) break; const ns = simApply(s, a, pid); if (ns) scored.push({ a, v: evaluateState(ns, pid) }); }
+    if (scored.length < keep) return acts.slice(0, keep);
+    scored.sort((x, y) => y.v - x.v);
+    return scored.slice(0, keep).map(x => x.a);
+}
+// Gegnerischen Zug durchspielen (schnelle KI, mehrere Aktionen hintereinander, z. B. alle Angriffe)
+function simulateOppTurn(s, oppId, maxSteps = 8) {
+    for (let i = 0; i < maxSteps && !s.gameOver && s.activePlayer === oppId && aiTimeLeft(); i++) {
+        const d = fastAiAction(s, oppId, 15);
+        if (!d || !d.action) break;
+        if (!applyAction(s, d.action, true, oppId)) break;
+        autoResolve(s);
+    }
+    return s;
+}
+
 function simApply(s, act, pid) { const c = cloneState(s); if (!applyAction(c, act, true, pid)) return null; autoResolve(c); return c; }
 
 function searchBestAction(state, playerId, difficulty = 'normal') {
-    const legal = getLegalActions(state, playerId);
+    let legal = getLegalActions(state, playerId);
     if (legal.length === 0) return null;
     const oppId = playerId === 1 ? 2 : 1;
+    _aiDeadline = performance.now() + (AI_BUDGET[difficulty] || 1200);
+    // Ressource zuerst und nach eigener Regel (ob überhaupt und welche Karte) – nicht über die Bewertung
+    if (difficulty !== 'easy') {
+        const ra = chooseResourceAction(state, playerId, legal);
+        if (ra) return { action: ra, score: 0, reason: ra.desc };
+        legal = legal.filter(a => a.type !== 'PLACE_RESOURCE');
+        if (!legal.length) return null;
+    }
     const scored = [];
     for (const act of legal) {
         const sim = simApply(state, act, playerId);
@@ -70,8 +158,9 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
     for (let d = 1; d < maxDepth; d++) {
         const cands = beam.slice();
         for (const it of beam) {
-            if (it.state.gameOver || !it.firstAction) continue;
-            const acts = getLegalActions(it.state, playerId).slice(0, width2);
+            if (it.state.gameOver || !it.firstAction || !aiTimeLeft()) continue;
+            // die vielversprechendsten statt der ersten Aktionen weiterverfolgen; Ressourcen regelt chooseResourceAction
+            const acts = quickOrder(it.state, playerId, getLegalActions(it.state, playerId).filter(a => a.type !== 'PLACE_RESOURCE'), width2);
             for (const act of acts) { const ns = simApply(it.state, act, playerId); if (!ns) continue; cands.push({ state: ns, firstAction: it.firstAction, score: evaluateState(ns, playerId) }); }
         }
         cands.sort((a, b) => b.score - a.score);
@@ -85,7 +174,9 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         let score;
         if (s.gameOver) score = evaluateState(s, playerId);
         else {
-            let worst = evaluateState(s, playerId);
+            // Gegnerzug: (a) ein ganzer gieriger Zug mit mehreren Aktionen, (b) die schlimmste Einzelaktion – das Schlechtere zählt
+            const turn = simulateOppTurn(cloneState(s), oppId);
+            let worst = evaluateState(turn, playerId);
             const threat = getLegalActions(s, oppId).filter(a => a.type === 'ATTACK' || a.type === 'PLAY_CARD').slice(0, threatN);
             for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
@@ -97,25 +188,15 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
 
 // Schnelle KI für Simulationen: Ressource legen (Heuristik), dann gierig die
 // beste Aktion nach einem Zug Vorausschau – nur wenn sie die Lage verbessert.
-function fastAiAction(state, pid) {
+function fastAiAction(state, pid, maxCands = 40) {
     const legal = getLegalActions(state, pid);
     if (!legal.length) return null;
-    const p = getPlayer(state, pid);
-    const res = legal.filter(a => a.type === 'PLACE_RESOURCE');
-    if (res.length) {
-        const qUp = res.find(a => a.faceUp && (p.hand[a.handIdx].questCost || 0) <= p.resources.length + 1);
-        if (qUp) return { action: qUp, reason: qUp.desc };
-        const down = res.filter(a => !a.faceUp);
-        const needRes = p.resources.length < 7 || p.hand.length > 5;
-        if (needRes && down.length) {
-            down.sort((a, b) => fastResValue(state, p, p.hand[a.handIdx]) - fastResValue(state, p, p.hand[b.handIdx]));
-            return { action: down[0], reason: down[0].desc };
-        }
-    }
+    const ra = chooseResourceAction(state, pid, legal);   // gleiche Ressourcen-Regel wie die große Suche
+    if (ra) return { action: ra, reason: ra.desc };
     const base = evaluateState(state, pid);
     let best = null, bv = base + 0.5;
     const cands = legal.filter(a => a.type !== 'PLACE_RESOURCE');
-    for (const act of cands.length > 40 ? cands.slice(0, 40) : cands) {
+    for (const act of cands.length > maxCands ? cands.slice(0, maxCands) : cands) {
         const sim = simApply(state, act, pid);
         if (!sim) continue;
         if (sim.gameOver && sim.winner === pid) return { action: act, reason: 'Lethal' };
@@ -123,13 +204,4 @@ function fastAiAction(state, pid) {
         if (v > bv) { bv = v; best = act; }
     }
     return best ? { action: best, score: bv, reason: best.desc } : null;
-}
-// Je niedriger, desto eher wird die Karte als verdeckte Ressource gelegt
-function fastResValue(s, p, c) {
-    if (!c) return 0;
-    if (c.type === 'Quest') return -1;
-    if (!cardMatchesPlayer(c, p)) return -2;
-    const cost = c.cost || 0;
-    const dupes = p.hand.filter(x => x.id === c.id).length;
-    return 5 - Math.abs(cost - Math.min(7, p.resources.length + 1)) * 0.5 - (dupes - 1) * 2 + (c.type === 'Ally' ? 1 : 0);
 }

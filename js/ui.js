@@ -105,6 +105,14 @@ function renderResourceTray(player, containerId, isHuman) {
     });
     if (miniRow.children.length > 0) box.appendChild(miniRow);
     if (activeRow.children.length > 0) box.appendChild(activeRow);
+    box.appendChild(manaBadge(player));
+    // Quests: bis 3 nebeneinander, danach immer stärker überlappend (Gesamtbreite bleibt bei ~3 Karten)
+    const qs = [...activeRow.children], nq = qs.length;
+    if (nq) {
+        const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
+        const step = nq <= 3 ? w + 6 : w * Math.min(1, 2.2 / (nq - 1));
+        qs.forEach((q, i) => { q.style.flex = `0 0 ${i === nq - 1 ? w : step}px`; });
+    }
     animateResources(player, shown);
     if (isHuman) {
         // Drop-Ziel: Karte als Ressource legen (Quest offen, sonst verdeckt)
@@ -118,6 +126,26 @@ function renderResourceTray(player, containerId, isHuman) {
     }
 }
 
+// Mana-Juwel über den Ressourcen (Gegner: darunter): noch verfügbare Ressourcen in diesem Zug.
+// Ändert sich die Zahl, zählt sie sichtbar hoch/runter und das Juwel pulsiert (rot beim Bezahlen, golden beim Auffüllen).
+const MANA_SHOWN = {};
+function manaBadge(player) {
+    const cur = getReadyRes(player), tot = player.resources.length;
+    const el = document.createElement('div'); el.className = 'mana-badge' + (cur === 0 ? ' empty' : '');
+    el.title = `${cur} von ${tot} Ressourcen verfügbar`;
+    el.innerHTML = `<div class="mana-gem"><span>${cur}</span></div><div class="mana-txt"><b>verfügbar</b><small>von ${tot}</small></div>`;
+    const prev = MANA_SHOWN[player.id];
+    MANA_SHOWN[player.id] = cur;
+    if (prev !== undefined && prev !== cur) {
+        const span = el.querySelector('span'), gem = el.querySelector('.mana-gem');
+        gem.classList.add(cur < prev ? 'spend' : 'gain');
+        const t0 = performance.now(), dur = Math.min(600, 120 * Math.abs(cur - prev) + 150);
+        span.textContent = prev;
+        const step = (t) => { const k = Math.min(1, (t - t0) / dur); span.textContent = Math.round(prev + (cur - prev) * k); if (k < 1) requestAnimationFrame(step); };
+        requestAnimationFrame(step);
+    }
+    return el;
+}
 // Ressourcen: neu gelegte fliegen von der Hand heran; beim Bezahlen kippen sie sichtbar zur Seite,
 // beim Bereitmachen richten sie sich mit einem goldenen Aufleuchten wieder auf.
 function animateResources(player, shown) {
@@ -150,7 +178,8 @@ function layoutRows() {
         const row = document.getElementById(rowId); if (!row) continue;
         row.style.paddingLeft = row.style.paddingRight = '0px';
         const rr = row.getBoundingClientRect(), mid = rr.left + rr.width / 2;
-        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel)].filter(Boolean);
+        // Ausrüstung + laufende Fähigkeiten liegen beim Helden (absolut in der Reihe) – Allies weichen auch ihnen aus
+        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel), row.querySelector('.bf-equip-zone')].filter(Boolean);
         let padL = 0, padR = 0;
         for (const e of els) {
             const r = e.getBoundingClientRect();
@@ -159,6 +188,19 @@ function layoutRows() {
             else padR = Math.max(padR, Math.round(rr.right - r.left + 12));
         }
         row.style.paddingLeft = padL + 'px'; row.style.paddingRight = padR + 'px';
+    }
+    // Viele Ressourcen: die Hand rückt nach rechts, solange sie nicht an Friedhof/Held stößt
+    const hand = document.getElementById('bot-hand'), tray = document.getElementById('bot-resource-tray');
+    if (hand && tray) {
+        hand.style.setProperty('--hand-shift', '0px');
+        const cards = [...hand.children].map(c => c.getBoundingClientRect()).filter(r => r.width);
+        if (cards.length) {
+            const left = Math.min(...cards.map(r => r.left)), right = Math.max(...cards.map(r => r.right));
+            const block = [document.querySelector('.bottom-row .deck-zone'), document.getElementById('bot-dock')].map(e => e && e.getBoundingClientRect()).filter(r => r && r.width);
+            const limit = block.length ? Math.min(...block.map(r => r.left)) - 12 : innerWidth;
+            const need = tray.getBoundingClientRect().right + 12 - left;
+            if (need > 0) hand.style.setProperty('--hand-shift', Math.max(0, Math.min(need, limit - right)) + 'px');
+        }
     }
 }
 // Hand fährt hoch, wenn die Maus im unteren Viertel des Bildschirms ist
@@ -388,7 +430,7 @@ function updateAim() {
     drawArrow(n.getBoundingClientRect(), AIM.x, AIM.y);
 }
 function startDragAim(uid, e) { AIM.srcUid = uid; AIM.drag = true; if (e) { AIM.x = e.clientX; AIM.y = e.clientY; } }
-function stopDragAim() { if (AIM.drag) { AIM.drag = false; AIM.srcUid = null; hideArrow(); } }
+function stopDragAim() { if (AIM.drag) { AIM.drag = false; AIM.srcUid = null; if (AIM.fixed) drawFixedAim(); else hideArrow(); } }
 // Nach jedem Zeichnen: Pfeil für "Angreifer gewählt" oder offene Zielwahl (Quelle = Kraft-Quelle bzw. eigener Held)
 function syncAim() {
     if (AIM.drag) { updateAim(); return; }
@@ -397,8 +439,18 @@ function syncAim() {
     if (UI.attacker) src = UI.attacker;
     else if (d && d.target && G.chainPrep) src = G.chainPrep.kind === 'power' ? G.chainPrep.src : G.p1.hero.uid;
     AIM.srcUid = src;
+    // Gegnerischer Angriff, während du entscheidest (Protector wählen / Durchlassen / Reagieren): fester Pfeil Angreifer → Ziel
+    AIM.fixed = !src && G.battle && G.battle.apid === 2 && G.pending && G.pending.pid === 1 && !G.gameOver ? [G.battle.att, G.battle.def] : null;
+    if (AIM.fixed) { drawFixedAim(); return; }
     updateAim();
 }
+function drawFixedAim() {
+    const a = document.querySelector(`#arena [data-uid="${AIM.fixed[0]}"]`), t = document.querySelector(`#arena [data-uid="${AIM.fixed[1]}"]`);
+    if (!a || !t) { hideArrow(); return; }
+    const tr = t.getBoundingClientRect();
+    drawArrow(a.getBoundingClientRect(), tr.left + tr.width / 2, tr.top + tr.height / 2);
+}
+addEventListener('resize', () => { if (AIM.fixed && !AIM.drag) drawFixedAim(); });
 document.addEventListener('mousemove', (e) => { AIM.x = e.clientX; AIM.y = e.clientY; if (AIM.srcUid) updateAim(); });
 document.addEventListener('dragover', (e) => { if (!AIM.drag) return; AIM.x = e.clientX; AIM.y = e.clientY; updateAim(); });
 // CPU-Angriff: Pfeil kurz vom Angreifer zum Ziel zeigen
@@ -407,7 +459,7 @@ function flashArrow(attUid, defUid, ms = 650) {
     if (!a || !d || AIM.srcUid) return Promise.resolve();
     const dr = d.getBoundingClientRect();
     drawArrow(a.getBoundingClientRect(), dr.left + dr.width / 2, dr.top + dr.height / 2);
-    return sleep(ms).then(() => { if (!AIM.srcUid) hideArrow(); });
+    return sleep(ms).then(() => { if (AIM.fixed) drawFixedAim(); else if (!AIM.srcUid) hideArrow(); });
 }
 
 // ---------------------------------------------------------------- Bildschirmwackeln
@@ -794,9 +846,15 @@ function openHandCardMenu(idx) {
 // Deck heran. Startzeiten stehen in UI.handFly, damit ein render() mitten im Flug die Animation
 // an derselben Stelle fortsetzt statt sie abzubrechen.
 const FLY_MS = 520, FLY_GAP = 130;
+// Das Deck liegt nicht sichtbar auf dem Brett: gezogene Karten kommen von außerhalb des Bildschirms (unten rechts)
 function deckRect() {
-    const d = document.getElementById("p1-deck-stack");
-    return d ? d.getBoundingClientRect() : { left: 0, top: window.innerHeight, width: 50, height: 70 };
+    const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
+    return { left: window.innerWidth + 40, top: window.innerHeight + 40, width: w, height: w * 1.4 };
+}
+// Gegnerisches Deck: außerhalb oben links
+function oppDeckRect() {
+    const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
+    return { left: -w - 40, top: -w * 1.4 - 40, width: w, height: w * 1.4 };
 }
 function flyFrom(node, from, { delay = 0, elapsed = 0, angle = 0 } = {}) {
     const r = node.getBoundingClientRect(); if (!r.width) return null;
@@ -840,8 +898,7 @@ function flyNewHandCards(p, box) {
 }
 // Gegner-Hand: Kartenrücken fliegen vom gegnerischen Deck heran (Container ist um 180° gedreht)
 function flyNewOppCards(p, box) {
-    const mid = (p.hand.length - 1) / 2, d = document.getElementById("p2-deck-stack");
-    const from = d ? d.getBoundingClientRect() : { left: 0, top: 0, width: 50, height: 70 };
+    const mid = (p.hand.length - 1) / 2, from = oppDeckRect();
     flyNewCards(p.hand, [...box.children].map(w => w.firstChild), 'oppSeen', 'oppFly', from, i => 180 + (i - mid) * 5);
 }
 

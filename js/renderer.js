@@ -14,7 +14,7 @@
         wrap.dataset.uid = card.uid;
         if (card.exhausted) wrap.classList.add('is-exhausted');
         const seed = hashStr(String(card.uid || card.id || card.name || 'x'));
-        wrap._cfx = { uid: card.uid, seed, cardId: card.id };
+        wrap._cfx = { uid: card.uid, seed, cardId: card.id, previewMode: opts.previewMode || null };   // previewMode 'ea': Vorschau mit Extended Art
         const rot = el('div', 'cfx-rot');
         const tilt = el('div', 'cfx-tilt');
         const face = el('div', 'card-visual');
@@ -37,6 +37,7 @@
                 // NEU: 0 ATK -> opacity 0
                 if (finalAtk <= 0) atkEl.style.opacity = '0';
                 atkEl.innerHTML = `<img src="Bottom Icons/${atkIcon}" alt="ATK"><span>${finalAtk}</span>`;
+                if (card.type !== 'Hero' && card.b && finalAtk > (card.b.atk || 0)) atkEl.classList.add('buffed');   // erhöhter Wert: grün
                 statsBar.appendChild(atkEl);
                 
                 const hpEl = el('div', 'cfx-stat-badge hp-badge');
@@ -45,7 +46,9 @@
                 statsBar.appendChild(hpEl);
             } else if (card.type === 'Weapon') {
                 const atkEl = el('div', 'cfx-stat-badge lean');
-                atkEl.innerHTML = `<img src="Bottom Icons/Melee.png" alt="ATK"><span>${(card.atk || 0) + (card.tempAtkBonus || 0)}</span>`;
+                const wAtk = (card.atk || 0) + (card.tempAtkBonus || 0);
+                atkEl.innerHTML = `<img src="Bottom Icons/Melee.png" alt="ATK"><span>${wAtk}</span>`;
+                if (card.b && wAtk > (card.b.atk || 0)) atkEl.classList.add('buffed');
                 statsBar.appendChild(atkEl);
                 const strikeEl = el('div', 'cfx-stat-badge lean');
                 strikeEl.innerHTML = `<img src="Bottom Icons/Strike.png" alt="STRIKE"><span>${card.strike || 0}</span>`;
@@ -226,7 +229,7 @@
         const sb = clone.querySelector('.cfx-stats-bar'); if (sb) sb.remove();
         const pimg = clone.querySelector('.card-image-layer');
         if (pimg && meta.cardId != null && typeof getImageCandidates === 'function') {
-            const list = getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
+            const list = meta.previewMode === 'ea' ? getImageCandidates(meta.cardId, 'ea') : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
             let k = 0; const probe = new Image();
             probe.onload = () => { pimg.src = probe.src; };
             probe.onerror = () => { k++; if (k < list.length) probe.src = list[k]; };
