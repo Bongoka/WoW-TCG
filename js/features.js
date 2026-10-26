@@ -873,7 +873,7 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
         }
         pairStats[`${deckA.id}_vs_${deckB.id}_${mi}`] = { a: deckA, b: deckB, aWins, bWins, mirror: deckA.id === deckB.id, avgP1Hp: sumP1Hp / gamesPerMatchup, avgP2Hp: sumP2Hp / gamesPerMatchup };
     }
-    ui.progress.textContent = `Fertig – ${totalGames} Spiele in ${((performance.now() - ui.t0) / 1000).toFixed(1)}s${timeouts ? ` (${timeouts} nach Zuglimit gewertet)` : ''}.`; ui.bar.style.width = "100%";
+    ui.progress.textContent = `Fertig – ${totalGames} Spiele in ${((performance.now() - ui.t0) / 1000).toFixed(1)}s${timeouts ? ` (${timeouts} nach Zug-/Zeitlimit gewertet)` : ''}.`; ui.bar.style.width = "100%";
     const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
     const wrTable = (title, entries, label) => {
         let h = `<h3 style="color:var(--gold);">${title}</h3><table><tr><th>${label}</th><th>Spiele</th><th>Siege</th><th>Winrate</th></tr>`;

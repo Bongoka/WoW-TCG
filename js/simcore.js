@@ -4,16 +4,18 @@
 // gegen Winrate in Spielen, in denen sie im Deck war, aber nicht gespielt wurde.
 // Δ = WR(gespielt) − WR(nicht gespielt). Quests: "gespielt" = abgeschlossen.
 // ============================================================================
-const SIM_MAX_TURNS = 60;
+const SIM_MAX_TURNS = 60, SIM_MAX_MS = 6000;
 function simulateOneGame(deckA, deckB) {
     const s = newGameState(deckA.hero, deckA.cards, deckB.hero, deckB.cards);
     dealOpeningHands(s);
     for (const pid of [1, 2]) if (aiWantsMulligan(s, pid)) doMulligan(s, pid);
     s._batch = [];
     let turns = 0, guard = 0;
-    while (!s.gameOver && turns < SIM_MAX_TURNS) {
+    // Zeitgrenze: festgefahrene Spiele mit riesigen Boards (z. B. Dutzende Token) werden wie beim Zuglimit nach HP gewertet
+    const tEnd = performance.now() + SIM_MAX_MS;
+    while (!s.gameOver && turns < SIM_MAX_TURNS && performance.now() < tEnd) {
         const pid = s.activePlayer; let steps = 0;
-        while (!s.gameOver && steps < 30 && guard++ < 5000) {
+        while (!s.gameOver && steps < 30 && guard++ < 5000 && performance.now() < tEnd) {
             if (s.pending) { autoResolve(s); continue; }
             const dec = fastAiAction(s, pid);
             if (!dec || !dec.action) break;

@@ -545,6 +545,33 @@ function runRuleTests() {
         assert(pick(6, [cheap.id, mid.id]) === cheap.id, 'Spät nicht die billige Karte als Ressource');
         assert(pick(5, [cheap.id, cheap.id], [cheap.id, cheap.id, cheap.id]) === null, 'Ressource gelegt, obwohl nur noch billige Karten kommen');
     });
+    test(76, 'KI: gleichwertige Angriffe (identische Token) werden nur einmal geprüft', () => {
+        const s = fresh('alliance_mage', 'horde_warrior'); s.real = false;
+        const vanilla = Object.values(CARDS).find(c => c.type === 'Ally' && !c.set && !c.text && !c.totem && c.atk > 0);
+        assert(vanilla, 'Testaufbau: keine Ally ohne Text');
+        for (let i = 0; i < 8; i++) put(s, 1, vanilla.id);
+        for (let i = 0; i < 6; i++) put(s, 2, vanilla.id);
+        const hurt = put(s, 2, vanilla.id); hurt.damage = 1;                          // anderer Zustand → eigenes Ziel
+        const atk = getLegalActions(s, 1).filter(a => a.type === 'ATTACK');
+        const kept = aiDistinct(s, atk).filter(a => a.type === 'ATTACK' && a.attackerUid !== P(s, 1).hero.uid);
+        assert(atk.length >= 8 * 8, `Testaufbau: nur ${atk.length} Angriffe`);
+        // Allies: 1 Angreifer-Art × 3 Ziel-Arten (Held, unverletzte Ally, verletzte Ally)
+        assert(kept.length === 3, `erwartet 3 verschiedene Angriffe, erhalten ${kept.length}`);
+    });
+    test(77, 'KI: greift trotz Protector an, wenn mehrere Angriffe zusammen tödlich sind', () => {
+        const s = fresh('alliance_mage', 'horde_warrior'); s.real = false; s.turn = 5; s.placedResource = true;
+        const byName = n => Object.values(CARDS).find(c => c.name === n);
+        const vanilla = byName('Kor Cindervein'), prot = byName("Fa'tafi");                  // 3/3 ohne Text, 3/6 Protector
+        assert(vanilla && prot, 'Testaufbau: Karten fehlen');
+        P(s, 1).hand = []; P(s, 2).hand = [];
+        for (let i = 0; i < 3; i++) put(s, 1, vanilla.id);
+        put(s, 2, prot.id);
+        const h2 = P(s, 2).hero; h2.damage = hpOf(s, h2) - 6;                               // 6 HP: zwei 3er-Angriffe reichen
+        const d = fastAiAction(s, 1);
+        assert(d && d.action && d.action.type === 'ATTACK', 'KI greift nicht an: ' + (d && d.action ? d.action.desc : 'keine Aktion'));
+        for (let i = 0; i < 10 && !s.gameOver; i++) { const x = fastAiAction(s, 1); if (!x || !x.action) break; applyAction(s, x.action, true, 1); autoResolve(s); }
+        assert(s.gameOver && s.winner === 1, 'Angriffe über den Protector hinweg nicht tödlich zu Ende gespielt');
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));

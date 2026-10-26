@@ -17,7 +17,8 @@ function evaluateState(s, pid) {
         const atk = a.isTotem ? 0 : atkOf(s, a, {}), rem = Math.max(0, hpOf(s, a) - (a.damage || 0));
         let v = 3.5 + atk * (mine ? 2.2 : 2.6) + rem * (mine ? 1.5 : 1.6);
         if (a.isTotem) v += 3 + (a.cost || 0);
-        if (hasProtector(s, a)) v += mine ? 4.5 : (a.exhausted ? 1 : 5);
+        // Erschöpfte eigene Protectors schützen im Gegnerzug nicht (erst im eigenen Zug wieder bereit)
+        if (hasProtector(s, a)) v += mine ? (a.exhausted ? 1.5 : 4.5) : (a.exhausted ? 1 : 5);
         if (hasElusive(s, a)) v += mine ? 2.5 : 3;
         if (mine && !a.exhausted) v += 0.6;
         return v;
@@ -125,7 +126,53 @@ function simulateOppTurn(s, oppId, maxSteps = 8) {
     return s;
 }
 
+// Gleichwertige Angriffe nur einmal prüfen: z. B. 17 identische Dwarf-Warrior-Token gegen 30 Ziele ergäben sonst
+// über 500 Angriffe, die alle simuliert würden. Gleich = gleiche Karte im gleichen Zustand (ohne uid/Optik) und
+// nicht von Effekten über die uid betroffen; die Engine-Aktionen selbst bleiben unverändert.
+const AI_SIG_SKIP = new Set(['uid', 'isFoil', 'hasDamageMask', 'maskId', 'maskStyle', 'maskOpacity']);
+function aiDistinct(s, acts) {
+    if (acts.length < 30) return acts;
+    const refs = JSON.stringify([s.pe, s.delayed, s.lastAttack, s.lastProtect]), sigs = {};
+    const sig = uid => {
+        if (uid in sigs) return sigs[uid];
+        const l = locate(s, uid), c = l && l.c;
+        return sigs[uid] = (!c || l.zone !== 'party' || refs.includes(uid)) ? uid
+            : l.pid + JSON.stringify(c, (k, v) => AI_SIG_SKIP.has(k) ? undefined
+                // joinedTurn zählt nur relativ (Engine vergleicht mit s.turn bzw. dem Zugbeginn): neu / seit Zugbeginn / länger
+                : k === 'joinedTurn' ? (v === s.turn ? 'now' : v < turnStartOf(s, l.pid) ? 'old' : v < s.turn ? 'mid' : v) : v);
+    };
+    const seen = new Set();
+    return acts.filter(a => {
+        if (a.type !== 'ATTACK') return true;
+        const k = sig(a.attackerUid) + '→' + sig(a.defenderUid);
+        if (seen.has(k)) return false; seen.add(k); return true;
+    });
+}
+
 function simApply(s, act, pid) { const c = cloneState(s); if (!applyAction(c, act, true, pid)) return null; autoResolve(c); return c; }
+
+// Angriffsplan: mehrere Angriffe auf den gegnerischen Helden hintereinander. Ein einzelner Angriff in einen
+// Protector (z. B. King Magni 6/8) sieht schlecht aus, erschöpft ihn aber – danach kommen die übrigen Angriffe
+// durch. Das sieht die Bewertung nach nur einer Aktion nicht. Zwei Reihenfolgen: schwächste Angreifer zuerst
+// (opfern sich in die Protectors) bzw. stärkste zuerst. Ergebnis: erster Angriff + Zustand nach dem ganzen Plan.
+function attackPlans(s, pid) {
+    const hasHeroAttack = st => getLegalActions(st, pid).filter(a => a.type === 'ATTACK' && a.defenderUid === getOpponent(st, pid).hero.uid);
+    if (hasHeroAttack(s).length < 2) return [];
+    const plans = [];
+    for (const order of ['weak', 'strong']) {
+        const c = cloneState(s); let first = null;
+        for (let i = 0; i < 25 && !c.gameOver; i++) {
+            if (c.pending) { autoResolve(c); continue; }
+            const atks = hasHeroAttack(c); if (!atks.length) break;
+            const pow = a => { const x = findCharacter(c, a.attackerUid); return x ? atkOf(c, x, { attacking: true }) * 10 + Math.max(0, hpOf(c, x) - (x.damage || 0)) : 0; };
+            atks.sort((a, b) => order === 'weak' ? pow(a) - pow(b) : pow(b) - pow(a));
+            if (!applyAction(c, atks[0], true, pid)) break;
+            autoResolve(c); if (!first) first = atks[0];
+        }
+        if (first) plans.push({ first, state: c });
+    }
+    return plans;
+}
 
 function searchBestAction(state, playerId, difficulty = 'normal') {
     let legal = getLegalActions(state, playerId);
@@ -139,6 +186,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         legal = legal.filter(a => a.type !== 'PLACE_RESOURCE');
         if (!legal.length) return null;
     }
+    legal = aiDistinct(state, legal);
     const scored = [];
     for (const act of legal) {
         const sim = simApply(state, act, playerId);
@@ -155,12 +203,14 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
     const stay = () => ({ state: cloneState(state), firstAction: null, score: evaluateState(state, playerId) });
     let beam = scored.slice(0, beamWidth + 2).map(x => ({ state: x.sim, firstAction: x.act, score: x.score }));
     beam.push(stay());
+    // Angriffspläne (mehrere Angriffe hintereinander) als eigene Kandidaten – der Gegnerzug wird unten mitbewertet
+    if (aiTimeLeft()) for (const pl of attackPlans(state, playerId)) beam.push({ state: pl.state, firstAction: pl.first, score: evaluateState(pl.state, playerId), plan: true });
     for (let d = 1; d < maxDepth; d++) {
         const cands = beam.slice();
         for (const it of beam) {
             if (it.state.gameOver || !it.firstAction || !aiTimeLeft()) continue;
             // die vielversprechendsten statt der ersten Aktionen weiterverfolgen; Ressourcen regelt chooseResourceAction
-            const acts = quickOrder(it.state, playerId, getLegalActions(it.state, playerId).filter(a => a.type !== 'PLACE_RESOURCE'), width2);
+            const acts = quickOrder(it.state, playerId, aiDistinct(it.state, getLegalActions(it.state, playerId).filter(a => a.type !== 'PLACE_RESOURCE')), width2);
             for (const act of acts) { const ns = simApply(it.state, act, playerId); if (!ns) continue; cands.push({ state: ns, firstAction: it.firstAction, score: evaluateState(ns, playerId) }); }
         }
         cands.sort((a, b) => b.score - a.score);
@@ -177,7 +227,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
             // Gegnerzug: (a) ein ganzer gieriger Zug mit mehreren Aktionen, (b) die schlimmste Einzelaktion – das Schlechtere zählt
             const turn = simulateOppTurn(cloneState(s), oppId);
             let worst = evaluateState(turn, playerId);
-            const threat = getLegalActions(s, oppId).filter(a => a.type === 'ATTACK' || a.type === 'PLAY_CARD').slice(0, threatN);
+            const threat = aiDistinct(s, getLegalActions(s, oppId)).filter(a => a.type === 'ATTACK' || a.type === 'PLAY_CARD').slice(0, threatN);
             for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
         }
@@ -195,13 +245,18 @@ function fastAiAction(state, pid, maxCands = 40) {
     if (ra) return { action: ra, reason: ra.desc };
     const base = evaluateState(state, pid);
     let best = null, bv = base + 0.5;
-    const cands = legal.filter(a => a.type !== 'PLACE_RESOURCE');
+    const cands = aiDistinct(state, legal.filter(a => a.type !== 'PLACE_RESOURCE'));
     for (const act of cands.length > maxCands ? cands.slice(0, maxCands) : cands) {
         const sim = simApply(state, act, pid);
         if (!sim) continue;
         if (sim.gameOver && sim.winner === pid) return { action: act, reason: 'Lethal' };
         const v = evaluateState(sim, pid);
         if (v > bv) { bv = v; best = act; }
+    }
+    // Mehrere Angriffe zusammen können besser sein als jeder einzelne (Protector erschöpfen, dann durch)
+    for (const pl of attackPlans(state, pid)) {
+        const v = evaluateState(pl.state, pid);
+        if (v > bv) { bv = v; best = pl.first; }
     }
     return best ? { action: best, score: bv, reason: best.desc } : null;
 }
