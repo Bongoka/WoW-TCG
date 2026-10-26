@@ -40,13 +40,18 @@ function probeImageDirs(done) {
 function updateImgStyleOptions() {
     const sel = document.getElementById("cfg-img-style"); if (!sel) return;
     const miss = f => IMG_DIR_MISSING.has(f);
-    const avail = { scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: !miss('azeroth big') };
+    const edited = !(miss('azeroth') && miss('azeroth small'));
+    const avail = { edited, scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: edited && !miss('azeroth big') };
     for (const o of sel.options) {
         if (!(o.value in avail)) continue;
         o.disabled = !avail[o.value];
         o.textContent = o.textContent.replace(/ \(nicht installiert\)$/, '') + (avail[o.value] ? '' : ' (nicht installiert)');
     }
-    if (avail[imgStyle()] === false) { try { localStorage.setItem(IMG_STYLE_KEY, 'edited'); } catch (e) {} sel.value = 'edited'; if (G) render(); }
+    // Gewählte Option nicht installiert (z. B. Paket nur mit Scans): erste vorhandene nehmen
+    if (avail[imgStyle()] === false) {
+        const pick = ['edited', 'scans', 'hq'].find(k => avail[k]); if (!pick) return;
+        try { localStorage.setItem(IMG_STYLE_KEY, pick); } catch (e) {} sel.value = pick; if (G) render();
+    }
 }
 // Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.png" (große Vorschau)
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
@@ -176,6 +181,7 @@ function pickDeck(key) {
 let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
 function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     UNDO.stack = [];
+    if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
     const keys = GAME_DECKS.map(d => d.id);
     const pKey = seedPlayerDeck || keys[Math.floor(Math.random() * keys.length)];
     let oKey = seedOppDeck || keys[Math.floor(Math.random() * keys.length)];

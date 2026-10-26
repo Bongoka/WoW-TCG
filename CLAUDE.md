@@ -31,6 +31,7 @@ Kommunikation mit dem Nutzer auf **Deutsch**.
 | `simcore.js` | DOM-freie Simulation `simulateOneGame`, Karten-Statistik, Zufallsdecks, Late-Game-Testaufbau |
 | `tests.js` | Regeltests `runRuleTests()` |
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
+| `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
 | `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups |
 
 Wichtige Engine-Konzepte:
