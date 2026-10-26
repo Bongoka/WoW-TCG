@@ -9,7 +9,7 @@ function getImageCandidates(id, mode = 'ea') {
     const cd = CARDS[id];
     if (TOKEN_IMG[id]) {
         const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.png`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
-        return mode === 'full' ? [big, small] : [small, big];
+        return mode === 'full' || mode === 'eaBig' ? [big, small] : [small, big];
     }
     if (cd && SET_IMG_PREFIX[cd.set]) {
         const n = `${SET_IMG_PREFIX[cd.set]}-${cd.num}`;
@@ -17,9 +17,13 @@ function getImageCandidates(id, mode = 'ea') {
         if (mode === 'full') return [`cards/${n}.png`, `${n}.png`];
         return [`cards/${n}-EA.png`, `cards/${n}.png`, `${n}-EA.png`, `${n}.png`];
     }
-    if (mode === 'back') return [`cards/AZEROTH-${id}-Back.png`, `AZEROTH-${id}-Back.png`, ...getImageCandidates(id, 'ea')];   // umgedrehter Held
-    if (mode === 'full') return [`AZEROTH-${id}.png`, `cards/AZEROTH-${id}.png`];
-    return [_cfgImgPath.replace("{id}", id), `AZEROTH-${id}-EA.png`, `AZEROTH-${id}.png`, `cards/AZEROTH-${id}-EA.png`, `cards/AZEROTH-${id}.png`];
+    // Set 1: cards/azeroth small/*.webp (358 px, Hand/Spielfeld), cards/azeroth/*.webp (716 px, große Vorschau),
+    // cards/azeroth big/*.png (Originale, nur als Rückfall)
+    const w = (dir, suf) => encodeURI(`cards/${dir}/AZEROTH-${id}${suf}_ergebnis.webp`), big = suf => encodeURI(`cards/azeroth big/AZEROTH-${id}${suf}.png`);
+    if (mode === 'back') return [w('azeroth small', '-Back'), big('-Back'), ...getImageCandidates(id, 'ea')];   // umgedrehter Held
+    if (mode === 'full') return [w('azeroth', ''), big('')];
+    if (mode === 'eaBig') return [w('azeroth', '-EA'), w('azeroth', ''), big('-EA'), big('')];                 // Vorschau mit Extended Art
+    return [w('azeroth small', '-EA'), w('azeroth small', ''), big('-EA'), big(''), _cfgImgPath.replace("{id}", id)];
 }
 function getCardColor(card) {
     if (card.type === 'Weapon' || card.type === 'Armor' || card.type === 'Item') return '#a89880';

@@ -231,7 +231,7 @@
         const sb = clone.querySelector('.cfx-stats-bar'); if (sb) sb.remove();
         const pimg = clone.querySelector('.card-image-layer');
         if (pimg && meta.cardId != null && typeof getImageCandidates === 'function') {
-            const list = meta.previewMode === 'ea' ? getImageCandidates(meta.cardId, 'ea') : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
+            const list = meta.previewMode === 'ea' ? getImageCandidates(meta.cardId, 'eaBig') : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
             let k = 0; const probe = new Image();
             probe.onload = () => { pimg.src = probe.src; };
             probe.onerror = () => { k++; if (k < list.length) probe.src = list[k]; };
