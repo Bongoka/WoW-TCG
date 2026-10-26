@@ -2,8 +2,15 @@ let _cfgImgPath = "AZEROTH-{id}-EA.png";
 // Set 2–5: Bilder heißen nach Set und Kartennummer, z. B. cards/DARKPORTAL-12-EA.png, cards/OUTLAND-7-EA.png,
 // Raid-Loot cards/ONYXIA-21.png, cards/MOLTENCORE-30.png
 const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };
+// Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.png" (große Vorschau)
+const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
+    9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton' };
 function getImageCandidates(id, mode = 'ea') {
     const cd = CARDS[id];
+    if (TOKEN_IMG[id]) {
+        const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.png`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
+        return mode === 'full' ? [big, small] : [small, big];
+    }
     if (cd && SET_IMG_PREFIX[cd.set]) {
         const n = `${SET_IMG_PREFIX[cd.set]}-${cd.num}`;
         if (mode === 'back') return [`cards/${n}-Back.png`, `${n}-Back.png`, ...getImageCandidates(id, 'ea')];

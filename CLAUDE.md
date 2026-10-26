@@ -61,6 +61,7 @@ Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit fes
 
 ## Simulation & Statistik
 
-- Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **gespielt** vs. wenn **nicht gespielt** (Δ). Quests: gespielt = abgeschlossen. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
-- Bekannte Verzerrung: Karten, die man eher im Rückstand spielt (z. B. Counterattack!, Heilung, Removal), wirken schlechter als sie sind.
+- Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
+- Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
+- Jedes Match läuft doppelt mit gleichem Seed (`simulateMatchPair`): ohne und mit Münze für Spieler 2 (nur Simulationstest, `p.coin`/`p.coinMana`).
 - In Simulationen antwortet die CPU nie mit Instants in Prioritätsfenstern (nur in echten Partien, `aiRespond`).

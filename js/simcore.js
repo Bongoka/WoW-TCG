@@ -4,13 +4,21 @@
 // gegen Winrate in Spielen, in denen sie im Deck war, aber nicht gespielt wurde.
 // Δ = WR(gespielt) − WR(nicht gespielt). Quests: "gespielt" = abgeschlossen.
 // ============================================================================
-const SIM_MAX_TURNS = 60, SIM_MAX_MS = 6000;
+const SIM_MAX_TURNS = 60, SIM_MAX_MS = 6000, SIM_EARLY_DRAWS = 3;
 // opts.coin: Spieler 2 (nicht Startspieler) bekommt die Münze (Simulationstest, +1 Mana einmal pro Spiel)
 function simulateOneGame(deckA, deckB, opts = {}) {
     const s = newGameState(deckA.hero, deckA.cards, deckB.hero, deckB.cards);
     dealOpeningHands(s);
     for (const pid of [1, 2]) if (aiWantsMulligan(s, pid)) doMulligan(s, pid);
     if (opts.coin) s.p2.coin = true;
+    // Früh gezogen = Starthand nach Mulligan + die obersten SIM_EARLY_DRAWS Karten (Ziehen der ersten Züge).
+    // Allein durch das Mischen bestimmt – anders als "gespielt" nicht vom Spielverlauf abhängig.
+    for (const p of [s.p1, s.p2]) {
+        const early = {};
+        p.hand.forEach(c => early[c.id] = true);
+        p.deck.slice(-SIM_EARLY_DRAWS).forEach(id => early[id] = true);                    // drawCards zieht vom Ende
+        p.stats.early = early;
+    }
     s._batch = [];
     let turns = 0, guard = 0;
     // Zeitgrenze: festgefahrene Spiele mit riesigen Boards (z. B. Dutzende Token) werden wie beim Zuglimit nach HP gewertet
@@ -50,16 +58,18 @@ function simulateMatchPair(deckA, deckB) {
         return { plain, coin };
     } finally { Math.random = orig; }
 }
-// cardStats[id] ={ g, w, pg, pw }  (g/w: Spiele/Siege mit der Karte im Deck; pg/pw: davon gespielt)
+// cardStats[id] = { g, w, pg, pw }  (g/w: Spiele/Siege mit der Karte im Deck; pg/pw: davon früh gezogen)
+// Früher zählte "gespielt" (Quests: abgeschlossen) – das hängt vom Spielverlauf ab: Wer vorne liegt, spielt mehr
+// teure Karten. Selbst eine Karte ohne jede Wirkung kam so auf +15 bis +28 Prozentpunkte. "Früh gezogen" entscheidet nur das Mischen.
 function recordCardStats(cardStats, deck, pid, res) {
     const won = res.winner === pid;
-    const st = res.stats[pid] || { played: {}, completed: {} };
+    const early = (res.stats[pid] && res.stats[pid].early) || {};
     const seen = new Set();
     for (const id of (deck.cards || [])) {
         if (seen.has(id)) continue; seen.add(id);
         const c = CARDS[id]; if (!c || c.isToken) continue;
         const e = cardStats[id] || (cardStats[id] = { g: 0, w: 0, pg: 0, pw: 0 });
-        const used = c.type === 'Quest' ? !!st.completed[id] : !!st.played[id];
+        const used = !!early[id];
         e.g++; if (won) e.w++;
         if (used) { e.pg++; if (won) e.pw++; }
     }

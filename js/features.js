@@ -28,65 +28,6 @@ function applyImageTestSize() {
 }
 document.getElementById("btn-img-test").onclick = openImageTest;
 
-// --- FOIL-TEST: 10 neue Foil-Effekte (css/cards.css .cfx-foil.n1 … n10) nebeneinander ansehen ---
-const FOIL_TESTS = [
-    { k: 'n1', name: 'Prisma-Holo (sanfter)', desc: 'Regenbogenbänder wandern mit der Maus, nahe der Maus am stärksten.' },
-    { k: 'n10', name: 'Drachenschuppen', desc: 'Schuppenmuster schimmert in Smaragd- und Goldtönen.' },
-    { k: 'n2', name: 'Base-Set-Holo', desc: 'Wie Pokémon 1999: nur das Bild glänzt, senkrechte Regenbogenschlieren.' },
-    { k: 'n3', name: 'Cosmos-Holo', desc: 'Kreise verschiedener Größe im Bild, durch die der Regenbogen läuft.' },
-    { k: 'n4', name: 'Reverse-Holo', desc: 'Alles glänzt außer dem Bild.' },
-    { k: 'n5', name: 'Magic-Foil 1999', desc: 'Weicher Regenbogen-Schleier über der ganzen Karte, dazu ein Glanzstreifen.' },
-    { k: 'n6', name: 'Cracked Ice', desc: 'Das Bild zerfällt in Splitter, jeder spiegelt eine andere Farbe.' },
-    { k: 'n7', name: 'Secret Rare', desc: 'Feines Kreuzgitter aus Linien, durch das der Regenbogen wandert.' },
-    { k: 'n8', name: 'Starlight-Holo', desc: 'Funkelnde vierzackige Sterne im Bild, nahe der Maus am hellsten.' },
-    { k: 'n9', name: 'Linien-Holo', desc: 'Senkrechte Regenbogenlinien im Bild, die bei Bewegung durchlaufen.' },
-];
-const FOILT = { ids: [], raf: 0 };
-function foilTestPick(n) {
-    const pool = Object.values(CARDS).filter(c => !c.isToken && !c.set && c.type !== 'Quest').map(c => c.id);   // Set 1: Bilder vorhanden
-    const out = []; while (out.length < n) out.push(pool[Math.floor(Math.random() * pool.length)]);
-    return out;
-}
-function renderFoilTest() {
-    const grid = document.getElementById("foiltest-grid"); grid.innerHTML = "";
-    const mixed = document.getElementById("foiltest-mixed").checked;
-    FOIL_TESTS.forEach((f, i) => {
-        const id = mixed ? FOILT.ids[i] : FOILT.ids[0];
-        const item = document.createElement("div"); item.className = "imgtest-item";
-        const card = createCardDOM({ ...CARDS[id], uid: 'foiltest_' + f.k, isFoil: false }, false, f.k, { imageMode: 'full', stats: false, noDamage: true });
-        const cap = document.createElement("div"); cap.className = "foiltest-cap";
-        cap.innerHTML = `<b>${i + 1}. ${esc(f.name)}</b>${esc(f.desc)}`;
-        item.appendChild(card); item.appendChild(cap); grid.appendChild(item);
-    });
-    applyFoilTestSize();
-}
-function applyFoilTestSize() { document.getElementById("foiltest-grid").style.setProperty('--ft-w', document.getElementById("foiltest-size").value); }
-// "Immer sichtbar": Lichtposition wandert auf jeder Karte von selbst (beim Hover gilt die Maus – sie steht weiter innen in .cfx-tilt)
-function foilTestTick(t) {
-    const m = document.getElementById("foiltest-modal");
-    if (m.style.display === 'none' || !m.classList.contains('always')) { FOILT.raf = 0; return; }
-    m.querySelectorAll('#foiltest-grid .card-wrapper').forEach((w, i) => {
-        const a = t / 1600 + i * 0.7;
-        w.style.setProperty('--mx', (50 + Math.sin(a) * 38).toFixed(1) + '%');
-        w.style.setProperty('--my', (50 + Math.cos(a * 0.8) * 38).toFixed(1) + '%');
-    });
-    FOILT.raf = requestAnimationFrame(foilTestTick);
-}
-function foilTestAnimate() {
-    const on = document.getElementById("foiltest-always").checked;
-    document.getElementById("foiltest-modal").classList.toggle('always', on);
-    if (!on) document.querySelectorAll('#foiltest-grid .card-wrapper').forEach(w => { w.style.removeProperty('--mx'); w.style.removeProperty('--my'); });
-    if (on && !FOILT.raf) FOILT.raf = requestAnimationFrame(foilTestTick);
-}
-document.getElementById("btn-foil-test").onclick = () => {
-    document.getElementById("foiltest-modal").style.display = "flex";
-    FOILT.ids = foilTestPick(FOIL_TESTS.length); renderFoilTest(); foilTestAnimate();
-};
-document.getElementById("foiltest-card").onclick = () => { FOILT.ids = foilTestPick(FOIL_TESTS.length); renderFoilTest(); };
-document.getElementById("foiltest-mixed").addEventListener('change', renderFoilTest);
-document.getElementById("foiltest-always").addEventListener('change', foilTestAnimate);
-document.getElementById("foiltest-size").addEventListener('change', applyFoilTestSize);
-document.getElementById("foiltest-close").onclick = () => { document.getElementById("foiltest-modal").style.display = "none"; };
 document.getElementById("imgtest-close").onclick = () => { document.getElementById("imgtest-modal").style.display = "none"; };
 document.getElementById("imgtest-input").addEventListener('change', (e) => loadImageTest(e.target.files));
 document.getElementById("imgtest-size").addEventListener('change', applyImageTestSize);
@@ -594,8 +535,8 @@ function generateBoosterCards() {
     if (Math.random() < 0.125) { if(shuffledEpics.length) { let id = shuffledEpics.pop(); boosterCards.push({cardId:id,rarity:'Epic'}); availablePool = availablePool.filter(cid=>cid!==id); } }
     else { if(shuffledRares.length) { let id = shuffledRares.pop(); boosterCards.push({cardId:id,rarity:'Rare'}); availablePool = availablePool.filter(cid=>cid!==id); } }
     if(shuffledHeroes.length) { let id = shuffledHeroes.pop(); const foil = Math.random() < 0.1;   // 10 %: Foil-Held
-        boosterCards.push({ cardId: id, rarity: foil ? 'HeroFoil' : 'Hero', forceFoil: foil ? 'f' + [2, 5, 9][Math.floor(Math.random() * 3)] : null }); }
-    if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)]; const eaFoil = Math.random()<0.1 ? 'f'+[2,5,9][Math.floor(Math.random()*3)] : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); }
+        boosterCards.push({ cardId: id, rarity: foil ? 'HeroFoil' : 'Hero', forceFoil: foil ? randomFoil() : null }); }
+    if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)]; const eaFoil = Math.random()<0.1 ? randomFoil() : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); }
     shuffleDeck(boosterCards);
     const box = document.getElementById("booster-cards-container");
     box.style.display = "block"; box.innerHTML = "";
@@ -609,7 +550,7 @@ function generateBoosterCards() {
         const card = makeCardInst(data.cardId);
         card.hasDamageMask = false; delete card.maskStyle;
         let forceFoil = data.forceFoil || null;
-        if (!data.isEA && card.isFoil && card.type !== 'Hero') forceFoil = 'f' + [2, 5, 9][Math.floor(Math.random() * 3)];   // Helden: Foil nur über die 10 %-Würfel oben
+        if (!data.isEA && card.isFoil && card.type !== 'Hero') forceFoil = randomFoil();   // Helden: Foil nur über die 10 %-Würfel oben
         // stats: false -> im Booster keine Werte-Symbole; no-fx bis zum Aufdecken (keine Vorschau verdeckter Karten)
         const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', previewMode: data.isEA ? 'ea' : null, noDamage: true, stats: false });
         node.style.setProperty('--cw', '100%'); node.classList.add('no-fx');
@@ -790,11 +731,11 @@ function openDeckView(deckId) {
 function getDeckFaction(deck) { if (deck.faction) return deck.faction; const hero = CARDS[deck.hero]; return (hero && hero.faction) || 'Neutral'; }
 function getDeckClass(deck) { if (deck.class) return deck.class; const hero = CARDS[deck.hero]; return (hero && hero.class) || 'Neutral'; }
 
-// Karten-Auswertung: Δ = Winrate wenn gespielt − Winrate wenn im Deck, aber nicht gespielt
+// Karten-Auswertung: Δ = Winrate wenn früh gezogen − Winrate wenn im Deck, aber nicht früh gezogen
 function renderCardDeltaTable(list) {
     if (!list.length) return `<div style="color:var(--text-dim);font-size:11px;">Keine Karten mit ausreichender Stichprobe.</div>`;
     const pct = v => (v * 100).toFixed(1) + '%';
-    let h = `<table><tr><th>Karte</th><th>Typ</th><th>Im Deck</th><th>Gespielt</th><th>WR gespielt</th><th>WR nicht gespielt</th><th>Δ</th></tr>`;
+    let h = `<table><tr><th>Karte</th><th>Typ</th><th>Im Deck</th><th>Früh gezogen</th><th>WR gezogen</th><th>WR nicht gezogen</th><th>Δ</th></tr>`;
     for (const r of list) {
         const col = r.delta >= 0 ? '#4ade80' : '#f87171';
         const sig = Math.abs(r.delta) >= 2 * r.se ? '' : ' style="opacity:.6" title="Unterschied liegt im Zufallsbereich (< 2 Standardfehler)"';
@@ -806,7 +747,7 @@ function renderCardAnalysis(cardStats, totalGames) {
     const minEach = Math.max(6, Math.floor(totalGames / 150));
     const A = analyzeCardStats(cardStats, minEach);
     let html = `<h3 style="color:var(--gold);">Karten nach Manakosten</h3>
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Für jede Karte zählen nur Spiele, in denen sie im Deck war. Verglichen wird die Winrate der Spiele, in denen sie <b>gespielt</b> wurde, mit denen, in denen sie <b>nicht gespielt</b> wurde (Δ in Prozentpunkten). So hat eine Karte keinen Vorteil nur dadurch, dass sie in einem starken Deck steckt. Mindestens ${minEach} Spiele je Gruppe; blasse Zeilen liegen im Zufallsbereich.</div>`;
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Für jede Karte zählen nur Spiele, in denen sie im Deck war. Verglichen wird die Winrate der Spiele, in denen sie <b>früh gezogen</b> wurde (Starthand nach Mulligan oder eine der nächsten ${SIM_EARLY_DRAWS} Karten), mit denen, in denen nicht (Δ in Prozentpunkten). Ob man eine Karte früh zieht, entscheidet allein das Mischen – anders als „gespielt“ hängt es nicht davon ab, ob man gerade vorne liegt. So hat eine Karte auch keinen Vorteil nur dadurch, dass sie in einem starken Deck steckt. Mindestens ${minEach} Spiele je Gruppe; blasse Zeilen liegen im Zufallsbereich.</div>`;
     const keys = Object.keys(A.byCost).map(Number).sort((a, b) => a - b);
     for (const k of keys) {
         const list = A.byCost[k];
@@ -815,7 +756,7 @@ function renderCardAnalysis(cardStats, totalGames) {
         html += `<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(list.slice(0, n))}`;
         if (list.length > n) html += `<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(list.slice(-n).reverse())}`;
     }
-    html += `<h3 style="color:var(--gold);">Quests (gespielt = abgeschlossen)</h3>`;
+    html += `<h3 style="color:var(--gold);">Quests (früh gezogen)</h3>`;
     const nq = Math.min(5, Math.ceil(A.quests.length / 2));
     html += `<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(A.quests.slice(0, nq))}`;
     if (A.quests.length > nq) html += `<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(A.quests.slice(nq).reverse().slice(0, nq))}`;

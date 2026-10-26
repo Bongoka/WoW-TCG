@@ -510,13 +510,6 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .fx-showcase .card-wrapper { width: 100%; }
 
 /* ===== Bild-Test-Szene ===== */
-#foiltest-modal { position: fixed; inset: 0; z-index: 100200; display: none; flex-direction: column; background: radial-gradient(ellipse at center, #1c1726 0%, #050308 80%); }
-#foiltest-grid { flex: 1; overflow: auto; display: flex; flex-wrap: wrap; gap: 30px 26px; align-content: flex-start; justify-content: center; padding: 26px; }
-#foiltest-grid .imgtest-item .card-wrapper { --cw: var(--ft-w, 260px); }
-.foiltest-cap { max-width: var(--ft-w, 260px); text-align: center; font-size: 12px; line-height: 1.35; color: var(--text-dim); }
-.foiltest-cap b { display: block; color: var(--gold-light); font-size: 14px; margin-bottom: 2px; }
-.foiltest-opt { font-size: 12px; color: var(--text-main); display: flex; align-items: center; gap: 5px; cursor: pointer; }
-#foiltest-modal.always .cfx-foil { opacity: 1; }
 #imgtest-modal { position: fixed; inset: 0; z-index: 100200; display: none; flex-direction: column; background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 80%); }
 .imgtest-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 18px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.4); }
 .imgtest-pick { cursor: pointer; padding: 7px 14px; border: 1px solid #0ea5e9; border-radius: 3px; background: #0c4a6e; color: #e0f2fe; font-weight: bold; font-size: 12px; }

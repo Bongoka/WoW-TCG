@@ -8,6 +8,8 @@
     // Bei jedem render() werden die Karten neu gebaut; ohne Cache startete jedes Bild unsichtbar
     // und wurde erst nach dem Laden eingeblendet -> alle Karten blitzten kurz schwarz auf.
     const IMG_OK = new Map();
+    // Foil-Arten (css/cards.css): n1 = Prisma-Holo (sanft), n5 = Magic-Foil 1999
+    window.randomFoil = () => ['n1', 'n5'][Math.floor(Math.random() * 2)];
 
     function createCardDOM(card, isField = false, forceFoil = null, opts = {}) {
         const wrap = el('div', 'card-wrapper' + (isField ? '' : ' hand-card'));
@@ -83,7 +85,7 @@
         }
         face.appendChild(img);
         
-        const foilClass = forceFoil !== null ? forceFoil : (card.isFoil ? 'f' + [2, 5, 9][Math.floor(Math.random() * 3)] : null);
+        const foilClass = forceFoil !== null ? forceFoil : (card.isFoil ? randomFoil() : null);
         if (foilClass) { const foil = el('div', `cfx-foil ${foilClass}`); face.appendChild(foil); }
         face.appendChild(el('div', 'cfx-glare'));
 
