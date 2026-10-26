@@ -86,6 +86,7 @@
     <button id="btn-test-setup">⚡ Test-Setup</button>
     <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
     <button id="btn-img-test" style="border-color:#0ea5e9; background:#0c4a6e; color:#e0f2fe;">🖼 Bild-Test (Ordner „test“)</button>
+    <button id="btn-foil-test" style="border-color:#f472b6; background:#831843; color:#fce7f3;">✨ Foil-Test (10 neue Effekte)</button>
     <div style="border-top:1px solid var(--border);padding-top:6px;">
         <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
         <input type="text" id="cfg-img-path" value="AZEROTH-{id}-EA.png" style="width:100%;font-size:10px;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px 5px;border-radius:3px;">
@@ -128,6 +129,21 @@
     <p id="decision-text" style="font-size:14px;line-height:1.5;"></p>
     <div id="decision-actions" style="display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap;"></div>
 </div></div>
+
+<div id="foiltest-modal" class="always">
+    <div class="imgtest-head">
+        <h2 style="margin:0;color:var(--gold);">Foil-Test</h2>
+        <button id="foiltest-card">🎲 Andere Karte</button>
+        <label class="foiltest-opt"><input type="checkbox" id="foiltest-mixed"> Verschiedene Karten</label>
+        <label class="foiltest-opt"><input type="checkbox" id="foiltest-always" checked> Immer sichtbar (bewegt sich von selbst)</label>
+        <label style="font-size:12px;color:var(--text-dim);">Größe:
+            <select id="foiltest-size"><option value="200px">klein</option><option value="260px" selected>mittel</option><option value="340px">groß</option></select>
+        </label>
+        <span style="font-size:12px;color:var(--text-dim);">Maus über eine Karte: Effekt folgt der Maus, große Vorschau daneben</span>
+        <button id="foiltest-close" class="danger" style="margin-left:auto;">Schließen</button>
+    </div>
+    <div id="foiltest-grid"></div>
+</div>
 
 <div id="imgtest-modal">
     <div class="imgtest-head">
@@ -292,13 +308,26 @@
 </div></div>
 
 <div id="booster-modal">
+    <div id="booster-bg"><div class="booster-rays"></div><div class="booster-motes"></div></div>
     <div style="position: absolute; top: 20px; right: 20px; z-index: 1000000;">
-        <button id="booster-close-btn" class="danger">Schließen</button>
+        <button id="booster-close-btn" class="danger">✕ Schließen</button>
     </div>
-    <div id="booster-pack-container" class="booster-pack-container">
-        <img id="booster-pack-img" class="booster-pack-img" src="booster/booster1.png" alt="Booster">
+    <div id="booster-stage">
+        <div id="booster-pack-container" class="booster-pack-container">
+            <div class="booster-pack-aura"></div>
+            <img id="booster-pack-img" class="booster-pack-img" src="booster/booster1.png" alt="Booster" draggable="false">
+            <div class="booster-pack-shine"></div>
+        </div>
+        <div id="booster-hint">Klicke auf den Booster, um ihn zu öffnen</div>
+        <div id="booster-cards-container" class="booster-cards-container"></div>
     </div>
-    <div id="booster-cards-container" class="booster-cards-container"></div>
+    <div id="booster-actions">
+        <span id="booster-count"></span>
+        <button id="booster-reveal-all">✨ Alle aufdecken</button>
+        <button id="booster-again" class="success">🎁 Noch einen öffnen</button>
+    </div>
+    <div id="booster-flash"></div>
+    <canvas id="booster-fx"></canvas>
 </div>
 
 <script src="js/utils.js"></script>

@@ -27,6 +27,66 @@ function applyImageTestSize() {
     document.querySelectorAll("#imgtest-grid .imgtest-item").forEach(it => it.style.setProperty('--it-w', v === 'orig' ? (it.dataset.w ? it.dataset.w + 'px' : '350px') : v));
 }
 document.getElementById("btn-img-test").onclick = openImageTest;
+
+// --- FOIL-TEST: 10 neue Foil-Effekte (css/cards.css .cfx-foil.n1 … n10) nebeneinander ansehen ---
+const FOIL_TESTS = [
+    { k: 'n1', name: 'Prisma-Holo', desc: 'Regenbogenbänder wandern mit der Maus, feine Holo-Linien darüber.' },
+    { k: 'n2', name: 'Sternenstaub', desc: 'Drei Glitzerschichten mit Parallaxe, eine davon funkelt.' },
+    { k: 'n3', name: 'Chrom', desc: 'Karte wird metallisch entsättigt, gebürstete Linien und ein Lichtstreifen.' },
+    { k: 'n4', name: 'Arkaner Zirkel', desc: 'Zwei gegenläufig drehende Runenringe kreisen um die Maus.' },
+    { k: 'n5', name: 'Glut', desc: 'Funken steigen auf, Hitzeschein von unten, leichtes Flackern.' },
+    { k: 'n6', name: 'Frost', desc: 'Eisrisse, Raureif am Rand und ein kalter Lichtstreifen.' },
+    { k: 'n7', name: 'Galaxie', desc: 'Nebelwolken bewegen sich gegen die Maus, Sterne funkeln.' },
+    { k: 'n8', name: 'Sonnengold', desc: 'Drehende Goldstrahlen aus der Mausposition, Karte leicht vergoldet.' },
+    { k: 'n9', name: 'Wasser', desc: 'Wellenringe breiten sich von der Maus aus, Lichtflecken wandern.' },
+    { k: 'n10', name: 'Drachenschuppen', desc: 'Schuppenmuster schimmert in Smaragd- und Goldtönen.' },
+];
+const FOILT = { ids: [], raf: 0 };
+function foilTestPick(n) {
+    const pool = Object.values(CARDS).filter(c => !c.isToken && !c.set && c.type !== 'Quest').map(c => c.id);   // Set 1: Bilder vorhanden
+    const out = []; while (out.length < n) out.push(pool[Math.floor(Math.random() * pool.length)]);
+    return out;
+}
+function renderFoilTest() {
+    const grid = document.getElementById("foiltest-grid"); grid.innerHTML = "";
+    const mixed = document.getElementById("foiltest-mixed").checked;
+    FOIL_TESTS.forEach((f, i) => {
+        const id = mixed ? FOILT.ids[i] : FOILT.ids[0];
+        const item = document.createElement("div"); item.className = "imgtest-item";
+        const card = createCardDOM({ ...CARDS[id], uid: 'foiltest_' + f.k, isFoil: false }, false, f.k, { imageMode: 'full', stats: false, noDamage: true });
+        const cap = document.createElement("div"); cap.className = "foiltest-cap";
+        cap.innerHTML = `<b>${i + 1}. ${esc(f.name)}</b>${esc(f.desc)}`;
+        item.appendChild(card); item.appendChild(cap); grid.appendChild(item);
+    });
+    applyFoilTestSize();
+}
+function applyFoilTestSize() { document.getElementById("foiltest-grid").style.setProperty('--ft-w', document.getElementById("foiltest-size").value); }
+// "Immer sichtbar": Lichtposition wandert auf jeder Karte von selbst (beim Hover gilt die Maus – sie steht weiter innen in .cfx-tilt)
+function foilTestTick(t) {
+    const m = document.getElementById("foiltest-modal");
+    if (m.style.display === 'none' || !m.classList.contains('always')) { FOILT.raf = 0; return; }
+    m.querySelectorAll('#foiltest-grid .card-wrapper').forEach((w, i) => {
+        const a = t / 1600 + i * 0.7;
+        w.style.setProperty('--mx', (50 + Math.sin(a) * 38).toFixed(1) + '%');
+        w.style.setProperty('--my', (50 + Math.cos(a * 0.8) * 38).toFixed(1) + '%');
+    });
+    FOILT.raf = requestAnimationFrame(foilTestTick);
+}
+function foilTestAnimate() {
+    const on = document.getElementById("foiltest-always").checked;
+    document.getElementById("foiltest-modal").classList.toggle('always', on);
+    if (!on) document.querySelectorAll('#foiltest-grid .card-wrapper').forEach(w => { w.style.removeProperty('--mx'); w.style.removeProperty('--my'); });
+    if (on && !FOILT.raf) FOILT.raf = requestAnimationFrame(foilTestTick);
+}
+document.getElementById("btn-foil-test").onclick = () => {
+    document.getElementById("foiltest-modal").style.display = "flex";
+    FOILT.ids = foilTestPick(FOIL_TESTS.length); renderFoilTest(); foilTestAnimate();
+};
+document.getElementById("foiltest-card").onclick = () => { FOILT.ids = foilTestPick(FOIL_TESTS.length); renderFoilTest(); };
+document.getElementById("foiltest-mixed").addEventListener('change', renderFoilTest);
+document.getElementById("foiltest-always").addEventListener('change', foilTestAnimate);
+document.getElementById("foiltest-size").addEventListener('change', applyFoilTestSize);
+document.getElementById("foiltest-close").onclick = () => { document.getElementById("foiltest-modal").style.display = "none"; };
 document.getElementById("imgtest-close").onclick = () => { document.getElementById("imgtest-modal").style.display = "none"; };
 document.getElementById("imgtest-input").addEventListener('change', (e) => loadImageTest(e.target.files));
 document.getElementById("imgtest-size").addEventListener('change', applyImageTestSize);
@@ -323,26 +383,121 @@ document.getElementById('db-io-ok').onclick = () => {
 };
 
 // --- BOOSTER ---
-let boosterActive = false;
-document.getElementById("btn-booster").onclick = () => {
-    const modal = document.getElementById("booster-modal"); modal.style.display = "flex";
-    boosterActive = false;
-    const packContainer = document.getElementById("booster-pack-container");
-    const cardsContainer = document.getElementById("booster-cards-container");
-    const packImg = document.getElementById("booster-pack-img");
-    packContainer.style.display = "flex"; packContainer.style.opacity = "1"; packContainer.style.transform = "scale(1)";
-    packContainer.classList.remove("booster-shaking", "booster-burst");
-    cardsContainer.style.display = "none"; cardsContainer.innerHTML = "";
-    packImg.src = Math.random() < 0.5 ? "booster/booster1.png" : "booster/booster2.jpg";
-    packContainer.onclick = () => {
-        if (boosterActive) return;
-        boosterActive = true;
-        sfx.play('draw'); packContainer.classList.add("booster-shaking");
-        setTimeout(() => {
-            sfx.play('destroy'); packContainer.classList.remove("booster-shaking"); packContainer.classList.add("booster-burst");
-            setTimeout(() => { packContainer.style.display = "none"; generateBoosterCards(); }, 400);
-        }, 800);
-    };
+// Ablauf: Pack schwebt → Klick: Schütteln, Lichtblitz, Funken → Karten fliegen in einen Fächer → Klick deckt auf
+// (Funken und Klang je Seltenheit) → Klick auf eine offene Karte holt sie groß in die Mitte.
+const BOOSTER_RAR = {
+    common: { label: 'Gewöhnlich', n: 14, notes: [523] },
+    uncommon: { label: 'Ungewöhnlich', n: 22, notes: [523, 659] },
+    rare: { label: 'Selten', n: 40, notes: [523, 659, 784] },
+    epic: { label: 'Episch', n: 70, notes: [523, 659, 784, 1047], big: true },
+    hero: { label: 'Held', n: 55, notes: [392, 523, 659, 784], big: true },
+    ea: { label: 'Extended Art', n: 60, notes: [587, 740, 880, 1175], big: true },
+};
+const BOOSTER = { busy: false, cards: [], focus: null };
+const bModal = () => document.getElementById("booster-modal");
+// Kleine Klänge (WebAudio, wie sfx in utils.js)
+function boosterTone(freq, dur = 0.25, type = 'sine', vol = 0.05, delay = 0) {
+    if (sfx.muted) return;
+    try {
+        sfx.init(); const ctx = sfx.ctx; if (!ctx) return;
+        const t = ctx.currentTime + delay, o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) {}
+}
+function boosterWhoosh(vol = 0.06, dur = 0.35) {
+    if (sfx.muted) return;
+    try {
+        sfx.init(); const ctx = sfx.ctx; if (!ctx) return;
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+        const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        f.type = 'bandpass'; f.frequency.setValueAtTime(400, ctx.currentTime); f.frequency.exponentialRampToValueAtTime(2400, ctx.currentTime + dur);
+        g.gain.value = vol; src.buffer = buf; src.connect(f); f.connect(g); g.connect(ctx.destination); src.start();
+    } catch (e) {}
+}
+
+// ---- Funken (Canvas über dem ganzen Booster-Fenster)
+const BFX = { parts: [], raf: 0 };
+function boosterCanvas() {
+    const c = document.getElementById('booster-fx');
+    if (c.width !== innerWidth || c.height !== innerHeight) { c.width = innerWidth; c.height = innerHeight; }
+    return c;
+}
+function boosterBurst(x, y, rgb, n, power = 1) {
+    for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 7) * power;
+        BFX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2 * power, life: 1, decay: 0.012 + Math.random() * 0.02,
+            size: 1.5 + Math.random() * 3.5 * power, rgb: Math.random() < 0.25 ? '255,255,255' : rgb, spin: Math.random() < 0.5 });
+    }
+    if (!BFX.raf) BFX.raf = requestAnimationFrame(boosterFxTick);
+}
+function boosterFxTick() {
+    const c = boosterCanvas(), g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'lighter';
+    BFX.parts = BFX.parts.filter(p => p.life > 0);
+    for (const p of BFX.parts) {
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.12; p.life -= p.decay;
+        const r = p.size * (0.4 + p.life * 0.6);
+        g.fillStyle = `rgba(${p.rgb},${Math.max(0, p.life).toFixed(3)})`;
+        if (p.spin) { g.fillRect(p.x - r, p.y - r * 0.35, r * 2, r * 0.7); }
+        else { g.beginPath(); g.arc(p.x, p.y, r, 0, Math.PI * 2); g.fill(); }
+    }
+    g.globalCompositeOperation = 'source-over';
+    BFX.raf = BFX.parts.length && bModal().style.display !== 'none' ? requestAnimationFrame(boosterFxTick) : 0;
+    if (!BFX.raf) g.clearRect(0, 0, c.width, c.height);
+}
+function boosterShake(strength = 1) {
+    const st = document.getElementById('booster-stage');
+    st.style.setProperty('--shk', strength * 8 + 'px');
+    st.classList.remove('bshake'); void st.offsetWidth; st.classList.add('bshake');
+}
+function boosterFlash(rgb = '255,236,180', ms = 450) {
+    const f = document.getElementById('booster-flash');
+    f.style.setProperty('--fl', rgb); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    setTimeout(() => f.classList.remove('go'), ms);
+}
+
+// ---- Öffnen
+document.getElementById("btn-booster").onclick = () => { bModal().style.display = "flex"; boosterReset(); };
+function boosterReset() {
+    BOOSTER.busy = false; BOOSTER.cards = []; BOOSTER.focus = null;
+    const pack = document.getElementById("booster-pack-container");
+    const cards = document.getElementById("booster-cards-container");
+    pack.className = 'booster-pack-container enter'; pack.style.display = 'flex'; pack.style.removeProperty('--px'); pack.style.removeProperty('--py');
+    cards.style.display = "none"; cards.innerHTML = "";
+    document.getElementById("booster-pack-img").src = Math.random() < 0.5 ? "booster/booster1.png" : "booster/booster2.jpg";
+    document.getElementById('booster-hint').classList.add('show');
+    document.getElementById('booster-actions').classList.remove('show');
+    bModal().classList.remove('has-focus', 'opened');
+    setTimeout(() => pack.classList.remove('enter'), 900);
+    boosterWhoosh(0.04, 0.5);
+}
+// Pack neigt sich zur Maus
+document.getElementById("booster-pack-container").addEventListener('pointermove', (e) => {
+    const p = e.currentTarget, r = p.getBoundingClientRect();
+    p.style.setProperty('--px', (((e.clientX - r.left) / r.width - 0.5) * 2).toFixed(3));
+    p.style.setProperty('--py', (((e.clientY - r.top) / r.height - 0.5) * 2).toFixed(3));
+});
+document.getElementById("booster-pack-container").addEventListener('pointerleave', (e) => { e.currentTarget.style.removeProperty('--px'); e.currentTarget.style.removeProperty('--py'); });
+document.getElementById("booster-pack-container").onclick = () => {
+    if (BOOSTER.busy) return; BOOSTER.busy = true;
+    const pack = document.getElementById("booster-pack-container");
+    document.getElementById('booster-hint').classList.remove('show');
+    pack.classList.add('charging');
+    // Spannung: immer schnellere, höhere Ticks
+    [0, 220, 400, 540, 650, 730, 790].forEach((t, i) => setTimeout(() => boosterTone(220 + i * 60, 0.08, 'triangle', 0.035), t));
+    setTimeout(() => {
+        const r = pack.getBoundingClientRect();
+        pack.classList.remove('charging'); pack.classList.add('burst');
+        boosterFlash(); boosterShake(1.4); boosterWhoosh(0.09, 0.6);
+        [262, 330, 392, 523].forEach((f, i) => boosterTone(f, 0.6, 'sine', 0.04, i * 0.03));
+        boosterBurst(r.left + r.width / 2, r.top + r.height / 2, '251,191,36', 120, 1.4);
+        bModal().classList.add('opened');
+        setTimeout(() => { pack.style.display = "none"; generateBoosterCards(); }, 380);
+    }, 850);
 };
 function generateBoosterCards() {
     const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken && (CARDS[id].set || 1) <= 3);   // Raid-Loot (Set 4/5) gab es nicht in Boostern
@@ -362,45 +517,102 @@ function generateBoosterCards() {
     if(shuffledHeroes.length) { let id = shuffledHeroes.pop(); boosterCards.push({cardId:id,rarity:'Hero'}); }
     if(availablePool.length) { const eaCardId = availablePool[Math.floor(Math.random()*availablePool.length)]; const eaFoil = Math.random()<0.1 ? 'f'+[2,5,9][Math.floor(Math.random()*3)] : null; boosterCards.push({cardId:eaCardId,rarity:'Extended Art',isEA:true,forceFoil:eaFoil}); }
     shuffleDeck(boosterCards);
-    const cardsContainer = document.getElementById("booster-cards-container");
-    cardsContainer.style.display = "flex";
-    const total = boosterCards.length, mid = (total - 1) / 2;
-    boosterCards.forEach((data, idx) => {
+    const box = document.getElementById("booster-cards-container");
+    box.style.display = "block"; box.innerHTML = "";
+    BOOSTER.cards = boosterCards.map((data, idx) => {
+        const rk = data.isEA ? 'ea' : String(data.rarity).toLowerCase();
         const wrap = document.createElement("div");
-        wrap.className = "booster-card-wrapper glow-" + (data.isEA ? 'ea' : String(data.rarity).toLowerCase());
-        const offset = idx - mid, angle = offset * 5, xOffset = offset * 150, yOffset = Math.abs(offset) * 15;
-        wrap.style.transform = `translate(${xOffset}px, ${yOffset}px) rotate(${angle}deg)`;
+        wrap.className = `booster-card-wrapper glow-${rk} dealing`;
         wrap.style.zIndex = idx;
-        const flipContainer = document.createElement("div"); flipContainer.className = "flip-container";
+        const flip = document.createElement("div"); flip.className = "flip-container";
         const front = document.createElement("div"); front.className = "flip-face flip-front";
         const card = makeCardInst(data.cardId);
-        
-        card.hasDamageMask = false; 
-        delete card.maskStyle;
-        
+        card.hasDamageMask = false; delete card.maskStyle;
         let forceFoil = data.forceFoil || null;
-        if (!data.isEA && card.isFoil) forceFoil = 'f'+[2,5,9][Math.floor(Math.random()*3)];
-        
-        // FIX: stats: false -> Icons und Zahlen werden im Booster NICHT gezeichnet
-        const cardNode = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', noDamage: true, stats: false });
-        cardNode.style.setProperty('--cw', '180px');
-        front.appendChild(cardNode);
+        if (!data.isEA && card.isFoil) forceFoil = 'f' + [2, 5, 9][Math.floor(Math.random() * 3)];
+        // stats: false -> im Booster keine Werte-Symbole; no-fx bis zum Aufdecken (keine Vorschau verdeckter Karten)
+        const node = createCardDOM(card, true, forceFoil, { imageMode: data.isEA ? 'ea' : 'full', noDamage: true, stats: false });
+        node.style.setProperty('--cw', '100%'); node.classList.add('no-fx');
+        front.appendChild(node);
         const back = document.createElement("div"); back.className = "flip-face flip-back";
-        const backImg = document.createElement("img"); backImg.src = "cards/Card Back.png";
+        const backImg = document.createElement("img"); backImg.src = "cards/Card Back.png"; backImg.draggable = false;
         backImg.onerror = () => { backImg.style.display = 'none'; back.style.background = 'url(https://i.imgur.com/3Vq5V2e.png) center/cover'; };
         back.appendChild(backImg);
-        flipContainer.appendChild(front); flipContainer.appendChild(back); wrap.appendChild(flipContainer);
-        wrap.onmouseenter = () => { if (!wrap.classList.contains('flipped')) wrap.style.transform = `translate(${xOffset}px, ${yOffset-20}px) rotate(${angle}deg) scale(1.1)`; };
-        wrap.onmouseleave = () => { if (!wrap.classList.contains('flipped')) wrap.style.transform = `translate(${xOffset}px, ${yOffset}px) rotate(${angle}deg)`; };
-        wrap.onclick = (e) => {
-            e.stopPropagation();
-            if (wrap.classList.contains('flipped')) { wrap.classList.remove('flipped'); wrap.style.transform = `translate(${xOffset}px, ${yOffset}px) rotate(${angle}deg)`; wrap.style.zIndex = idx; }
-            else { wrap.classList.add('flipped'); wrap.style.transform = `translate(${xOffset}px, -100px) rotate(0deg) scale(1.6)`; wrap.style.zIndex = 1000; sfx.play('play'); }
-        };
-        cardsContainer.appendChild(wrap);
+        const label = document.createElement("div"); label.className = "booster-rar-label"; label.textContent = BOOSTER_RAR[rk].label;
+        flip.appendChild(front); flip.appendChild(back); wrap.appendChild(flip); wrap.appendChild(label);
+        const entry = { wrap, node, rk, idx, flipped: false };
+        wrap.onclick = (e) => { e.stopPropagation(); if (entry.flipped) boosterFocus(entry); else boosterFlip(entry); };
+        box.appendChild(wrap);
+        return entry;
+    });
+    boosterLayout(true);
+    // Austeilen: eine Karte nach der anderen fliegt aus der Mitte in den Fächer
+    BOOSTER.cards.forEach((c, i) => setTimeout(() => { c.wrap.classList.remove('dealing'); boosterTone(380 + i * 35, 0.09, 'triangle', 0.03); boosterWhoosh(0.02, 0.18); }, 120 + i * 95));
+    setTimeout(() => { document.getElementById('booster-actions').classList.add('show'); boosterActions(); BOOSTER.busy = false; }, 120 + BOOSTER.cards.length * 95 + 300);
+}
+// Fächer an die Fensterbreite anpassen (Kartengröße, Abstand, Bogen)
+function boosterLayout(initial) {
+    const n = BOOSTER.cards.length, mid = (n - 1) / 2;
+    const cw = Math.round(Math.min(190, innerHeight * 0.27, (innerWidth - 160) / (n * 0.8 + 0.6)));
+    const gap = Math.min(cw * 1.08, (innerWidth - cw - 160) / Math.max(1, n - 1));
+    const box = document.getElementById("booster-cards-container"); box.style.setProperty('--bcw', cw + 'px');
+    BOOSTER.cards.forEach(c => {
+        const off = c.idx - mid;
+        c.wrap.style.setProperty('--tx', (off * gap).toFixed(1) + 'px');
+        c.wrap.style.setProperty('--ty', (Math.pow(Math.abs(off), 1.6) * cw * 0.045).toFixed(1) + 'px');
+        c.wrap.style.setProperty('--rot', (off * 4).toFixed(2) + 'deg');
+        if (initial) c.wrap.style.setProperty('--deal', (off * -12).toFixed(1) + 'deg');
     });
 }
-document.getElementById("booster-close-btn").onclick = () => { document.getElementById("booster-modal").style.display = "none"; };
+addEventListener('resize', () => { if (bModal().style.display !== 'none' && BOOSTER.cards.length) boosterLayout(false); });
+function boosterFlip(c) {
+    if (c.flipped || c.wrap.classList.contains('dealing')) return;
+    c.flipped = true;
+    const R = BOOSTER_RAR[c.rk], w = c.wrap;
+    w.classList.add('flipped', 'pop'); w.style.zIndex = 50 + c.idx;
+    setTimeout(() => w.classList.remove('pop'), 600);
+    boosterWhoosh(0.035, 0.25);
+    // Mitte der Drehung: Funken in der Seltenheitsfarbe, Klang je Seltenheit
+    setTimeout(() => {
+        const r = w.getBoundingClientRect(), rgb = getComputedStyle(w).getPropertyValue('--gc').trim() || '255,255,255';
+        boosterBurst(r.left + r.width / 2, r.top + r.height / 2, rgb, R.n, R.big ? 1.3 : 0.9);
+        R.notes.forEach((f, i) => boosterTone(f, R.big ? 0.7 : 0.35, 'sine', R.big ? 0.05 : 0.035, i * 0.07));
+        if (R.big) { boosterShake(c.rk === 'epic' ? 1.1 : 0.7); boosterFlash(rgb, 380); w.classList.add('rays'); }
+        c.node.classList.remove('no-fx');
+        boosterActions();
+    }, 260);
+}
+// Offene Karte groß in die Mitte holen (nochmal klicken oder daneben klicken: zurück)
+function boosterFocus(c) {
+    const was = BOOSTER.focus;
+    if (was) { was.wrap.classList.remove('focus'); was.wrap.style.zIndex = 50 + was.idx; }
+    BOOSTER.focus = was === c ? null : c;
+    bModal().classList.toggle('has-focus', !!BOOSTER.focus);
+    if (was) was.node.classList.remove('no-fx');
+    if (BOOSTER.focus) {
+        const cw = parseFloat(getComputedStyle(document.getElementById("booster-cards-container")).getPropertyValue('--bcw')) || 180;
+        c.wrap.style.setProperty('--fs', Math.min(innerHeight * 0.78 / (cw * 1.4), innerWidth * 0.6 / cw).toFixed(3));
+        c.wrap.classList.add('focus'); c.wrap.style.zIndex = 500; c.node.classList.add('no-fx');   // groß in der Mitte: keine zusätzliche Hover-Vorschau
+        boosterTone(660, 0.15, 'sine', 0.03);
+    }
+}
+function boosterActions() {
+    const left = BOOSTER.cards.filter(c => !c.flipped).length;
+    document.getElementById('booster-reveal-all').style.display = left ? '' : 'none';
+    document.getElementById('booster-again').classList.toggle('pulse', !left);
+    document.getElementById('booster-count').textContent = left ? `${BOOSTER.cards.length - left} / ${BOOSTER.cards.length} aufgedeckt` : 'Alle Karten aufgedeckt';
+}
+document.getElementById('booster-reveal-all').onclick = (e) => {
+    e.stopPropagation();
+    BOOSTER.cards.filter(c => !c.flipped).forEach((c, i) => setTimeout(() => boosterFlip(c), i * 170));
+};
+document.getElementById('booster-again').onclick = (e) => { e.stopPropagation(); boosterReset(); };
+bModal().addEventListener('click', () => { if (BOOSTER.focus) boosterFocus(BOOSTER.focus); });
+addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || bModal().style.display === 'none') return;
+    if (BOOSTER.focus) boosterFocus(BOOSTER.focus); else bModal().style.display = 'none';
+});
+document.getElementById("booster-close-btn").onclick = (e) => { e.stopPropagation(); bModal().style.display = "none"; };
 
 // --- TURNIER-DECKS: einmalig über den Importer in "Deine Decks" übernehmen (danach frei bearbeit-/löschbar) ---
 // Gemerkt wird die Nummer jeder übernommenen Liste – neue Listen kommen dazu, gelöschte Decks bleiben gelöscht.
