@@ -31,7 +31,7 @@ FX[2009] = { powers: [flipPow('1 Natur pro eigenem Ally', 3, { myTurn: true, slo
 FX[2010] = { powers: [flipPow('Ally wird beim Tod zur Ressource', 3, { slots: (s, pid) => [{ label: 'Eigener Ally', cands: targetCands(s, pid, { ally: true, side: 'friendly' }), harm: false }],
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'culRes', turn: s.turn }); } })] };
 onEvt('died', (s, d) => { if ((d.snap.tm || []).some(m => m.k === 'culRes' && m.turn === s.turn) && !d.snap.isToken) pushTrig(s, d.snap.owner, 2010, [{ op: 'call', k: '2010:res', a: { uid: d.snap.uid, pid: d.snap.owner } }]); });
-FX[2010].k = { res: (s, a) => { const p = me(s, a.pid); const c = p.graveyard.find(x => x.uid === a.uid); if (!c) return; p.graveyard.splice(p.graveyard.indexOf(c), 1); p.resources.push({ card: c, faceUp: false, exhausted: true }); L(s, `${c.name} wird verdeckt und erschöpft zur Ressource.`); } };
+FX[2010].k = { res: (s, a) => { const p = me(s, a.pid); const c = p.graveyard.find(x => x.uid === a.uid); if (!c) return; p.graveyard.splice(p.graveyard.indexOf(c), 1); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); L(s, `${c.name} wird verdeckt und erschöpft zur Ressource.`); } };
 FX[2011] = { powers: [flipPow('Zwei Allies in einem Friedhof entfernen, ziehe 1', 2, { myTurn: true,
     slots: (s, pid) => [{ label: 'Zwei Allies in einem Friedhof', cands: [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(c)).map(c => c.uid), min: 2, max: 2, harm: true, ai: u => locate(s, u).pid === pid ? -1 : 1 }],
     canUse: (s, pid) => [s.p1, s.p2].some(p => p.graveyard.filter(c => isAllyCard(c)).length >= 2) || 'Kein Friedhof mit zwei Allies',
@@ -365,7 +365,7 @@ FX[2154] = { enter: (s, c, pid) => mayPick(s, pid, 'Broan Charges-the-Fight: Zie
 FX[2156] = { leave: (s, snap, dest, info) => { if (dest === 'graveyard' && info.destroyed) pushTrig(s, snap.wasCtrl, 2156, [{ op: 'trig', id: 2156, k: 'ask', a: { pid: snap.wasCtrl } }]); },
     k: { ask: (s, a) => mustPick(s, a.pid, 'Erytheis: 1 Arkanschaden an Ziel', 'Erytheis', targetCands(s, a.pid, CH), 'E:doDmg', { src: null, pid: a.pid, amt: 1, dt: 'Arcane' }) } };
 FX[2157] = { enter: (s, c, pid) => trig(s, { id: 2157, k: 'go', a: { opp: pid === 1 ? 2 : 1 } }),
-    k: { go: (s, a) => { const p = me(s, a.opp); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: false }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte verdeckt in die Ressourcenreihe.`); } } };
+    k: { go: (s, a) => { const p = me(s, a.opp); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: false }); evt(s, 'resEnters', { pid: p.id }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte verdeckt in die Ressourcenreihe.`); } } };
 FX[2158] = { enter: (s, c, pid) => mayPick(s, pid, "Ez'trin: Ziel-Waffe erschöpfen?", "Ez'trin", targetCands(s, pid, { weapon: true, filter: w => !w.exhausted }), 'E:optExhaust', {}, u => ctrlOf(s, findCharacter(s, u)) === pid ? -5 : 5) };
 FX[2159] = { powers: [{ key: 'faesha', label: 'Ressource zerstören: Long-Range', aiSkip: () => true, canUse: (s, pid) => me(s, pid).resources.length > 0 || 'Keine Ressource',
     payExtra: (s, it) => FX[296].k.pick(s, { pid: it.pl, left: 1 }), resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'longRange', turn: s.turn }); } }] };

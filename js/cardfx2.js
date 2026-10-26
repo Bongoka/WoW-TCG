@@ -371,14 +371,14 @@ FX[1113] = { canPlay: (s, pid) => me(s, pid).resources.length > 0 || 'Du brauchs
     addCost: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: 'Shadowburn: Welche eigene Ressource zerstören?', src: 'Shadowburn', opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : `Ressource ${i + 1}${r.exhausted ? ' (erschöpft)' : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: '1113:pay', a: {} }); },
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; addTM(t, { k: 'shadowburn', by: it.pl, turn: s.turn }); heroDmg(s, it.pl, t.uid, 4, 'Shadow'); },
     k: { pay: (s, a, v) => { destroyResource(s, v); q(s, { op: 'call', k: 'E:finishPrep', a: {} }); },
-        res: (s, a) => { const p = me(s, a.pid); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte als erschöpfte Ressource.`); } } };
+        res: (s, a) => { const p = me(s, a.pid); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte als erschöpfte Ressource.`); } } };
 onEvt('died', (s, d) => { (d.snap.tm || []).filter(m => m.k === 'shadowburn' && m.turn === s.turn).forEach(m => pushTrig(s, m.by, 1113, [{ op: 'call', k: '1113:res', a: { pid: m.by } }])); });
 FX[1114] = { slots: slotAlly('Ziel-Ally', true), resolve: (s, it) => { const t = T1(s, it); if (t) { L(s, `${t.name} wird aus dem Spiel entfernt.`); removeFromGame(s, t); } } };
 
 // ============================================================================
 // FÄHIGKEITEN – Krieger
 // ============================================================================
-function topToResource(s, pid) { const p = me(s, pid); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte verdeckt und erschöpft in die Ressourcenreihe.`); }
+function topToResource(s, pid) { const p = me(s, pid); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); s._hidden = true; L(s, `${p.hero.name} legt die oberste Karte verdeckt und erschöpft in die Ressourcenreihe.`); }
 EK.topToRes = (s, a) => topToResource(s, a.pid);
 FX[1115] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.combat && d.weapon && d.src === heroOf(s, pid).uid && t && t.type === 'Hero') trig(s, { k: 'topToRes', a: { pid } }); } } };
 FX[1116] = { addCost: (s, it) => { putDamage(s, heroOf(s, it.pl), 2); finishPrep(s); }, resolve: (s, it) => drawCards(s, me(s, it.pl), 2),

@@ -98,7 +98,9 @@ function renderDBPool() {
         return true;
     });
     const typeIdx = c => DB_TYPES.indexOf(dbTypeOf(c));
-    list.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
+    const setNum = c => [(c.set || 1), c.set ? c.num : c.id];   // Set 1 hat keine eigene Nummer: ID = Kartennummer
+    list.sort((a, b) => sort === 'set' ? (setNum(a)[0] - setNum(b)[0] || setNum(a)[1] - setNum(b)[1])
+        : sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
         : ((a.type === 'Quest' ? 99 : a.cost || 0) - (b.type === 'Quest' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
     document.getElementById("db-pool-count").textContent = `${list.length} Karten`;
     list.forEach(card => {
@@ -231,9 +233,9 @@ function dbExportText() {
         if (!ids.length) return; lines.push(`# ${t.label}`); ids.forEach(id => lines.push(`${counts[id]} ${CARDS[id].name}`)); lines.push(''); });
     return lines.join('\n').trim() + '\n';
 }
-// Namen vergleichbar machen: Groß/klein, Apostrophe/Anführungszeichen, Satzzeichen und Leerzeichen egal
-const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„]/g, '"').replace(/[^a-z0-9äöüß'"!?.,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3 };
+// Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
+const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
+const DB_SET_CODES = { azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
@@ -243,7 +245,7 @@ function dbParseList(text, heroId) {
     Object.values(CARDS).forEach(c => { if (c.isToken) return; (byName[dbNorm(c.name)] = byName[dbNorm(c.name)] || []).push(c); });
     const bySetNum = (set, num) => Object.values(CARDS).find(c => (c.set || 1) === set && (c.set ? c.num : c.id) === num && !c.isToken);
     const out = { heroId, name: null, cards: [], report: [] };
-    let wantHero = false;
+    let wantHero = false, heroFound = false;
     const lookup = (rawName) => {
         // Set-Angabe in Klammern ("(AZEROTH 32/361)", "(Dark Portal-12)") zur Zuordnung
         let exact = null;
@@ -259,13 +261,14 @@ function dbParseList(text, heroId) {
         const nm = line.match(/^(name|deck|deckname)\s*:\s*(.+)$/i);
         if (nm) { out.name = nm[2].trim(); continue; }
         const hm = line.match(/^(hero|held)\s*:?\s*(.*)$/i);
-        if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) out.heroId = h.id; else out.report.push({ bad: true, msg: `Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
+        if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) { out.heroId = h.id; heroFound = true; } else out.report.push({ bad: true, msg: `Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
         const m = line.match(/^(\d+)\s*[x×*]?\s*(.+)$/i);
         const n = m ? parseInt(m[1]) : 1, rawName = m ? m[2] : line;
         const cands = lookup(rawName);
         if (!cands.length) { if (m && !/^\d+$/.test(rawName.trim())) out.report.push({ bad: true, msg: `„${rawName.replace(/\([^)]*\)/g, '').trim()}“ nicht gefunden` }); continue; }
         const hero = cands.find(c => c.type === 'Hero');
-        if (hero && (!m || wantHero)) { out.heroId = hero.id; wantHero = false; continue; }   // Zeile ohne Zahl kann der Held sein
+        // Zeile ohne Zahl kann der Held sein – ebenso "1 Heldenname", solange noch kein Held feststeht (Listen von Deck-Seiten)
+        if (hero && (!m || wantHero || (n === 1 && !heroFound))) { out.heroId = hero.id; wantHero = false; heroFound = true; continue; }
         const nonHero = cands.filter(c => c.type !== 'Hero');
         if (!nonHero.length) continue;
         wantHero = false;
@@ -342,7 +345,7 @@ document.getElementById("btn-booster").onclick = () => {
     };
 };
 function generateBoosterCards() {
-    const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken);
+    const pool = Object.keys(CARDS).map(Number).filter(id => !CARDS[id].isToken && (CARDS[id].set || 1) <= 3);   // Raid-Loot (Set 4/5) gab es nicht in Boostern
     const heroes = pool.filter(id => CARDS[id].type === 'Hero');
     const rar = id => RARITIES[id] || CARDS[id].rarity;                                   // Set 2/3: Seltenheit steht in den Kartendaten
     const commons = pool.filter(id => rar(id) === 'Common' && CARDS[id].type !== 'Hero');
@@ -398,6 +401,40 @@ function generateBoosterCards() {
     });
 }
 document.getElementById("booster-close-btn").onclick = () => { document.getElementById("booster-modal").style.display = "none"; };
+
+// --- TURNIER-DECKS: einmalig über den Importer in "Deine Decks" übernehmen (danach frei bearbeit-/löschbar) ---
+// Gemerkt wird die Nummer jeder übernommenen Liste – neue Listen kommen dazu, gelöschte Decks bleiben gelöscht.
+const TOURNEY_KEY = 'wow_tcg_tourney_imported';
+function importTourneyDecks() {
+    if (typeof TOURNEY_DECKS === 'undefined') return;
+    let done = [];
+    try { done = JSON.parse(localStorage.getItem(TOURNEY_KEY) || '[]');
+        if (localStorage.getItem('wow_tcg_tourney_imported_v1')) done = [...new Set([...done, ...Array.from({ length: 16 }, (_, i) => i + 1)])];   // alte Fassung: Listen 1–16
+    } catch (e) { return; }
+    // Kartenstand der Listen: steigt, wenn neue Karten dazukommen (2 = Raid-Loot Onyxia / Molten Core) –
+    // vorhandene, unveränderte Turnier-Decks werden dann neu eingelesen
+    const REV = 2; let rev = 1;
+    try { rev = +(localStorage.getItem(TOURNEY_KEY + '_rev') || 1); } catch (e) {}
+    const list = loadCustomDecks();
+    TOURNEY_DECKS.forEach((text, i) => {
+        // Kopfzeile "#1 Spieler, Turnier" → "Platz 1 · Spieler · Turnier"
+        const head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+        const r = dbParseList(text, null), hero = CARDS[r.heroId];
+        const id = `custom_tourney_${i + 1}`;
+        if (done.includes(i + 1)) {
+            const d = list.find(x => x.id === id);
+            if (d && rev < REV && hero && d.hero === hero.id && r.cards.length > d.cards.length && d.cards.every(c => r.cards.includes(c))) d.cards = r.cards;
+            return;
+        }
+        done.push(i + 1);
+        if (!hero || !r.cards.length) return;
+        const name = head ? `Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
+        if (list.some(d => d.name === name)) return;
+        list.push({ id, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards });
+    });
+    if (saveCustomDecks(list)) try { localStorage.setItem(TOURNEY_KEY, JSON.stringify(done)); localStorage.setItem(TOURNEY_KEY + '_rev', String(REV)); localStorage.removeItem('wow_tcg_tourney_imported_v1'); } catch (e) {}
+}
+importTourneyDecks();
 
 // --- DECK OVERVIEW ---
 function openDeckOverview() {

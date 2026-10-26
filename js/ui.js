@@ -758,6 +758,9 @@ function openHandCardMenu(idx) {
         return;
     }
     const err = canPlayCard(G, 1, card);
+    // Kraft von der Hand (Obsidian Edged Blade): statt Spielen nutzbar
+    const hp = getPowers(G, card).find(pw => !canUsePower(G, 1, card, pw));
+    if (hp && (err || confirm(`${card.name}: „${hp.label}“ (${hp.cost || 0}) nutzen?\nOK = Kraft nutzen, Abbrechen = Karte spielen`))) { humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }); return; }
     if (err) { addLog(`${card.name}: ${err}`, "log-hit"); render(); return; }
     humanAct({ type: 'PLAY_CARD', handIdx: idx });
 }

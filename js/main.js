@@ -1,6 +1,7 @@
 let _cfgImgPath = "AZEROTH-{id}-EA.png";
-// Set 2/3: Bilder heißen nach Set und Kartennummer, z. B. cards/DARKPORTAL-12-EA.png, cards/OUTLAND-7-EA.png
-const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND' };
+// Set 2–5: Bilder heißen nach Set und Kartennummer, z. B. cards/DARKPORTAL-12-EA.png, cards/OUTLAND-7-EA.png,
+// Raid-Loot cards/ONYXIA-21.png, cards/MOLTENCORE-30.png
+const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };
 function getImageCandidates(id, mode = 'ea') {
     const cd = CARDS[id];
     if (cd && SET_IMG_PREFIX[cd.set]) {

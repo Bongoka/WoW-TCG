@@ -195,6 +195,7 @@ function weaponAtk(s, w, ctx = {}) {
     }
     v += 2 * attachedTo(s, w.uid, 115).length;                                            // Rockbiter Weapon
     if (w.id === 318) v += (w.counters && w.counters.strength) || 0;                      // Destiny
+    v += (w.counters && w.counters.atk1) || 0;                                            // +1 ATK-Zähler (Core Hound Tooth, Obsidian Edged Blade)
     if (ctx.attacking && ctx.target) {
         if (w.id === 315 && ctx.target.exhausted) v += 2;                                 // Barman Shanker
         if (w.id === 326 && ctx.target.dmgTurn === s.turn) v += 2;                        // Heartseeker
@@ -366,6 +367,7 @@ function addValue(s, uid, kind, n, val = n, victimPid = null) {
 function heal(s, healerUid, tgtUid, amt) {
     const t = findCharacter(s, tgtUid); if (!t || !isChar(t) || !isInPlayZone((locate(s, tgtUid) || {}).zone)) return 0;
     if (hasTM(s, t, 'noHeal')) return 0;                                                  // Mortal Strike
+    if (pes(s, ctrlOf(s, t), 'noHeal').length) return 0;                                  // Brutality Blade: "Opposing heroes and allies can't be healed this turn"
     const healer = healerUid ? findCharacter(s, healerUid) : null;
     if (healer && healer.type === 'Hero' && amt !== 'all') amt += countCtrl(s, ctrlOf(s, healer), 294); // Hide of the Wild
     if (amt !== 'all' && (t.damage || 0) > 0) amt += auraSum(s, 'heal', healer, t, amt);   // "that much +N is healed instead"
@@ -522,7 +524,9 @@ const EV_CHAIN = { damaged: 'Schadens-Auslöser', destroyed: 'Zerstörungs-Ausl�
 // Ereignisse, deren Kartenreaktionen ausgelöste Effekte sind (sie kommen beim nächsten PPP auf die Kette)
 const CHAIN_EVENTS = { startOfTurn: 1, endOfTurn: 1, attacks: 1, defends: 1, protects: 1, allyEnters: 1, strike: 1, cardPlayed: 1,
     // Set 2/3: weitere ausgelöste Effekte
-    dmg: 1, died: 1, exhausted: 1, healed: 1, questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1 };
+    dmg: 1, died: 1, exhausted: 1, healed: 1, questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1,
+    // Raid-Loot: Ressource kommt ins Spiel (Shard of the Flame), Rüstung verhindert Schaden (Drillborer Disk)
+    resEnters: 1, armorPrevented: 1 };
 // Führt die Auslöse-Prüfung sofort aus; die erzeugten Schritte werden zu einem wartenden ausgelösten Effekt.
 function asTrigger(s, c, pid, fn) {
     const saved = s._batch; s._batch = [];
@@ -769,7 +773,8 @@ function chainDesc(s, it) {
 }
 
 // ---------------------------------------------------------------- Kosten
-function getPlayCost(s, p, card, x = 0) {
+// targets: gewählte Ziele (beim Bezahlen bekannt) – Ring of Binding: "abilities that target your hero"
+function getPlayCost(s, p, card, x = 0, targets = null) {
     if (!card) return 0;
     let cost = (card.cost || 0) + (card.xCost ? (x || 0) : 0);
     if (card.type === 'Quest' || card.type === 'Hero') return 0;
@@ -781,7 +786,7 @@ function getPlayCost(s, p, card, x = 0) {
     let minOne = 0;
     for (const e of auraSrcs(s)) {
         const h = FX[e.c.id].aura.cost; if (!h) continue;
-        const r = h(s, e.c, e.pid, p.id, card); if (!r) continue;
+        const r = h(s, e.c, e.pid, p.id, card, targets); if (!r) continue;
         if (typeof r === 'object') minOne += r.min1 || 0; else cost += r;
     }
     pes(s, p.id, 'nextAbilityLess').forEach(m => { if (!m.used && card.type === 'Ability') cost -= m.v; });
@@ -988,6 +993,7 @@ function doAction(s, a, pid) {
             const c = p.hand.splice(a.handIdx, 1)[0];
             // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
             p.resources.push({ card: c, faceUp: !!a.faceUp, exhausted: !!(a.faceUp && FX[c.id] && FX[c.id].resExhausted) });
+            evt(s, 'resEnters', { pid: p.id });                                                   // Shard of the Flame
             s.placedResource = true;
             L(s, `[${p.hero.name}] Ressource: ${a.faceUp ? c.name + ' (offen)' : 'verdeckt'}`);
             if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
@@ -1066,7 +1072,7 @@ EK.prepItem = (s) => {
     // 4) Alternative Kosten ("You may … rather than pay this card's cost", Trap) – Set 2/3
     if (it.kind === 'card' && f.alt && !it.altAsked && f.alt.can(s, p.id, card)) {
         it.altAsked = true;
-        const cost = getPlayCost(s, p, card, it.x || 0);
+        const cost = getPlayCost(s, p, card, it.x || 0, it.targets);
         const opts = [{ label: f.alt.label, v: 'alt', ai: f.alt.ai !== undefined ? (typeof f.alt.ai === 'function' ? f.alt.ai(s, p.id, card) : f.alt.ai) : 2 }];
         if (getReadyRes(p) >= cost) opts.push({ label: `(${cost}) bezahlen`, v: 'pay', ai: 1 });
         ask(s, { pid: p.id, prompt: `${card.name}: Wie bezahlen?`, src: card.name, opts, k: 'E:altPay', cancel: true, a: {}, keep: true });
@@ -1127,7 +1133,7 @@ function finishPrep(s) {
     if (it.kind === 'card') {
         const f = fx(it.card);
         if (!it.altPaid) {
-            const cost = getPlayCost(s, p, it.card, it.x || 0);
+            const cost = getPlayCost(s, p, it.card, it.x || 0, it.targets);
             if (!payRes(p, cost)) { returnPrepCard(s, it); L(s, '[Abgebrochen] Nicht genug Ressourcen', 'log-hit'); return; }
             pes(s, p.id, 'nextCardLess').forEach(m => m.used = true);
             if (it.card.type === 'Ability') { pes(s, p.id, 'nextAbilityLess').forEach(m => m.used = true); pes(s, p.id, 'ruins').forEach(m => m.used = true); }
@@ -1257,10 +1263,13 @@ EK.placeAbility = (s, a) => {
 // ---------------------------------------------------------------- Kräfte (Activate, (X) >>>, Helden-Flip)
 function getPowers(s, src) {
     if (!src) return [];
-    const l = locate(s, src.uid); if (!l || !isInPlayZone(l.zone)) return [];
-    const out = [];
+    const l = locate(s, src.uid); if (!l) return [];
     const f = fx(src);
-    if (f.powers && active(s, src)) f.powers.forEach(pw => out.push(pw));
+    // Kräfte, die man von der Hand aus nutzt ("(1), Discard this weapon from your hand >>> …", Obsidian Edged Blade)
+    if (l.zone === 'hand') return (f.powers || []).filter(pw => pw.fromHand);
+    if (!isInPlayZone(l.zone)) return [];
+    const out = [];
+    if (f.powers && active(s, src)) f.powers.forEach(pw => { if (!pw.fromHand) out.push(pw); });
     // verliehene Kräfte: Blessing of Wisdom, Face Smash
     if (isChar(src)) {
         attachedTo(s, src.uid, 64).forEach(o => out.push({ ...FX_GRANT.bow, key: 'bow_' + o.uid, grant: 'bow' }));
@@ -1286,7 +1295,7 @@ function powerDef(it) {
     const f = FX[it.srcId]; return f && f.powers ? f.powers.find(p => p.key === it.key) : null;
 }
 function canUsePower(s, pid, src, pw, a = {}) {
-    const l = locate(s, src.uid); if (!l || !isInPlayZone(l.zone)) return 'Nicht im Spiel';
+    const l = locate(s, src.uid); if (!l || !(isInPlayZone(l.zone) || (l.zone === 'hand' && pw.fromHand))) return 'Nicht im Spiel';
     if (l.pid !== pid) return 'Nicht deine Karte';
     if (!canActInstant(s, pid)) return 'Gerade keine Priorität';
     if (pw.myTurn && s.activePlayer !== pid) return 'Nur in deinem Zug';
@@ -1471,6 +1480,7 @@ function dmgStep(s, o) {
         // Set 2/3: Verhinderung durch Dauereffekte und "this turn"-Effekte
         if (o.combat && src && hasTM(s, src, 'noCombatDmgOut')) all();                    // Turn Aside / Katsin Bloodoath
         if (o.combat && hasTM(s, t, 'noCombatDmgIn')) all();                              // Katsin Bloodoath
+        if (src && hasTM(s, src, 'noDmgOut')) all();                                      // Judgement Legplates: "prevent all damage … dealt by"
         if (amt > 0) { const pv = auraSum(s, 'prevent', t, src, o, amt); if (pv > 0) amt = Math.max(0, amt - pv); }
         if (amt > 0 && FX[t.id] && FX[t.id].selfPrevent && active(s, t)) amt = Math.max(0, amt - (FX[t.id].selfPrevent(s, t, tp.id, src, o, amt) || 0)); // Miandra, Shelly
         if (src && attachedTo(s, src.uid, 63).length) all();                              // Blessing of Protection (verursacht von)
@@ -1514,7 +1524,8 @@ EK.armorUse = (s, a, v) => {
     const st = a.st;
     if (v === '__none') { q(s, { ...st, op: 'dmgApply' }); return; }
     const ar = findCharacter(s, v);
-    if (ar && !ar.exhausted) { const d = defOf(s, ar); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, `🛡 ${ar.name} verhindert ${pv} Schaden.`); }
+    if (ar && !ar.exhausted) { const d = defOf(s, ar); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, `🛡 ${ar.name} verhindert ${pv} Schaden.`);
+        if (pv > 0) evt(s, 'armorPrevented', { uid: ar.uid, pid: st.tp, src: st.src || null, amt: pv }); }   // "When this armor prevents damage" (Drillborer Disk)
     q(s, { op: 'call', k: 'E:armorAsk', a: { st } });
 };
 function dmgApply(s, st) {
@@ -1809,6 +1820,8 @@ function attackTargets(s, att) {
     if (ch) { const h = getPlayer(s, ch.pid).hero; if (list.includes(h)) list = [h]; }
     // Misdirection: "Opposing allies can attack only that ally this turn if able"
     if (att.type === 'Ally') { const only = auraAny(s, 'attackOnly', att); if (only) { const x = list.filter(d => d.uid === only); if (x.length) list = x; } }
+    // Thorn in the Side (angehängt an einen Helden): "Attached hero can attack only your hero if able"
+    { const only = auraAny(s, 'attackOnlyAll', att); if (only) { const x = list.filter(d => d.uid === only); if (x.length) list = x; } }
     // Sarmoth: kann nur diesen Ally angreifen, wenn möglich
     const sar = list.filter(d => d.id === 130 && active(s, d));
     if (sar.length) list = sar;
@@ -2233,7 +2246,7 @@ function targetCombos(s, pid, slots, distinct) {
 }
 function powerVariants(s, pid, instantOnly) {
     const out = [];
-    for (const e of inPlay(s)) {
+    for (const e of [...inPlay(s), ...getPlayer(s, pid).hand.filter(c => FX[c.id] && (FX[c.id].powers || []).some(pw => pw.fromHand)).map(c => ({ c, pid }))]) {
         if (e.pid !== pid) continue;
         for (const pw of getPowers(s, e.c)) {
             if (canUsePower(s, pid, e.c, pw)) continue;

@@ -357,7 +357,7 @@ FX[98] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).le
     addCost: (s, it) => removeCombos(s, it), resolve: (s, it) => T(it).forEach(u => { const a = findCharacter(s, u); if (a) destroy(s, a); }) };
 FX[99] = { slots: slotChar('Erschöpfe Ziel', true), resolve: (s, it) => { const t = T1(s, it); if (t) { exhaust(s, t); addTM(t, { k: 'noReady' }); } } };
 FX[100] = { slots: (s, pid) => [{ label: 'Ziel-Ressource', cands: [...me(s, pid).resources, ...foe(s, pid).resources].map(r => r.card.uid), harm: true, ai: u => locate(s, u).pid === pid ? -10 : 5 }],
-    resolve: (s, it) => { const u = T(it)[0]; if (u) destroyResource(s, u); const p = me(s, it.pl); if (hasStealth(s, p.hero) && p.deck.length) { const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); s._hidden = true; } } };
+    resolve: (s, it) => { const u = T(it)[0]; if (u) destroyResource(s, u); const p = me(s, it.pl); if (hasStealth(s, p.hero) && p.deck.length) { const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); s._hidden = true; } } };
 FX[100].slots = (s, pid) => [{ label: 'Ziel-Ressource', cands: [...me(s, pid).resources, ...foe(s, pid).resources].map(r => r.card.uid), harm: true, ai: u => { const l = locate(s, u); return l && l.pid === pid ? -10 : 5; } }];
 FX[101] = { resolve: (s, it) => searchDeck(s, it.pl, 'Premeditation', 'combo', 2) };
 FX[102] = { slots: slotChar('Ziel', true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1 + bestWeaponAtk(s, it.pl, w => w.slot === 'Melee'), 'Melee'); } };
@@ -572,7 +572,7 @@ FX[209] = { powers: [{ key: 'moira', label: 'Zerstören: Zerstöre Rüstung oder
 FX[211] = { powers: [{ key: 'bloom', label: 'Handkarte als erschöpfte Ressource', act: true, cost: 1,
     resolve: (s, it) => { const p = me(s, it.pl); if (!p.hand.length) return; const opts = p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })); opts.push({ label: 'Keine', v: 0, ai: -9 });
         ask(s, { pid: it.pl, prompt: 'Nightbloom: Karte verdeckt und erschöpft in die Ressourcenreihe legen?', src: 'Nightbloom', opts, k: '211:do', a: { pid: it.pl }, auto: false }); } }],
-    k: { do: (s, a, uid) => { if (!uid) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === uid); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); p.resources.push({ card: c, faceUp: false, exhausted: true }); } } };
+    k: { do: (s, a, uid) => { if (!uid) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === uid); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); } } };
 FX[212] = { enter: (s, c, pid) => drawCards(s, me(s, pid), 1) };
 FX[214] = { powers: [{ key: 'ryn', label: 'Ziel +2 ATK beim Angreifen', act: true, slots: slotChar('Ziel', false), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: 2, turn: s.turn, when: 'attacking' }); } }] };
 FX[216] = { powers: [allyHealPower('seva', 'Heile X', it => it.x || 0, { act: true, cost: 'X' })] };

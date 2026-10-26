@@ -459,6 +459,61 @@ function runRuleTests() {
         const s2 = freshH(1001, 9); res(s2, 1, 8); put(s2, 2, 1118);   // Kalinna gegen Commanding Shout (Kosten 3)
         assert(getLegalActions(s2, 1).some(a => a.type === 'ACTIVATE' && a.x === 3), 'Kalinna: kein X = 3 angeboten');
     });
+    // ---------------- Raid-Loot (Onyxia's Lair / Molten Core)
+    const N = n => Object.values(CARDS).find(c => c.name === n && !c.isToken).id;
+    test(65, 'Bloodfang Hood: wird bereit, wenn du eine Schurken-Fähigkeit spielst', () => {
+        const s = freshH(2007, 9); res(s, 1, 6); const hood = put(s, 1, 3010, { exhausted: true });
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, N('Sinister Strike')), targets: [[P(s, 2).hero.uid]] }, 1);
+        assert(!hood.exhausted, 'Bloodfang Hood ist noch erschöpft');
+    });
+    test(66, "Perdition's Blade: 1 Feuerschaden beim Eintreten; Striker's Mark: Nahkampfwaffen +1 ATK", () => {
+        const s = freshH(2007, 9); res(s, 1, 6); put(s, 1, 3129);
+        act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 3125) }, 1);
+        const w = P(s, 1).hero.weapons.find(x => x.id === 3125);
+        assert(w && P(s, 2).hero.damage === 1, `Gegner-Held hat ${P(s, 2).hero.damage} Schaden`);
+        assert(weaponAtk(s, w) === 3, `Perdition's Blade hat ${weaponAtk(s, w)} ATK statt 3`);
+    });
+    test(67, 'Ring of Binding: Fähigkeiten gegen deinen Helden kosten (1) mehr', () => {
+        const s = fresh('alliance_mage', 'alliance_warrior'); put(s, 2, 3026); const a = put(s, 2, 262);
+        const base = CARDS[52].cost;   // Fireball
+        assert(getPlayCost(s, P(s, 1), CARDS[52], 0, [[P(s, 2).hero.uid]]) === base + 1, 'Kein Aufschlag gegen den Helden');
+        assert(getPlayCost(s, P(s, 1), CARDS[52], 0, [[a.uid]]) === base, 'Aufschlag gegen einen Ally');
+    });
+    test(68, 'Thorn in the Side: angehängter Held kann nur deinen Helden angreifen', () => {
+        const s = freshH(9, 9); put(s, 1, 262); put(s, 1, 3008, { attachedTo: P(s, 2).hero.uid });
+        const t = attackTargets(s, P(s, 2).hero);
+        assert(t.length === 1 && t[0] === P(s, 1).hero, 'Ziele: ' + t.map(c => c.name).join(', '));
+    });
+    test(69, 'Obsidian Edged Blade: Kraft von der Hand legt einen +1-ATK-Zähler auf ein Zweihand-Schwert', () => {
+        const s = freshH(9, 9); res(s, 1, 2); const sw = put(s, 1, 3118); const i = hand(s, 1, 3124); const ob = P(s, 1).hand[i];
+        const before = weaponAtk(s, sw);
+        act(s, { type: 'ACTIVATE', srcUid: ob.uid, key: 'obsid', targets: [[sw.uid]] }, 1);
+        assert(weaponAtk(s, sw) === before + 1, `ATK ${weaponAtk(s, sw)} statt ${before + 1}`);
+        assert(P(s, 1).graveyard.includes(ob), 'Obsidian Edged Blade nicht abgeworfen');
+    });
+    test(70, 'Benediction: Held erschöpfen holt Anathema aus dem Friedhof ins Spiel', () => {
+        // Danach wählt der Spieler, welche der beiden Zweihandwaffen bleibt (CR 414.3) – geprüft wird das Eintreten
+        const s = freshH(1, 9); const b = put(s, 1, 3116); const an = makeCardInst(1270, false, 1); P(s, 1).graveyard.push(an);
+        let entered = false; const hk = (s2, d) => { if (d.uid === an.uid) entered = true; }; onEvt('entersPlay', hk);
+        try { act(s, { type: 'ACTIVATE', srcUid: b.uid, key: 'anath' }, 1); } finally { HOOKS.entersPlay.splice(HOOKS.entersPlay.indexOf(hk), 1); }
+        assert(entered && P(s, 1).hero.exhausted, 'Anathema nicht ins Spiel gekommen');
+    });
+    test(71, 'Judgement Legplates: Schaden an und von dem Ally wird verhindert; Brutality Blade verhindert Heilung', () => {
+        const s = freshH(9, 9); const a = put(s, 1, 262); addTM(a, { k: 'preventAll', turn: s.turn }); addTM(a, { k: 'noDmgOut', turn: s.turn });
+        dealDamage(s, { src: a.uid, tgt: P(s, 2).hero.uid, amt: 3, dt: 'Melee' }); dealDamage(s, { src: P(s, 2).hero.uid, tgt: a.uid, amt: 3, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(a.damage === 0 && P(s, 2).hero.damage === 0, `Ally ${a.damage}, Held ${P(s, 2).hero.damage}`);
+        const bb = put(s, 1, 3119); P(s, 2).hero.damage = 4;
+        act(s, { type: 'ACTIVATE', srcUid: bb.uid, key: 'brut' }, 1);
+        heal(s, P(s, 2).hero.uid, P(s, 2).hero.uid, 3);
+        assert(P(s, 2).hero.damage === 4, 'Gegner wurde trotzdem geheilt');
+    });
+    test(72, 'Simulation mit Raid-Loot läuft fehlerfrei', () => {
+        for (const h of [2007, 9, 1, 12]) {
+            const raid = Object.values(CARDS).filter(c => (c.set === 4 || c.set === 5) && legalCardsFor(h).includes(c.id)).map(c => c.id);
+            const d = randomLegalDeck(h); for (let i = 0; i < Math.min(raid.length * 2, 40); i++) d.cards[i] = raid[i % raid.length];
+            simulateOneGame(d, randomLegalDeck(9));
+        }
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
