@@ -780,3 +780,38 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 @media (hover: none) {
     #side-tab { top: 8px; padding: 14px 16px; font-size: 22px; opacity: .95; }
 }
+
+/* ===== Lernen: Menü mit Videos, Tutorial-Overlay ===== */
+.learn-btn { border-color: #60a5fa !important; color: #bfdbfe !important; }
+#hs-mull-learn { margin-top: 10px; padding: 8px 22px; font-size: 14px; }
+#learn-modal { position: fixed; inset: 0; z-index: 100060; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.88); backdrop-filter: blur(6px); }
+.learn-box { width: min(760px, 94vw); max-height: 94vh; overflow-y: auto; background: linear-gradient(180deg, #1a1512, #0a0705); border: 1px solid var(--gold-dark, #8a6d2b); border-radius: 10px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.8); }
+.learn-box h2 { margin: 0; color: var(--gold); font-family: Georgia, serif; }
+.learn-videos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.learn-video { display: flex; flex-direction: column; gap: 4px; color: var(--text-main); text-decoration: none; }
+.learn-video b { font-size: 13px; } .learn-video small { color: var(--text-dim); font-size: 11px; }
+.learn-thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 6px; border: 1px solid var(--border); background: #000 center / cover no-repeat; display: flex; align-items: center; justify-content: center; transition: transform .15s, border-color .15s; }
+.learn-video:hover .learn-thumb { transform: scale(1.02); border-color: var(--gold); }
+.learn-play { width: 54px; height: 38px; border-radius: 10px; background: rgba(220,38,38,.92); color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+#learn-tut { padding: 12px; font-size: 16px; }
+#tut-dim { position: fixed; inset: 0; z-index: 2500; background: rgba(0,0,0,.62); pointer-events: none; transition: clip-path .2s; }
+#tut-rings { position: fixed; inset: 0; z-index: 2510; pointer-events: none; }
+.tut-ring { position: fixed; border: 3px solid #fde047; border-radius: 10px; box-shadow: 0 0 18px rgba(250,204,21,.85); animation: tutPulse 1.2s ease-in-out infinite; }
+@keyframes tutPulse { 50% { box-shadow: 0 0 34px rgba(250,204,21,1); border-color: #fff7ae; } }
+#tut-arrow { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2520; pointer-events: none; overflow: visible; }
+.tut-path { fill: none; stroke: #fde047; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 14 10; animation: tutDash .8s linear infinite; filter: drop-shadow(0 0 6px rgba(250,204,21,.9)); }
+@keyframes tutDash { to { stroke-dashoffset: -24; } }
+#tut-box { position: fixed; z-index: 2600; width: min(440px, calc(100vw - 24px)); box-sizing: border-box; padding: 12px 16px; border-radius: 10px; background: linear-gradient(180deg, #2a2118, #120d09); border: 2px solid #fde047; box-shadow: 0 10px 34px rgba(0,0,0,.8); color: var(--text-main); }
+#tut-step { font-size: 11px; color: var(--text-dim); letter-spacing: .5px; }
+#tut-text { margin: 6px 0 10px; font: 600 15px/1.45 Georgia, serif; }
+#tut-box .tut-actions, .tut-final .tut-actions { display: flex; gap: 8px; justify-content: flex-end; }
+#tut-box.tut-passive { border-color: var(--border); opacity: .9; }
+#tut-box.tut-passive .tut-actions { display: none; }
+#tut-box.tut-final { position: fixed; text-align: center; padding: 18px 22px; }
+#tut-box.tut-final h3 { margin: 0 0 6px; color: var(--gold); font-family: Georgia, serif; }
+#tut-box.tut-final .tut-actions { justify-content: center; margin-top: 10px; }
+#tut-hand { position: fixed; left: 0; top: 0; z-index: 2530; pointer-events: none; display: none; font-size: 46px; line-height: 1;
+    offset-rotate: 0deg; offset-anchor: 30% 10%; filter: drop-shadow(0 4px 8px rgba(0,0,0,.8)); animation: tutHand 2s ease-in-out infinite; }
+@keyframes tutHand { 0% { offset-distance: 0%; opacity: 0; transform: scale(1.15); } 12% { opacity: 1; transform: scale(.95); } 80% { offset-distance: 100%; opacity: 1; transform: scale(.95); } 100% { offset-distance: 100%; opacity: 0; transform: scale(1); } }
+#tut-labels { position: fixed; inset: 0; z-index: 2515; pointer-events: none; }
+.tut-label { position: fixed; padding: 4px 12px; border-radius: 999px; background: rgba(20,14,10,.9); border: 2px solid #fde047; color: #fde68a; font: 800 13px Georgia, serif; letter-spacing: .5px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.7); }

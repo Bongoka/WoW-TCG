@@ -304,7 +304,7 @@ document.addEventListener('click', (e) => {
 }, true);
 // Auto-Zugende (Einstellung, Standard an): ist nichts mehr möglich, endet der Zug nach kurzer Pause von selbst
 const AUTO_END_KEY = 'wow_tcg_auto_end_turn', AUTO_END_MS = 1100;
-function autoEndTurn() { try { return localStorage.getItem(AUTO_END_KEY) !== 'off'; } catch (e) { return true; } }
+function autoEndTurn() { if (typeof TUT !== 'undefined' && TUT.active) return false; try { return localStorage.getItem(AUTO_END_KEY) !== 'off'; } catch (e) { return true; } }
 let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
     const eb = document.getElementById('btn-end-turn');

@@ -137,7 +137,7 @@ function commitUndoSnapshot(snap, action) {
     UNDO.stack.push({ snap, desc: describeUndoAction(snap, action) });
     if (UNDO.stack.length > UNDO.max) UNDO.stack.shift();
 }
-function canUndo() { return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && isIdle(G); }
+function canUndo() { if (typeof TUT !== 'undefined' && TUT.active) return false; return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && isIdle(G); }
 function undoLastAction() {
     if (!canUndo()) return;
     const { snap, desc } = UNDO.stack.pop();
@@ -180,6 +180,7 @@ function pickDeck(key) {
 }
 let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
 function initGame(seedPlayerDeck = null, seedOppDeck = null) {
+    if (typeof tutStop === 'function') tutStop();                                       // neues Spiel beendet ein laufendes Tutorial
     UNDO.stack = [];
     if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
     const keys = GAME_DECKS.map(d => d.id);
@@ -214,13 +215,15 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     // Mulligan (CR 101.2: einmal)
     openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
         { label: tr("Behalten"), cls: "success", action: startPlay },
-        { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
+        { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } },
+        { label: tr("📖 Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
     ]);
 }
 
 // Menschliche Aktion ausführen; danach ggf. die CPU weiterlaufen lassen
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
+    if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
     const dmgBefore = G.p2.hero.damage;
     const why = validateAction(G, { ...action, actorId: 1 }, 1);
     const ok = applyAction(G, { ...action, actorId: 1 }, false, 1);
@@ -293,7 +296,9 @@ async function driveCpu() {
             // Ab und zu eine Denkpause mit Sprechblase
             if (steps > 0 && cpuSpeed() === 'normal' && !CPU_SKIP.on && Math.random() < 0.25) { cpuSay('think'); await cpuSleep(900 + Math.random() * 900); }
             const g0 = G;
-            const dec = steps < 25 ? await cpuDecide(G, 2, document.getElementById("cfg-difficulty").value) : null;
+            const tutA = typeof TUT !== 'undefined' && TUT.active ? tutCpuAction(G) : undefined;   // Tutorial: festes Drehbuch statt KI
+            const dec = tutA !== undefined ? (tutA ? { action: tutA, reason: tutA.type === 'PLACE_RESOURCE' ? tr('Ressource') : G.p2.hand[tutA.handIdx].name } : null)
+                : steps < 25 ? await cpuDecide(G, 2, document.getElementById("cfg-difficulty").value) : null;
             if (G !== g0 || G.gameOver) break;                                              // inzwischen neues Spiel / Spiel vorbei
             if (!dec || !dec.action) {
                 updateCpuStatus(true, tr("CPU beendet Zug."));

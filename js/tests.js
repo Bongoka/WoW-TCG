@@ -746,6 +746,21 @@ function runRuleTests() {
         ({ s, ev } = setup()); const o = put(s, 2, 1050); act(s, { type: 'PLACE_RESOURCE', handIdx: 0, faceUp: false }, 1);
         assert(P(s, 2).ongoing.includes(o), 'Evocation des Gegners zerstört, obwohl nur meine Hand betroffen war');
     });
+    test(95, 'Tutorial: festes Drehbuch geht auf (Quest als Ressource, Ally, Gegnerzug, Karte als Ressource, Fire Blast, Sieg)', () => {
+        const s = buildTutorialState(); s.real = false; s.humans = [];
+        const T = TUT_CARDS, p = P(s, 1), o = P(s, 2), idx = id => p.hand.findIndex(c => c.id === id), left = () => hpOf(s, o.hero) - o.hero.damage;
+        assert(act(s, { type: 'PLACE_RESOURCE', handIdx: idx(T.quest), faceUp: true }, 1) && p.resources.length === 1 && p.resources[0].faceUp, 'Quest offen als Ressource');
+        assert(act(s, { type: 'PLAY_CARD', handIdx: idx(T.ally) }, 1) && p.allies.some(a => a.id === T.ally) && getReadyRes(p) === 0, 'Cerwyn spielen');
+        act(s, { type: 'END_TURN' }, 1);
+        for (let n = 0; n < 10 && s.activePlayer === 2 && !s.gameOver; n++) { autoResolve(s); const a = tutCpuAction(s); if (!a) { advanceTurn(s, true); break; } assert(applyAction(s, a, true, 2), 'Gegner-Drehbuch abgelehnt'); autoResolve(s); }
+        assert(s.activePlayer === 1 && o.resources.length === 2 && o.allies.length === 1 && left() === 3, 'Gegnerzug anders als geplant');
+        assert(p.hand.some(c => c.id === T.ability) && !p.hand.some(c => c.type === 'Quest'), 'Zug 2: Fire Blast gezogen, keine Quest auf der Hand');
+        assert(act(s, { type: 'PLACE_RESOURCE', handIdx: idx(T.resource), faceUp: false }, 1) && p.resources.length === 2, 'normale Karte als Ressource');
+        const fb = getLegalActions(s, 1).find(a => a.type === 'PLAY_CARD' && a.handIdx === idx(T.ability) && JSON.stringify(a.targets) === JSON.stringify([[o.hero.uid]]));
+        assert(fb && act(s, fb, 1) && left() === 1, `Fire Blast: Gorebelly ${left()} Leben`);
+        const cw = p.allies.find(a => a.id === T.ally);
+        assert(act(s, { type: 'ATTACK', attackerUid: cw.uid, defenderUid: o.hero.uid }, 1) && s.gameOver && s.winner === 1, `kein Sieg: Gorebelly ${left()} Leben`);
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));

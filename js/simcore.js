@@ -163,3 +163,39 @@ function buildLateGameState(deckA, deckB) {
     refreshDisplay(s);
     return s;
 }
+
+// ============================================================================
+// TUTORIAL: fest vorgegebene Partie ohne Zufall, nur einfache Karten (Allies ohne Text, Fire Blast, simple Quest).
+// Zug 1 (Mensch): Quest offen als Ressource, Cerwyn (1) spielen, Zug beenden.
+// Gegnerzug (TUT_CPU_SCRIPT, keine KI): Ressource legen, Araelun spielen. Zug 2: Fire Blast ziehen, eine
+// normale Karte verdeckt als Ressource, Fire Blast auf Gorebelly (3 → 1), Cerwyn greift an (1) → Sieg.
+// ============================================================================
+const TUT_CARDS = { hero: 5, oppHero: 9, quest: 360, ally: 1159, resource: 1193, ability: 52, filler: 192, oppAlly: 1198, oppRes: 1239, oppFill: 2167 };
+// Gegnerzüge der Reihe nach (je Zug eine Liste): { type, id } – Karte wird über die ID auf der Hand gefunden
+const TUT_CPU_SCRIPT = [[{ type: 'PLACE_RESOURCE', id: 1239 }, { type: 'PLAY_CARD', id: 1198 }]];
+function buildTutorialState() {
+    const T = TUT_CARDS;
+    const s = newGameState(T.hero, [], T.oppHero, []);
+    const mk = (pid, id) => Object.assign(makeCardInst(id, false, pid), { joinedTurn: 1, hasDamageMask: false, isFoil: false });
+    s.turn = 2; s.activePlayer = 1; s.lastTurnOf = { 1: 2, 2: 1 }; s.placedResource = false; s.phase = 'main';   // dein erster Zug (der Gegner hat begonnen)
+    const p = s.p1, o = s.p2;
+    p.mulliganed = o.mulliganed = true;
+    o.resources.push({ card: mk(2, T.oppFill), faceUp: false, exhausted: false });     // Ressource aus dem ersten Gegnerzug
+    p.hand = [mk(1, T.quest), mk(1, T.ally), mk(1, T.resource), mk(1, T.filler)];
+    o.hand = [mk(2, T.oppRes), mk(2, T.oppAlly), mk(2, T.oppFill)];
+    p.deck = [...Array(15).fill(T.filler), T.ability];                                   // gezogen wird vom Ende: Fire Blast zuerst
+    o.deck = Array(15).fill(T.oppFill);
+    o.hero.damage = CARDS[T.oppHero].hp - 3;                                             // Gorebelly: schon angeschlagen, 3 Leben
+    refreshDisplay(s);
+    return s;
+}
+// Nächste Aktion des Gegners im Tutorial (oder null = Zug beenden); Zähler je Gegnerzug in s.tutCpu
+function tutCpuAction(s) {
+    const turnIdx = Math.floor((s.turn - 2) / 2), list = TUT_CPU_SCRIPT[turnIdx] || [];
+    s.tutCpu = s.tutCpu || {}; const k = s.tutCpu[turnIdx] || 0;
+    if (k >= list.length) return null;
+    s.tutCpu[turnIdx] = k + 1;
+    const step = list[k], idx = s.p2.hand.findIndex(c => c.id === step.id);
+    if (idx < 0) return tutCpuAction(s);
+    return step.type === 'PLACE_RESOURCE' ? { type: 'PLACE_RESOURCE', handIdx: idx, faceUp: false, actorId: 2 } : { type: 'PLAY_CARD', handIdx: idx, actorId: 2 };
+}
