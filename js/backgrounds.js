@@ -72,5 +72,5 @@ function pickMatchBackground() {
         img.onerror = () => tryNext(left - 1);
         img.src = url;
     };
-    tryNext(8);
+    tryNext(pool.length);   // alle probieren: online (GitHub Pages) liegt nur eine kleine Auswahl der Liste
 }

@@ -17,3 +17,18 @@ node_modules/
 # Testbilder für die Bild-Test-Szene (bleiben lokal)
 test/*
 !test/.gitkeep
+
+# Große Bildordner nur lokal (Repo/GitHub Pages bleibt klein): Originale in hoher Auflösung und Scans.
+# Das Spiel erkennt fehlende Ordner und blendet die Bild-Optionen dann aus.
+cards/* big/
+cards/* scans/
+cards/* scans small/
+
+# Hintergründe: online nur eine kleine Auswahl, der Rest bleibt lokal
+backgrounds/*
+!backgrounds/Darkmoon_Faire_Illidan_2009_-_TCG_Playmat.webp
+!backgrounds/Fires_of_Outlands_-_TCG_Playmat.webp
+!backgrounds/Heroes_of_Azeroth_-_TCG_Playmat.webp
+!backgrounds/Leeeeeroy_Jenkins_-_TCG_Playmat.webp
+!backgrounds/Litori_Frostburn_-_TCG_Playmat.webp
+!backgrounds/Through_the_Dark_Portal_-_TCG_Playmat.webp
