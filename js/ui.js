@@ -224,6 +224,8 @@ function render() {
         const ok = typeof canUndo === 'function' && canUndo();
         undoBtn.disabled = !ok;
         undoBtn.title = ok ? tr`Rückgängig: ${UNDO.stack[UNDO.stack.length - 1].desc}` : tr("Letzte eigene Aktion rückgängig machen");
+        // Sichtbar (auch ohne Tooltip, z. B. auf dem Handy): was zurückgenommen wird
+        undoBtn.innerHTML = ok ? `${esc(tr('↶ Rückgängig'))}<small>${esc(UNDO.stack[UNDO.stack.length - 1].desc)}</small>` : esc(tr('↶ Rückgängig'));
     }
     // Fortune Telling: umgedrehtes Deck – oberste Karte ist offen
     const deckTxt = p => p.deck.length + (p.deckFaceUp && p.deck.length ? tr` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
@@ -274,7 +276,7 @@ function render() {
 // ---------------------------------------------------------------- Wer ist am Zug? / Großer End-Turn-Button
 function renderTurnIndicator() {
     const mine = G.activePlayer === 1, over = G.gameOver;
-    document.getElementById('bot-dock').classList.toggle('turn-active', mine && !over);
+    document.getElementById('bot-dock').classList.remove('turn-active');                 // eigener Held: kein Zug-Leuchten (Gelb heißt: Kraft/Angriff möglich)
     document.getElementById('top-dock').classList.toggle('turn-active', !mine && !over);
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
@@ -286,18 +288,33 @@ function renderTurnIndicator() {
     const done = nothingLeftToDo();
     document.getElementById('big-end-turn').style.display = done && !autoEndTurn() ? 'block' : 'none';
     scheduleAutoEnd(done);
+    // Touch: angetippte eigene Karte zeigt ihre Knöpfe (Angriff, Kräfte) – auch nach dem Neuzeichnen
+    if (UI.touchUid) { const n = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(UI.touchUid)}"]`); if (n && n.querySelector('.card-action-bar')) n.classList.add('touch-active'); else UI.touchUid = null; }
 }
+// Touch (Geräte ohne Hover): Tipp auf eine eigene Karte mit Knöpfen wählt sie aus, Tipp woanders hebt das auf.
+// Mit Maus ohne Wirkung – dort erscheinen die Knöpfe wie bisher beim Darüberfahren.
+document.addEventListener('click', (e) => {
+    if (TOUCH_DRAG.lastType !== 'touch') return;
+    if (e.target.closest('.card-action-bar')) return;                                  // Knopf selbst: normal ausführen
+    const w = e.target.closest('#arena .card-wrapper');
+    const has = w && w.querySelector('.card-action-bar');
+    document.querySelectorAll('#arena .card-wrapper.touch-active').forEach(n => { if (n !== w) n.classList.remove('touch-active'); });
+    if (has) { const on = !w.classList.contains('touch-active'); w.classList.toggle('touch-active', on); UI.touchUid = on ? w.dataset.uid : null; }
+    else UI.touchUid = null;
+}, true);
 // Auto-Zugende (Einstellung, Standard an): ist nichts mehr möglich, endet der Zug nach kurzer Pause von selbst
 const AUTO_END_KEY = 'wow_tcg_auto_end_turn', AUTO_END_MS = 1100;
 function autoEndTurn() { try { return localStorage.getItem(AUTO_END_KEY) !== 'off'; } catch (e) { return true; } }
 let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
-    if (!done || !autoEndTurn() || G.gameOver) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } return; }
+    const eb = document.getElementById('btn-end-turn');
+    if (!done || !autoEndTurn() || G.gameOver) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } eb.classList.remove('auto-ending'); return; }
     document.querySelector('#turn-indicator span').textContent = tr('⏩ ZUG ENDET …');
     if (_autoEndTimer) return;
+    eb.style.setProperty('--ae', AUTO_END_MS + 'ms'); eb.classList.remove('auto-ending'); void eb.offsetWidth; eb.classList.add('auto-ending');   // Balken läuft bis zum Zugende
     const turn = G.turn;
     _autoEndTimer = setTimeout(() => {
-        _autoEndTimer = null;
+        _autoEndTimer = null; eb.classList.remove('auto-ending');
         if (!G || G.turn !== turn || G.activePlayer !== 1 || !autoEndTurn()) return;
         if (UI.busy) { scheduleAutoEnd(nothingLeftToDo()); return; }   // Animationen erst abwarten
         if (nothingLeftToDo()) endTurn();
@@ -380,6 +397,64 @@ const KEYWORDS = [
     { name: 'Warp', easy: 'When revealed from your deck, you may play it for free.', text: 'As this card is revealed from your deck, you may remove it from the game. If you do, you may play it immediately without paying its cost.', re: kwAt('Warp') },
     { name: 'Will of the Forsaken', easy: 'Only leaves play when it dies.', text: 'This card can\'t leave play unless it has fatal damage or 0 health.', re: /\bWill of the Forsaken\b/ }
 ];
+// Deutsche Fassung der Keyword-Kästen (Sprache Deutsch): [Casual, Expert]. Expert = Übersetzung des CR-Glossars.
+const KW_DE = {
+    'Ferocity': ['Kann im Zug angreifen, in dem er ins Spiel kommt.', 'Dieser Ally kann als Angreifer vorgeschlagen werden, egal wie lange er schon unter deiner Kontrolle ist. Aktivierte Kräfte eines Allies mit Ferocity können aber wie üblich erst genutzt werden, wenn die Karte seit Beginn des letzten Zuges ihres Controllers ununterbrochen in ihrer Party ist.'],
+    'Elusive': ['Kann nicht angegriffen werden.', 'Diese Karte kann nicht als Verteidiger vorgeschlagen werden.'],
+    'Protector': ['Kann einspringen und einen Angriff auf jemand anderen auf deiner Seite abfangen.', 'Dieser Charakter kann schützen. Um mit einem Charakter zu schützen, erschöpfe ihn am Schutzpunkt eines Kampfschritts.'],
+    'Long-Range': ['Wenn er angreift, kann der Verteidiger nicht zurückschlagen.', 'Solange dieser Charakter angreift, können Verteidiger keinen Kampfschaden zufügen. Das ist etwas anderes als die Schadensart Fernkampf. Ein Charakter hat Long-Range, solange er mit einer Waffe mit Long-Range verbunden ist.'],
+    'Stealth': ['Wenn er angreift, kann niemand schützen.', 'Solange dieser Charakter angreift, können Charaktere nicht schützen. Ein Charakter hat Stealth, solange er mit einer Waffe mit Stealth verbunden ist.'],
+    'Untargetable': ['Kann von nichts als Ziel gewählt werden.', 'Diese Karte kann nicht als Ziel gewählt werden. Solche Karten sind nur im Spiel unanvisierbar. Ein Ziel wird ungültig, wenn es unanvisierbar wird.'],
+    'Spellshield': ['Dein Gegner kann ihn nicht als Ziel wählen.', 'Diese Karte kann nicht von Gegnern als Ziel gewählt werden – solche Karten nur, solange sie im Spiel sind.'],
+    'Finishing Move': ['Entferne bis zu 5 Combo-Karten aus deinem Friedhof, um sie zu verstärken.', 'Als zusätzliche Kosten zum Spielen entfernst du X [Beschreibung]-Karten in deinem Friedhof aus dem Spiel, wobei X höchstens 5 ist. Ohne [Beschreibung] gilt „Combo“.'],
+    'Bear Form': ['Dein Held erhält Protector. Endet, wenn du mit einer Waffe zuschlägst oder eine Nicht-Feral-Fähigkeit spielst.', 'Dein Held hat Protector und „Wenn du eine Nicht-Feral-Fähigkeit spielst oder mit einer Waffe zuschlägst, zerstöre jede Fähigkeit, die deinem Helden Bear Form oder Cat Form verleiht.“'],
+    'Cat Form': ['Dein Held hat beim Angreifen +1 ATK. Endet, wenn du mit einer Waffe zuschlägst oder eine Nicht-Feral-Fähigkeit spielst.', 'Dein Held hat „+1 ATK beim Angreifen“ und „Wenn du eine Nicht-Feral-Fähigkeit spielst oder mit einer Waffe zuschlägst, zerstöre jede Fähigkeit, die deinem Helden Bear Form oder Cat Form verleiht.“'],
+    'Totem': ['Zählt als Ally, kann aber nicht angreifen.', 'Jedes Totem hat ATK und Leben. Totems können nicht als Angreifer vorgeschlagen werden. Totems sind Fähigkeits-Allies und zählen in allen Zonen als beides.'],
+    'Ongoing': ['Bleibt nach dem Auflösen im Spiel.', 'Eine dauerhafte (ongoing) Fähigkeit kommt beim Auflösen ins Spiel; eine nicht dauerhafte geht beim Auflösen in den Friedhof ihres Besitzers. Eine dauerhafte Fähigkeit, die ihre Kräfte verliert, bleibt dauerhaft.'],
+    'Instant': ['Kann jederzeit gespielt werden, auch im Zug des Gegners.', 'Ein Spieler kann eine Instant-Karte immer spielen, wenn er Priorität hat. Andere Karten nur in seiner Aktionsphase außerhalb des Kampfes, bei leerer Kette und mit Priorität.'],
+    'Unique': ['Nur eine Karte mit diesem Namen darf im Spiel sein.', 'Kontrolliert ein Spieler zwei oder mehr einzigartige Karten mit demselben Namen im Spiel, verletzen diese Karten die Einzigartigkeit.'],
+    'Flip': ['Dreh deinen Helden um, um seine Kraft zu nutzen. Einmal nutzbar.', 'Einen offenen Helden umdrehen heißt, ihn verdeckt hinzulegen, und umgekehrt. War der Held vorher bereit, bleibt er bereit; war er erschöpft, bleibt er erschöpft.'],
+    'Aberration': ['Erleidet nur im Kampf Schaden.', 'Verhindere allen Nicht-Kampfschaden, der diesem Charakter zugefügt würde.'],
+    'Absorb': ['Kampfschaden an einem Helden heilt deinen Helden.', 'Wenn dieser Charakter einem Helden Kampfschaden zufügt, heilt er so viel Schaden von deinem Helden.'],
+    'Arcane Torrent': ['Wenn er ins Spiel kommt, verliert eine gegnerische Karte in diesem Zug ihre Kräfte.', 'Wenn diese Karte ins Spiel kommt, verliert eine gegnerische Ziel-Karte im Spiel in diesem Zug ihre Kräfte und kann keine haben.'],
+    'Artifact': ['Kann aus deinem Friedhof gespielt werden.', 'Du darfst diese Karte aus deinem Friedhof spielen.'],
+    'Assault': ['Zusätzliche ATK in deinem Zug.', 'Assault 1 bedeutet „Diese Karte hat in deinem Zug +1 ATK.“'],
+    'Berserking': ['+1 ATK für jeden Schaden auf ihm.', 'Dieser Charakter hat +1 ATK für jeden Schaden auf ihm.'],
+    'Conspicuous': ['Gegner können gegen ihn schützen.', 'Gegnerische Helden und Allies können gegen diesen Charakter schützen.'],
+    'Death Rattle': ['Bewirkt etwas, wenn er in den Friedhof kommt.', 'Wenn diese Karte von irgendwo in einen Friedhof kommt, [ausgelöster Effekt]. Die Death-Rattle-Kraft ist nur aktiv, solange die Karte im Friedhof ist und die Kraft nicht verloren hat.'],
+    'Delve': ['Sieh dir die obersten 2 Karten an, lege beliebige oben zurück, den Rest unter das Deck.', 'Sieh dir die obersten zwei Karten deines Decks an. Lege beliebig viele davon in beliebiger Reihenfolge oben auf dein Deck und den Rest unter das Deck.'],
+    'Diplomacy': ['Bestimmte Allies kosten (1) weniger.', 'Du zahlst (1) weniger, um [Beschreibung]-Allies zu spielen, mindestens aber (1).'],
+    'Dual Shield': ['Dein Held kann zwei Schilde nutzen.', 'Der Controller eines Helden mit Dual Shield kann zwei Schilde haben, ohne die Einzigartigkeit zu verletzen. Eine Nahkampfwaffe oder eine weitere Off-Hand-Ausrüstung verletzt sie.'],
+    'Dual Wield': ['Dein Held kann zwei Waffen nutzen und mit beiden zuschlagen.', 'Der Controller eines Helden mit Dual Wield (oder Zweihand-Dual-Wield) darf bestimmte Ausrüstungskombinationen haben, die sonst die Einzigartigkeit verletzen, und pro Kampf mit zwei Nahkampfwaffen zuschlagen.'],
+    'Echo': ['Wird kopiert, wenn du zwei Allies derselben Rasse kontrollierst.', 'Wenn du diese Fähigkeit spielst und zwei oder mehr Allies kontrollierst, die eine [Horde]- oder [Alliance]-Rasse teilen, kopiere diese Fähigkeit.'],
+    'Enrage': ['Wenn er ins Spiel kommt, darfst du deine oberste Karte für einen Bonus aufdecken.', 'Wenn diese Karte ins Spiel kommt, darfst du die oberste Karte deines Decks aufdecken. Je nach aufgedeckter Karte können Kräfte ausgelöst werden.'],
+    'Escape Artist': ['Wählt ein Gegner ihn als Ziel, kannst du ihn auf die Hand nehmen.', 'Wenn diese Karte Ziel eines gegnerischen Kettenglieds wird, darfst du sie auf die Hand ihres Besitzers nehmen.'],
+    'Eternal': ['Kommt er in deinen Friedhof, darfst du ihn zurück ins Deck mischen.', 'Wenn diese Karte von irgendwo in deinen Friedhof kommt, darfst du sie in dein Deck mischen.'],
+    'Find Treasure': ['Wenn er ins Spiel kommt, darfst du eine Karte ziehen und dann eine abwerfen.', 'Wenn diese Karte ins Spiel kommt, darfst du eine Karte ziehen. Wenn du das tust, wirf eine Karte ab.'],
+    'Hardiness': ['Erleidet jedes Mal 1 Schaden weniger.', 'Würde diesem Charakter Schaden zugefügt, verhindere 1 davon.'],
+    'Harmonize': ['Allies mit Kosten 4 oder mehr kosten (1) weniger.', 'Du zahlst (1) weniger, um Allies mit aufgedruckten Kosten von 4 oder mehr zu spielen.'],
+    'Haste': ['Billiger, wenn deine Allies in diesem Zug den gegnerischen Helden getroffen haben.', 'Haste 1 bedeutet „Du zahlst (1) weniger für diese Karte, wenn ein Ally unter deiner Kontrolle in diesem Zug einem gegnerischen Helden Schaden zugefügt hat.“'],
+    'Inspire': ['Kann im Zug des Gegners eine Karte bereit machen.', 'Zu Beginn des Bereitmach-Schritts jedes anderen Spielers darfst du (eine) erschöpfte [Karte(n)] unter deiner Kontrolle bereit machen. Das nutzt die Kette nicht.'],
+    'Inspiring Presence': ['Dein Nicht-Kampfschaden ist um 1 höher.', 'Würde ein Held oder Ally unter deiner Kontrolle Nicht-Kampfschaden zufügen, fügt er stattdessen so viel +1 zu.'],
+    'Invincible': ['Kann das Spiel nicht verlassen, nicht Ziel werden und keinen Schaden nehmen.', 'Diese Karte kann das Spiel nicht verlassen, nicht als Ziel gewählt werden und keinen Schaden erleiden.'],
+    'Irradiated': ['Überträgt sich auf Allies, die er im Kampf trifft.', 'Wenn dieser Charakter einem Ally ohne Irradiated Kampfschaden zufügt, hat dieser Ally Irradiated.'],
+    'Mend': ['Heilt zu Beginn deines Zugs etwas Schaden.', 'Mend 1 bedeutet „Zu Beginn deines Zugs darf dieser Charakter 1 Schaden von einem Ziel-Helden oder -Ally heilen.“'],
+    'Portal': ['Decke deine obersten 3 Karten auf und beschwöre vielleicht einen billigeren Dämon.', 'Decke die obersten drei Karten deines Decks auf. Du darfst einen aufgedeckten Dämonen-Ally mit geringeren Kosten als diese Karte ins Spiel bringen. Lege die übrigen Karten unter dein Deck.'],
+    'Preparation': ['In deinem ersten Zug kostenlos spielbar.', 'In deinem ersten Zug darfst du diese Karte spielen, ohne ihre Kosten zu zahlen.'],
+    'Resistance': ['Immun gegen diese Schadensart.', 'Verhindere allen Schaden dieser [Art] (unabhängig von weiteren Arten), der diesem Charakter zugefügt würde.'],
+    'Rift': ['Billiger für jeden Ally der gewählten Rasse.', 'Wenn du diese Karte spielst, wähle eine [Horde]- oder [Alliance]-Rasse. Sie kostet (1) weniger für jeden Ally der gewählten Rasse, den du kontrollierst.'],
+    'Sabotage': ['Kann bestimmte Karten statt Charakteren angreifen. Macht keinen Schaden.', 'Ein solcher Charakter kann entweder einen Sabotage-Kampf gegen ein nicht befreundetes [Ding] oder einen normalen Kampf gegen einen nicht befreundeten Charakter vorschlagen. Am Ende eines Sabotage-Kampfs wird kein Kampfschaden zugefügt. Schützt ein Charakter, ist es keine Sabotage mehr.'],
+    'Sentinel': ['Wird beim ersten Erschöpfen in jedem Zug wieder bereit.', 'Wenn diese Karte zum ersten Mal in einem Zug erschöpft wird, mache sie bereit.'],
+    'Shadowmeld': ['Solange bereit: kann nicht angegriffen oder als Ziel gewählt werden.', 'Diese Karte hat Elusive und Untargetable, solange sie bereit ist.'],
+    'Smash': ['Überschüssiger Kampfschaden an einem Ally geht auf seinen Helden über.', 'Würde dieser Charakter einem verteidigenden Ally mehr als tödlichen Kampfschaden zufügen, fügt er diesem genau tödlichen Schaden zu und den Rest stattdessen dem Helden seines Controllers.'],
+    'Stash': ['Bonus, wenn du sie als Ressource legst.', 'Kommt diese Karte von irgendwo verdeckt in deine Ressourcenreihe, darfst du sie offen hineinlegen und sofort umdrehen. Wenn du das tust, [Text].'],
+    'Thrown': ['Dein Held greift aus der Ferne an, danach kommt die Waffe auf die Hand zurück.', 'Wenn du mit dieser Waffe zuschlägst, hat dein Held in diesem Kampf Long-Range. Am Ende des Zugs kommt diese Waffe aus dem Spiel auf die Hand ihres Besitzers.'],
+    'Time is Money': ['Kann seine Kräfte sofort nutzen.', 'Dieser Ally kann [Activate]-Kräfte schon in dem Zug nutzen, in dem er in deine Party kommt.'],
+    'Trap': ['Kann bezahlt werden, indem du deinen verteidigenden Helden erschöpfst.', 'Du darfst einen verteidigenden Helden unter deiner Kontrolle erschöpfen, statt die Kosten dieser Karte zu zahlen.'],
+    'War Stomp': ['Wenn er angreift oder verteidigt, darfst du einen Gegner erschöpfen.', 'Wenn diese Karte angreift oder verteidigt, darfst du einen gegnerischen Ziel-Helden oder -Ally erschöpfen.'],
+    'Warp': ['Wird sie aus deinem Deck aufgedeckt, darfst du sie kostenlos spielen.', 'Wird diese Karte aus deinem Deck aufgedeckt, darfst du sie aus dem Spiel entfernen. Wenn du das tust, darfst du sie sofort spielen, ohne ihre Kosten zu zahlen.'],
+    'Will of the Forsaken': ['Verlässt das Spiel nur, wenn er stirbt.', 'Diese Karte kann das Spiel nicht verlassen, außer sie hat tödlichen Schaden oder 0 Leben.']
+};
 // CR 202.1: Tag mit Zahl in Klammern auf der Typzeile (z. B. „Pet (1)“, „Trinket (2)“)
 const TAG_LIMIT_TEXT = 'If a tag is followed by a number in parentheses, any player controlling more than that number of cards in play with that tag is violating uniqueness.';
 // Keywords einer Karte: aus Typzeile und Text der Card Reference, dazu im Spiel verliehene (z. B. Ferocity durch Into the Fray)
@@ -391,9 +466,11 @@ function cardKeywords(uid, cardId) {
     const list = KEYWORDS.filter(k => {
         const src = k.on === 'type' ? type : k.on === 'both' ? type + ' <p> ' + text : text;
         return k.re.test(src) || (k.flag && inst && inst[k.flag]);
-    }).map(k => ({ name: k.name, text: easy ? k.easy : k.text }));
+    }).map(k => { const de = LANG === 'de' && KW_DE[k.name]; return { name: k.name, text: easy ? (de ? de[0] : k.easy) : (de ? de[1] : k.text) }; });
     for (const m of type.matchAll(/(?:—|, )([A-Z][^,—()]*?) \((\d+)\)/g))
-        list.push({ name: m[1] + ' (' + m[2] + ')', text: easy ? 'You can have at most ' + m[2] + ' ' + m[1] + ' in play.' : TAG_LIMIT_TEXT });
+        list.push({ name: m[1] + ' (' + m[2] + ')', text: LANG === 'de'
+            ? (easy ? `Du darfst höchstens ${m[2]} × ${m[1]} im Spiel haben.` : 'Folgt einem Tag eine Zahl in Klammern, verletzt jeder Spieler die Einzigartigkeit, der mehr als so viele Karten mit diesem Tag im Spiel kontrolliert.')
+            : (easy ? 'You can have at most ' + m[2] + ' ' + m[1] + ' in play.' : TAG_LIMIT_TEXT) });
     return list;
 }
 // Regeltexte der Kästen: 'casual' (kurz & einfach, Standard) oder 'expert' (CR-Glossar)
@@ -674,7 +751,9 @@ function decorateInPlay(node, c) {
         const bar = document.createElement("div"); bar.className = "card-action-bar";
         // Gelber Rand (wie spielbare Handkarten): Angriff mit Schaden oder bezahlbare Kraft möglich
         const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true })) > 0;
-        if (canHit || usablePowers(c).length) node.classList.add('can-act');
+        // Kraft mit Kosten X: Rahmen erst ab 1 bereiten Ressource (X = 0 wäre wirkungslos)
+        const worth = pw => pw.cost !== 'X' || getReadyRes(G.p1) >= 1;
+        if (canHit || usablePowers(c).some(worth)) node.classList.add('can-act');
         if (canMain() && isChar(c) && canAttackNow(G, c, G.p1)) {
             const b = document.createElement("button"); b.textContent = tr("⚔ Angriff"); b.style.background = "#ea580c";
             b.onclick = (e) => { e.stopPropagation(); UI.attacker = UI.attacker === uid ? null : uid; render(); };
@@ -845,15 +924,21 @@ function openHandCardMenu(idx) {
     const card = G.p1.hand[idx]; if (!card) return;
     if (card.type === 'Quest') {
         if (!canMain()) return;
-        if (G.placedResource) { addLog(tr("Du hast in diesem Zug schon eine Ressource gelegt."), "log-hit"); render(); return; }
+        if (G.placedResource) { addLog(tr("Du hast in diesem Zug schon eine Ressource gelegt."), "log-hit"); showToast(tr("Du hast in diesem Zug schon eine Ressource gelegt.")); render(); return; }
         humanAct({ type: 'PLACE_RESOURCE', handIdx: idx, faceUp: true });
         return;
     }
     const err = canPlayCard(G, 1, card);
     // Kraft von der Hand (Obsidian Edged Blade): statt Spielen nutzbar
     const hp = getPowers(G, card).find(pw => !canUsePower(G, 1, card, pw));
-    if (hp && (err || confirm(tr`${card.name}: „${hp.label}“ (${hp.cost || 0}) nutzen?\nOK = Kraft nutzen, Abbrechen = Karte spielen`))) { humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }); return; }
-    if (err) { addLog(`${card.name}: ${err}`, "log-hit"); render(); return; }
+    if (hp && err) { humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }); return; }
+    if (hp) {                                                                           // Kraft von der Hand oder Karte spielen
+        openDecisionModal(card.name, esc(tr`„${hp.label}“ (${hp.cost || 0}) nutzen oder die Karte spielen?`), [
+            { label: tr('Kraft nutzen'), cls: 'success', action: () => humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }) },
+            { label: tr('Karte spielen'), action: () => humanAct({ type: 'PLAY_CARD', handIdx: idx }) }]);
+        return;
+    }
+    if (err) { addLog(`${card.name}: ${err}`, "log-hit"); showToast(`${card.name}: ${err}`); render(); return; }
     humanAct({ type: 'PLAY_CARD', handIdx: idx });
 }
 
@@ -1177,7 +1262,9 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
     }, true);
     document.addEventListener('pointermove', (e) => {
         if (e.pointerType !== 'touch' || !TOUCH_DRAG.src) return;
-        if (!TOUCH_DRAG.active) { if (Math.hypot(e.clientX - TOUCH_DRAG.x0, e.clientY - TOUCH_DRAG.y0) > START_PX) begin(e.clientX, e.clientY); }
+        // Zoom per Gedrückthalten offen: nur ein deutliches Losziehen startet das Ziehen (Fingerzittern nicht)
+        const th = typeof touchZoomShown === 'function' && touchZoomShown() ? 30 : START_PX;
+        if (!TOUCH_DRAG.active) { if (Math.hypot(e.clientX - TOUCH_DRAG.x0, e.clientY - TOUCH_DRAG.y0) > th) begin(e.clientX, e.clientY); }
         else move(e.clientX, e.clientY);
     }, true);
     document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src) finish(e.clientX, e.clientY, true); }, true);
@@ -1366,6 +1453,32 @@ function renderChoiceModal(d) {
     });
 }
 
+// Kurze Meldung mitten auf dem Spielfeld (wichtige Infos gehören ins Hauptfenster, nicht ins Log)
+let _toastTimer = 0;
+function showToast(msg, isErr = true, ms = 2200) {
+    let t = document.getElementById('game-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'game-toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.toggle('err', isErr);
+    clearTimeout(_toastTimer); void t.offsetWidth; t.classList.add('show');
+    _toastTimer = setTimeout(() => t.classList.remove('show'), ms);
+}
+// Laufende Partie würde verloren gehen (neues Spiel, Sprachwechsel …): nur dann eine Rückfrage, sonst sofort
+function confirmLeaveGame(go) {
+    if (!G || G.gameOver || G.turn <= 1) { go(); return; }
+    uiConfirm(tr('Laufende Partie beenden?'), tr('Die aktuelle Partie geht dabei verloren.'), tr('Ja, beenden'), go);
+}
+// Spieleigene Rückfrage statt confirm(): onYes läuft nur bei Bestätigung
+function uiConfirm(title, text, yesLabel, onYes, cls = 'danger') {
+    openDecisionModal(title, esc(text), [{ label: yesLabel, cls, action: onYes }, { label: tr('Abbrechen'), action: () => {} }]);
+}
+// Spieleigene Zahleneingabe statt prompt(): onOk(n) nur bei gültiger Zahl ≥ min
+function uiAskNumber(title, text, def, min, onOk) {
+    openDecisionModal(title, `${esc(text)}<br><input type="number" id="dm-num" min="${min}" value="${def}">`, [
+        { label: 'OK', cls: 'success', action: () => { const n = parseInt(document.getElementById('dm-num').value, 10); if (!isNaN(n) && n >= min) onOk(n); } },
+        { label: tr('Abbrechen'), action: () => {} }]);
+    const inp = document.getElementById('dm-num'); inp.focus(); inp.select();
+    inp.onkeydown = (e) => { if (e.key === 'Enter') document.querySelector('#decision-actions button').click(); };
+}
 function openDecisionModal(title, text, buttons) {
     const m = document.getElementById("decision-modal");
     document.getElementById("decision-title").textContent = title;

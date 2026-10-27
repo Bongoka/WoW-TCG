@@ -285,10 +285,12 @@
     }, { passive: true });
     document.addEventListener('pointerdown', () => { if (S.live) release(); }, true);
     document.addEventListener('dragstart', () => { if (S.live) finish(S.live); }, true);
-    // Touch (kein Hover): Tippen wirkt wie ein Klick; Gedrückthalten zeigt die Zoom-Karte, bis man loslässt.
-    // Bewegt sich der Finger (Ziehen), verschwindet der Zoom; nach dem Zoom löst das Loslassen keinen Klick aus.
+    // Touch (kein Hover): Tippen wirkt wie ein Klick; Gedrückthalten zeigt die Zoom-Karte, bis der Finger losgelassen wird.
+    // Fingerzittern bewegt nichts; erst ein deutliches Losziehen startet das Ziehen der Karte (ui.js, touchZoomShown).
+    // Nach dem Zoom löst das Loslassen keinen Klick aus.
     const T = { timer: 0, wrap: null, x: 0, y: 0, shown: false, eatClick: false };
-    const HOLD_MS = 380, MOVE_PX = 10;
+    const HOLD_MS = 380, MOVE_PX = 16;
+    window.touchZoomShown = () => T.shown;
     const touchEnd = () => { clearTimeout(T.timer); if (T.shown) { release(); T.eatClick = true; setTimeout(() => { T.eatClick = false; }, 450); } T.shown = false; T.wrap = null; };
     document.addEventListener('pointerdown', (e) => {
         if (e.pointerType !== 'touch') return;
@@ -297,14 +299,14 @@
         if (w) T.timer = setTimeout(() => { if (T.wrap === w && w.isConnected) { enter(w); T.shown = true; } }, HOLD_MS);
     }, { passive: true });
     document.addEventListener('pointermove', (e) => {
-        if (e.pointerType !== 'touch' || !T.wrap) return;
-        if (Math.hypot(e.clientX - T.x, e.clientY - T.y) > MOVE_PX) { clearTimeout(T.timer); if (T.shown) { release(); T.shown = false; } T.wrap = null; }
+        if (e.pointerType !== 'touch' || !T.wrap || T.shown) return;                      // Zoom offen: bleibt bis zum Loslassen
+        if (Math.hypot(e.clientX - T.x, e.clientY - T.y) > MOVE_PX) { clearTimeout(T.timer); T.wrap = null; }
     }, { passive: true });
     document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
     document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
     document.addEventListener('click', (e) => { if (T.eatClick) { T.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
     document.addEventListener('contextmenu', (e) => { if (e.target && e.target.closest && e.target.closest('.card-wrapper')) e.preventDefault(); });
-    document.documentElement.addEventListener('mouseleave', release);
-    window.addEventListener('blur', release);
+    document.documentElement.addEventListener('mouseleave', () => { if (!T.shown) release(); });
+    window.addEventListener('blur', () => { if (!T.shown) release(); });
     window.addEventListener('resize', () => { if (S.live) placePreview(S.live); });
 })();

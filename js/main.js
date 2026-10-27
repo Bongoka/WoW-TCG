@@ -197,7 +197,12 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
     refreshDisplay(G);
     resetBanter();
-    const startPlay = () => { showTurnBanner(tr("Dein Zug!")); setTimeout(() => cpuSay('greet'), 1400); };
+    const startPlay = () => {
+        showTurnBanner(tr("Dein Zug!")); setTimeout(() => cpuSay('greet'), 1400);
+        // Einmaliger Bedienhinweis beim allerersten Spiel
+        let seen = true; try { seen = localStorage.getItem('wow_tcg_hint_seen') === '1'; localStorage.setItem('wow_tcg_hint_seen', '1'); } catch (e) {}
+        if (!seen) setTimeout(() => showToast(matchMedia('(hover: none)').matches ? tr('Karten ziehen zum Ausspielen · gedrückt halten: Karte groß ansehen') : tr('Karten ziehen oder anklicken zum Ausspielen · Maus darüber: Karte groß ansehen'), false, 6000), 1800);
+    };
     if (mulliganMode() === 'hs') {
         // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
         UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
@@ -217,7 +222,9 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
     const dmgBefore = G.p2.hero.damage;
+    const why = validateAction(G, { ...action, actorId: 1 }, 1);
     const ok = applyAction(G, { ...action, actorId: 1 }, false, 1);
+    if (!ok && why && typeof showToast === 'function') showToast(why);                 // Grund sichtbar auf dem Spielfeld
     UI.reset();
     render();
     playEventAnimations();
@@ -227,12 +234,46 @@ function humanAct(action) {
 }
 function endTurn() {
     if (!G || G.gameOver || UI.busy) return;
-    if (!canActMain(G, 1)) { addLog(tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."), "log-hit"); return; }
+    if (!canActMain(G, 1)) { const m = tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."); addLog(m, "log-hit"); showToast(m); return; }
     const err = validateAction(G, { type: 'END_TURN' }, 1);
-    if (err) { addLog(err, "log-hit"); return; }
+    if (err) { addLog(err, "log-hit"); showToast(err); return; }
     sfx.play('play');
     UNDO.stack = [];
     humanAct({ type: 'END_TURN' });
+}
+
+// CPU-Tempo (gemerkt): 'normal' oder 'fast' (kürzere Pausen, keine Denkpausen). Ein Klick/Tipp aufs Spielfeld
+// während des CPU-Zugs überspringt die restlichen Pausen dieses Zugs.
+const CPU_SPEED_KEY = 'wow_tcg_cpu_speed';
+function cpuSpeed() { try { return localStorage.getItem(CPU_SPEED_KEY) === 'fast' ? 'fast' : 'normal'; } catch (e) { return 'normal'; } }
+const CPU_SKIP = { on: false, wake: new Set() };
+function cpuSleep(ms) {
+    if (CPU_SKIP.on) return Promise.resolve();
+    return new Promise(r => { const t = setTimeout(() => { CPU_SKIP.wake.delete(w); r(); }, ms * (cpuSpeed() === 'fast' ? 0.35 : 1)); const w = () => { clearTimeout(t); r(); }; CPU_SKIP.wake.add(w); });
+}
+function skipCpuPauses() { if (!_cpuRunning || CPU_SKIP.on) return; CPU_SKIP.on = true; CPU_SKIP.wake.forEach(w => w()); CPU_SKIP.wake.clear(); }
+function updCpuSpeedBtn() { const b = document.getElementById("btn-cpu-speed"); if (b) b.textContent = cpuSpeed() === 'fast' ? tr('⚡ CPU-Tempo: Schnell') : tr('🐢 CPU-Tempo: Normal'); }
+
+// CPU-Entscheidung: im Hintergrund (js/aiworker.js), damit die Seite nicht einfriert. Geht kein Worker
+// (z. B. index.html direkt von der Festplatte geöffnet) oder antwortet er nicht, rechnet das Spiel wie bisher selbst.
+const CPU_WORKER = { w: null, broken: false, seq: 0, wait: new Map() };
+function cpuDecide(s, pid, difficulty) {
+    const sync = () => searchBestAction(s, pid, difficulty);
+    if (CPU_WORKER.broken || typeof Worker === 'undefined') return Promise.resolve(sync());
+    if (!CPU_WORKER.w) {
+        try {
+            CPU_WORKER.w = new Worker('js/aiworker.js');
+            CPU_WORKER.w.onmessage = (e) => { const r = CPU_WORKER.wait.get(e.data.id); if (!r) return; CPU_WORKER.wait.delete(e.data.id); r(e.data.error ? 'error' : e.data.dec); };
+            CPU_WORKER.w.onerror = () => { CPU_WORKER.broken = true; for (const r of CPU_WORKER.wait.values()) r('error'); CPU_WORKER.wait.clear(); };
+        } catch (e) { CPU_WORKER.broken = true; return Promise.resolve(sync()); }
+    }
+    const id = ++CPU_WORKER.seq;
+    return new Promise(resolve => {
+        const done = (dec) => { clearTimeout(t); if (dec === 'error') { CPU_WORKER.broken = true; resolve(sync()); } else resolve(dec); };
+        const t = setTimeout(() => { if (CPU_WORKER.wait.delete(id)) done('error'); }, 15000);
+        CPU_WORKER.wait.set(id, done);
+        CPU_WORKER.w.postMessage({ id, state: cloneState(s), pid, difficulty, lang: LANG });
+    });
 }
 
 // CPU steuern: läuft, solange die CPU am Zug ist und keine Entscheidung des Menschen offen ist
@@ -246,15 +287,17 @@ async function driveCpu() {
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
             if (G.activePlayer !== 2) break;
-            if (!announced) { announced = true; showTurnBanner(tr("CPU ist am Zug!")); UI.busy = true; render(); await sleep(700); cpuSay('turn', 0.35); }
+            if (!announced) { announced = true; CPU_SKIP.on = false; showTurnBanner(tr("CPU ist am Zug!")); UI.busy = true; render(); await cpuSleep(700); cpuSay('turn', 0.35); }
             updateCpuStatus(true, tr("CPU analysiert..."));
-            await sleep(250);
+            await cpuSleep(250);
             // Ab und zu eine Denkpause mit Sprechblase
-            if (steps > 0 && Math.random() < 0.25) { cpuSay('think'); await sleep(900 + Math.random() * 900); }
-            const dec = steps < 25 ? searchBestAction(G, 2, document.getElementById("cfg-difficulty").value) : null;
+            if (steps > 0 && cpuSpeed() === 'normal' && !CPU_SKIP.on && Math.random() < 0.25) { cpuSay('think'); await cpuSleep(900 + Math.random() * 900); }
+            const g0 = G;
+            const dec = steps < 25 ? await cpuDecide(G, 2, document.getElementById("cfg-difficulty").value) : null;
+            if (G !== g0 || G.gameOver) break;                                              // inzwischen neues Spiel / Spiel vorbei
             if (!dec || !dec.action) {
                 updateCpuStatus(true, tr("CPU beendet Zug."));
-                await sleep(400);
+                await cpuSleep(400);
                 applyAction(G, { type: 'END_TURN', actorId: 2 }, false, 2);
                 render(); playEventAnimations();
                 if (G.activePlayer === 1 && isIdle(G)) showTurnBanner(tr("Dein Zug!"));
@@ -267,8 +310,8 @@ async function driveCpu() {
             else if (played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
             // Gespielte Karte groß in der Mitte zeigen, Angriffe mit Pfeil ankündigen
             let show = null;
-            if (played) { show = await showcaseCpuCard(played, dec.action.handIdx); await sleep(950); }
-            else await sleep(500);
+            if (played) { show = await showcaseCpuCard(played, dec.action.handIdx); await cpuSleep(950); }
+            else await cpuSleep(500);
             if (dec.action.type === 'ATTACK') { await flashArrow(dec.action.attackerUid, dec.action.defenderUid); await animateAttack(dec.action.attackerUid, dec.action.defenderUid); }
             const dmgBefore = G.p2.hero.damage;
             applyAction(G, dec.action, false, 2);
@@ -277,7 +320,7 @@ async function driveCpu() {
             if (show) { await landShowcase(show, played.uid); if ((played.cost || 0) >= 7) screenShake(1.2); }
             playEventAnimations();
             cpuReact(dmgBefore);
-            await sleep(350);
+            await cpuSleep(350);
         }
     } catch (e) {
         console.error("CPU-Fehler:", e);
@@ -298,8 +341,26 @@ function updateCpuStatus(active, text = "") {
 
 function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
+    if (matchMedia('(hover: none)').matches) { const h = document.querySelector('.db-hint'); if (h) h.textContent = tr('Tippen: hinzufügen · „−“ in der Deckliste: entfernen'); }
+    // Tastatur: Leertaste/Enter = Zug beenden, Strg+Z = Rückgängig, Esc = Fenster schließen / Abbrechen
+    const openModals = () => ['decision-modal', 'deck-builder-modal', 'sim-modal', 'deck-overview-modal', 'deck-view-modal', 'graveyard-modal', 'booster-modal', 'db-io-modal', 'choice-modal', 'hs-mulligan', 'gameover']
+        .map(id => document.getElementById(id)).filter(m => m && getComputedStyle(m).display !== 'none');
+    document.addEventListener('keydown', (e) => {
+        if (e.target.closest && e.target.closest('input, textarea, select')) return;
+        const open = openModals();
+        if (e.key === 'Escape') {
+            const dm = open.find(m => m.id === 'decision-modal');
+            if (dm) { const b = [...dm.querySelectorAll('#decision-actions button')].find(x => x.textContent === tr('Abbrechen')); if (b) b.click(); return; }
+            const close = open.find(m => ['sim-modal', 'deck-view-modal', 'deck-overview-modal', 'graveyard-modal'].includes(m.id));
+            if (close) { if (close.id === 'sim-modal') document.getElementById('sim-close-btn').click(); else close.style.display = 'none'; }
+            return;
+        }
+        if (open.length || !G || G.gameOver) return;
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); if (canActMain(G, 1)) endTurn(); }
+        else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (canUndo()) undoLastAction(); }
+    });
     document.documentElement.lang = LANG;
-    document.querySelectorAll('.lang-flag').forEach(f => { f.classList.toggle('active', f.dataset.lang === LANG); f.onclick = () => { if (f.dataset.lang !== LANG) setLang(f.dataset.lang); }; });
+    document.querySelectorAll('.lang-flag').forEach(f => { f.classList.toggle('active', f.dataset.lang === LANG); f.onclick = () => { if (f.dataset.lang !== LANG) confirmLeaveGame(() => setLang(f.dataset.lang)); }; });
     // Menü rechts: Maus auf den Reiter/ins Menü → auf, Maus raus → nach kurzer Pause zu (nicht, solange ein Auswahlfeld darin aktiv ist).
     // Antippen des Reiters (Touch) klappt auf; ein Tipp außerhalb klappt wieder zu.
     const side = document.getElementById("side-panel"), tab = document.getElementById("side-tab");
@@ -318,8 +379,12 @@ function bootGame() {
     fsBtn.onclick = () => { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else enterFs(); };
     document.addEventListener('fullscreenchange', updFs); document.addEventListener('webkitfullscreenchange', updFs);
     if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) fsBtn.style.display = 'none';   // z. B. iPhone: dort über den Startbildschirm
-    if (matchMedia('(pointer: coarse)').matches && !matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches)
-        document.addEventListener('pointerup', enterFs, { once: true });
+    // Handy/Tablet (Touch): jedes Antippen holt den Vollbildmodus zurück, falls er verlassen wurde (Zurück-Geste o. Ä.).
+    // Ohne Berührung geht es nicht – Browser erlauben Vollbild nur als Reaktion auf eine Eingabe. Der Knopf ist dort überflüssig.
+    if (matchMedia('(pointer: coarse)').matches && !matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) {
+        document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch' && !fsOn()) enterFs(); }, true);
+        fsBtn.style.display = 'none';
+    }
     updFs();
     document.getElementById("btn-end-turn").onclick = endTurn;
     document.getElementById("big-end-turn").onclick = endTurn;
@@ -328,7 +393,7 @@ function bootGame() {
     document.getElementById("btn-test-setup").onclick = loadQuickTest;
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
-    document.getElementById("btn-new-game").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(); };
+    document.getElementById("btn-new-game").onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
     document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; document.getElementById("sim-modal").style.display = "none"; };   // laufende Simulation beenden
     document.getElementById("btn-decks").onclick = openDeckOverview;
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
@@ -338,28 +403,16 @@ function bootGame() {
     document.getElementById("btn-deck-builder").onclick = () => openDeckBuilder();
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
-    document.getElementById("btn-simulate").onclick = async () => {
-        const input = prompt(tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), "3");
-        if (input === null) return;
-        const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1) { alert(tr("Bitte eine Zahl ab 1.")); return; }
-        try { await runSimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
-    };
-    document.getElementById("btn-simulate-tourney").onclick = async () => {
+    // Simulationen: Anzahl über das spieleigene Eingabefenster (statt prompt)
+    const simRun = async (fn) => { try { await fn(); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; } };
+    document.getElementById("btn-simulate").onclick = () =>
+        uiAskNumber(tr('🧪 CPU vs CPU Simulation'), tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), 3, 1, n => simRun(() => runSimulation(n)));
+    document.getElementById("btn-simulate-tourney").onclick = () => {
         const n0 = tourneySimDecks().length;
-        const input = prompt(tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, "1");
-        if (input === null) return;
-        const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1) { alert(tr("Bitte eine Zahl ab 1.")); return; }
-        try { await runTourneySimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
+        uiAskNumber(tr('🏆 Turnierdeck-Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runTourneySimulation(n)));
     };
-    document.getElementById("btn-simulate-all").onclick = async () => {
-        const input = prompt(tr("Wie viele All-Cards-Spiele? (Standard: 100)"), "100");
-        if (input === null) return;
-        const n = parseInt(input, 10);
-        if (isNaN(n) || n < 10) { alert(tr("Bitte Zahl >= 10.")); return; }
-        try { await runSimulationAllCards(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
-    };
+    document.getElementById("btn-simulate-all").onclick = () =>
+        uiAskNumber(tr('🎯 All-Cards Test'), tr("Wie viele All-Cards-Spiele? (Standard: 100)"), 100, 10, n => simRun(() => runSimulationAllCards(n)));
 
     const imgPathInput = document.getElementById("cfg-img-path");
     if (imgPathInput) {
@@ -372,6 +425,10 @@ function bootGame() {
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
     document.getElementById("btn-rules-text").onclick = toggleRulesTextMode;
+    document.getElementById("btn-cpu-speed").onclick = () => { try { localStorage.setItem(CPU_SPEED_KEY, cpuSpeed() === 'fast' ? 'normal' : 'fast'); } catch (e) {} updCpuSpeedBtn(); };
+    updCpuSpeedBtn();
+    // Klick/Tipp auf eine freie Stelle (nicht auf Karten – die will man während des CPU-Zugs lesen) überspringt die Pausen
+    document.getElementById("arena").addEventListener('click', (e) => { if (G && G.activePlayer === 2 && !e.target.closest('.card-wrapper, button')) skipCpuPauses(); });
     updateRulesTextButton();
     const autoBtn = document.getElementById("btn-auto-end");
     const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("⏩ Auto-Zugende: An") : tr("⏸ Auto-Zugende: Aus"); };
@@ -386,10 +443,15 @@ function bootGame() {
     // Untermenü "Einstellungen & Tests"
     const more = document.getElementById("side-more");
     more.open = false;                                                                  // startet immer eingeklappt
-    document.getElementById("btn-sound").onclick = (e) => {
-        sfx.muted = !sfx.muted;
-        e.target.textContent = sfx.muted ? tr("🔇 Sound Aus") : tr("🔊 Sound An");
-    };
+    // Sound und Schwierigkeit werden gemerkt
+    const soundBtn = document.getElementById("btn-sound");
+    const updSound = () => { soundBtn.textContent = sfx.muted ? tr("🔇 Sound Aus") : tr("🔊 Sound An"); };
+    try { sfx.muted = localStorage.getItem('wow_tcg_muted') === '1'; } catch (e) {}
+    soundBtn.onclick = () => { sfx.muted = !sfx.muted; try { localStorage.setItem('wow_tcg_muted', sfx.muted ? '1' : '0'); } catch (e) {} updSound(); };
+    updSound();
+    const diffSel = document.getElementById("cfg-difficulty");
+    try { const d = localStorage.getItem('wow_tcg_difficulty'); if (d && [...diffSel.options].some(o => o.value === d)) diffSel.value = d; } catch (e) {}
+    diffSel.onchange = () => { try { localStorage.setItem('wow_tcg_difficulty', diffSel.value); } catch (e) {} };
     initUiHandlers();
     initGame();
 }

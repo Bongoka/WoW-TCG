@@ -237,10 +237,9 @@ document.getElementById("db-save-only-btn").onclick = () => dbSave();
 document.getElementById("db-save-btn").onclick = () => {
     if (!currentDeckBuilder.cards.length) { dbFlash(tr('Das Deck ist leer.')); return; }
     const d = dbSave(); if (!d) return;
-    document.getElementById("deck-builder-modal").style.display = "none";
-    initGame(d.id, null);
+    confirmLeaveGame(() => { document.getElementById("deck-builder-modal").style.display = "none"; initGame(d.id, null); });
 };
-document.getElementById("db-new-btn").onclick = () => { if (currentDeckBuilder.cards.length && !confirm(tr('Aktuelles Deck verwerfen und neu beginnen?'))) return; openDeckBuilder(); };
+document.getElementById("db-new-btn").onclick = () => { if (!currentDeckBuilder.cards.length) { openDeckBuilder(); return; } uiConfirm(tr('Neues Deck'), tr('Aktuelles Deck verwerfen und neu beginnen?'), tr('Verwerfen'), () => openDeckBuilder()); };
 document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); closeDBHeroPicker(); };
 
 // --- IMPORT / EXPORT als Textliste: "4 Weeble" (Anzahl Leerzeichen Name), optional "Hero: Name" ---
@@ -677,9 +676,9 @@ function openDeckView(deckId) {
     acts.innerHTML = '';
     const mk = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; acts.appendChild(b); };
     const closeAll = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "none"; };
-    mk(tr('▶ Spielen'), 'success', () => { closeAll(); initGame(deck.id, null); });
+    mk(tr('▶ Spielen'), 'success', () => confirmLeaveGame(() => { closeAll(); initGame(deck.id, null); }));
     mk(custom ? tr('✎ Bearbeiten') : tr('✎ Als Kopie bearbeiten'), '', () => { closeAll(); openDeckBuilder(deck, !custom); });
-    if (custom) mk(tr('🗑 Löschen'), 'danger', () => { if (!confirm(tr`„${deck.name}“ löschen?`)) return; saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); });
+    if (custom) mk(tr('🗑 Löschen'), 'danger', () => uiConfirm(tr('🗑 Löschen'), tr`„${deck.name}“ löschen?`, tr('🗑 Löschen'), () => { saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); }));
     const content = document.getElementById("deck-view-content"); content.innerHTML = "";
     const counts = {}; deck.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     const sortedIds = [...new Set(deck.cards)].sort((a, b) => (CARDS[a].cost||0) - (CARDS[b].cost||0));
