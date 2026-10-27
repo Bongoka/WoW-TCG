@@ -265,7 +265,7 @@ function cpuDecide(s, pid, difficulty) {
     if (CPU_WORKER.broken || typeof Worker === 'undefined') return Promise.resolve(sync());
     if (!CPU_WORKER.w) {
         try {
-            CPU_WORKER.w = new Worker('js/aiworker.js');
+            CPU_WORKER.w = new Worker('js/aiworker.js' + ((document.querySelector('script[src*="main.js"]') || {}).src || '').replace(/^[^?]*/, ''));   // gleiche Version wie die Seite (Cache)
             CPU_WORKER.w.onmessage = (e) => { const r = CPU_WORKER.wait.get(e.data.id); if (!r) return; CPU_WORKER.wait.delete(e.data.id); r(e.data.error ? 'error' : e.data.dec); };
             CPU_WORKER.w.onerror = () => { CPU_WORKER.broken = true; for (const r of CPU_WORKER.wait.values()) r('error'); CPU_WORKER.wait.clear(); };
         } catch (e) { CPU_WORKER.broken = true; return Promise.resolve(sync()); }

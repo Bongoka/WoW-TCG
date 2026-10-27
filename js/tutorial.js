@@ -21,7 +21,7 @@ function openLearnMenu() {
         <h2>${esc(tr('📖 Lerne die Regeln'))}</h2>
         <div class="learn-videos">${LEARN_VIDEOS.map(v => `
             <a class="learn-video" href="https://www.youtube.com/watch?v=${v.id}" target="_blank" rel="noopener">
-                <span class="learn-thumb" style="background-image:url('https://i.ytimg.com/vi/${v.id}/hqdefault.jpg')"><span class="learn-play">▶</span></span>
+                <span class="learn-thumb"><img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()"><span class="learn-play">▶</span></span>
                 <b>${esc(v.title)}</b><small>YouTube · ${v.len}</small></a>`).join('')}</div>
         <button id="learn-tut" class="success">${esc(tr('🎓 Tutorial-Match starten (ca. 2 Min.)'))}</button>
         <button id="learn-close">${esc(tr('✕ Zurück – neues Spiel'))}</button>

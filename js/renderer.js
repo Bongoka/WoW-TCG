@@ -284,7 +284,8 @@
         if (S.live && !S.raf) S.raf = requestAnimationFrame(tick);
     }, { passive: true });
     document.addEventListener('pointerdown', () => { if (S.live) release(); }, true);
-    document.addEventListener('dragstart', () => { if (S.live) finish(S.live); }, true);
+    // Ziehen beginnt: Zoom weg – außer beim eingebauten Ziehen des Handy-Browsers während Gedrückthalten (wird in ui.js blockiert)
+    document.addEventListener('dragstart', (e) => { if (e.isTrusted && T.wrap) return; if (S.live) finish(S.live); }, true);
     // Touch (kein Hover): Tippen wirkt wie ein Klick; Gedrückthalten zeigt die Zoom-Karte, bis der Finger losgelassen wird.
     // Fingerzittern bewegt nichts; erst ein deutliches Losziehen startet das Ziehen der Karte (ui.js, touchZoomShown).
     // Nach dem Zoom löst das Loslassen keinen Klick aus.
@@ -303,7 +304,9 @@
         if (Math.hypot(e.clientX - T.x, e.clientY - T.y) > MOVE_PX) { clearTimeout(T.timer); T.wrap = null; }
     }, { passive: true });
     document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
-    document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
+    // Bricht der Browser die Berührung ab (z. B. beim langen Drücken), bleibt ein offener Zoom bis zum echten Loslassen (touchend)
+    document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch' && !T.shown) touchEnd(); }, { passive: true });
+    document.addEventListener('touchend', (e) => { if (T.shown && !e.touches.length) touchEnd(); }, { passive: true });
     document.addEventListener('click', (e) => { if (T.eatClick) { T.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
     document.addEventListener('contextmenu', (e) => { if (e.target && e.target.closest && e.target.closest('.card-wrapper')) e.preventDefault(); });
     document.documentElement.addEventListener('mouseleave', () => { if (!T.shown) release(); });

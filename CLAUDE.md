@@ -46,6 +46,16 @@ Wichtige Engine-Konzepte:
 - Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`).
 - `cloneState` (eigene Tiefenkopie `deepCopy`, schneller als `structuredClone`) teilt nur die statischen Kartenlisten (`CLONE_SHARED`: `limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`, `allyTypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
 
+## Veröffentlichen (GitHub Pages)
+
+Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuern – sonst laden Browser (vor allem Handys) alte Dateien aus dem Cache und es gibt Fehler wie „Funktion nicht definiert“:
+
+```bash
+V=$(date +%Y%m%d%H%M); sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]+)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]+)?\"#\1?v=$V\"#g" index.html
+```
+
+Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
+
 ## Testen
 
 Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü.

@@ -4,8 +4,8 @@
 // Nachricht: { id, state, pid, difficulty, lang } → Antwort { id, dec: { action, reason } | null } oder { id, error }
 // ============================================================================
 self.window = self;
-importScripts('i18n_en.js', 'i18n.js', 'utils.js', 'cards.js', 'cards2.js', 'cards3.js', 'cards4.js', 'cards5.js',
-    'decks.js', 'state.js', 'engine.js', 'cardfx.js', 'cardfx2.js', 'cardfx3.js', 'cardfx4.js', 'cardfx5.js', 'ai.js');
+const AIW_VERSION = self.location.search;                                                      // Versionsnummer der Seite (gegen veraltete Dateien im Cache)
+importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'ai'].map(f => f + '.js' + AIW_VERSION));
 self.onmessage = (e) => {
     const { id, state, pid, difficulty, lang } = e.data;
     try {

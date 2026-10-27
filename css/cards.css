@@ -110,3 +110,6 @@
     .card-wrapper.touch-active .card-action-bar { opacity: 1; pointer-events: auto; }
     .card-wrapper.touch-active .card-visual { box-shadow: 0 0 0 3px #fde68a, 0 0 18px rgba(250,204,21,.8); }
 }
+/* Touch-Geräte: eingebautes Ziehen des Browsers aus (startet sonst beim langen Drücken und bricht den Zoom ab).
+   Das Ziehen mit dem Finger übernimmt ui.js (TOUCH_DRAG). */
+@media (hover: none) { [draggable="true"], .card-wrapper, .card-wrapper img { -webkit-user-drag: none; } }
