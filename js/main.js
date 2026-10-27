@@ -154,7 +154,7 @@ function undoLastAction() {
 // ============================================================================
 // Mulligan-Art: 'standard' (ganze Hand neu, CR 101.2) oder 'hs' (Hearthstone-Stil, Hausregel)
 const MULLIGAN_KEY = 'wow_tcg_mulligan_mode';
-function mulliganMode() { try { return localStorage.getItem(MULLIGAN_KEY) === 'hs' ? 'hs' : 'standard'; } catch (e) { return 'standard'; } }
+function mulliganMode() { try { return localStorage.getItem(MULLIGAN_KEY) === 'standard' ? 'standard' : 'hs'; } catch (e) { return 'hs'; } }   // Standard: Hearthstone-Stil
 function updateMulliganButton() {
     const b = document.getElementById("btn-mulligan-mode");
     if (b) b.textContent = mulliganMode() === 'hs' ? tr("🃏 Mulligan: Hearthstone") : tr("🔄 Mulligan: Standard");
