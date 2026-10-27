@@ -315,18 +315,18 @@ function bootGame() {
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
     document.getElementById("btn-simulate").onclick = async () => {
-        const input = prompt("Wie viele Spiele pro Deck-Paar? Jedes wird doppelt gespielt (ohne / mit Münze). (Standard: 3, max 30)", "3");
+        const input = prompt("Wie viele Spiele pro Deck-Paar? Jedes wird doppelt gespielt (ohne / mit Münze). (Standard: 3)", "3");
         if (input === null) return;
         const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1 || n > 30) { alert("Bitte Zahl 1-30."); return; }
+        if (isNaN(n) || n < 1) { alert("Bitte eine Zahl ab 1."); return; }
         try { await runSimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = `<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
     };
     document.getElementById("btn-simulate-tourney").onclick = async () => {
         const n0 = tourneySimDecks().length;
-        const input = prompt(`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1, max 30)`, "1");
+        const input = prompt(`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, "1");
         if (input === null) return;
         const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1 || n > 30) { alert("Bitte Zahl 1-30."); return; }
+        if (isNaN(n) || n < 1) { alert("Bitte eine Zahl ab 1."); return; }
         try { await runTourneySimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = `<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
     };
     document.getElementById("btn-simulate-all").onclick = async () => {
