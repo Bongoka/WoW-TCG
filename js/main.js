@@ -310,6 +310,17 @@ function bootGame() {
     side.addEventListener('mouseenter', openSide); side.addEventListener('mouseleave', () => closeSide());
     document.addEventListener('pointerdown', e => { if (document.body.classList.contains('side-open') && !side.contains(e.target) && e.target !== tab) closeSide(0); });
     side.addEventListener('change', e => { if (e.target.tagName === 'SELECT') e.target.blur(); });
+    // Vollbild (ohne Browserleisten): Knopf im Menü; auf Touch-Geräten automatisch beim ersten Antippen, dazu Querformat
+    const fsBtn = document.getElementById("btn-fullscreen");
+    const fsEl = document.documentElement, fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const enterFs = () => { const r = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen; if (!r || fsOn()) return; Promise.resolve(r.call(fsEl)).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {}); };
+    const updFs = () => { fsBtn.textContent = fsOn() ? tr('⛶ Vollbild aus') : tr('⛶ Vollbild'); };
+    fsBtn.onclick = () => { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else enterFs(); };
+    document.addEventListener('fullscreenchange', updFs); document.addEventListener('webkitfullscreenchange', updFs);
+    if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) fsBtn.style.display = 'none';   // z. B. iPhone: dort über den Startbildschirm
+    if (matchMedia('(pointer: coarse)').matches && !matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches)
+        document.addEventListener('pointerup', enterFs, { once: true });
+    updFs();
     document.getElementById("btn-end-turn").onclick = endTurn;
     document.getElementById("big-end-turn").onclick = endTurn;
     document.getElementById("btn-cancel-action").onclick = cancelAction;

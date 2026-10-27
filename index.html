@@ -3,6 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+    // Kleine Bildschirme (Handy): Seite wie einen Desktop (~680 px hoch) darstellen und verkleinern lassen –
+    // das Spiel ist für etwa 1280×720 gebaut. Querformat: Breite passend zum Seitenverhältnis.
+    (function () {
+        const m = document.querySelector('meta[name=viewport]');
+        const fit = () => {
+            const W = Math.max(screen.width, screen.height), H = Math.min(screen.width, screen.height);
+            if (H >= 700) { m.content = 'width=device-width, initial-scale=1.0'; return; }
+            const land = (screen.orientation ? screen.orientation.type.startsWith('landscape') : innerWidth > innerHeight);
+            m.content = 'width=' + (land ? Math.max(1280, Math.round(680 * W / H)) : 1280) + ', user-scalable=no';
+        };
+        fit();
+        addEventListener('orientationchange', () => setTimeout(fit, 200));
+    })();
+    </script>
+    <meta name="theme-color" content="#0a0705">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>WoW TCG – Azeroth vs CPU</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/cards.css">
@@ -115,7 +137,10 @@
     </details>
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">Log:</span>
-        <button id="btn-sound" style="padding:2px 8px;font-size:10px;">🔊 Sound An</button>
+        <span style="display:flex;gap:4px;">
+            <button id="btn-fullscreen" style="padding:2px 8px;font-size:10px;">⛶ Vollbild</button>
+            <button id="btn-sound" style="padding:2px 8px;font-size:10px;">🔊 Sound An</button>
+        </span>
     </div>
     <div id="log-area"></div>
 </div>
