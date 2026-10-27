@@ -508,7 +508,7 @@ FX[1167] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl === pid && d.sna
         resolve: (s, it) => opposingChars(s, it.pl).forEach(x => dealDamage(s, { src: null, srcPl: it.pl, tgt: x.uid, amt: 1, dt: 'Nature' })) }],
     k: { pay: (s, a, uid) => { destroy(s, findCharacter(s, uid), { cause: 'cost' }); q(s, { op: 'call', k: 'E:finishPrep', a: {} }); } } };
 FX[1168] = { powers: [{ key: 'ilandre', label: tr('Hand unter das Deck, gleich viele ziehen'), act: true, aiSkip: (s, pid) => me(s, pid).hand.length < 3,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); p.hand = []; s._hidden = true; drawCards(s, p, n); } }] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; s._hidden = true; drawCards(s, p, n); } }] };
 FX[1169] = { selfCost: (s, pid) => -alliesOf(me(s, pid)).filter(a => !a.isToken && a.faction === 'Alliance' && a.type === 'Ally').length,
     aura: { noReady: (s, src, sp, c) => ctrlOf(s, c) !== sp && c.type !== 'Hero' } };
 FX[1171] = { aura: { atk: (s, src, sp, c) => isAllyLike(c) && c !== src && ctrlOf(s, c) === sp ? 1 : 0, hp: (s, src, sp, c) => isAllyLike(c) && c !== src && ctrlOf(s, c) === sp ? 1 : 0 } };
@@ -731,7 +731,7 @@ FX[1288] = { on: { dmg: (s, c, d, pid) => { if (d.combat && (d.weapons || []).in
 // QUESTS
 // ============================================================================
 const onMyTurnQ = (s, pid) => s.activePlayer === pid ? null : tr('Nur in deinem Zug');
-RACE_CHOICE.handBottom = (s, pid) => { const p = me(s, pid); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); p.hand = []; s._hidden = true; drawCards(s, p, n); };
+RACE_CHOICE.handBottom = (s, pid) => { const p = me(s, pid); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; s._hidden = true; drawCards(s, p, n); };
 FX[1289] = { reward: raceChoice('Night Elf', { key: 'handBottom', label: tr('Hand unter das Deck, gleich viele ziehen'), ai: (s, pid) => me(s, pid).hand.length >= 3 ? 1 : -1 }) };
 RACE_CHOICE.allyToHand = (s, pid) => chooseOwnAlly(s, pid, tr('Inoculation: Welchen eigenen Ally auf die Hand?'), 'Inoculation', 'E:optBounce', {}, c => -cardValue(s, c));
 FX[1290] = { questCond: onMyTurnQ, reward: raceChoice('Draenei', { key: 'allyToHand', label: tr('Eigenen Ally auf die Hand'), ai: () => -1 }) };

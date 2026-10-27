@@ -2361,6 +2361,8 @@ function cardValue(s, c) {
 // Wie beim Ressource-Legen (resourceKeepValue): unspielbare Karten zuerst, früh viel zu teure, spät zu billige,
 // Doppelte vor Einzelstücken. Quests: die erste ist als offene Ressource nützlich, jede weitere auf der Hand und
 // jede schon offen liegende Quest macht eine Quest weniger wertvoll.
+// Alle Handkarten verlassen die Hand (ins Deck mischen, unter das Deck, bis Zugende entfernen): je Karte "handLeft" (Evocation)
+function handLeftAll(s, p) { p.hand.forEach(c => evt(s, 'handLeft', { pid: p.id, uid: c.uid })); }
 function cardHandValue(s, p, c) {
     if (!c) return 0;
     if (c.type === 'Quest') {

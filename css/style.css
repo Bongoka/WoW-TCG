@@ -744,3 +744,18 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .lang-flag:hover { opacity: .85; filter: none; }
 .lang-flag.active { opacity: 1; filter: none; border-color: var(--gold-dark, #8a6d2b); cursor: default; }
 .lang-flag svg { display: block; border-radius: 1px; }
+
+/* ===== Menü rechts einklappbar, Zugsteuerung auf dem Spielfeld ===== */
+/* Menü liegt über dem Spielfeld (Spielfeld nutzt die volle Breite); eingeklappt nur der Reiter #side-tab */
+#side-panel { position: fixed; top: 0; right: 0; bottom: 0; overflow-y: auto; z-index: 2000; transform: translateX(100%);
+    transition: transform .22s ease, box-shadow .22s; box-shadow: none; }
+body.side-open #side-panel { transform: none; box-shadow: -10px 0 30px rgba(0,0,0,.7); }
+#side-tab { position: fixed; top: 10px; right: 0; z-index: 1999; padding: 8px 9px; font-size: 16px; line-height: 1;
+    border-radius: 6px 0 0 6px; border-right: none; background: linear-gradient(180deg, #2a2118, #120d09); opacity: .85; }
+#side-tab:hover { opacity: 1; }
+body.side-open #side-tab { opacity: 0; pointer-events: none; }
+#turn-controls { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); z-index: 850; display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+#turn-controls button { box-shadow: 0 4px 12px rgba(0,0,0,.6); }
+#btn-end-turn { padding: 11px 18px; font-size: 14px; letter-spacing: .5px; min-width: 130px; }
+#btn-undo, #btn-cancel-action { padding: 6px 10px; font-size: 12px; }
+#btn-undo:disabled { display: none; }

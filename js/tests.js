@@ -726,6 +726,26 @@ function runRuleTests() {
         d = pick(3, [ally(2), ally(3), quests[0], foreign]);
         assert(d === foreign, `unspielbar: ${CARDS[d] && CARDS[d].name} statt der fremden Karte abgeworfen`);
     });
+    test(94, 'Evocation: (2) >>> Ziehe 1 (mehrfach); zerstört, sobald eine Karte die Hand verlässt (auf jedem Weg)', () => {
+        const setup = () => { const s = fresh('alliance_mage', 'horde_warrior'); s.real = false; s.placedResource = false; res(s, 1, 6);
+            const ev = put(s, 1, 1050); P(s, 1).hand = [1, 2, 3].map(k => makeCardInst(Object.values(CARDS).find(c => c.type === 'Ally' && c.cost === k && cardMatchesPlayer(c, P(s, 1))).id, false, 1)); return { s, ev }; };
+        const alive = (s, ev) => P(s, 1).ongoing.includes(ev);
+        let { s, ev } = setup(); const h0 = P(s, 1).hand.length;
+        for (let i = 0; i < 2; i++) { const a = getLegalActions(s, 1).find(x => x.type === 'ACTIVATE' && x.srcUid === ev.uid); assert(a, `Kraft ${i + 1}. Mal nicht nutzbar`); act(s, a, 1); }
+        assert(P(s, 1).hand.length === h0 + 2 && getReadyRes(P(s, 1)) === 2 && alive(s, ev), `zweimal ziehen: Hand ${P(s, 1).hand.length}, Ressourcen ${getReadyRes(P(s, 1))}`);
+        act(s, { type: 'PLAY_CARD', handIdx: 0 }, 1);
+        assert(!alive(s, ev), 'Karte gespielt, Evocation noch im Spiel');
+        ({ s, ev } = setup()); act(s, { type: 'PLACE_RESOURCE', handIdx: 0, faceUp: false }, 1);
+        assert(!alive(s, ev), 'Ressource gelegt, Evocation noch im Spiel');
+        ({ s, ev } = setup()); q(s, { op: 'call', k: 'E:discard', a: { pid: 1, n: 1, src: 'Test' } }); process(s); autoResolve(s);
+        assert(!alive(s, ev), 'abgeworfen, Evocation noch im Spiel');
+        ({ s, ev } = setup()); FX[6].powers[0].resolve(s, { pl: 1 }); process(s); autoResolve(s);
+        assert(!alive(s, ev), 'Hand ins Deck gemischt, Evocation noch im Spiel');
+        ({ s, ev } = setup()); FX[1168].powers[0].resolve(s, { pl: 1 }); process(s); autoResolve(s);
+        assert(!alive(s, ev), 'Hand unter das Deck, Evocation noch im Spiel');
+        ({ s, ev } = setup()); const o = put(s, 2, 1050); act(s, { type: 'PLACE_RESOURCE', handIdx: 0, faceUp: false }, 1);
+        assert(P(s, 2).ongoing.includes(o), 'Evocation des Gegners zerstört, obwohl nur meine Hand betroffen war');
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));

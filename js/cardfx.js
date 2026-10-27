@@ -169,7 +169,7 @@ FX[5] = { powers: [{ key: 'flip', label: tr('Umdrehen: Ziel kann nicht angreifen
     slots: (s, pid) => [{ label: tr('Ziel'), cands: targetCands(s, pid, CH), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'cantAttack', turn: s.turn }); } }] };
 FX[6] = { powers: [{ key: 'flip', label: tr('Umdrehen: Hand neu ziehen'), flip: true, cost: 3,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.push(...p.hand.map(c => c.id)); p.hand = []; shuffleInPlace(p); s._hidden = true; drawCards(s, p, n); } }] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.push(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; shuffleInPlace(p); s._hidden = true; drawCards(s, p, n); } }] };
 FX[7] = { powers: [{ key: 'flip', label: tr('Umdrehen: Zerstöre erschöpften Ally'), flip: true, myTurn: true, cost: 5,
     slots: (s, pid) => [{ label: tr('Erschöpfter Ally'), cands: targetCands(s, pid, { ally: true, exhausted: true }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } }] };
@@ -573,7 +573,7 @@ FX[209] = { powers: [{ key: 'moira', label: tr('Zerstören: Zerstöre Rüstung o
 FX[211] = { powers: [{ key: 'bloom', label: tr('Handkarte als erschöpfte Ressource'), act: true, cost: 1,
     resolve: (s, it) => { const p = me(s, it.pl); if (!p.hand.length) return; const opts = p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })); opts.push({ label: tr('Keine'), v: 0, ai: -9 });
         ask(s, { pid: it.pl, prompt: tr('Nightbloom: Karte verdeckt und erschöpft in die Ressourcenreihe legen?'), src: 'Nightbloom', opts, k: '211:do', a: { pid: it.pl }, auto: false }); } }],
-    k: { do: (s, a, uid) => { if (!uid) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === uid); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); } } };
+    k: { do: (s, a, uid) => { if (!uid) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === uid); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id }); } } };
 FX[212] = { enter: (s, c, pid) => drawCards(s, me(s, pid), 1) };
 FX[214] = { powers: [{ key: 'ryn', label: tr('Ziel +2 ATK beim Angreifen'), act: true, slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: 2, turn: s.turn, when: 'attacking' }); } }] };
 FX[216] = { powers: [allyHealPower('seva', tr('Heile X'), it => it.x || 0, { act: true, cost: 'X' })] };
@@ -724,7 +724,7 @@ FX[325] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.ty
 FX[327] = { powers: [{ key: 'hypno', label: tr('Ziel-Spieler wirft ab'), act: true, myTurn: true, cost: 3, exhaustHero: true, modes: playerModes(-2, 2),
     resolve: (s, it) => q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Hypnotic Blade' } }) }] };
 FX[329] = { powers: [{ key: 'rod', label: tr('Hand bis zum Zugende entfernen'), act: true, cost: 1, exhaustHero: true, aiSkip: () => true,
-    resolve: (s, it) => { const p = me(s, it.pl); const ids = p.hand.map(c => c.uid); p.rod = (p.rod || []).concat(p.hand); p.hand = []; s.delayed = s.delayed || []; s.delayed.push({ at: 'nextEnd', k: '329:back', a: { pid: it.pl } }); L(s, tr`${p.hero.name} entfernt seine Hand bis zum Ende des Zuges.`); } }],
+    resolve: (s, it) => { const p = me(s, it.pl); const ids = p.hand.map(c => c.uid); p.rod = (p.rod || []).concat(p.hand); handLeftAll(s, p); p.hand = []; s.delayed = s.delayed || []; s.delayed.push({ at: 'nextEnd', k: '329:back', a: { pid: it.pl } }); L(s, tr`${p.hero.name} entfernt seine Hand bis zum Ende des Zuges.`); } }],
     k: { back: (s, a) => { const p = me(s, a.pid); p.hand.push(...(p.rod || [])); p.rod = []; } } };
 FX[330] = { powers: [{ key: 'focal', label: tr('Angehängte Fähigkeit umhängen'), act: true, cost: 2,
     slots: (s, pid) => [{ label: tr('Angehängte Fähigkeit'), cands: abilityInPlay(s, pid, o => !!o.attachedTo && isChar(findCharacter(s, o.attachedTo))), harm: false }],

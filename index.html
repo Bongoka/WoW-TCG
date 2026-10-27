@@ -25,6 +25,12 @@
 
     <div id="battlefield-zone">
         <div id="turn-indicator"><span></span></div>
+        <!-- Zugsteuerung rechts auf der Mittellinie: immer sichtbar (Rückgängig/Abbrechen nur, wenn möglich) -->
+        <div id="turn-controls">
+            <button id="btn-undo" disabled title="Letzte eigene Aktion rückgängig machen">↶ Rückgängig</button>
+            <button id="btn-cancel-action" class="danger" style="display:none;">Abbrechen</button>
+            <button id="btn-end-turn" class="success">Zug beenden</button>
+        </div>
         <button id="big-end-turn">End Turn</button>
         <div id="top-allies" class="battlefield-row"><span class="row-watermark">Gegnerische Diener</span></div>
         <div id="bot-allies" class="battlefield-row"><span class="row-watermark">Deine Diener (Dropzone)</span></div>
@@ -42,6 +48,8 @@
     </div>
 </div>
 
+<!-- Menü rechts: eingeklappt nur ein Reiter; Maus darüber (oder Antippen) klappt es auf -->
+<button id="side-tab" title="Menü">☰</button>
 <div id="side-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:900;color:var(--gold);font-size:15px;">WoW TCG</span>
@@ -53,11 +61,6 @@
         </span>
     </div>
     <div id="cpu-status-box" class="cpu-indicator" style="display:none;"><div class="spinner"></div><span id="cpu-status-text">CPU überlegt...</span></div>
-    <div style="display:flex;gap:6px;">
-        <button id="btn-end-turn" class="success" style="flex:1;padding:9px;">Zug beenden</button>
-        <button id="btn-undo" disabled title="Letzte eigene Aktion rückgängig machen">↶ Rückgängig</button>
-        <button id="btn-cancel-action" class="danger" style="display:none;">Abbrechen</button>
-    </div>
     <div class="stats-box">
         <div class="stats-row">
             <span style="color:#60a5fa;font-weight:900;" id="bot-deck-label">Du:</span>

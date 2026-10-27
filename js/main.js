@@ -300,6 +300,16 @@ function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
     document.documentElement.lang = LANG;
     document.querySelectorAll('.lang-flag').forEach(f => { f.classList.toggle('active', f.dataset.lang === LANG); f.onclick = () => { if (f.dataset.lang !== LANG) setLang(f.dataset.lang); }; });
+    // Menü rechts: Maus auf den Reiter/ins Menü → auf, Maus raus → nach kurzer Pause zu (nicht, solange ein Auswahlfeld darin aktiv ist).
+    // Antippen des Reiters (Touch) klappt auf; ein Tipp außerhalb klappt wieder zu.
+    const side = document.getElementById("side-panel"), tab = document.getElementById("side-tab");
+    let sideTimer = 0;
+    const openSide = () => { clearTimeout(sideTimer); document.body.classList.add('side-open'); };
+    const closeSide = (delay = 350) => { clearTimeout(sideTimer); sideTimer = setTimeout(() => { if (side.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return; document.body.classList.remove('side-open'); }, delay); };
+    tab.addEventListener('mouseenter', openSide); tab.onclick = openSide;
+    side.addEventListener('mouseenter', openSide); side.addEventListener('mouseleave', () => closeSide());
+    document.addEventListener('pointerdown', e => { if (document.body.classList.contains('side-open') && !side.contains(e.target) && e.target !== tab) closeSide(0); });
+    side.addEventListener('change', e => { if (e.target.tagName === 'SELECT') e.target.blur(); });
     document.getElementById("btn-end-turn").onclick = endTurn;
     document.getElementById("big-end-turn").onclick = endTurn;
     document.getElementById("btn-cancel-action").onclick = cancelAction;
