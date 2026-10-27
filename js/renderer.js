@@ -238,7 +238,12 @@
         const sb = clone.querySelector('.cfx-stats-bar'); if (sb) sb.remove();
         const pimg = clone.querySelector('.card-image-layer');
         if (pimg && meta.cardId != null && typeof getImageCandidates === 'function') {
-            const list = meta.previewMode === 'ea' ? getImageCandidates(meta.cardId, 'eaBig') : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
+            // Vorschau in derselben Variante wie die kleine Karte (das tatsächlich geladene Bild entscheidet):
+            // Extended Art → große Extended Art, Rückseite → Rückseite, sonst das normale Bild
+            const shown = decodeURI((tilt.querySelector('.card-image-layer') || {}).src || '');
+            const list = meta.previewMode === 'ea' || /-EA(_ergebnis)?\.\w+$/.test(shown) ? getImageCandidates(meta.cardId, 'eaBig')
+                : /-Back(_ergebnis)?\.\w+$| - Backside/.test(shown) ? [shown]
+                : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
             let k = 0; const probe = new Image();
             probe.onload = () => { pimg.src = probe.src; };
             probe.onerror = () => { k++; if (k < list.length) probe.src = list[k]; };
