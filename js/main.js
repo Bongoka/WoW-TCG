@@ -305,7 +305,7 @@ function bootGame() {
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
     document.getElementById("btn-new-game").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(); };
-    document.getElementById("sim-close-btn").onclick = () => { document.getElementById("sim-modal").style.display = "none"; };
+    document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; document.getElementById("sim-modal").style.display = "none"; };   // laufende Simulation beenden
     document.getElementById("btn-decks").onclick = openDeckOverview;
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
     document.getElementById("graveyard-close-btn").onclick = () => { document.getElementById("graveyard-modal").style.display = "none"; };
@@ -323,7 +323,7 @@ function bootGame() {
     };
     document.getElementById("btn-simulate-tourney").onclick = async () => {
         const n0 = tourneySimDecks().length;
-        const input = prompt(`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; jedes Spiel doppelt: ohne / mit Münze; Standard: 1, max 30)`, "1");
+        const input = prompt(`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1, max 30)`, "1");
         if (input === null) return;
         const n = parseInt(input, 10);
         if (isNaN(n) || n < 1 || n > 30) { alert("Bitte Zahl 1-30."); return; }

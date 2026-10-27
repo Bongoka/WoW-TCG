@@ -39,7 +39,7 @@ Wichtige Engine-Konzepte:
 - `s.real` = echte Partie (Log, Sound, Mensch); Kopien für KI/Simulation haben `real=false`, `humans=[]`.
 - Ausgelöste Effekte warten in `waitTrig` und kommen beim nächsten Prioritätspunkt auf die Kette (Zugspieler zuerst).
 - Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`).
-- `cloneState` teilt nur die statischen Kartenlisten (`limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
+- `cloneState` (eigene Tiefenkopie `deepCopy`, schneller als `structuredClone`) teilt nur die statischen Kartenlisten (`CLONE_SHARED`: `limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`, `allyTypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
 
 ## Testen
 
@@ -64,5 +64,6 @@ Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit fes
 
 - Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
 - Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
-- Jedes Match läuft doppelt mit gleichem Seed (`simulateMatchPair`): ohne und mit Münze für Spieler 2 (nur Simulationstest, `p.coin`/`p.coinMana`).
+- Deck-Simulation: jedes Match läuft doppelt mit gleichem Seed (`simulateMatchPair`): ohne und mit Münze für Spieler 2 (nur Simulationstest, `p.coin`/`p.coinMana`). Der Turniertest spielt jedes Match nur einmal ohne Münze (`runSimulation(..., coinTest = false)`).
+- „Abbrechen & auswerten“ / Schließen setzt `SIM_STOP.req`; bei Abbruch oder Fehler wertet `runSimulation` die bis dahin gespielten Spiele aus (mit Anteil in %).
 - In Simulationen antwortet die CPU nie mit Instants in Prioritätsfenstern (nur in echten Partien, `aiRespond`).

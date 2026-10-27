@@ -160,7 +160,7 @@ function simApply(s, act, pid) { const c = cloneState(s); if (!applyAction(c, ac
 // durch. Das sieht die Bewertung nach nur einer Aktion nicht. Zwei Reihenfolgen: schwächste Angreifer zuerst
 // (opfern sich in die Protectors) bzw. stärkste zuerst. Ergebnis: erster Angriff + Zustand nach dem ganzen Plan.
 function attackPlans(s, pid) {
-    const hasHeroAttack = st => getLegalActions(st, pid).filter(a => a.type === 'ATTACK' && a.defenderUid === getOpponent(st, pid).hero.uid);
+    const hasHeroAttack = st => getAttackActions(st, pid).filter(a => a.defenderUid === getOpponent(st, pid).hero.uid);
     if (hasHeroAttack(s).length < 2) return [];
     const plans = [];
     for (const order of ['weak', 'strong']) {

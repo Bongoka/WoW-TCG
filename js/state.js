@@ -57,8 +57,18 @@ function newGameState(heroId1, deck1, heroId2, deck2) {
 }
 
 // Kopie für KI-Suche: niemals echt, niemand ist Mensch
+// Statische Kartenlisten (aus CARDS) werden geteilt statt kopiert – sie dürfen nie verändert werden.
+// Sonst reines JSON ohne Mehrfach-Referenzen: eine einfache Tiefenkopie ist gleichwertig zu structuredClone, aber deutlich schneller.
+const CLONE_SHARED = { limitTags: 1, allowedClasses: 1, allowedFactions: 1, subtypes: 1, allyTypes: 1 };
+function deepCopy(v) {
+    if (v === null || typeof v !== 'object') return v;
+    if (Array.isArray(v)) { const n = v.length, a = new Array(n); for (let i = 0; i < n; i++) a[i] = deepCopy(v[i]); return a; }
+    const o = {};
+    for (const k in v) { const x = v[k]; o[k] = (x === null || typeof x !== 'object' || CLONE_SHARED[k] === 1) ? x : deepCopy(x); }
+    return o;
+}
 function cloneState(s) {
-    const c = structuredClone({ ...s, _undo: null, fxq: null });
+    const c = deepCopy({ ...s, _undo: null, fxq: null });
     c.real = false; c.humans = [];
     return c;
 }

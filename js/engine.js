@@ -48,13 +48,16 @@ function inPlay(s) {
 }
 function locate(s, uid) {
     if (!uid) return null;
+    // Zuerst die Spielzonen beider Spieler (häufigster Fall, z. B. ctrlOf in hpOf/atkOf), dann Hand, Friedhof, Ressourcen
     for (const p of [s.p1, s.p2]) {
         if (p.hero.uid === uid) return { c: p.hero, pid: p.id, zone: 'hero' };
         let c = p.allies.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'party' };
         c = p.hero.weapons.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'equip' };
         c = p.hero.armors.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'equip' };
         c = (p.ongoing || []).find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'ongoing' };
-        c = p.hand.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'hand' };
+    }
+    for (const p of [s.p1, s.p2]) {
+        let c = p.hand.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'hand' };
         c = p.graveyard.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'graveyard' };
         const r = p.resources.find(x => x.card && x.card.uid === uid); if (r) return { c: r.card, pid: p.id, zone: 'resource', res: r };
     }
@@ -80,7 +83,11 @@ function polymorphed(s, c) {
     return false;
 }
 function active(s, c) { if (!c) return true; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
-function attachedTo(s, uid, id) { return (s.p1.ongoing.concat(s.p2.ongoing)).filter(o => o.attachedTo === uid && (id === undefined || o.id === id)); }
+function attachedTo(s, uid, id) {
+    const out = [];
+    for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.attachedTo === uid && (id === undefined || o.id === id)) out.push(o);
+    return out;
+}
 function unattachedOngoing(p, id) { return (p.ongoing || []).filter(o => !o.attachedTo && o.id === id); }
 function hasBearForm(s, pid) { return (getPlayer(s, pid).ongoing || []).some(o => CARDS[o.id] && CARDS[o.id].bearForm); }
 function catForms(s, pid) { return (getPlayer(s, pid).ongoing || []).filter(o => CARDS[o.id] && CARDS[o.id].catForm && active(s, o)); }
@@ -707,6 +714,8 @@ function priorityStep(s) {
     }
     const pid = w.prio;
     if (isHuman(s, pid) && humanAutoPass(s, w, pid)) { passPriority(s); return true; }
+    // KI in Kopien/Simulation antwortet nie (aiRespond) – die Liste aller Instant-/Kraft-Varianten wäre umsonst
+    if (!isHuman(s, pid) && !isReal(s)) { passPriority(s); return true; }
     const acts = getPriorityActions(s, pid);
     if (!acts.length) { passPriority(s); return true; }
     if (isHuman(s, pid)) {
@@ -2311,13 +2320,21 @@ function getLegalActions(s, pid) {
     p.hand.forEach((c, i) => { if (seen.has(c.id)) return; seen.add(c.id); acts.push(...playVariants(s, pid, c, i, false)); });
     gyPlayables(s, pid).forEach(c => acts.push(...playVariants(s, pid, c, -1, false, c.uid)));
     acts.push(...powerVariants(s, pid, false));
-    if (mustAttack(s, pid).length) { const f2 = acts.filter(a => a.type !== 'PLACE_RESOURCE'); }
-    const forced = mustAttack(s, pid);
+    pushAttackActions(s, pid, acts);
+    return acts;
+}
+function pushAttackActions(s, pid, acts) {
+    const p = getPlayer(s, pid), forced = mustAttack(s, pid);
     for (const c of (forced.length ? forced : partyOf(p))) {
         if (!canAttackNow(s, c, p)) continue;
         attackTargets(s, c).forEach(d => { if (winterCost(s, c, d) <= getReadyRes(p)) acts.push({ type: 'ATTACK', attackerUid: c.uid, defenderUid: d.uid, actorId: pid, desc: `${c.name} → ${d.name}` }); });
     }
     return acts;
+}
+// Nur die Angriffe aus getLegalActions (gleiche Reihenfolge) – für die KI-Angriffspläne, ohne alle Karten-/Kraft-Varianten
+function getAttackActions(s, pid) {
+    if (!s || s.gameOver || s.pending || !canActMain(s, pid)) return [];
+    return pushAttackActions(s, pid, []);
 }
 
 // ---------------------------------------------------------------- KI-Heuristiken für Entscheidungen
