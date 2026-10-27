@@ -1123,6 +1123,68 @@ function markDropTargets() {
 // Beim Angreifen/Schützen ersetzt der Pfeil das Ziehbild
 const _noDragImg = new Image(); _noDragImg.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 function hideDragImage(e) { try { e.dataTransfer.setDragImage(_noDragImg, 0, 0); } catch (err) {} }
+// Ziehen mit dem Finger (Touch): übersetzt Fingerbewegungen in dieselben Drag-Ereignisse wie mit der Maus
+// (dragstart → dragenter/dragover/dragleave → drop → dragend). Alle Drop-Regeln, Hervorhebungen und der Zielpfeil
+// gelten damit unverändert. Unter dem Finger läuft eine Kopie der Karte mit – außer der Code blendet das
+// Ziehbild aus (Angriff/Protector: dort zeigt der Pfeil das Ziel).
+const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: null, over: null, accept: false, lastType: '' };
+(function initTouchDrag() {
+    const START_PX = 8;
+    const mkDT = () => { try { return new DataTransfer(); } catch (e) { const d = {}; return { setData: (k, v) => { d[k] = v; }, getData: k => d[k] || '', setDragImage() {}, dropEffect: 'move', effectAllowed: 'all' }; } };
+    const fire = (el, type, x, y) => {
+        if (!el) return null;
+        let ev; try { ev = new DragEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: TOUCH_DRAG.dt }); } catch (e) { ev = new Event(type, { bubbles: true, cancelable: true }); }
+        if (!ev.dataTransfer) Object.defineProperty(ev, 'dataTransfer', { value: TOUCH_DRAG.dt });
+        if (ev.clientX !== x) { Object.defineProperty(ev, 'clientX', { value: x }); Object.defineProperty(ev, 'clientY', { value: y }); }
+        el.dispatchEvent(ev); return ev;
+    };
+    const moveGhost = (x, y) => { const g = TOUCH_DRAG.ghost; if (g) g.style.transform = `translate(${x - g._w / 2}px, ${y - g._h * 0.6}px) rotate(-3deg) scale(1.05)`; };
+    const begin = (x, y) => {
+        const src = TOUCH_DRAG.src; TOUCH_DRAG.active = true; TOUCH_DRAG.dt = mkDT(); TOUCH_DRAG.over = null; TOUCH_DRAG.accept = false;
+        let hidden = false; const sdi = TOUCH_DRAG.dt.setDragImage; TOUCH_DRAG.dt.setDragImage = (img, ...r) => { if (img === _noDragImg) hidden = true; try { sdi && sdi.call(TOUCH_DRAG.dt, img, ...r); } catch (e) {} };
+        const ev = fire(src, 'dragstart', TOUCH_DRAG.x0, TOUCH_DRAG.y0);
+        if (!ev || ev.defaultPrevented) { TOUCH_DRAG.active = false; TOUCH_DRAG.src = null; return; }
+        if (!hidden) {
+            const r = src.getBoundingClientRect(), g = src.cloneNode(true);
+            g.classList.remove('is-dragging'); g.classList.add('touch-drag-ghost'); g.style.setProperty('--cw', r.width + 'px');
+            g._w = r.width; g._h = r.height; document.body.appendChild(g); TOUCH_DRAG.ghost = g; moveGhost(x, y);
+        }
+        move(x, y);
+    };
+    const move = (x, y) => {
+        moveGhost(x, y);
+        const el = document.elementFromPoint(x, y);
+        if (el !== TOUCH_DRAG.over) { fire(TOUCH_DRAG.over, 'dragleave', x, y); fire(el, 'dragenter', x, y); TOUCH_DRAG.over = el; }
+        const ev = fire(el, 'dragover', x, y); TOUCH_DRAG.accept = !!(ev && ev.defaultPrevented);
+    };
+    const finish = (x, y, drop) => {
+        const src = TOUCH_DRAG.src;
+        if (TOUCH_DRAG.active) {
+            if (drop && TOUCH_DRAG.accept && TOUCH_DRAG.over) fire(TOUCH_DRAG.over, 'drop', x, y); else fire(TOUCH_DRAG.over, 'dragleave', x, y);
+            fire(src, 'dragend', x, y);
+        }
+        if (TOUCH_DRAG.ghost) TOUCH_DRAG.ghost.remove();
+        if (TOUCH_DRAG.active) { TOUCH_DRAG.eatClick = true; setTimeout(() => { TOUCH_DRAG.eatClick = false; }, 400); }   // kein Klick hinterher
+        Object.assign(TOUCH_DRAG, { src: null, active: false, dt: null, ghost: null, over: null, accept: false });
+    };
+    document.addEventListener('click', (e) => { if (TOUCH_DRAG.eatClick) { TOUCH_DRAG.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+    document.addEventListener('pointerdown', (e) => {
+        TOUCH_DRAG.lastType = e.pointerType;
+        if (e.pointerType !== 'touch') return;
+        const src = e.target && e.target.closest ? e.target.closest('[draggable="true"]') : null;
+        if (!src || TOUCH_DRAG.active) return;
+        Object.assign(TOUCH_DRAG, { src, x0: e.clientX, y0: e.clientY });
+    }, true);
+    document.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'touch' || !TOUCH_DRAG.src) return;
+        if (!TOUCH_DRAG.active) { if (Math.hypot(e.clientX - TOUCH_DRAG.x0, e.clientY - TOUCH_DRAG.y0) > START_PX) begin(e.clientX, e.clientY); }
+        else move(e.clientX, e.clientY);
+    }, true);
+    document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src) finish(e.clientX, e.clientY, true); }, true);
+    document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src) finish(e.clientX, e.clientY, false); }, true);
+    // Eingebautes Ziehen des Handy-Browsers aus (sonst doppelt); echte Maus-Drags bleiben unberührt
+    document.addEventListener('dragstart', (e) => { if (e.isTrusted && TOUCH_DRAG.lastType === 'touch') { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+})();
 function clearDragHighlights() {
     stopDragAim();
     document.querySelectorAll(".dropzone-active").forEach(el => el.classList.remove("dropzone-active"));

@@ -218,12 +218,23 @@
     function tick(now) {
         const L = S.live;
         if (!L) { S.raf = 0; return; }
-        if (!L.wrap.isConnected && !L.releasing) release();
+        // Neu gezeichnet (Aktion im Spiel): Vorschau an die neue Karte mit derselben Kennung hängen statt zu schließen
+        if (!L.wrap.isConnected && !L.releasing) { const n = sameCard(L.wrap); if (n) adopt(L, n); else release(); }
         L.x += (L.tx - L.x) * 0.22; L.y += (L.ty - L.y) * 0.22; L.h += ((L.releasing ? 0 : 1) - L.h) * 0.18;
         applyFx(L.tilt, L, now, 7, L.lift);
         if (L.clone && !L.releasing) applyFx(L.clone, L, now, 13, 0);
         if (L.releasing && L.h < 0.01) { finish(L); S.raf = 0; return; }
         S.raf = requestAnimationFrame(tick);
+    }
+    function sameCard(old) {
+        const uid = old.dataset.uid; if (!uid || uid === 'undefined') return null;
+        return [...document.querySelectorAll(`.card-wrapper[data-uid="${CSS.escape(uid)}"]`)].find(e => e !== S.pv && !e.classList.contains('no-fx') && e.querySelector('.cfx-tilt')) || null;
+    }
+    function adopt(L, n) {
+        clearFx(L.tilt);
+        L.wrap = n; L.tilt = n.querySelector('.cfx-tilt'); L.tilt.classList.add('cfx-live');
+        placePreview(L);
+        if (T.wrap) T.wrap = n;                                                           // Touch: gedrückt gehaltene Karte
     }
     function release() { const L = S.live; if (!L || L.releasing) return; L.releasing = true; L.tx = 0.5; L.ty = 0.5; hideKeywords(); if (S.pv) S.pv.classList.remove('show'); }
     function enter(wrap) {
@@ -274,6 +285,25 @@
     }, { passive: true });
     document.addEventListener('pointerdown', () => { if (S.live) release(); }, true);
     document.addEventListener('dragstart', () => { if (S.live) finish(S.live); }, true);
+    // Touch (kein Hover): Tippen wirkt wie ein Klick; Gedrückthalten zeigt die Zoom-Karte, bis man loslässt.
+    // Bewegt sich der Finger (Ziehen), verschwindet der Zoom; nach dem Zoom löst das Loslassen keinen Klick aus.
+    const T = { timer: 0, wrap: null, x: 0, y: 0, shown: false, eatClick: false };
+    const HOLD_MS = 380, MOVE_PX = 10;
+    const touchEnd = () => { clearTimeout(T.timer); if (T.shown) { release(); T.eatClick = true; setTimeout(() => { T.eatClick = false; }, 450); } T.shown = false; T.wrap = null; };
+    document.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const w = e.target && e.target.closest ? e.target.closest('.card-wrapper:not(#cfx-preview):not(.no-fx)') : null;
+        clearTimeout(T.timer); T.wrap = w; T.shown = false; T.x = e.clientX; T.y = e.clientY;
+        if (w) T.timer = setTimeout(() => { if (T.wrap === w && w.isConnected) { enter(w); T.shown = true; } }, HOLD_MS);
+    }, { passive: true });
+    document.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'touch' || !T.wrap) return;
+        if (Math.hypot(e.clientX - T.x, e.clientY - T.y) > MOVE_PX) { clearTimeout(T.timer); if (T.shown) { release(); T.shown = false; } T.wrap = null; }
+    }, { passive: true });
+    document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
+    document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
+    document.addEventListener('click', (e) => { if (T.eatClick) { T.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+    document.addEventListener('contextmenu', (e) => { if (e.target && e.target.closest && e.target.closest('.card-wrapper')) e.preventDefault(); });
     document.documentElement.addEventListener('mouseleave', release);
     window.addEventListener('blur', release);
     window.addEventListener('resize', () => { if (S.live) placePreview(S.live); });
