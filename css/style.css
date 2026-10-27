@@ -738,3 +738,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .db-hero-tile .card-wrapper { width: 100%; }
 .db-hero-name { margin-top: 3px; font-size: 9.5px; line-height: 1.15; text-align: center; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .db-hero-tile.on .db-hero-name { color: var(--gold-light); font-weight: bold; }
+
+/* Sprachwahl (Flaggen im Menükopf) */
+.lang-flag { padding: 2px; line-height: 0; background: transparent; border: 1px solid transparent; border-radius: 3px; cursor: pointer; opacity: .45; filter: saturate(.6); transition: opacity .15s, filter .15s; }
+.lang-flag:hover { opacity: .85; filter: none; }
+.lang-flag.active { opacity: 1; filter: none; border-color: var(--gold-dark, #8a6d2b); cursor: default; }
+.lang-flag svg { display: block; border-radius: 1px; }

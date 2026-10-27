@@ -128,7 +128,7 @@ function kwHas(s, c, k) {
 }
 // Ausgelöster Effekt, der beim nächsten PPP auf die Kette kommt (auch wenn die Quelle das Spiel verlassen hat)
 function pushTrig(s, pid, srcId, steps, srcUid = null) {
-    (s.waitTrig || (s.waitTrig = [])).push({ pid, src: srcUid, srcId, srcName: CARDS[srcId] ? CARDS[srcId].name : 'Auslöser', steps: [].concat(steps) });
+    (s.waitTrig || (s.waitTrig = [])).push({ pid, src: srcUid, srcId, srcName: CARDS[srcId] ? CARDS[srcId].name : tr('Auslöser'), steps: [].concat(steps) });
 }
 
 // Temporäre Modifikatoren "this turn" / "this combat"
@@ -334,9 +334,9 @@ function untargetableBy(s, c, byPid) {
 function cantPlayCards(s, pid) { return pes(s, pid, 'fangLock').length > 0; }
 // Weitere Spiel-Sperren (Set 2/3): Dauereffekte (FX.aura.noPlay) und Spieler-Effekte "this turn"
 function playBlocked(s, pid, card) {
-    if (card.type === 'Ability' && pes(s, pid, 'noAbilities').length) return 'Du kannst in diesem Zug keine Fähigkeiten spielen';
-    if (pes(s, pid, 'noCards').length) return 'Du kannst in diesem Zug keine Karten spielen';
-    if (pes(s, pid, 'banName').some(m => m.name === card.name)) return `${card.name} wurde benannt und kann in diesem Zug nicht gespielt werden`;   // Jin'do's Evil Eye
+    if (card.type === 'Ability' && pes(s, pid, 'noAbilities').length) return tr('Du kannst in diesem Zug keine Fähigkeiten spielen');
+    if (pes(s, pid, 'noCards').length) return tr('Du kannst in diesem Zug keine Karten spielen');
+    if (pes(s, pid, 'banName').some(m => m.name === card.name)) return tr`${card.name} wurde benannt und kann in diesem Zug nicht gespielt werden`;   // Jin'do's Evil Eye
     const r = auraAny(s, 'noPlay', pid, card);
     return r || null;
 }
@@ -392,7 +392,7 @@ function heal(s, healerUid, tgtUid, amt) {
     const v = amt === 'all' ? (t.damage || 0) : Math.min(t.damage || 0, Math.max(0, amt));
     t.damage -= v;
     if (v > 0) {
-        L(s, `💚 ${t.name} wird um ${v} geheilt.`, "log-heal"); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); addValue(s, valueCredit(s, healerUid, false), 'heal', v);
+        L(s, tr`💚 ${t.name} wird um ${v} geheilt.`, "log-heal"); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); addValue(s, valueCredit(s, healerUid, false), 'heal', v);
         const hp = healer ? ctrlOf(s, healer) : null;
         if (healer && healer.type === 'Hero' && hp) addPE(s, hp, { k: 'heroHealed' });   // Faith Healer's Boots
         evt(s, 'healed', { healer: healerUid, hpid: hp, tgt: t.uid, tpid: ctrlOf(s, t), amt: v, abilityId: s.resolvingCard ? s.resolvingCard.id : null });
@@ -405,7 +405,7 @@ function drawCards(s, p, n) {
     let got = 0;
     for (let i = 0; i < n; i++) {
         if (s.gameOver) return got;
-        if (cantDraw(s, p.id)) { L(s, `${p.hero.name} kann in diesem Zug keine Karten ziehen.`); return got; }
+        if (cantDraw(s, p.id)) { L(s, tr`${p.hero.name} kann in diesem Zug keine Karten ziehen.`); return got; }
         if ((p.ongoing || []).some(o => o.id === 124) && p.fk) {                         // Forbidden Knowledge
             q(s, { op: 'fkDraw', pid: p.id }); got++; continue;
         }
@@ -422,7 +422,7 @@ function lose(s, pid, why) {
     if (s.gameOver) return;
     s.gameOver = true; s.winner = pid === 1 ? 2 : 1;
     const p = getPlayer(s, pid);
-    L(s, `☠ ${why || ''} ${p.hero.name} verliert!`, "log-hit");
+    L(s, tr`☠ ${why || ''} ${p.hero.name} verliert!`, "log-hit");
 }
 function shuffleInPlace(p) { p.deck = shuffleDeck(p.deck); }
 
@@ -473,13 +473,13 @@ function resetInst(c) {
 function destroy(s, c, info = {}) {
     if (!c) return false;
     const l = locate(s, c.uid); if (!l || !isInPlayZone(l.zone)) return false;
-    if (isIndestructible(s, c)) { L(s, `${c.name} kann nicht zerstört werden.`); return false; } // Noggenfogger, Sylvanas, Moala …
+    if (isIndestructible(s, c)) { L(s, tr`${c.name} kann nicht zerstört werden.`); return false; } // Noggenfogger, Sylvanas, Moala …
     if (c.type === 'Hero') {
         // CR 102.1a: Wird der Held zerstört, verliert sein Spieler sofort (Valthak: "Your hero can't be destroyed")
         if (alliesOf(getPlayer(s, l.pid)).some(a => a.id === 263 && active(s, a))) return false;
-        lose(s, l.pid, `${c.name} wurde zerstört.`); return true;
+        lose(s, l.pid, tr`${c.name} wurde zerstört.`); return true;
     }
-    L(s, `💀 ${c.name} wird zerstört.`, "log-hit");
+    L(s, tr`💀 ${c.name} wird zerstört.`, "log-hit");
     if (isAllyLike(c)) addValue(s, s.lastCard, 'kills', 1, 2 + (c.cost || 0), l.pid);
     return leavePlay(s, c, 'graveyard', { ...info, destroyed: true });
 }
@@ -487,7 +487,7 @@ function removeFromGame(s, c) { if (cantLeavePlay(s, c)) return false; return le
 function isIndestructible(s, c) { return hasTM(s, c, 'indestructible') || !!auraAny(s, 'kw', c, 'indestructible'); }
 // Will of the Forsaken / Invincible-artige Effekte (FX.aura.kw 'cantLeave')
 function cantLeavePlay(s, c) { return !!auraAny(s, 'kw', c, 'cantLeave'); }
-function bounce(s, c) { L(s, `↩ ${c.name} geht auf die Hand.`); return leavePlay(s, c, 'hand', { destroyed: false }); }
+function bounce(s, c) { L(s, tr`↩ ${c.name} geht auf die Hand.`); return leavePlay(s, c, 'hand', { destroyed: false }); }
 
 // Kontrolle wechseln (Mind Control, Helwen, Infernal, Barak)
 // Kontrolle über eine laufende Fähigkeit wechseln (Spellsteal, Conjured Sparkling Water) – Set 2/3
@@ -498,7 +498,7 @@ function moveOngoing(s, c, toPid) {
     else if (l.zone === 'party' && c.isTotem) { from.allies.splice(from.allies.indexOf(c), 1); to.allies.push(c); }
     else return false;
     c.joinedTurn = s.turn;
-    L(s, `🔀 ${to.hero.name} kontrolliert jetzt ${c.name}.`);
+    L(s, tr`🔀 ${to.hero.name} kontrolliert jetzt ${c.name}.`);
     return true;
 }
 function changeControl(s, c, toPid) {
@@ -507,8 +507,8 @@ function changeControl(s, c, toPid) {
     from.allies.splice(from.allies.indexOf(c), 1);
     to.allies.push(c);
     c.joinedTurn = s.turn;   // muss seit Beginn des eigenen Zuges in der Party sein
-    L(s, `🔀 ${to.hero.name} kontrolliert jetzt ${c.name}.`);
-    if (s.battle && (s.battle.att === c.uid || s.battle.def === c.uid)) endBattle(s, 'Kontrollwechsel');
+    L(s, tr`🔀 ${to.hero.name} kontrolliert jetzt ${c.name}.`);
+    if (s.battle && (s.battle.att === c.uid || s.battle.def === c.uid)) endBattle(s, tr('Kontrollwechsel'));
     const fc = FX[c.id]; if (fc && fc.ctrlChanged) fc.ctrlChanged(s, c, l.pid, toPid);   // Nyn'jah (Set 2)
 }
 
@@ -563,8 +563,8 @@ function addWaitingTriggers(s) {
     const w = s.waitTrig; s.waitTrig = [];
     w.sort((a, b) => (a.pid === s.activePlayer ? 0 : 1) - (b.pid === s.activePlayer ? 0 : 1));
     for (const t of w) {
-        s.chain.push({ kind: 'trigger', id: newUid('t_'), pl: t.pid, src: t.src, srcId: t.srcId, srcName: t.srcName, steps: t.steps, label: 'Ausgelöster Effekt' });
-        L(s, `↯ ${t.srcName}: ausgelöster Effekt kommt auf die Kette.`);
+        s.chain.push({ kind: 'trigger', id: newUid('t_'), pl: t.pid, src: t.src, srcId: t.srcId, srcName: t.srcName, steps: t.steps, label: tr('Ausgelöster Effekt') });
+        L(s, tr`↯ ${t.srcName}: ausgelöster Effekt kommt auf die Kette.`);
     }
     if (s.win) { s.win.prio = s.activePlayer; s.win.passes = 0; }
     else s.win = { prio: s.activePlayer, passes: 0 };
@@ -589,7 +589,7 @@ function execStep(s, st) {
             if (!d.opts.length) { if (d.none !== undefined) callK(s, d.k, d.a, d.none); break; }
             if (d.opts.length === 1 && d.auto !== false && !d.keep) { callK(s, d.k, d.a, d.opts[0].v); break; }
             if (isHuman(s, d.pid)) {
-                if (d.cancel && !d.opts.some(o => o.v === '__cancel')) d.opts.push({ label: '✖ Abbrechen', v: '__cancel', ai: -1e9 });
+                if (d.cancel && !d.opts.some(o => o.v === '__cancel')) d.opts.push({ label: tr('✖ Abbrechen'), v: '__cancel', ai: -1e9 });
                 s.pending = { kind: 'choose', ...d }; break;
             }
             const v = aiPick(s, d);
@@ -627,7 +627,7 @@ function process(s) {
         if (s.waitTrig && s.waitTrig.length) { addWaitingTriggers(s); continue; }
         if (s.win) { if (priorityStep(s)) continue; return; }
         if (s.chain.length) { s.win = { prio: s.activePlayer, passes: 0 }; continue; }
-        if (s.battle) { const before = s.battle.step; battleStep(s, s.battle.step); if (s.battle && s.battle.step === before && !s.queue.length && !s.pending && !s.win) { endBattle(s, 'Kampf hing'); } continue; }
+        if (s.battle) { const before = s.battle.step; battleStep(s, s.battle.step); if (s.battle && s.battle.step === before && !s.queue.length && !s.pending && !s.win) { endBattle(s, tr('Kampf hing')); } continue; }
         return;
     }
     if (guard >= 50000) { console.error('Engine-Schleife abgebrochen'); s.queue = []; s.win = null; }
@@ -639,17 +639,17 @@ function stateBased(s) {
     let changed = false;
     for (const p of [s.p1, s.p2]) {
         const dead = p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a));
-        for (const a of dead) { L(s, `💀 ${a.name} erliegt seinen Wunden.`, "log-hit"); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
+        for (const a of dead) { L(s, tr`💀 ${a.name} erliegt seinen Wunden.`, "log-hit"); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
     const heroDead = [s.p1, s.p2].filter(p => p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)) && !isIndestructible(s, p.hero));
-    if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, 'Unentschieden!'); return true; }
-    if (heroDead.length === 1) { lose(s, heroDead[0].id, `${heroDead[0].hero.name} ist gefallen.`); return true; }
+    if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, tr('Unentschieden!')); return true; }
+    if (heroDead.length === 1) { lose(s, heroDead[0].id, tr`${heroDead[0].hero.name} ist gefallen.`); return true; }
     // Unique + Tag-Limits (Pet(1), Totem-Tags, Ausrüstungsplätze)
     for (const p of [s.p1, s.p2]) {
         const v = findLimitViolation(s, p);
         if (v) {
-            ask(s, { pid: p.id, prompt: `${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label,
+            ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label,
                 opts: v.cards.map(c => ({ label: c.name, v: c.uid, ai: -(c.joinedTurn || 0) - cardValue(s, c) })), k: 'E:limitDestroy', a: {} });
             flushBatch(s); return true;
         }
@@ -680,7 +680,7 @@ function findLimitViolation(s, p) {
     }
     // Zweihänder + Off-Hand (414.3c)
     const two = p.hero.weapons.filter(w => w.twoHanded), off = p.hero.armors.filter(a => a.limitTags && a.limitTags['Off-Hand']);
-    if (two.length && off.length) return { label: 'Zweihänder + Off-Hand', cards: [...two, ...off] };
+    if (two.length && off.length) return { label: tr('Zweihänder + Off-Hand'), cards: [...two, ...off] };
     return null;
 }
 
@@ -785,16 +785,16 @@ function humanStopActions(s, pid, acts) {
 }
 function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = w.prio === 1 ? 2 : 1; }
 function priorityPrompt(s, pid) {
-    if (s.chain.length) { const t = s.chain[s.chain.length - 1]; return `Auf der Kette: ${chainDesc(s, t)}. Reagieren?`; }
-    if (s.battle) return `Kampf: ${nameOf(s, s.battle.att)} greift ${nameOf(s, s.battle.def)} an. Reagieren?`;
-    if (s.phase === 'end') return 'Ende des Zuges. Noch etwas spielen?';
-    return 'Reagieren?';
+    if (s.chain.length) { const t = s.chain[s.chain.length - 1]; return tr`Auf der Kette: ${chainDesc(s, t)}. Reagieren?`; }
+    if (s.battle) return tr`Kampf: ${nameOf(s, s.battle.att)} greift ${nameOf(s, s.battle.def)} an. Reagieren?`;
+    if (s.phase === 'end') return tr('Ende des Zuges. Noch etwas spielen?');
+    return tr('Reagieren?');
 }
 function nameOf(s, uid) { const c = findCharacter(s, uid); return c ? c.name : '?'; }
 function chainDesc(s, it) {
     if (it.kind === 'card') return it.card.name;
-    if (it.kind === 'proposal') return `Angriff: ${nameOf(s, it.att)} → ${nameOf(s, it.def)}`;
-    return `${it.srcName || nameOf(s, it.src)}: ${it.label || 'Kraft'}`;
+    if (it.kind === 'proposal') return tr`Angriff: ${nameOf(s, it.att)} → ${nameOf(s, it.def)}`;
+    return `${it.srcName || nameOf(s, it.src)}: ${it.label || tr('Kraft')}`;
 }
 
 // ---------------------------------------------------------------- Kosten
@@ -888,20 +888,20 @@ function targetsPossible(s, pid, f, card, x, mode) {
 }
 function canPlayCard(s, pid, card, opts = {}) {
     const p = getPlayer(s, pid);
-    if (!card || card.type === 'Quest' || card.type === 'Hero') return 'Diese Karte kann nicht gespielt werden';
-    if (!cardMatchesPlayer(card, p)) return `Karte passt nicht zu ${p.hero.name}`;
-    if (cantPlayCards(s, pid)) return 'Du kannst in diesem Zug keine Karten spielen (Fang of the Crystal Spider)';
+    if (!card || card.type === 'Quest' || card.type === 'Hero') return tr('Diese Karte kann nicht gespielt werden');
+    if (!cardMatchesPlayer(card, p)) return tr`Karte passt nicht zu ${p.hero.name}`;
+    if (cantPlayCards(s, pid)) return tr('Du kannst in diesem Zug keine Karten spielen (Fang of the Crystal Spider)');
     if (!heroReqOk(p.hero, card)) return `${card.raceReq || card.factionReq} Hero Required`;
     const blk = playBlocked(s, pid, card); if (blk) return blk;
     const inst = isInstantFor(s, p, card);
-    if (!inst && !canActMain(s, pid)) return 'Nur in deiner Aktionsphase bei leerer Kette';
-    if (inst && !canActInstant(s, pid)) return 'Gerade keine Priorität';
+    if (!inst && !canActMain(s, pid)) return tr('Nur in deiner Aktionsphase bei leerer Kette');
+    if (inst && !canActInstant(s, pid)) return tr('Gerade keine Priorität');
     const f = fx(card);
     if (f.canPlay) { const e = f.canPlay(s, pid, card); if (e !== true && e) return e; }
     const minX = card.xCost ? ((f.xRange && f.xRange(s, pid, card).min) || 0) : 0;
-    if (!card.xCost && f.xRange && opts.x === undefined) { const xr = f.xRange(s, pid, card); if (xr.min > xr.max) return 'Kein gültiger Wert für X'; }
+    if (!card.xCost && f.xRange && opts.x === undefined) { const xr = f.xRange(s, pid, card); if (xr.min > xr.max) return tr('Kein gültiger Wert für X'); }
     const altCost = (f.altCost && f.altCost(s, pid, card)) || (f.alt && f.alt.can(s, pid, card));
-    if (!altCost && getReadyRes(p) < getPlayCost(s, p, card, minX)) return 'Nicht genug Ressourcen';
+    if (!altCost && getReadyRes(p) < getPlayCost(s, p, card, minX)) return tr('Nicht genug Ressourcen');
     // Pflichtziele vorhanden? Bei X-Kosten ohne festes X: irgendein bezahlbares X mit Ziel genügt
     // (Mind Control: "target ally with cost X" – mit X = 0 gäbe es meist kein Ziel)
     let xs = [opts.x !== undefined ? opts.x : (card.xCost ? minX : undefined)];
@@ -910,7 +910,7 @@ function canPlayCard(s, pid, card, opts = {}) {
         const maxX = altCost ? xr.max : Math.min(xr.max, getReadyRes(p) - getPlayCost(s, p, card, 0));
         for (let x = minX + 1; x <= maxX; x++) xs.push(x);
     }
-    if (!xs.some(x => targetsPossible(s, pid, f, card, x, opts.mode))) return 'Kein legales Ziel';
+    if (!xs.some(x => targetsPossible(s, pid, f, card, x, opts.mode))) return tr('Kein legales Ziel');
     return null;
 }
 
@@ -919,7 +919,7 @@ function applyAction(s, action, isSim = false, actorId = null) {
     if (!action || !s || s.gameOver) return false;
     const pid = action.actorId || actorId || s.activePlayer;
     const err = validateAction(s, action, pid);
-    if (err) { if (!isSim && isReal(s)) L(s, `[Abgelehnt] ${err}`, "log-hit"); return false; }
+    if (err) { if (!isSim && isReal(s)) L(s, tr`[Abgelehnt] ${err}`, "log-hit"); return false; }
     const undoSnap = (isReal(s) && pid === 1 && typeof takeUndoSnapshot === 'function' && action.type !== 'CHOOSE') ? takeUndoSnapshot() : null;
     s._hidden = false; s._oppDecided = false;
     doAction(s, action, pid);
@@ -930,68 +930,68 @@ function applyAction(s, action, isSim = false, actorId = null) {
 }
 
 function validateAction(s, a, pid) {
-    const p = getPlayer(s, pid); if (!p) return 'Ungültiger Spieler';
+    const p = getPlayer(s, pid); if (!p) return tr('Ungültiger Spieler');
     if (s.pending) {
-        if (s.pending.pid !== pid) return 'Warte auf Entscheidung des Gegners';
+        if (s.pending.pid !== pid) return tr('Warte auf Entscheidung des Gegners');
         if (s.pending.kind === 'choose') {
-            if (a.type !== 'CHOOSE') return 'Bitte zuerst die Entscheidung treffen';
-            if (!s.pending.opts.some(o => sameV(o.v, a.v))) return 'Ungültige Auswahl';
+            if (a.type !== 'CHOOSE') return tr('Bitte zuerst die Entscheidung treffen');
+            if (!s.pending.opts.some(o => sameV(o.v, a.v))) return tr('Ungültige Auswahl');
             return null;
         }
         if (s.pending.kind === 'priority') {
             if (a.type === 'PASS') return null;
-            if (!['PLAY_CARD', 'ACTIVATE', 'COMPLETE_QUEST'].includes(a.type)) return 'Jetzt nur Instants/Kräfte oder Passen';
+            if (!['PLAY_CARD', 'ACTIVATE', 'COMPLETE_QUEST'].includes(a.type)) return tr('Jetzt nur Instants/Kräfte oder Passen');
         }
-    } else if (a.type === 'CHOOSE' || a.type === 'PASS') return 'Keine offene Entscheidung';
+    } else if (a.type === 'CHOOSE' || a.type === 'PASS') return tr('Keine offene Entscheidung');
     switch (a.type) {
         case 'PASS': return null;
         case 'END_TURN':
-            if (!canActMain(s, pid)) return 'Zug kann jetzt nicht beendet werden';
-            if (mustAttack(s, pid).length) return `${mustAttack(s, pid)[0].name} muss angreifen (Mocking Blow)`;
+            if (!canActMain(s, pid)) return tr('Zug kann jetzt nicht beendet werden');
+            if (mustAttack(s, pid).length) return tr`${mustAttack(s, pid)[0].name} muss angreifen (Mocking Blow)`;
             return null;
         case 'PLACE_RESOURCE': {
-            if (!canActMain(s, pid)) return 'Ressourcen nur in deiner Aktionsphase';
-            if (s.placedResource) return 'Du hast in diesem Zug schon eine Ressource gelegt';
-            const c = p.hand[a.handIdx]; if (!c) return 'Karte nicht auf der Hand';
-            if (a.faceUp && c.type !== 'Quest') return 'Nur Quests werden offen gelegt';
+            if (!canActMain(s, pid)) return tr('Ressourcen nur in deiner Aktionsphase');
+            if (s.placedResource) return tr('Du hast in diesem Zug schon eine Ressource gelegt');
+            const c = p.hand[a.handIdx]; if (!c) return tr('Karte nicht auf der Hand');
+            if (a.faceUp && c.type !== 'Quest') return tr('Nur Quests werden offen gelegt');
             return null;
         }
         case 'COMPLETE_QUEST': {
             const r = p.resources[a.resIdx];
-            if (!r || !r.faceUp || r.card.type !== 'Quest') return 'Keine offene Quest';
-            if (!canActInstant(s, pid)) return 'Gerade keine Priorität';
+            if (!r || !r.faceUp || r.card.type !== 'Quest') return tr('Keine offene Quest');
+            if (!canActInstant(s, pid)) return tr('Gerade keine Priorität');
             const e = checkQuestCondition(s, p, r); if (e) return e;
             return null;
         }
         case 'PLAY_CARD': {
-            const src = playSource(s, p, a); if (!src) return a.gyUid ? 'Karte nicht im Friedhof' : 'Karte nicht auf der Hand';
+            const src = playSource(s, p, a); if (!src) return a.gyUid ? tr('Karte nicht im Friedhof') : tr('Karte nicht auf der Hand');
             const c = src.card;
-            if (a.gyUid && !canPlayFromGy(s, pid, c, src.owner)) return 'Diese Karte kann nicht aus dem Friedhof gespielt werden';
+            if (a.gyUid && !canPlayFromGy(s, pid, c, src.owner)) return tr('Diese Karte kann nicht aus dem Friedhof gespielt werden');
             const e = canPlayCard(s, pid, c, a); if (e) return e;
-            if (a.x !== undefined) { const f = fx(c); const xr = f.xRange ? f.xRange(s, pid, c) : { min: 0, max: 99 }; if (a.x < xr.min || a.x > xr.max) return 'Ungültiges X'; if (getReadyRes(p) < getPlayCost(s, p, c, a.x) && !(fx(c).altCost && fx(c).altCost(s, pid, c))) return 'Nicht genug Ressourcen'; }
+            if (a.x !== undefined) { const f = fx(c); const xr = f.xRange ? f.xRange(s, pid, c) : { min: 0, max: 99 }; if (a.x < xr.min || a.x > xr.max) return tr('Ungültiges X'); if (getReadyRes(p) < getPlayCost(s, p, c, a.x) && !(fx(c).altCost && fx(c).altCost(s, pid, c))) return tr('Nicht genug Ressourcen'); }
             const tErr = checkGivenTargets(s, pid, fx(c), c, a); if (tErr) return tErr;
             return null;
         }
         case 'ACTIVATE': {
-            const src = findCharacter(s, a.srcUid); if (!src) return 'Quelle nicht gefunden';
-            const pw = getPower(s, src, a.key); if (!pw) return 'Keine solche Kraft';
+            const src = findCharacter(s, a.srcUid); if (!src) return tr('Quelle nicht gefunden');
+            const pw = getPower(s, src, a.key); if (!pw) return tr('Keine solche Kraft');
             const e = canUsePower(s, pid, src, pw, a); if (e) return e;
             const tErr = checkGivenTargets(s, pid, pw, src, a); if (tErr) return tErr;
             return null;
         }
         case 'ATTACK': {
-            if (!canActMain(s, pid)) return 'Angriffe nur in deiner Aktionsphase';
+            if (!canActMain(s, pid)) return tr('Angriffe nur in deiner Aktionsphase');
             const att = findCharacter(s, a.attackerUid), def = findCharacter(s, a.defenderUid);
-            if (!att || !def) return 'Charakter nicht gefunden';
-            if (ctrlOf(s, att) !== pid) return 'Nicht dein Charakter';
-            if (!canAttackNow(s, att, p)) return `${att.name} kann nicht angreifen`;
+            if (!att || !def) return tr('Charakter nicht gefunden');
+            if (ctrlOf(s, att) !== pid) return tr('Nicht dein Charakter');
+            if (!canAttackNow(s, att, p)) return tr`${att.name} kann nicht angreifen`;
             const e = attackTargetError(s, att, def); if (e) return e;
-            if (winterCost(s, att, def) > getReadyRes(p)) return "Winter's Grasp: nicht genug Ressourcen";
+            if (winterCost(s, att, def) > getReadyRes(p)) return tr("Winter's Grasp: nicht genug Ressourcen");
             return null;
         }
-        case 'CHOOSE': return 'Keine offene Entscheidung';
+        case 'CHOOSE': return tr('Keine offene Entscheidung');
     }
-    return 'Unbekannte Aktion';
+    return tr('Unbekannte Aktion');
 }
 function sameV(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function checkGivenTargets(s, pid, f, card, a) {
@@ -1001,12 +1001,12 @@ function checkGivenTargets(s, pid, f, card, a) {
         const given = a.targets[i] || [];
         const sl = slots[i];
         const mn = sl.min === undefined ? 1 : sl.min, mx = sl.max === undefined ? 1 : sl.max;
-        if (given.length < mn || given.length > mx) return `Ziel ${i + 1}: falsche Anzahl`;
-        if (given.some(u => !sl.cands.includes(u))) return 'Ungültiges Ziel';
-        if (new Set(given).size !== given.length) return 'Ziele müssen verschieden sein';
+        if (given.length < mn || given.length > mx) return tr`Ziel ${i + 1}: falsche Anzahl`;
+        if (given.some(u => !sl.cands.includes(u))) return tr('Ungültiges Ziel');
+        if (new Set(given).size !== given.length) return tr('Ziele müssen verschieden sein');
     }
     // gleiche Karte nicht in zwei Slots, wenn verlangt
-    if (f && f.distinct) { const flat = a.targets.flat(); if (new Set(flat).size !== flat.length) return 'Ziele müssen verschieden sein'; }
+    if (f && f.distinct) { const flat = a.targets.flat(); if (new Set(flat).size !== flat.length) return tr('Ziele müssen verschieden sein'); }
     return null;
 }
 
@@ -1028,7 +1028,7 @@ function doAction(s, a, pid) {
             p.resources.push({ card: c, faceUp: !!a.faceUp, exhausted: !!(a.faceUp && FX[c.id] && FX[c.id].resExhausted) });
             evt(s, 'resEnters', { pid: p.id });                                                   // Shard of the Flame
             s.placedResource = true;
-            L(s, `[${p.hero.name}] Ressource: ${a.faceUp ? c.name + ' (offen)' : 'verdeckt'}`);
+            L(s, tr`[${p.hero.name}] Ressource: ${a.faceUp ? c.name + ' (offen)' : tr('verdeckt')}`);
             if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
             evt(s, 'handLeft', { pid: p.id, uid: c.uid });                                        // Evocation
             flushBatch(s);
@@ -1075,20 +1075,20 @@ EK.prepItem = (s) => {
             const base = it.kind === 'card' ? getPlayCost(s, p, card, 0) : 0;
             const maxAff = card.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max;
             const opts = []; for (let x = xr.min; x <= maxAff; x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
-            if (!opts.length) return abortPrep(s, 'X nicht bezahlbar');
+            if (!opts.length) return abortPrep(s, tr('X nicht bezahlbar'));
             // Nur X anbieten, für die es Pflichtziele gibt (Mind Control: Ally mit Kosten X)
             const withTgt = opts.filter(o => targetsPossible(s, p.id, f, card, o.v, it.mode));
-            if (!withTgt.length) return abortPrep(s, 'Kein legales Ziel');
+            if (!withTgt.length) return abortPrep(s, tr('Kein legales Ziel'));
             opts.splice(0, opts.length, ...withTgt);
-            ask(s, { pid: p.id, prompt: `${card.name}: Wähle X`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'x' }, keep: true });
+            ask(s, { pid: p.id, prompt: tr`${card.name}: Wähle X`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'x' }, keep: true });
             return;
         }
     }
     // 2) Modus (Choose one)
     if (f.modes && (it.mode === undefined || it.mode === null)) {
         const opts = f.modes(s, p.id, card, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai }));
-        if (!opts.length) return abortPrep(s, 'Kein Modus möglich');
-        ask(s, { pid: p.id, prompt: `${card.name}: Wähle`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
+        if (!opts.length) return abortPrep(s, tr('Kein Modus möglich'));
+        ask(s, { pid: p.id, prompt: tr`${card.name}: Wähle`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
         return;
     }
     // 3) Ziele
@@ -1100,7 +1100,7 @@ EK.prepItem = (s) => {
         const mn = sl.min === undefined ? 1 : sl.min, mx = sl.max === undefined ? 1 : sl.max;
         const used = it.targets.flat();
         const cands = sl.cands.filter(u => !(f.distinct && used.includes(u)));
-        if (cands.length < mn) return abortPrep(s, 'Kein legales Ziel');
+        if (cands.length < mn) return abortPrep(s, tr('Kein legales Ziel'));
         it._slot = { i, mn, mx, picked: [] };
         if (takeFirstTarget(it, cands)) { if (it._slot.picked.length >= mx) { it.targets[i] = it._slot.picked; delete it._slot; continue; } }
         askTarget(s, p.id, card, sl, cands, it);
@@ -1111,8 +1111,8 @@ EK.prepItem = (s) => {
         it.altAsked = true;
         const cost = getPlayCost(s, p, card, it.x || 0, it.targets);
         const opts = [{ label: f.alt.label, v: 'alt', ai: f.alt.ai !== undefined ? (typeof f.alt.ai === 'function' ? f.alt.ai(s, p.id, card) : f.alt.ai) : 2 }];
-        if (getReadyRes(p) >= cost) opts.push({ label: `(${cost}) bezahlen`, v: 'pay', ai: 1 });
-        ask(s, { pid: p.id, prompt: `${card.name}: Wie bezahlen?`, src: card.name, opts, k: 'E:altPay', cancel: true, a: {}, keep: true });
+        if (getReadyRes(p) >= cost) opts.push({ label: tr`(${cost}) bezahlen`, v: 'pay', ai: 1 });
+        ask(s, { pid: p.id, prompt: tr`${card.name}: Wie bezahlen?`, src: card.name, opts, k: 'E:altPay', cancel: true, a: {}, keep: true });
         return;
     }
     // 5) Zusatzkosten / Bezahlen
@@ -1120,7 +1120,7 @@ EK.prepItem = (s) => {
     finishPrep(s);
 };
 EK.altPay = (s, a, v) => {
-    if (v === '__cancel') return abortPrep(s, 'vom Spieler abgebrochen');
+    if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen'));
     const it = s.chainPrep;
     if (v === 'alt') { it.altPaid = true; fx(it.card).alt.pay(s, it); return; }   // pay ruft am Ende altDone(s)
     q(s, { op: 'call', k: 'E:prepItem', a: {} });
@@ -1136,11 +1136,11 @@ function takeFirstTarget(it, cands) {
 function askTarget(s, pid, card, sl, cands, it) {
     const st = it._slot;
     const opts = cands.filter(u => !st.picked.includes(u)).map(u => ({ label: targetLabel(s, u, pid), v: u, ai: sl.ai ? sl.ai(u, s) : aiTargetValue(s, pid, u, sl.harm) }));
-    if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? 'Fertig' : 'Kein Ziel', v: '__done', ai: sl.stopAi !== undefined ? sl.stopAi : -0.5 });
+    if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? tr('Fertig') : tr('Kein Ziel'), v: '__done', ai: sl.stopAi !== undefined ? sl.stopAi : -0.5 });
     ask(s, { pid, prompt: `${card.name}: ${sl.label}${st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : ''}`, src: card.name, opts, k: 'E:prepTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
 }
-EK.prepSet = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'vom Spieler abgebrochen'); s.chainPrep[a.key] = v; q(s, { op: 'call', k: 'E:prepItem', a: {} }); };
-EK.prepTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'vom Spieler abgebrochen');
+EK.prepSet = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen')); s.chainPrep[a.key] = v; q(s, { op: 'call', k: 'E:prepItem', a: {} }); };
+EK.prepTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen'));
     const it = s.chainPrep; const st = it._slot;
     if (v !== '__done') st.picked.push(v);
     if (v === '__done' || st.picked.length >= st.mx) { it.targets[st.i] = [...st.picked]; delete it._slot; q(s, { op: 'call', k: 'E:prepItem', a: {} }); return; }
@@ -1156,7 +1156,7 @@ EK.prepTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'vom Sp
 function abortPrep(s, why) {
     const it = s.chainPrep; s.chainPrep = null;
     if (it && it.kind === 'card') returnPrepCard(s, it);
-    L(s, `[Abgebrochen] ${why}`, "log-hit");
+    L(s, tr`[Abgebrochen] ${why}`, "log-hit");
 }
 // Abgebrochene Karte zurück an ihren Ursprung (Hand oder Friedhof)
 function returnPrepCard(s, it) {
@@ -1171,7 +1171,7 @@ function finishPrep(s) {
         const f = fx(it.card);
         if (!it.altPaid) {
             const cost = getPlayCost(s, p, it.card, it.x || 0, it.targets);
-            if (!payRes(p, cost)) { returnPrepCard(s, it); L(s, '[Abgebrochen] Nicht genug Ressourcen', 'log-hit'); return; }
+            if (!payRes(p, cost)) { returnPrepCard(s, it); L(s, tr('[Abgebrochen] Nicht genug Ressourcen'), 'log-hit'); return; }
             pes(s, p.id, 'nextCardLess').forEach(m => m.used = true);
             if (it.card.type === 'Ability') { pes(s, p.id, 'nextAbilityLess').forEach(m => m.used = true); pes(s, p.id, 'ruins').forEach(m => m.used = true); }
             if (it.card.isPet) pes(s, p.id, 'nextPetLess').forEach(m => m.used = true);
@@ -1187,7 +1187,7 @@ function finishPrep(s) {
         evt(s, 'cardPlayed', { pid: p.id, card: it.card });
     } else {
         s.chain.push(it);
-        L(s, `▶ [${p.hero.name}] ${nameOf(s, it.src)}: ${it.label || 'Kraft'}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
+        L(s, `▶ [${p.hero.name}] ${nameOf(s, it.src)}: ${it.label || tr('Kraft')}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
     }
     // Wer einen Link hinzufügt, bekommt danach wieder Priorität (CR 410.2)
     const ow = s.win;
@@ -1202,13 +1202,13 @@ function resolveTop(s) {
     s.resolvingCard = null;
     s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
     if (it.kind === 'trigger') {
-        if (it.interrupted) { L(s, `✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
+        if (it.interrupted) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         it.steps.forEach(st => q(s, st));
         return;
     }
     if (it.kind === 'proposal') { resolveProposal(s, it); return; }
     if (it.kind === 'reward') {
-        if (it.interrupted) { L(s, `✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
+        if (it.interrupted) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         const f = FX[it.srcId] || {};
         const r = p.resources.find(x => x.card && x.card.uid === it.src) || { card: { ...CARDS[it.srcId], uid: it.src }, faceUp: false };
         if (f.reward) f.reward(s, p.id, r);
@@ -1228,7 +1228,7 @@ function resolveTop(s) {
         }
     }
     if (interrupted) {
-        L(s, `✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit");
+        L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit");
         if (it.kind === 'card') leaveChain(s, it, 'graveyard');
         return;
     }
@@ -1251,13 +1251,13 @@ function resolveCard(s, it) {
         c.joinedTurn = s.turn; c.exhausted = false; c.damage = f.enterDamage || 0;     // "This ally enters play with N damage"
         if (f.enterCounters) c.counters = { ...(c.counters || {}), ...f.enterCounters };  // "enters play with a … counter"
         p.allies.push(c);
-        L(s, `[${p.hero.name}] Verbündeter kommt ins Spiel: ${c.name}`);
+        L(s, tr`[${p.hero.name}] Verbündeter kommt ins Spiel: ${c.name}`);
         evt(s, 'allyEnters', { uid: c.uid, pid: p.id });
         if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it));
         return;
     }
-    if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; L(s, `[${p.hero.name}] Waffe: ${c.name}`); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
-    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.exhausted = !!f.entersExhausted; L(s, `[${p.hero.name}] ${c.type === 'Armor' ? 'Rüstung' : 'Gegenstand'}: ${c.name}`); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
+    if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; L(s, tr`[${p.hero.name}] Waffe: ${c.name}`); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
+    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.exhausted = !!f.entersExhausted; L(s, `[${p.hero.name}] ${c.type === 'Armor' ? tr('Rüstung') : tr('Gegenstand')}: ${c.name}`); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     // Fähigkeit
     it.dest = c.ongoing ? 'play' : 'graveyard';
     if (f.resolve) f.resolve(s, it);
@@ -1282,11 +1282,11 @@ EK.placeAbility = (s, a) => {
         if (c.attach) {
             const host = it.attachTo ? findCharacter(s, it.attachTo) : null;
             const hl = host ? locate(s, host.uid) : null;
-            if (!host || !hl || !isInPlayZone(hl.zone)) { L(s, `${c.name}: Ziel nicht mehr im Spiel.`); leaveChain(s, it, 'graveyard'); return; }
+            if (!host || !hl || !isInPlayZone(hl.zone)) { L(s, tr`${c.name}: Ziel nicht mehr im Spiel.`); leaveChain(s, it, 'graveyard'); return; }
             c.attachedTo = host.uid;
         }
         p.ongoing.push(c);
-        L(s, `[${p.hero.name}] ${c.name} bleibt im Spiel${c.attachedTo ? ' (an ' + nameOf(s, c.attachedTo) + ')' : ''}.`);
+        L(s, tr`[${p.hero.name}] ${c.name} bleibt im Spiel${c.attachedTo ? ' (an ' + nameOf(s, c.attachedTo) + ')' : ''}.`);
         const f = fx(c);
         if (f.enterCounters) c.counters = { ...(c.counters || {}), ...f.enterCounters };  // "This ability enters play with N … counters"
         if (f.entered) f.entered(s, c, p.id, it);
@@ -1332,23 +1332,23 @@ function powerDef(it) {
     const f = FX[it.srcId]; return f && f.powers ? f.powers.find(p => p.key === it.key) : null;
 }
 function canUsePower(s, pid, src, pw, a = {}) {
-    const l = locate(s, src.uid); if (!l || !(isInPlayZone(l.zone) || (l.zone === 'hand' && pw.fromHand))) return 'Nicht im Spiel';
-    if (l.pid !== pid) return 'Nicht deine Karte';
-    if (!canActInstant(s, pid)) return 'Gerade keine Priorität';
-    if (pw.myTurn && s.activePlayer !== pid) return 'Nur in deinem Zug';
-    if (pw.oppTurn && s.activePlayer === pid) return 'Nur im Zug eines Gegners';
-    if (pw.flip && src.flipped) return 'Held wurde bereits umgedreht';
+    const l = locate(s, src.uid); if (!l || !(isInPlayZone(l.zone) || (l.zone === 'hand' && pw.fromHand))) return tr('Nicht im Spiel');
+    if (l.pid !== pid) return tr('Nicht deine Karte');
+    if (!canActInstant(s, pid)) return tr('Gerade keine Priorität');
+    if (pw.myTurn && s.activePlayer !== pid) return tr('Nur in deinem Zug');
+    if (pw.oppTurn && s.activePlayer === pid) return tr('Nur im Zug eines Gegners');
+    if (pw.flip && src.flipped) return tr('Held wurde bereits umgedreht');
     if (pw.act) {
-        if (src.exhausted) return 'Bereits erschöpft';
+        if (src.exhausted) return tr('Bereits erschöpft');
         // Time is Money / Breanna Greenmother: [Activate] schon im Zug, in dem der Ally die Party betritt
-        if (isAllyLike(src) && !(src.joinedTurn !== undefined && src.joinedTurn < turnStartOf(s, pid)) && !kwHas(s, src, 'activateNow')) return 'Erst ab dem nächsten eigenen Zug ([Activate])';
+        if (isAllyLike(src) && !(src.joinedTurn !== undefined && src.joinedTurn < turnStartOf(s, pid)) && !kwHas(s, src, 'activateNow')) return tr('Erst ab dem nächsten eigenen Zug ([Activate])');
     }
-    if (pw.exhaustHero && getPlayer(s, pid).hero.exhausted) return 'Held ist erschöpft';
-    if (pw.once === 'turn' && (src.usedTurn || {})[pw.key] === s.turn) return 'Nur einmal pro Zug';
+    if (pw.exhaustHero && getPlayer(s, pid).hero.exhausted) return tr('Held ist erschöpft');
+    if (pw.once === 'turn' && (src.usedTurn || {})[pw.key] === s.turn) return tr('Nur einmal pro Zug');
     const cost = typeof pw.cost === 'number' ? pw.cost : 0;
-    if (getReadyRes(getPlayer(s, pid)) < cost) return 'Nicht genug Ressourcen';
+    if (getReadyRes(getPlayer(s, pid)) < cost) return tr('Nicht genug Ressourcen');
     if (pw.canUse) { const e = pw.canUse(s, pid, src); if (e !== true && e) return e; }
-    if (!targetsPossible(s, pid, pw, src, a.x, a.mode)) return 'Kein legales Ziel';
+    if (!targetsPossible(s, pid, pw, src, a.x, a.mode)) return tr('Kein legales Ziel');
     return null;
 }
 // Beginn des letzten eigenen Zuges (für [Activate] und Angriffe von Allies)
@@ -1363,17 +1363,17 @@ function startPower(s, p, a) {
 EK.prepItemPower = (s) => {
     const it = s.chainPrep; const p = getPlayer(s, it.pl);
     const src = findCharacter(s, it.src); const pw = getPower(s, src, it.key);
-    if (!pw) return abortPrep(s, 'Kraft nicht verfügbar');
+    if (!pw) return abortPrep(s, tr('Kraft nicht verfügbar'));
     if ((pw.cost === 'X' || pw.xRange) && (it.x === undefined || it.x === null)) {
         const xr = pw.xRange ? pw.xRange(s, p.id, src) : { min: 0, max: getReadyRes(p) };
         const opts = []; for (let x = xr.min; x <= Math.min(xr.max, getReadyRes(p)); x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
-        if (!opts.length) return abortPrep(s, 'X nicht bezahlbar');
-        ask(s, { pid: p.id, prompt: `${src.name}: Wähle X`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'x' }, keep: true });
+        if (!opts.length) return abortPrep(s, tr('X nicht bezahlbar'));
+        ask(s, { pid: p.id, prompt: tr`${src.name}: Wähle X`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'x' }, keep: true });
         return;
     }
     if (pw.modes && (it.mode === undefined || it.mode === null)) {
         const opts = pw.modes(s, p.id, src, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai }));
-        ask(s, { pid: p.id, prompt: `${src.name}: Wähle`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
+        ask(s, { pid: p.id, prompt: tr`${src.name}: Wähle`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
         return;
     }
     const slots = targetSlots(s, p.id, pw, src, it);
@@ -1384,7 +1384,7 @@ EK.prepItemPower = (s) => {
         const mn = sl.min === undefined ? 1 : sl.min, mx = sl.max === undefined ? 1 : sl.max;
         const used = it.targets.flat();
         const cands = sl.cands.filter(u => !(pw.distinct && used.includes(u)));
-        if (cands.length < mn) return abortPrep(s, 'Kein legales Ziel');
+        if (cands.length < mn) return abortPrep(s, tr('Kein legales Ziel'));
         it._slot = { i, mn, mx, picked: [] };
         if (takeFirstTarget(it, cands)) { if (it._slot.picked.length >= mx) { it.targets[i] = it._slot.picked; delete it._slot; continue; } }
         askTargetPower(s, p.id, src, sl, cands, it);
@@ -1394,11 +1394,11 @@ EK.prepItemPower = (s) => {
     if (!it.costPaid) {
         it.costPaid = true;
         const cost = pw.cost === 'X' ? (it.x || 0) : (pw.cost || 0);
-        if (!payRes(p, cost)) return abortPrep(s, 'Nicht genug Ressourcen');
+        if (!payRes(p, cost)) return abortPrep(s, tr('Nicht genug Ressourcen'));
         if (pw.act) exhaust(s, src);
         if (pw.exhaustHero) exhaust(s, p.hero);
         if (pw.once === 'turn') { src.usedTurn = src.usedTurn || {}; src.usedTurn[pw.key] = s.turn; }
-        if (pw.flip) { src.flipped = true; L(s, `🔄 ${src.name} wird umgedreht.`); }
+        if (pw.flip) { src.flipped = true; L(s, tr`🔄 ${src.name} wird umgedreht.`); }
         if (pw.payExtra) { pw.payExtra(s, it, src); return; }   // weitere Kosten (z.B. Ally zerstören) – ruft danach E:finishPrep
         if (pw.selfCost) pw.selfCost(s, it, src);
     }
@@ -1407,11 +1407,11 @@ EK.prepItemPower = (s) => {
 function askTargetPower(s, pid, src, sl, cands, it) {
     const st = it._slot;
     const opts = cands.filter(u => !st.picked.includes(u)).map(u => ({ label: targetLabel(s, u, pid), v: u, ai: sl.ai ? sl.ai(u, s) : aiTargetValue(s, pid, u, sl.harm) }));
-    if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? 'Fertig' : 'Kein Ziel', v: '__done', ai: -0.5 });
+    if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? tr('Fertig') : tr('Kein Ziel'), v: '__done', ai: -0.5 });
     ask(s, { pid, prompt: `${src.name}: ${sl.label}${st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : ''}`, src: src.name, opts, k: 'E:prepPowerTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
 }
-EK.prepPowerSet = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'vom Spieler abgebrochen'); s.chainPrep[a.key] = v; q(s, { op: 'call', k: 'E:prepItemPower', a: {} }); };
-EK.prepPowerTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'vom Spieler abgebrochen');
+EK.prepPowerSet = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen')); s.chainPrep[a.key] = v; q(s, { op: 'call', k: 'E:prepItemPower', a: {} }); };
+EK.prepPowerTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen'));
     const it = s.chainPrep; const st = it._slot;
     if (v !== '__done') st.picked.push(v);
     const src = findCharacter(s, it.src); const pw = getPower(s, src, it.key);
@@ -1425,8 +1425,8 @@ EK.prepPowerTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, 'v
 
 // Verliehene Kräfte
 const FX_GRANT = {
-    bow: { label: 'Ziehe 1 (Blessing of Wisdom)', act: true, resolve: (s, it) => drawCards(s, getPlayer(s, it.pl), 1) },
-    faceSmash: { key: 'faceSmash', label: 'Zerstöre Ziel-Ally (Face Smash)', act: true,
+    bow: { label: tr('Ziehe 1 (Blessing of Wisdom)'), act: true, resolve: (s, it) => drawCards(s, getPlayer(s, it.pl), 1) },
+    faceSmash: { key: 'faceSmash', label: tr('Zerstöre Ziel-Ally (Face Smash)'), act: true,
         slots: (s, pid) => [{ label: 'Ziel-Ally', cands: targetCands(s, pid, { ally: true }), harm: true }],
         resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } },
 };
@@ -1458,9 +1458,9 @@ function targetCands(s, pid, spec) {
 }
 function targetLabel(s, uid, pid) {
     const l = locate(s, uid); if (!l) return '?';
-    const c = l.c; const who = l.pid === pid ? 'eigen' : 'Gegner';
+    const c = l.c; const who = l.pid === pid ? tr('eigen') : tr('Gegner');
     if (isChar(c)) return `${c.name} (${who}, ${Math.max(0, hpOf(s, c) - (c.damage || 0))} HP)`;
-    if (l.zone === 'graveyard') return `${c.name} (Friedhof)`;
+    if (l.zone === 'graveyard') return tr`${c.name} (Friedhof)`;
     if (l.zone === 'hand') return `${c.name}`;
     return `${c.name} (${who})`;
 }
@@ -1480,7 +1480,7 @@ function dmgStep(s, o) {
     if (!o.redirected) {
         const iv = (tl.c.tm || []).find(m => m.k === 'intervene' && m.turn === s.turn && !m.used);
         const to = iv ? getPlayer(s, iv.pid).hero.uid : auraAny(s, 'redirect', tl.c, o);
-        if (to && to !== tl.c.uid) { if (iv) iv.used = true; L(s, `↪ Schaden an ${tl.c.name} geht an ${nameOf(s, to)}.`); o = { ...o, tgt: to, redirected: true }; tl = locate(s, to); if (!tl) return; }
+        if (to && to !== tl.c.uid) { if (iv) iv.used = true; L(s, tr`↪ Schaden an ${tl.c.name} geht an ${nameOf(s, to)}.`); o = { ...o, tgt: to, redirected: true }; tl = locate(s, to); if (!tl) return; }
     }
     const t = tl.c; const tp = getPlayer(s, tl.pid);
     const src = o.src ? findCharacter(s, o.src) : null;
@@ -1553,15 +1553,15 @@ EK.armorAsk = (s, a) => {
     const st = a.st; const tp = getPlayer(s, st.tp);
     const armors = tp.hero.armors.filter(x => x.type === 'Armor' && !x.exhausted && defOf(s, x) > 0);
     if (!armors.length || st.amt <= 0) { q(s, { ...st, op: 'dmgApply' }); return; }
-    const opts = armors.map(x => ({ label: `${x.name} erschöpfen (verhindert ${Math.min(defOf(s, x), st.amt)})`, v: x.uid, ai: Math.min(defOf(s, x), st.amt) * 2 - defOf(s, x) * 0.1 }));
-    opts.push({ label: `Keine Rüstung – ${st.amt} Schaden nehmen`, v: '__none', ai: 0 });
-    ask(s, { pid: tp.id, prompt: `${tp.hero.name} erhält ${st.amt} Schaden. Rüstung benutzen?`, src: 'Rüstung', opts, k: 'E:armorUse', a: { st }, keep: true });
+    const opts = armors.map(x => ({ label: tr`${x.name} erschöpfen (verhindert ${Math.min(defOf(s, x), st.amt)})`, v: x.uid, ai: Math.min(defOf(s, x), st.amt) * 2 - defOf(s, x) * 0.1 }));
+    opts.push({ label: tr`Keine Rüstung – ${st.amt} Schaden nehmen`, v: '__none', ai: 0 });
+    ask(s, { pid: tp.id, prompt: tr`${tp.hero.name} erhält ${st.amt} Schaden. Rüstung benutzen?`, src: 'Rüstung', opts, k: 'E:armorUse', a: { st }, keep: true });
 };
 EK.armorUse = (s, a, v) => {
     const st = a.st;
     if (v === '__none') { q(s, { ...st, op: 'dmgApply' }); return; }
     const ar = findCharacter(s, v);
-    if (ar && !ar.exhausted) { const d = defOf(s, ar); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, `🛡 ${ar.name} verhindert ${pv} Schaden.`);
+    if (ar && !ar.exhausted) { const d = defOf(s, ar); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, tr`🛡 ${ar.name} verhindert ${pv} Schaden.`);
         if (pv > 0) evt(s, 'armorPrevented', { uid: ar.uid, pid: st.tp, src: st.src || null, amt: pv }); }   // "When this armor prevents damage" (Drillborer Disk)
     q(s, { op: 'call', k: 'E:armorAsk', a: { st } });
 };
@@ -1573,7 +1573,7 @@ function dmgApply(s, st) {
     if (amt > 0) {
         t.damage = (t.damage || 0) + amt;
         t.dmgTurn = s.turn;
-        L(s, `💥 ${t.name} erhält ${amt} ${st.dt ? dtName(st.dt) + '-' : ''}Schaden${st.src ? ' von ' + nameOf(s, st.src) : ''}.`, "log-hit");
+        L(s, tr`💥 ${t.name} erhält ${amt} ${st.dt ? dtName(st.dt) + tr('-') : ''}Schaden${st.src ? tr(tr(' von ')) + nameOf(s, st.src) : ''}.`, "log-hit");
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('hit');
         fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero' });
         if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; }
@@ -1594,7 +1594,7 @@ function dmgApply(s, st) {
     }
     if (st.after) q(s, { op: 'call', k: st.after.k, a: { ...st.after.a, dealt: amt } });
 }
-function dtName(dt) { return ({ Melee: 'Nahkampf', Ranged: 'Fernkampf', Fire: 'Feuer', Frost: 'Frost', Arcane: 'Arkan', Nature: 'Natur', Shadow: 'Schatten', Holy: 'Heilig' })[dt] || dt; }
+function dtName(dt) { return ({ Melee: tr('Nahkampf'), Ranged: tr('Fernkampf'), Fire: tr('Feuer'), Frost: tr('Frost'), Arcane: tr('Arkan'), Nature: tr('Natur'), Shadow: tr('Schatten'), Holy: tr('Heilig') })[dt] || dt; }
 
 // Engine-weite Reaktionen auf Schaden
 EV.damaged = (s, d) => {
@@ -1672,14 +1672,14 @@ EK.grayson = (s, a) => {
     const g = findCharacter(s, a.uid); if (!g) return;
     const pid = ctrlOf(s, g);
     const cands = targetCands(s, pid, { char: true });
-    ask(s, { pid, prompt: 'Lord Grayson: Heile 2 Schaden von Ziel', src: g.name, opts: cands.map(u => ({ label: targetLabel(s, u, pid), v: u, ai: healValue(s, pid, u, 2) })), k: 'E:graysonHeal', a: { uid: g.uid } });
+    ask(s, { pid, prompt: tr('Lord Grayson: Heile 2 Schaden von Ziel'), src: g.name, opts: cands.map(u => ({ label: targetLabel(s, u, pid), v: u, ai: healValue(s, pid, u, 2) })), k: 'E:graysonHeal', a: { uid: g.uid } });
 };
 EK.graysonHeal = (s, a, v) => heal(s, a.uid, v, 2);
 // "you may pay (n). If you do, draw a card."
 EK.mayPayDraw = (s, a) => {
     const p = getPlayer(s, a.pid);
     if (getReadyRes(p) < a.cost) return;
-    ask(s, { pid: p.id, prompt: `${a.src}: (${a.cost}) bezahlen und eine Karte ziehen?`, src: a.src, opts: [{ label: `Ja (${a.cost})`, v: 1, ai: 3 }, { label: 'Nein', v: 0, ai: 0 }], k: 'E:mayPayDrawDo', a, auto: false });
+    ask(s, { pid: p.id, prompt: tr`${a.src}: (${a.cost}) bezahlen und eine Karte ziehen?`, src: a.src, opts: [{ label: tr`Ja (${a.cost})`, v: 1, ai: 3 }, { label: tr('Nein'), v: 0, ai: 0 }], k: 'E:mayPayDrawDo', a, auto: false });
 };
 EK.mayPayDrawDo = (s, a, v) => { if (v && payRes(getPlayer(s, a.pid), a.cost)) drawCards(s, getPlayer(s, a.pid), 1); };
 // Abwerfen: Spieler wählt selbst
@@ -1689,33 +1689,33 @@ EK.discard = (s, a) => {
 };
 EK.discardOne = (s, a) => {
     const p = getPlayer(s, a.pid); if (!p.hand.length) return;
-    ask(s, { pid: p.id, prompt: `${a.src ? a.src + ': ' : ''}Wirf eine Karte ab`, src: a.src || 'Abwerfen', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: 'E:discardDo', a: {} });
+    ask(s, { pid: p.id, prompt: tr`${a.src ? a.src + ': ' : ''}Wirf eine Karte ab`, src: a.src || 'Abwerfen', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: 'E:discardDo', a: {} });
 };
-EK.discardDo = (s, a, uid) => { const l = locate(s, uid); if (!l || l.zone !== 'hand') return; const p = getPlayer(s, l.pid); p.hand.splice(p.hand.indexOf(l.c), 1); p.graveyard.push(l.c); L(s, `🗑 ${p.hero.name} wirft ${l.c.name} ab.`); evt(s, 'discarded', { pid: p.id, uid }); evt(s, 'cardDiscarded', { pid: p.id, uid, id: l.c.id }); evt(s, 'handLeft', { pid: p.id, uid }); };
+EK.discardDo = (s, a, uid) => { const l = locate(s, uid); if (!l || l.zone !== 'hand') return; const p = getPlayer(s, l.pid); p.hand.splice(p.hand.indexOf(l.c), 1); p.graveyard.push(l.c); L(s, tr`🗑 ${p.hero.name} wirft ${l.c.name} ab.`); evt(s, 'discarded', { pid: p.id, uid }); evt(s, 'cardDiscarded', { pid: p.id, uid, id: l.c.id }); evt(s, 'handLeft', { pid: p.id, uid }); };
 EK.destroyOwnResource = (s, a) => {
     const p = getPlayer(s, a.pid); if (!p.resources.length) return;
-    ask(s, { pid: p.id, prompt: 'Zerstöre eine eigene Ressource', src: 'The Cruel Hand of Timmy', opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : `Verdeckte Ressource ${i + 1}${r.exhausted ? ' (erschöpft)' : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: 'E:destroyResDo', a: {} });
+    ask(s, { pid: p.id, prompt: tr('Zerstöre eine eigene Ressource'), src: tr('The Cruel Hand of Timmy'), opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Verdeckte Ressource ${i + 1}${r.exhausted ? tr(tr(tr(tr(' (erschöpft)')))) : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: 'E:destroyResDo', a: {} });
 };
 EK.destroyResDo = (s, a, uid) => destroyResource(s, uid);
 function destroyResource(s, cardUid) {
     for (const p of [s.p1, s.p2]) {
         const i = p.resources.findIndex(r => r.card.uid === cardUid);
-        if (i >= 0) { const r = p.resources.splice(i, 1)[0]; const owner = getPlayer(s, r.card.owner || p.id); resetInst(r.card); owner.graveyard.push(r.card); L(s, `🔥 Ressource von ${p.hero.name} zerstört (${r.faceUp ? r.card.name : 'verdeckt'}).`, 'log-hit'); evt(s, 'resDestroyed', { pid: p.id }); return true; }
+        if (i >= 0) { const r = p.resources.splice(i, 1)[0]; const owner = getPlayer(s, r.card.owner || p.id); resetInst(r.card); owner.graveyard.push(r.card); L(s, tr`🔥 Ressource von ${p.hero.name} zerstört (${r.faceUp ? r.card.name : tr('verdeckt')}).`, 'log-hit'); evt(s, 'resDestroyed', { pid: p.id }); return true; }
     }
     return false;
 }
 EK.shatterer = (s, a) => {
     const p = getPlayer(s, a.pid); if (!p.hero.weapons.length) return;
     const opts = [];
-    if (getReadyRes(p) >= 2) opts.push({ label: '(2) bezahlen – Waffe behalten', v: '__pay', ai: 5 });
-    p.hero.weapons.forEach(w => opts.push({ label: `${w.name} zerstören`, v: w.uid, ai: -weaponAtk(s, w) }));
-    ask(s, { pid: p.id, prompt: 'The Shatterer: Zerstöre eine deiner Waffen oder bezahle (2)', src: 'The Shatterer', opts, k: 'E:shattererDo', a, auto: false });
+    if (getReadyRes(p) >= 2) opts.push({ label: tr('(2) bezahlen – Waffe behalten'), v: '__pay', ai: 5 });
+    p.hero.weapons.forEach(w => opts.push({ label: tr`${w.name} zerstören`, v: w.uid, ai: -weaponAtk(s, w) }));
+    ask(s, { pid: p.id, prompt: tr('The Shatterer: Zerstöre eine deiner Waffen oder bezahle (2)'), src: 'The Shatterer', opts, k: 'E:shattererDo', a, auto: false });
 };
 EK.shattererDo = (s, a, v) => { if (v === '__pay') { payRes(getPlayer(s, a.pid), 2); return; } const w = findCharacter(s, v); if (w) destroy(s, w); };
 EK.greenWhelp = (s, a) => {
     const p = getPlayer(s, a.pid); const al = findCharacter(s, a.uid);
     if (!al || getReadyRes(p) < 2) return;
-    ask(s, { pid: p.id, prompt: `Green Whelp Armor: (2) bezahlen, um ${al.name} auf die Hand seines Besitzers zu schicken?`, src: 'Green Whelp Armor', opts: [{ label: 'Ja (2)', v: 1, ai: 2 + (al.cost || 0) }, { label: 'Nein', v: 0, ai: 0 }], k: 'E:greenWhelpDo', a, auto: false });
+    ask(s, { pid: p.id, prompt: tr`Green Whelp Armor: (2) bezahlen, um ${al.name} auf die Hand seines Besitzers zu schicken?`, src: 'Green Whelp Armor', opts: [{ label: tr('Ja (2)'), v: 1, ai: 2 + (al.cost || 0) }, { label: tr('Nein'), v: 0, ai: 0 }], k: 'E:greenWhelpDo', a, auto: false });
 };
 EK.greenWhelpDo = (s, a, v) => { if (v && payRes(getPlayer(s, a.pid), 2)) { const al = findCharacter(s, a.uid); if (al) bounce(s, al); } };
 
@@ -1737,7 +1737,7 @@ EK.circleOfLife = (s, a) => {
     const p = getPlayer(s, a.pid);
     const idx = p.deck.findIndex(id => isAllyCard(CARDS[id]) && CARDS[id].name === a.name);
     if (idx < 0) return;
-    ask(s, { pid: p.id, prompt: `Circle of Life: ${a.name} aus dem Deck erschöpft ins Spiel bringen?`, src: 'Circle of Life', show: [p.deck[idx]], opts: [{ label: 'Ja', v: 1, ai: 5 }, { label: 'Nein', v: 0, ai: 0 }], k: 'E:circleDo', a, auto: false });
+    ask(s, { pid: p.id, prompt: tr`Circle of Life: ${a.name} aus dem Deck erschöpft ins Spiel bringen?`, src: 'Circle of Life', show: [p.deck[idx]], opts: [{ label: tr('Ja'), v: 1, ai: 5 }, { label: tr('Nein'), v: 0, ai: 0 }], k: 'E:circleDo', a, auto: false });
 };
 EK.circleDo = (s, a, v) => {
     if (!v) return;
@@ -1757,7 +1757,7 @@ function putIntoPlay(s, c, pid, o = {}) {
     c.joinedTurn = s.turn; c.exhausted = !!o.exhausted; c.damage = o.damage || pf.enterDamage || 0;   // "enters play with N damage" (Set 3)
     if (pf.enterCounters) c.counters = { ...(c.counters || {}), ...pf.enterCounters };
     p.allies.push(c);
-    L(s, `✨ ${c.name} kommt für ${p.hero.name} ins Spiel.`);
+    L(s, tr`✨ ${c.name} kommt für ${p.hero.name} ins Spiel.`);
     evt(s, 'allyEnters', { uid: c.uid, pid });
     const f = fx(c); if (f.enter) f.enter(s, c, pid, null);
 }
@@ -1774,7 +1774,7 @@ function fkDraw(s, pid) {
     if (!p.fk || !p.fk.length) { lose(s, pid, 'DECKOUT'); return; }
     const seen = new Set();
     const opts = p.fk.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; }).map(id => ({ label: CARDS[id].name, v: id, card: id, ai: (CARDS[id].cost || 0) }));
-    ask(s, { pid, prompt: 'Forbidden Knowledge: Wähle eine entfernte Karte', src: 'Forbidden Knowledge', opts, k: 'E:fkPick', a: { pid } });
+    ask(s, { pid, prompt: tr('Forbidden Knowledge: Wähle eine entfernte Karte'), src: 'Forbidden Knowledge', opts, k: 'E:fkPick', a: { pid } });
 }
 EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexOf(id); if (i >= 0) { p.fk.splice(i, 1); p.hand.push(makeCardInst(id, false, p.id)); } };
 
@@ -1788,10 +1788,10 @@ function questCostOf(s, p, card) {
 function checkQuestCondition(s, p, r) {
     const id = r.card.id; const o = getOpponent(s, p.id);
     const f = FX[id] || {};
-    if (blockedQuests(s, p.id)) return 'Du kannst keine Quests abschließen';
+    if (blockedQuests(s, p.id)) return tr('Du kannst keine Quests abschließen');
     if (f.questCond) { const e = f.questCond(s, p.id, r); if (e) return e; }
     const cost = f.questNoPay ? 0 : questCostOf(s, p, r.card);
-    if (getReadyRes(p) < cost) return `Braucht (${cost})`;
+    if (getReadyRes(p) < cost) return tr`Braucht (${cost})`;
     return null;
 }
 function blockedQuests(s, pid) { return !!auraAny(s, 'noQuest', pid); }   // Greefer: "Opponents can't complete quests."
@@ -1807,15 +1807,15 @@ EK.questPay = (s) => {
     const r = p.resources.find(x => x.card.uid === qp.uid);
     if (!r) return;
     const f = FX[r.card.id] || {};
-    if (!f.questNoPay && !payRes(p, questCostOf(s, p, r.card))) { L(s, 'Nicht genug Ressourcen', 'log-hit'); return; }
+    if (!f.questNoPay && !payRes(p, questCostOf(s, p, r.card))) { L(s, tr('Nicht genug Ressourcen'), 'log-hit'); return; }
     if (!f.questNoPay) pes(s, p.id, 'questLess').forEach(m => m.used = true);
     r.faceUp = false;
-    L(s, `📜 [${p.hero.name}] Quest erfüllt: ${r.card.name}`, "log-heal");
+    L(s, tr`📜 [${p.hero.name}] Quest erfüllt: ${r.card.name}`, "log-heal");
     statCompleted(s, p.id, r.card.id);
     addPE(s, p.id, { k: 'questDone', id: r.card.id });                                    // Raene's Cleansing
     evt(s, 'questDone', { pid: p.id, uid: r.card.uid, id: r.card.id });                   // Penelope's Rose
     // CR 702.2: Abschließen = Belohnung als Link auf die Kette legen
-    s.chain.push({ kind: 'reward', id: newUid('rw_'), pl: p.id, src: r.card.uid, srcId: r.card.id, srcName: r.card.name, label: 'Belohnung' });
+    s.chain.push({ kind: 'reward', id: newUid('rw_'), pl: p.id, src: r.card.uid, srcId: r.card.id, srcName: r.card.name, label: tr('Belohnung') });
     const ow = s.win;
     s.win = linkWindow(s, p.id, ow);
     flushBatch(s);
@@ -1866,8 +1866,8 @@ function attackTargets(s, att) {
 }
 function attackTargetError(s, att, def) {
     if (!attackTargets(s, att).includes(def)) {
-        if (hasElusive(s, def)) return 'Elusive – kann nicht angegriffen werden';
-        return 'Kein gültiges Angriffsziel';
+        if (hasElusive(s, def)) return tr('Elusive – kann nicht angegriffen werden');
+        return tr('Kein gültiges Angriffsziel');
     }
     return null;
 }
@@ -1888,8 +1888,8 @@ function winterCost(s, att, def) {
 function startAttack(s, p, a) {
     const att = findCharacter(s, a.attackerUid), def = findCharacter(s, a.defenderUid);
     const wc = winterCost(s, att, def); if (wc) payRes(p, wc);
-    s.chain.push({ kind: 'proposal', id: newUid('pr_'), pl: p.id, att: att.uid, def: def.uid, label: 'Angriff' });
-    L(s, `⚔ ${att.name} will ${def.name} angreifen.`, "log-combat");
+    s.chain.push({ kind: 'proposal', id: newUid('pr_'), pl: p.id, att: att.uid, def: def.uid, label: tr('Angriff') });
+    L(s, tr`⚔ ${att.name} will ${def.name} angreifen.`, "log-combat");
     s.lastAttack = { att: att.uid, def: def.uid, t: Date.now() };
     const ow = s.win;
     s.win = linkWindow(s, p.id, ow);
@@ -1901,20 +1901,20 @@ function resolveProposal(s, it) {
     const p = getPlayer(s, it.pl);
     const legal = att && def && ctrlOf(s, att) === it.pl && !att.exhausted && attackTargets(s, att).includes(def)
         && isInPlayZone((locate(s, att.uid) || {}).zone) && isInPlayZone((locate(s, def.uid) || {}).zone);
-    if (!legal) { L(s, `✖ Angriff ${att ? att.name : '?'} → ${def ? def.name : '?'} wurde unterbrochen.`, "log-hit"); return; }
+    if (!legal) { L(s, tr`✖ Angriff ${att ? att.name : '?'} → ${def ? def.name : '?'} wurde unterbrochen.`, "log-hit"); return; }
     if (s.win) closeWindow(s);
     s.battle = { id: newUid('b_'), att: att.uid, def: def.uid, orig: def.uid, apid: p.id, dpid: ctrlOf(s, def), step: 'start', strikeA: null, strikeD: null, longRange: false };
 }
 function battleValid(s) {
     const b = s.battle; if (!b) return false;
     const a = locate(s, b.att), d = locate(s, b.def);
-    if (!a || !d || !isInPlayZone(a.zone) || !isInPlayZone(d.zone)) { endBattle(s, 'Kampfteilnehmer fehlt'); return false; }
-    if (a.pid !== b.apid || d.pid !== b.dpid) { endBattle(s, 'Kontrollwechsel'); return false; }
+    if (!a || !d || !isInPlayZone(a.zone) || !isInPlayZone(d.zone)) { endBattle(s, tr('Kampfteilnehmer fehlt')); return false; }
+    if (a.pid !== b.apid || d.pid !== b.dpid) { endBattle(s, tr('Kontrollwechsel')); return false; }
     return true;
 }
 function endBattle(s, why) {
     if (!s.battle) return;
-    if (why) L(s, `Kampf endet: ${why}.`, "log-combat");
+    if (why) L(s, tr`Kampf endet: ${why}.`, "log-combat");
     const b = s.battle;
     s.battle = null;
     evt(s, 'combatEnd', { att: b.att, def: b.def, apid: b.apid, dpid: b.dpid, id: b.id });   // "at the end of this combat" (Set 2/3)
@@ -1929,7 +1929,7 @@ function battleStep(s, step) {
         exhaust(s, att);
         att.attackedTurn = s.turn;
         addTM(att, { k: 'attacked', def: def.uid, turn: s.turn });                          // Revenge, Relics of Wakening (Set 2)
-        L(s, `⚔ ${att.name} greift ${def.name} an.`, "log-combat");
+        L(s, tr`⚔ ${att.name} greift ${def.name} an.`, "log-combat");
         s.lastAttack = { att: att.uid, def: def.uid, t: Date.now() };
         evt(s, 'attacks', { att: att.uid, def: def.uid, apid: b.apid, first: !(att.attackCount && att.attackCount.turn === s.turn) });
         att.attackCount = { turn: s.turn, n: (att.attackCount && att.attackCount.turn === s.turn ? att.attackCount.n : 0) + 1 };
@@ -1942,7 +1942,7 @@ function battleStep(s, step) {
     if (step === 'protect') { b.step = 'protecting'; askProtect(s); return; }
     if (step === 'protecting' || step === 'strikeA' || step === 'strikeD') return;     // wartet auf Entscheidung
     if (step === 'defend') {
-        L(s, `🛡 ${nameOf(s, b.def)} verteidigt gegen ${nameOf(s, b.att)}.`, "log-combat");
+        L(s, tr`🛡 ${nameOf(s, b.def)} verteidigt gegen ${nameOf(s, b.att)}.`, "log-combat");
         evt(s, 'defends', { def: b.def, dpid: b.dpid, att: b.att });
         b.step = 'strikeD';
         askStrike(s, 'D');
@@ -1974,9 +1974,9 @@ function askProtect(s) {
     const prots = protectorsFor(s);
     if (!prots.length) { b.step = 'defend'; return; }
     const att = findCharacter(s, b.att), def = findCharacter(s, b.def);
-    const opts = prots.map(c => ({ label: `🛡 ${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
-    opts.push({ label: 'Durchlassen', v: '__none', ai: 0 });
-    ask(s, { pid: b.dpid, prompt: `${att.name} greift ${def.name} an. Mit einem Protector blocken?`, src: 'Protector', opts, k: 'E:protectDo', a: {}, keep: true, protect: true });
+    const opts = prots.map(c => ({ label: tr`🛡 ${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
+    opts.push({ label: tr('Durchlassen'), v: '__none', ai: 0 });
+    ask(s, { pid: b.dpid, prompt: tr`${att.name} greift ${def.name} an. Mit einem Protector blocken?`, src: 'Protector', opts, k: 'E:protectDo', a: {}, keep: true, protect: true });
     flushBatch(s);
 }
 EK.protectDo = (s, a, v) => {
@@ -1986,7 +1986,7 @@ EK.protectDo = (s, a, v) => {
         if (pr && !pr.exhausted) {
             exhaust(s, pr);
             b.def = pr.uid; b.protectedBy = pr.uid; b.protecting = pr.uid;
-            L(s, `🛡 PROTECTED! ${pr.name} fängt den Angriff ab.`, "log-combat");
+            L(s, tr`🛡 PROTECTED! ${pr.name} fängt den Angriff ab.`, "log-combat");
             s.lastProtect = { uid: pr.uid, att: b.att, t: Date.now() };
             evt(s, 'protects', { uid: pr.uid, pid: b.dpid });
         }
@@ -2010,9 +2010,9 @@ function askStrike(s, side) {
     if (!ws.length) { b.step = next; return; }
     const p = getPlayer(s, pid);
     const ctx = side === 'A' ? { attacking: true, target: findCharacter(s, b.def) } : { defending: true };
-    const opts = ws.map(w => ({ label: `⚔ Schlag mit ${w.name} (+${weaponAtk(s, w, ctx)} ATK, Kosten ${strikeCost(s, p, w)})`, v: w.uid, ai: 10 + weaponAtk(s, w, ctx) - strikeCost(s, p, w) * 0.5 }));
-    opts.push({ label: 'Ohne Waffe', v: '__none', ai: 0 });
-    ask(s, { pid, prompt: side === 'A' ? `Mit einer Waffe zuschlagen?` : `${c.name} verteidigt: Mit einer Waffe zurückschlagen?`, src: 'Waffenschlag', opts, k: 'E:strikeDo', a: { side }, keep: true });
+    const opts = ws.map(w => ({ label: tr`⚔ Schlag mit ${w.name} (+${weaponAtk(s, w, ctx)} ATK, Kosten ${strikeCost(s, p, w)})`, v: w.uid, ai: 10 + weaponAtk(s, w, ctx) - strikeCost(s, p, w) * 0.5 }));
+    opts.push({ label: tr('Ohne Waffe'), v: '__none', ai: 0 });
+    ask(s, { pid, prompt: side === 'A' ? tr`Mit einer Waffe zuschlagen?` : tr`${c.name} verteidigt: Mit einer Waffe zurückschlagen?`, src: 'Waffenschlag', opts, k: 'E:strikeDo', a: { side }, keep: true });
     flushBatch(s);
 }
 EK.strikeDo = (s, a, v) => {
@@ -2028,7 +2028,7 @@ EK.strikeDo = (s, a, v) => {
             const first = a.side === 'A' ? b.strikeA : b.strikeD;
             if (first) { if (a.side === 'A') b.strikeA2 = w.uid; else b.strikeD2 = w.uid; }   // Dual Wield: zweiter Schlag
             else if (a.side === 'A') b.strikeA = w.uid; else b.strikeD = w.uid;
-            L(s, `⚔ ${p.hero.name} schlägt mit ${w.name} zu.`, "log-combat");
+            L(s, tr`⚔ ${p.hero.name} schlägt mit ${w.name} zu.`, "log-combat");
             evt(s, 'strike', { pid, weapon: w.uid, side: a.side });
             if (w.id === 311 || w.id === 319) { if (a.side === 'A') b.longRange = true; }  // Long-Range
             if (w.id === 337) addTM(p.hero, { k: 'shield', v: 3, turn: s.turn, combat: b.id }); // Truesilver Champion
@@ -2039,9 +2039,9 @@ EK.strikeDo = (s, a, v) => {
                 const more = strikeOptions(s, pid).filter(x => x.slot === 'Melee' && x.uid !== w.uid);
                 if (more.length) {
                     const ctx = a.side === 'A' ? { attacking: true, target: findCharacter(s, b.def) } : { defending: true };
-                    const opts = more.map(x => ({ label: `⚔ Zweiter Schlag mit ${x.name} (+${weaponAtk(s, x, ctx)} ATK, Kosten ${strikeCost(s, p, x)})`, v: x.uid, ai: 10 + weaponAtk(s, x, ctx) - strikeCost(s, p, x) * 0.5 }));
-                    opts.push({ label: 'Kein zweiter Schlag', v: '__none', ai: 0 });
-                    ask(s, { pid, prompt: 'Dual Wield: Mit einer zweiten Nahkampfwaffe zuschlagen?', src: 'Dual Wield', opts, k: 'E:strikeDo', a, keep: true });
+                    const opts = more.map(x => ({ label: tr`⚔ Zweiter Schlag mit ${x.name} (+${weaponAtk(s, x, ctx)} ATK, Kosten ${strikeCost(s, p, x)})`, v: x.uid, ai: 10 + weaponAtk(s, x, ctx) - strikeCost(s, p, x) * 0.5 }));
+                    opts.push({ label: tr('Kein zweiter Schlag'), v: '__none', ai: 0 });
+                    ask(s, { pid, prompt: tr('Dual Wield: Mit einer zweiten Nahkampfwaffe zuschlagen?'), src: 'Dual Wield', opts, k: 'E:strikeDo', a, keep: true });
                     return;
                 }
             }
@@ -2063,7 +2063,7 @@ function combatDamage(s) {
     if (!longR && def.type === 'Hero' && dw2) dDmg += weaponAtk(s, dw2, { defending: true });
     const aType = att.type === 'Hero' ? (aw ? wdt(aw) : 'Melee') : (att.atkType || 'Melee');
     const dType = def.type === 'Hero' ? (dw ? wdt(dw) : 'Melee') : (def.atkType || 'Melee');
-    L(s, `⚔ Kampfschaden: ${att.name} ${aDmg} → ${def.name}, ${def.name} ${dDmg} → ${att.name}${longR ? ' (Long-Range)' : ''}`, "log-combat");
+    L(s, tr`⚔ Kampfschaden: ${att.name} ${aDmg} → ${def.name}, ${def.name} ${dDmg} → ${att.name}${longR ? ' (Long-Range)' : ''}`, "log-combat");
     b.step = 'done';
     const aWs = att.type === 'Hero' ? [aw, aw2].filter(Boolean).map(w => w.uid) : [], dWs = def.type === 'Hero' ? [dw, dw2].filter(Boolean).map(w => w.uid) : [];
     if (aDmg > 0) dealDamage(s, { src: att.uid, tgt: def.uid, amt: aDmg, dt: aType, combat: true, weapon: aWs[0] || null, weapons: aWs });
@@ -2076,7 +2076,7 @@ function removeAttackers(s, alliesOnly) {
     const b = s.battle; if (!b) return;
     const att = findCharacter(s, b.att);
     if (alliesOnly && att && att.type !== 'Ally') return;
-    endBattle(s, 'Angreifer aus dem Kampf entfernt');
+    endBattle(s, tr('Angreifer aus dem Kampf entfernt'));
 }
 
 // ---------------------------------------------------------------- Zugablauf
@@ -2084,13 +2084,13 @@ function turnStep(s, step) {
     const p = getPlayer(s, s.activePlayer);
     if (step === 'endPhase') {
         s.phase = 'end';
-        L(s, `— Ende des Zuges von ${p.hero.name} —`, "log-turn");
+        L(s, tr`— Ende des Zuges von ${p.hero.name} —`, "log-turn");
         // "At the end of turn" / "at the next end of turn" lösen zu Beginn der End-Phase aus (CR 405)
         evt(s, 'endOfTurn', { pid: p.id });
         evt(s, 'nextEndOfTurn', { pid: p.id });
         const due = (s.delayed || []).filter(d => d.at === 'nextEnd');
         s.delayed = (s.delayed || []).filter(d => d.at !== 'nextEnd');
-        due.forEach(d => (s.waitTrig || (s.waitTrig = [])).push({ pid: d.pid || p.id, src: d.src || null, srcId: d.srcId, srcName: d.srcName || 'Verzögerter Effekt', steps: [{ op: 'call', k: d.k, a: d.a }] }));
+        due.forEach(d => (s.waitTrig || (s.waitTrig = [])).push({ pid: d.pid || p.id, src: d.src || null, srcId: d.srcId, srcName: d.srcName || tr('Verzögerter Effekt'), steps: [{ op: 'call', k: d.k, a: d.a }] }));
         flushBatch(s);
         s.queue.push({ op: 'window', first: s.activePlayer, reason: 'end' });
         s.queue.push({ op: 'turn', step: 'wrapUp' });
@@ -2106,18 +2106,18 @@ function turnStep(s, step) {
     if (step === 'start') {
         s.lastTurnOf = s.lastTurnOf || {};
         let next = s.activePlayer === 1 ? 2 : 1;
-        if (s.extraTurn && s.extraTurn.pid === s.activePlayer) { next = s.activePlayer; s.extraTurn = null; L(s, '⏳ Chromie: Zusätzlicher Zug!', 'log-turn'); }
+        if (s.extraTurn && s.extraTurn.pid === s.activePlayer) { next = s.activePlayer; s.extraTurn = null; L(s, tr('⏳ Chromie: Zusätzlicher Zug!'), 'log-turn'); }
         // "Skip your next turn" (Lay on Hands, Gone Fishin') – Set 2/3
         s.skip = s.skip || {};
         let guardSkip = 0;
-        while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, `⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
+        while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, tr`⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
         s.activePlayer = next; s.turn++; s.placedResource = false; s.phase = 'start';
         s.lastTurnOf[next] = s.turn;
         s.pe = (s.pe || []).filter(m => m.until === 'game' || m.turn >= s.turn - 1 || (m.untilTurn && m.untilTurn >= s.turn));
         // Alte "this turn"-Modifikatoren aufräumen (nur Speicher – tms() wertet ohnehin nur den aktuellen Zug)
         for (const pl of [s.p1, s.p2]) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);
         const np = getPlayer(s, next);
-        L(s, `=== Zug ${s.turn}: ${np.hero.name} ===`, "log-turn");
+        L(s, tr`=== Zug ${s.turn}: ${np.hero.name} ===`, "log-turn");
         s.queue.push({ op: 'turn', step: 'ready' });
         return;
     }
@@ -2150,7 +2150,7 @@ function turnStep(s, step) {
         // "At the start of your next turn" (Death Coil, Spirit Guide …) – verzögerte ausgelöste Effekte
         const due = (s.delayed || []).filter(d => d.at === 'nextStart' && d.pid === p.id);
         s.delayed = (s.delayed || []).filter(d => !(d.at === 'nextStart' && d.pid === p.id));
-        due.forEach(d => (s.waitTrig || (s.waitTrig = [])).push({ pid: d.pid, src: d.src || null, srcId: d.srcId, srcName: d.srcName || 'Verzögerter Effekt', steps: [{ op: 'call', k: d.k, a: d.a }] }));
+        due.forEach(d => (s.waitTrig || (s.waitTrig = [])).push({ pid: d.pid, src: d.src || null, srcId: d.srcId, srcName: d.srcName || tr('Verzögerter Effekt'), steps: [{ op: 'call', k: d.k, a: d.a }] }));
         flushBatch(s);
         s.queue.push({ op: 'window', first: s.activePlayer, reason: 'ready' });     // Fenster im Ready-Step
         s.queue.push({ op: 'turn', step: 'draw' });
@@ -2170,7 +2170,7 @@ EK.helwenReady = (s, a) => {
     const h = findCharacter(s, a.uid); if (!h) return;
     const pid = ctrlOf(s, h);
     const holding = (h.counters && h.counters.helwen) ? findCharacter(s, h.counters.helwen) : null;
-    ask(s, { pid, prompt: 'Helwen: Im Ready-Step bereit machen?', src: 'Helwen', opts: [{ label: 'Bereit machen', v: 1, ai: holding ? 0 : 2 }, { label: `Erschöpft lassen${holding ? ' (behält ' + holding.name + ')' : ''}`, v: 0, ai: holding ? 3 : 0 }], k: 'E:helwenDo', a, auto: false });
+    ask(s, { pid, prompt: tr('Helwen: Im Ready-Step bereit machen?'), src: 'Helwen', opts: [{ label: tr('Bereit machen'), v: 1, ai: holding ? 0 : 2 }, { label: tr`Erschöpft lassen${holding ? tr(tr(tr(tr(' (behält ')))) + holding.name + ')' : ''}`, v: 0, ai: holding ? 3 : 0 }], k: 'E:helwenDo', a, auto: false });
 };
 EK.helwenDo = (s, a, v) => { if (v) { const h = findCharacter(s, a.uid); if (h) { h.exhausted = false; evt(s, 'readied', { uid: h.uid }); } } };
 
@@ -2248,7 +2248,7 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
             if (combos === null) continue;
             for (const tg of combos) {
                 if (f.aiSkip && f.aiSkip(s, pid, c, { x, mode, targets: tg })) continue;
-                const act = { type: 'PLAY_CARD', handIdx: idx, x, mode, targets: tg, actorId: pid, desc: `${c.name}${gyUid ? ' (aus dem Friedhof)' : ''}${x !== undefined ? ' X=' + x : ''}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` };
+                const act = { type: 'PLAY_CARD', handIdx: idx, x, mode, targets: tg, actorId: pid, desc: `${c.name}${gyUid ? tr(tr(tr(tr(' (aus dem Friedhof)')))) : ''}${x !== undefined ? ' X=' + x : ''}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` };
                 if (gyUid) act.gyUid = gyUid;
                 out.push(act);
             }
@@ -2315,7 +2315,7 @@ function getLegalActions(s, pid) {
     if (s.pending) {
         if (s.pending.pid !== pid) return [];
         if (s.pending.kind === 'choose') return s.pending.opts.map(o => ({ type: 'CHOOSE', v: o.v, actorId: pid, desc: o.label }));
-        return [...getPriorityActions(s, pid), { type: 'PASS', actorId: pid, desc: 'Passen' }];
+        return [...getPriorityActions(s, pid), { type: 'PASS', actorId: pid, desc: tr('Passen') }];
     }
     if (!canActMain(s, pid)) return [];
     const p = getPlayer(s, pid), o = getOpponent(s, pid);
@@ -2324,7 +2324,7 @@ function getLegalActions(s, pid) {
         const seen = new Set();
         p.hand.forEach((c, i) => {
             const vs = c.type === 'Quest' ? [true, false] : [false];
-            vs.forEach(fu => { const k = c.id + '|' + fu; if (seen.has(k)) return; seen.add(k); acts.push({ type: 'PLACE_RESOURCE', handIdx: i, faceUp: fu, actorId: pid, desc: c.type === 'Quest' ? `Quest ${c.name} ${fu ? 'offen' : 'verdeckt'}` : `Ressource: ${c.name}` }); });
+            vs.forEach(fu => { const k = c.id + '|' + fu; if (seen.has(k)) return; seen.add(k); acts.push({ type: 'PLACE_RESOURCE', handIdx: i, faceUp: fu, actorId: pid, desc: c.type === 'Quest' ? `Quest ${c.name} ${fu ? tr('offen') : tr('verdeckt')}` : tr`Ressource: ${c.name}` }); });
         });
     }
     p.resources.forEach((r, i) => { if (r.faceUp && r.card.type === 'Quest' && !checkQuestCondition(s, p, r)) acts.push({ type: 'COMPLETE_QUEST', resIdx: i, actorId: pid, desc: `Quest: ${r.card.name}` }); });
@@ -2357,7 +2357,19 @@ function cardValue(s, c) {
     if (c.isTotem) return 4 + (c.cost || 0);
     return 2 + (c.cost || 0);
 }
-function cardHandValue(s, p, c) { return (c.cost || 0) + (c.type === 'Ally' ? 1 : 0) + (c.type === 'Quest' ? -1 : 0); }
+// Wert einer Handkarte für die KI (Abwerfen, Karte aus der Hand abgeben): der niedrigste Wert geht.
+// Wie beim Ressource-Legen (resourceKeepValue): unspielbare Karten zuerst, früh viel zu teure, spät zu billige,
+// Doppelte vor Einzelstücken. Quests: die erste ist als offene Ressource nützlich, jede weitere auf der Hand und
+// jede schon offen liegende Quest macht eine Quest weniger wertvoll.
+function cardHandValue(s, p, c) {
+    if (!c) return 0;
+    if (c.type === 'Quest') {
+        const inHand = p.hand.filter(x => x.type === 'Quest').length;
+        const faceUp = p.resources.filter(r => r.faceUp && r.card && r.card.type === 'Quest').length;
+        return 6 - (inHand - 1) * 2 - faceUp;
+    }
+    return resourceKeepValue(s, p, c);
+}
 function aiTargetValue(s, pid, uid, harm) {
     const l = locate(s, uid); if (!l) return 0;
     const mine = l.pid === pid;
@@ -2415,7 +2427,7 @@ function doMulligan(s, pid) {
     p.deck = shuffleDeck(p.deck.concat(p.hand.map(c => c.id)));
     p.hand = [];
     drawCards(s, p, 7);
-    L(s, `🔄 ${p.hero.name} nimmt einen Mulligan.`, "log-turn");
+    L(s, tr`🔄 ${p.hero.name} nimmt einen Mulligan.`, "log-turn");
     return true;
 }
 // Hausregel (nicht in den CR, per Menü wählbar): Mulligan im Hearthstone-Stil. Die markierten
@@ -2433,7 +2445,7 @@ function doPartialMulligan(s, pid, uids) {
     const fresh = p.hand;
     p.hand = old.map(c => uids.includes(c.uid) ? fresh.shift() : c).filter(Boolean);
     p.deck = shuffleDeck(p.deck.concat(swap.map(c => c.id)));
-    L(s, `🔄 ${p.hero.name} tauscht ${swap.length} Karte${swap.length === 1 ? '' : 'n'}.`, "log-turn");
+    L(s, tr`🔄 ${p.hero.name} tauscht ${swap.length} Karte${swap.length === 1 ? '' : 'n'}.`, "log-turn");
     return true;
 }
 function aiWantsMulligan(s, pid) {

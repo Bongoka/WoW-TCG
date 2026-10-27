@@ -2,7 +2,8 @@
 // REGEL- & KARTEN-TESTS (laufen ohne Oberfläche; Grundlage: CR v7.4 und OCR)
 // ============================================================================
 function runRuleTests() {
-    const results = [];
+    const results = [], prevLang = LANG;
+    LANG = 'de';   // Meldungen der Engine immer deutsch, unabhängig von der Spracheinstellung
     const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
     const test = (num, name, fn) => { try { fn(); results.push({ num, name, ok: true, msg: 'OK' }); } catch (e) { results.push({ num, name, ok: false, msg: e.message }); } };
     const deck = id => GAME_DECKS.find(d => d.id === id);
@@ -697,10 +698,39 @@ function runRuleTests() {
         P(s, 1).ongoing = [];
         assert(w === 1 && atkOf(s, P(s, 1).hero, {}) === 0, `mit Waffe ${w} statt 1`);
     });
+    test(92, 'Englisch: alle Texte von Engine und Karten haben eine Übersetzung (I18N_EN)', () => {
+        LANG = 'en'; I18N_MISS.clear();
+        try { runCardTests(); simulateOneGame(deck('alliance_mage'), deck('horde_warrior')); } finally { LANG = 'de'; }
+        const miss = [...I18N_MISS].filter(k => /[äöüÄÖÜß]|\b(der|die|das|und|nicht|kein|mit|für|auf|ist|wird|Zug|Karte|Ziel|Wähle|Schaden)\b/.test(k));
+        assert(!miss.length, `${miss.length} ohne Übersetzung: ` + miss.slice(0, 6).join(' · '));
+    });
+    test(93, 'KI wirft sinnvoll ab: unspielbar, früh zu teuer, spät zu billig, überzählige Quests', () => {
+        const pick = (resN, ids, faceUpQuests = 0) => {
+            const s = fresh(); s.real = false; const p = P(s, 1);
+            p.resources = []; res(s, 1, resN); for (let i = 0; i < faceUpQuests; i++) res(s, 1, 1, Object.values(CARDS).find(c => c.type === 'Quest').id);
+            p.hand = ids.map(id => makeCardInst(id, false, 1)); p.graveyard = [];
+            q(s, { op: 'call', k: 'E:discard', a: { pid: 1, n: 1, src: 'Test' } }); process(s); autoResolve(s);
+            return p.graveyard[0] && p.graveyard[0].id;
+        };
+        const p1 = P(fresh(), 1), mine = c => cardMatchesPlayer(c, p1) && !c.talentReq && !c.isToken;
+        const ally = cost => Object.values(CARDS).find(c => c.type === 'Ally' && !c.unique && c.cost === cost && mine(c)).id;
+        const big = Object.values(CARDS).find(c => c.type !== 'Quest' && c.type !== 'Hero' && (c.cost || 0) >= 8 && mine(c)).id;
+        const quests = Object.values(CARDS).filter(c => c.type === 'Quest').slice(0, 3).map(c => c.id);
+        const foreign = Object.values(CARDS).find(c => c.type === 'Ally' && !cardMatchesPlayer(c, p1)).id;
+        let d = pick(2, [ally(1), ally(2), big, quests[0]]);
+        assert(d === big, `früh: ${CARDS[d] && CARDS[d].name} statt der teuren Karte abgeworfen`);
+        d = pick(7, [ally(1), ally(4), ally(5)]);
+        assert(d === ally(1), `spät: ${CARDS[d] && CARDS[d].name} statt der 1er abgeworfen`);
+        d = pick(3, [ally(2), ally(3), quests[0], quests[1], quests[2]], 2);
+        assert(CARDS[d] && CARDS[d].type === 'Quest', `viele Quests: ${CARDS[d] && CARDS[d].name} statt einer Quest abgeworfen`);
+        d = pick(3, [ally(2), ally(3), quests[0], foreign]);
+        assert(d === foreign, `unspielbar: ${CARDS[d] && CARDS[d].name} statt der fremden Karte abgeworfen`);
+    });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
     });
+    LANG = prevLang;
     return results;
 }
 

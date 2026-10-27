@@ -45,7 +45,7 @@ function updateImgStyleOptions() {
     for (const o of sel.options) {
         if (!(o.value in avail)) continue;
         o.disabled = !avail[o.value];
-        o.textContent = o.textContent.replace(/ \(nicht installiert\)$/, '') + (avail[o.value] ? '' : ' (nicht installiert)');
+        o.textContent = o.textContent.replace(/ \(nicht installiert\)$/, '') + (avail[o.value] ? '' : tr(' (nicht installiert)'));
     }
     // Gewählte Option nicht installiert (z. B. Paket nur mit Scans): erste vorhandene nehmen
     if (avail[imgStyle()] === false) {
@@ -117,18 +117,18 @@ const UNDO = { stack: [], max: 30 };
 function takeUndoSnapshot() { return structuredClone({ ...G, _undo: null }); }
 function describeUndoAction(snap, action) {
     const p = snap.p1;
-    if (action.type === 'PLACE_RESOURCE') { const c = p.hand[action.handIdx]; return c ? `Ressource (${c.name})` : 'Ressource'; }
-    if (action.type === 'PLAY_CARD') { const c = p.hand[action.handIdx]; return c ? c.name : 'Karte'; }
+    if (action.type === 'PLACE_RESOURCE') { const c = p.hand[action.handIdx]; return c ? tr`Ressource (${c.name})` : tr('Ressource'); }
+    if (action.type === 'PLAY_CARD') { const c = p.hand[action.handIdx]; return c ? c.name : tr('Karte'); }
     if (action.type === 'COMPLETE_QUEST') { const r = p.resources[action.resIdx]; return r && r.card ? `Quest ${r.card.name}` : 'Quest'; }
-    if (action.type === 'ATTACK') return 'Angriff';
-    if (action.type === 'ACTIVATE') return 'Kraft';
-    return 'Aktion';
+    if (action.type === 'ATTACK') return tr('Angriff');
+    if (action.type === 'ACTIVATE') return tr('Kraft');
+    return tr('Aktion');
 }
 function commitUndoSnapshot(snap, action) {
     const sig = pl => pl.deck.join(',');
     const deckChanged = sig(snap.p1) !== sig(G.p1) || sig(snap.p2) !== sig(G.p2);
     if (deckChanged || G._hidden || G._oppDecided || G.gameOver || action.type === 'END_TURN') {
-        if (UNDO.stack.length && action.type !== 'END_TURN') addLog("Rückgängig hier nicht möglich (verdeckte Info / Zufall / Gegner hat entschieden) – Verlauf gelöscht.", "");
+        if (UNDO.stack.length && action.type !== 'END_TURN') addLog(tr("Rückgängig hier nicht möglich (verdeckte Info / Zufall / Gegner hat entschieden) – Verlauf gelöscht."), "");
         UNDO.stack = [];
         return;
     }
@@ -145,7 +145,7 @@ function undoLastAction() {
     UI.reset();
     UI.handSeen = new Set(G.p1.hand.map(c => c.uid));   // zurückgenommene Karten nicht "anfliegen" lassen
     UI.oppSeen = new Set(G.p2.hand.map(c => c.uid));
-    addLog(`↶ Rückgängig: ${desc}`, "log-turn");
+    addLog(tr`↶ Rückgängig: ${desc}`, "log-turn");
     render();
 }
 
@@ -157,7 +157,7 @@ const MULLIGAN_KEY = 'wow_tcg_mulligan_mode';
 function mulliganMode() { try { return localStorage.getItem(MULLIGAN_KEY) === 'hs' ? 'hs' : 'standard'; } catch (e) { return 'standard'; } }
 function updateMulliganButton() {
     const b = document.getElementById("btn-mulligan-mode");
-    if (b) b.textContent = mulliganMode() === 'hs' ? "🃏 Mulligan: Hearthstone" : "🔄 Mulligan: Standard";
+    if (b) b.textContent = mulliganMode() === 'hs' ? tr("🃏 Mulligan: Hearthstone") : tr("🔄 Mulligan: Standard");
 }
 function toggleMulliganMode() {
     try { localStorage.setItem(MULLIGAN_KEY, mulliganMode() === 'hs' ? 'standard' : 'hs'); } catch (e) {}
@@ -165,7 +165,7 @@ function toggleMulliganMode() {
 }
 function updateRulesTextButton() {
     const b = document.getElementById("btn-rules-text");
-    if (b) b.textContent = rulesTextMode() === 'expert' ? "📜 Regeltexte: Expert" : "💬 Regeltexte: Casual";
+    if (b) b.textContent = rulesTextMode() === 'expert' ? tr("📜 Regeltexte: Expert") : tr("💬 Regeltexte: Casual");
 }
 function toggleRulesTextMode() {
     try { localStorage.setItem(RULES_TEXT_KEY, rulesTextMode() === 'expert' ? 'casual' : 'expert'); } catch (e) {}
@@ -193,11 +193,11 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     G.real = true; G.humans = [1];
     UI.reset();
     dealOpeningHands(G);
-    addLog(`=== PARTIE: ${pDeck.name} vs ${oDeck.name} ===`, "log-turn");
+    addLog(tr`=== PARTIE: ${pDeck.name} vs ${oDeck.name} ===`, "log-turn");
     if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
     refreshDisplay(G);
     resetBanter();
-    const startPlay = () => { showTurnBanner("Dein Zug!"); setTimeout(() => cpuSay('greet'), 1400); };
+    const startPlay = () => { showTurnBanner(tr("Dein Zug!")); setTimeout(() => cpuSay('greet'), 1400); };
     if (mulliganMode() === 'hs') {
         // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
         UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
@@ -207,8 +207,8 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     }
     render();
     // Mulligan (CR 101.2: einmal)
-    openDecisionModal("Starthand", "Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?", [
-        { label: "Behalten", cls: "success", action: startPlay },
+    openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
+        { label: tr("Behalten"), cls: "success", action: startPlay },
         { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
     ]);
 }
@@ -227,7 +227,7 @@ function humanAct(action) {
 }
 function endTurn() {
     if (!G || G.gameOver || UI.busy) return;
-    if (!canActMain(G, 1)) { addLog("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette).", "log-hit"); return; }
+    if (!canActMain(G, 1)) { addLog(tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."), "log-hit"); return; }
     const err = validateAction(G, { type: 'END_TURN' }, 1);
     if (err) { addLog(err, "log-hit"); return; }
     sfx.play('play');
@@ -246,18 +246,18 @@ async function driveCpu() {
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
             if (G.activePlayer !== 2) break;
-            if (!announced) { announced = true; showTurnBanner("CPU ist am Zug!"); UI.busy = true; render(); await sleep(700); cpuSay('turn', 0.35); }
-            updateCpuStatus(true, "CPU analysiert...");
+            if (!announced) { announced = true; showTurnBanner(tr("CPU ist am Zug!")); UI.busy = true; render(); await sleep(700); cpuSay('turn', 0.35); }
+            updateCpuStatus(true, tr("CPU analysiert..."));
             await sleep(250);
             // Ab und zu eine Denkpause mit Sprechblase
             if (steps > 0 && Math.random() < 0.25) { cpuSay('think'); await sleep(900 + Math.random() * 900); }
             const dec = steps < 25 ? searchBestAction(G, 2, document.getElementById("cfg-difficulty").value) : null;
             if (!dec || !dec.action) {
-                updateCpuStatus(true, "CPU beendet Zug.");
+                updateCpuStatus(true, tr("CPU beendet Zug."));
                 await sleep(400);
                 applyAction(G, { type: 'END_TURN', actorId: 2 }, false, 2);
                 render(); playEventAnimations();
-                if (G.activePlayer === 1 && isIdle(G)) showTurnBanner("Dein Zug!");
+                if (G.activePlayer === 1 && isIdle(G)) showTurnBanner(tr("Dein Zug!"));
                 continue;
             }
             updateCpuStatus(true, `CPU: ${dec.reason}`);
@@ -297,6 +297,9 @@ function updateCpuStatus(active, text = "") {
 }
 
 function bootGame() {
+    translateDom();                                                                       // feste Texte der Seite (Englisch)
+    document.documentElement.lang = LANG;
+    document.querySelectorAll('.lang-flag').forEach(f => { f.classList.toggle('active', f.dataset.lang === LANG); f.onclick = () => { if (f.dataset.lang !== LANG) setLang(f.dataset.lang); }; });
     document.getElementById("btn-end-turn").onclick = endTurn;
     document.getElementById("big-end-turn").onclick = endTurn;
     document.getElementById("btn-cancel-action").onclick = cancelAction;
@@ -315,26 +318,26 @@ function bootGame() {
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
     document.getElementById("btn-simulate").onclick = async () => {
-        const input = prompt("Wie viele Spiele pro Deck-Paar? (Standard: 3)", "3");
+        const input = prompt(tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), "3");
         if (input === null) return;
         const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1) { alert("Bitte eine Zahl ab 1."); return; }
-        try { await runSimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = `<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
+        if (isNaN(n) || n < 1) { alert(tr("Bitte eine Zahl ab 1.")); return; }
+        try { await runSimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
     };
     document.getElementById("btn-simulate-tourney").onclick = async () => {
         const n0 = tourneySimDecks().length;
-        const input = prompt(`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, "1");
+        const input = prompt(tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, "1");
         if (input === null) return;
         const n = parseInt(input, 10);
-        if (isNaN(n) || n < 1) { alert("Bitte eine Zahl ab 1."); return; }
-        try { await runTourneySimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = `<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
+        if (isNaN(n) || n < 1) { alert(tr("Bitte eine Zahl ab 1.")); return; }
+        try { await runTourneySimulation(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
     };
     document.getElementById("btn-simulate-all").onclick = async () => {
-        const input = prompt("Wie viele All-Cards-Spiele? (Standard: 100)", "100");
+        const input = prompt(tr("Wie viele All-Cards-Spiele? (Standard: 100)"), "100");
         if (input === null) return;
         const n = parseInt(input, 10);
-        if (isNaN(n) || n < 10) { alert("Bitte Zahl >= 10."); return; }
-        try { await runSimulationAllCards(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = `<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
+        if (isNaN(n) || n < 10) { alert(tr("Bitte Zahl >= 10.")); return; }
+        try { await runSimulationAllCards(n); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; }
     };
 
     const imgPathInput = document.getElementById("cfg-img-path");
@@ -350,7 +353,7 @@ function bootGame() {
     document.getElementById("btn-rules-text").onclick = toggleRulesTextMode;
     updateRulesTextButton();
     const autoBtn = document.getElementById("btn-auto-end");
-    const updAuto = () => { autoBtn.textContent = autoEndTurn() ? "⏩ Auto-Zugende: An" : "⏸ Auto-Zugende: Aus"; };
+    const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("⏩ Auto-Zugende: An") : tr("⏸ Auto-Zugende: Aus"); };
     autoBtn.onclick = () => { try { localStorage.setItem(AUTO_END_KEY, autoEndTurn() ? 'off' : 'on'); } catch (e) {} updAuto(); if (G) render(); };
     updAuto();
     probeImageDirs(updateImgStyleOptions);
@@ -364,7 +367,7 @@ function bootGame() {
     more.open = false;                                                                  // startet immer eingeklappt
     document.getElementById("btn-sound").onclick = (e) => {
         sfx.muted = !sfx.muted;
-        e.target.textContent = sfx.muted ? "🔇 Sound Aus" : "🔊 Sound An";
+        e.target.textContent = sfx.muted ? tr("🔇 Sound Aus") : tr("🔊 Sound An");
     };
     initUiHandlers();
     initGame();

@@ -4,19 +4,19 @@
 const DB_KEY = 'wow_tcg_custom_decks';
 const DB_TYPES = [
     { k: 'Ally', label: 'Allies', color: '#3b82f6', is: c => c.type === 'Ally' },
-    { k: 'Ability', label: 'Fähigkeiten', color: '#a855f7', is: c => c.type === 'Ability' },
-    { k: 'Equipment', label: 'Ausrüstung', color: '#d97706', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
+    { k: 'Ability', label: tr('Fähigkeiten'), color: '#a855f7', is: c => c.type === 'Ability' },
+    { k: 'Equipment', label: tr('Ausrüstung'), color: '#d97706', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
     { k: 'Quest', label: 'Quests', color: '#10b981', is: c => c.type === 'Quest' },
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
 const DBF = { type: 'All', cost: 'all', cls: null };
 const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
-const DB_CLASS_DE = { Druid: 'Druide', Hunter: 'Jäger', Mage: 'Magier', Paladin: 'Paladin', Priest: 'Priester', Rogue: 'Schurke', Shaman: 'Schamane', Warlock: 'Hexenmeister', Warrior: 'Krieger' };
+const DB_CLASS_DE = { Druid: tr('Druide'), Hunter: tr('Jäger'), Mage: tr('Magier'), Paladin: 'Paladin', Priest: tr('Priester'), Rogue: tr('Schurke'), Shaman: tr('Schamane'), Warlock: tr('Hexenmeister'), Warrior: tr('Krieger') };
 // Karte für eine Klasse spielbar (ohne Held: Fraktion/Talent noch offen)
 const dbClassOk = (c, cls) => !c.allowedClasses || !c.allowedClasses.length || c.allowedClasses.includes(cls);
 function loadCustomDecks() { try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch (e) { return []; } }
-function saveCustomDecks(list) { try { localStorage.setItem(DB_KEY, JSON.stringify(list)); return true; } catch (e) { alert('Speichern fehlgeschlagen: ' + e.message); return false; } }
+function saveCustomDecks(list) { try { localStorage.setItem(DB_KEY, JSON.stringify(list)); return true; } catch (e) { alert(tr('Speichern fehlgeschlagen: ') + e.message); return false; } }
 const dbHero = () => CARDS[currentDeckBuilder.heroId];
 const dbLegal = (card, hero = dbHero()) => !!hero && cardMatchesPlayer(card, hero) && (!card.talentReq || card.talentReq === hero.talent);
 const dbMax = card => card.unlimited ? Infinity : 4;
@@ -26,7 +26,7 @@ const dbCount = id => currentDeckBuilder.cards.filter(x => x === id).length;
 function openDeckBuilder(deck = null, asCopy = false) {
     document.getElementById("deck-builder-modal").style.display = "flex";
     // Neues Deck: weder Klasse noch Held gewählt – alle Karten sichtbar
-    if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? `${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
+    if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? tr`${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
     else currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
     DBF.cls = dbHero() ? dbHero().class : null;
     document.getElementById("db-name").value = currentDeckBuilder.name;
@@ -37,7 +37,7 @@ function renderDBAll() { renderDBHero(); renderDBPool(); renderDBDeck(); }
 function renderDBHero() {
     const bar = document.getElementById("db-class-bar"); bar.innerHTML = '';
     const all = document.createElement('button'); all.className = 'db-class all' + (DBF.cls ? '' : ' on');
-    all.innerHTML = '<span class="db-class-all">✦</span><small>Alle</small>'; all.title = 'Alle Klassen';
+    all.innerHTML = tr('<span class="db-class-all">✦</span><small>Alle</small>'); all.title = tr('Alle Klassen');
     all.onclick = () => { DBF.cls = null; currentDeckBuilder.heroId = null; renderDBAll(); };
     bar.appendChild(all);
     DB_CLASSES.forEach(cls => {
@@ -54,11 +54,11 @@ function renderDBHero() {
     const slot = document.getElementById("db-hero-slot"); slot.innerHTML = ''; const h = dbHero();
     slot.className = h ? 'has' : '';
     if (h) {
-        slot.insertAdjacentHTML('beforeend', `<div class="db-hs-info"><b>${esc(h.name)}</b><span>${esc(DB_CLASS_DE[h.class] || h.class)}</span><span>${esc(h.faction)}${h.talent ? ' · ' + esc(h.talent) : ''}</span><small>Klicken zum Wechseln</small></div>`);
+        slot.insertAdjacentHTML('beforeend', tr`<div class="db-hs-info"><b>${esc(h.name)}</b><span>${esc(DB_CLASS_DE[h.class] || h.class)}</span><span>${esc(h.faction)}${h.talent ? ' · ' + esc(h.talent) : ''}</span><small>Klicken zum Wechseln</small></div>`);
         const card = document.createElement('div'); card.className = 'db-hs-card';
         const n = createCardDOM({ ...h, uid: 'db_hero_' + h.id }, false, null, { stats: false, noDamage: true }); n.style.setProperty('--cw', '100%');
         card.appendChild(n); slot.appendChild(card);
-    } else slot.innerHTML = '<div class="db-hs-card empty">Held</div><div class="db-hs-info"><b>Held wählen</b><span class="db-hs-hint">Klicken: alle Helden mit Bild.<br>Der Held legt Klasse, Fraktion und Talent fest.</span></div>';
+    } else slot.innerHTML = tr('<div class="db-hs-card empty">Held</div><div class="db-hs-info"><b>Held wählen</b><span class="db-hs-hint">Klicken: alle Helden mit Bild.<br>Der Held legt Klasse, Fraktion und Talent fest.</span></div>');
     slot.onclick = () => openDBHeroPicker(!!DBF.cls);
 }
 // Auswahl aller Helden mit Bildern (bei aktivem Klassenfilter nur diese Klasse, umschaltbar)
@@ -67,10 +67,10 @@ function openDBHeroPicker(byClass) {
     const cls = byClass ? DBF.cls : null;
     const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && (!cls || c.class === cls))
         .sort((a, b) => a.class.localeCompare(b.class) || (a.set || 1) - (b.set || 1) || a.name.localeCompare(b.name));
-    document.getElementById('db-hp-title').textContent = `Held wählen · ${heroes.length} Helden${cls ? ' · ' + (DB_CLASS_DE[cls] || cls) : ''}`;
+    document.getElementById('db-hp-title').textContent = tr`Held wählen · ${heroes.length} Helden${cls ? ' · ' + (DB_CLASS_DE[cls] || cls) : ''}`;
     const tools = document.getElementById('db-hp-tools'); tools.innerHTML = '';
-    if (DBF.cls) { const b = document.createElement('button'); b.textContent = cls ? 'Alle Klassen zeigen' : `Nur ${DB_CLASS_DE[DBF.cls]}`; b.onclick = () => openDBHeroPicker(!cls); tools.appendChild(b); }
-    if (dbHero()) { const b = document.createElement('button'); b.textContent = 'Kein Held'; b.onclick = () => { currentDeckBuilder.heroId = null; closeDBHeroPicker(); renderDBAll(); }; tools.appendChild(b); }
+    if (DBF.cls) { const b = document.createElement('button'); b.textContent = cls ? tr('Alle Klassen zeigen') : tr`Nur ${DB_CLASS_DE[DBF.cls]}`; b.onclick = () => openDBHeroPicker(!cls); tools.appendChild(b); }
+    if (dbHero()) { const b = document.createElement('button'); b.textContent = tr('Kein Held'); b.onclick = () => { currentDeckBuilder.heroId = null; closeDBHeroPicker(); renderDBAll(); }; tools.appendChild(b); }
     let lastCls = null;
     heroes.forEach(h => {
         if (!cls && h.class !== lastCls) { lastCls = h.class; grid.insertAdjacentHTML('beforeend', `<div class="db-hp-cls"><img src="${CLASS_ICONS[h.class]}" alt="">${esc(DB_CLASS_DE[h.class] || h.class)}</div>`); }
@@ -119,7 +119,7 @@ function renderDBPool() {
     list.sort((a, b) => sort === 'set' ? (setNum(a)[0] - setNum(b)[0] || setNum(a)[1] - setNum(b)[1])
         : sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
         : ((a.type === 'Quest' ? 99 : a.cost || 0) - (b.type === 'Quest' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
-    document.getElementById("db-pool-count").textContent = `${list.length} Karten`;
+    document.getElementById("db-pool-count").textContent = tr`${list.length} Karten`;
     list.forEach(card => {
         const tile = document.createElement('div'); tile.className = 'db-tile'; tile.dataset.id = card.id;
         const node = createCardDOM({ ...card, uid: 'db_' + card.id }, false); node.classList.add('db-card');
@@ -143,7 +143,7 @@ function dbUpdateTile(id) {
 }
 function dbAdd(id) {
     const card = CARDS[id];
-    if (dbCount(id) >= dbMax(card)) { dbFlash(`Maximal 4 Kopien von „${card.name}“`); return; }
+    if (dbCount(id) >= dbMax(card)) { dbFlash(tr`Maximal 4 Kopien von „${card.name}“`); return; }
     currentDeckBuilder.cards.push(id); dbUpdateTile(id); renderDBDeck(id);
 }
 function dbRemove(id) {
@@ -168,7 +168,7 @@ function renderDBDeck(highlightId) {
     const maxB = Math.max(4, ...buckets.map(b => Object.values(b).reduce((x, y) => x + y, 0)));
     buckets.forEach((b, i) => {
         const tot = Object.values(b).reduce((x, y) => x + y, 0);
-        const col = document.createElement('div'); col.className = 'db-curve-col'; col.title = `Kosten ${i === 7 ? '7+' : i}: ${tot} Karten`;
+        const col = document.createElement('div'); col.className = 'db-curve-col'; col.title = tr`Kosten ${i === 7 ? '7+' : i}: ${tot} Karten`;
         const stack = document.createElement('div'); stack.className = 'db-curve-stack'; stack.style.height = (tot / maxB * 100) + '%';
         DB_TYPES.forEach(t => { if (b[t.k]) { const seg = document.createElement('div'); seg.style.flex = b[t.k]; seg.style.background = t.color; stack.appendChild(seg); } });
         col.innerHTML = `<div class="db-curve-n">${tot || ''}</div>`; col.appendChild(stack);
@@ -182,16 +182,16 @@ function renderDBDeck(highlightId) {
         if (k) { const seg = document.createElement('div'); seg.style.flex = k; seg.style.background = t.color; seg.title = `${t.label}: ${k}`; tb.appendChild(seg); }
         tl.insertAdjacentHTML('beforeend', `<div><i style="background:${t.color}"></i>${t.label}<b>${k}</b><span>${n ? Math.round(k / n * 100) : 0}%</span></div>`);
     });
-    if (!n) tb.innerHTML = '<div class="db-empty-bar">leer</div>';
+    if (!n) tb.innerHTML = tr('<div class="db-empty-bar">leer</div>');
     // Warnungen: Karten, die der gewählte Held nicht spielen kann
     const warn = document.getElementById('db-warnings'); warn.querySelectorAll('.db-warn').forEach(x => x.remove());
     const bad = hero ? [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero)) : [];
     if (bad.length) { const w = document.createElement('div'); w.className = 'db-warn';
-        w.innerHTML = `⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
+        w.innerHTML = tr`⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
         w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
     // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
     const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
-    if (!n) { box.innerHTML = '<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>📥 Import</b> eine Kartenliste ein.</div>'; return; }
+    if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>📥 Import</b> eine Kartenliste ein.</div>'); return; }
     const counts = {}; cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     DB_TYPES.forEach(t => {
         const ids = Object.keys(counts).map(Number).filter(id => t.is(CARDS[id])).sort((a, b) => (CARDS[a].cost || 0) - (CARDS[b].cost || 0) || CARDS[a].name.localeCompare(CARDS[b].name));
@@ -201,7 +201,7 @@ function renderDBDeck(highlightId) {
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
             row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
-            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="Nicht vollständig umgesetzt: ${esc(CARD_ISSUES[id])}">⚠</span> ` : ''}${esc(c.name)}</span>`
+            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
             row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
             row.querySelector('[data-a="+"]').onclick = (e) => { e.stopPropagation(); dbAdd(id); };
@@ -222,7 +222,7 @@ function dbHoverHide() { document.getElementById('db-hover').style.display = 'no
 // Speichern: neues Deck oder das bearbeitete überschreiben
 function dbSave() {
     const hero = dbHero();
-    if (!hero) { dbFlash('Wähle zuerst rechts oben einen Helden.'); document.getElementById('db-hero-slot').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
+    if (!hero) { dbFlash(tr('Wähle zuerst rechts oben einen Helden.')); document.getElementById('db-hero-slot').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
     const name = (currentDeckBuilder.name || '').trim() || `${hero.class} – ${hero.name}`;
     const list = loadCustomDecks();
     const deck = { id: currentDeckBuilder.id || 'custom_' + Date.now(), hero: hero.id, faction: hero.faction, class: hero.class, name, cards: [...currentDeckBuilder.cards] };
@@ -230,17 +230,17 @@ function dbSave() {
     if (i >= 0) list[i] = deck; else list.push(deck);
     if (!saveCustomDecks(list)) return null;
     currentDeckBuilder.id = deck.id; currentDeckBuilder.name = name; document.getElementById('db-name').value = name;
-    dbFlash(`„${name}“ gespeichert (${deck.cards.length} Karten)`);
+    dbFlash(tr`„${name}“ gespeichert (${deck.cards.length} Karten)`);
     return deck;
 }
 document.getElementById("db-save-only-btn").onclick = () => dbSave();
 document.getElementById("db-save-btn").onclick = () => {
-    if (!currentDeckBuilder.cards.length) { dbFlash('Das Deck ist leer.'); return; }
+    if (!currentDeckBuilder.cards.length) { dbFlash(tr('Das Deck ist leer.')); return; }
     const d = dbSave(); if (!d) return;
     document.getElementById("deck-builder-modal").style.display = "none";
     initGame(d.id, null);
 };
-document.getElementById("db-new-btn").onclick = () => { if (currentDeckBuilder.cards.length && !confirm('Aktuelles Deck verwerfen und neu beginnen?')) return; openDeckBuilder(); };
+document.getElementById("db-new-btn").onclick = () => { if (currentDeckBuilder.cards.length && !confirm(tr('Aktuelles Deck verwerfen und neu beginnen?'))) return; openDeckBuilder(); };
 document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); closeDBHeroPicker(); };
 
 // --- IMPORT / EXPORT als Textliste: "4 Weeble" (Anzahl Leerzeichen Name), optional "Hero: Name" ---
@@ -279,11 +279,11 @@ function dbParseList(text, heroId) {
         const nm = line.match(/^(name|deck|deckname)\s*:\s*(.+)$/i);
         if (nm) { out.name = nm[2].trim(); continue; }
         const hm = line.match(/^(hero|held)\s*:?\s*(.*)$/i);
-        if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) { out.heroId = h.id; heroFound = true; } else out.report.push({ bad: true, msg: `Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
+        if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) { out.heroId = h.id; heroFound = true; } else out.report.push({ bad: true, msg: tr`Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
         const m = line.match(/^(\d+)\s*[x×*]?\s*(.+)$/i);
         const n = m ? parseInt(m[1]) : 1, rawName = m ? m[2] : line;
         const cands = lookup(rawName);
-        if (!cands.length) { if (m && !/^\d+$/.test(rawName.trim())) out.report.push({ bad: true, msg: `„${rawName.replace(/\([^)]*\)/g, '').trim()}“ nicht gefunden` }); continue; }
+        if (!cands.length) { if (m && !/^\d+$/.test(rawName.trim())) out.report.push({ bad: true, msg: tr`„${rawName.replace(/\([^)]*\)/g, '').trim()}“ nicht gefunden` }); continue; }
         const hero = cands.find(c => c.type === 'Hero');
         // Zeile ohne Zahl kann der Held sein – ebenso "1 Heldenname", solange noch kein Held feststeht (Listen von Deck-Seiten)
         if (hero && (!m || wantHero || (n === 1 && !heroFound))) { out.heroId = hero.id; wantHero = false; heroFound = true; continue; }
@@ -298,8 +298,8 @@ function dbParseList(text, heroId) {
     out.cards.forEach(({ n, cands, name }) => {
         const c = cands.find(x => hero && dbLegal(x, hero)) || cands[0];
         const have = res.filter(x => x === c.id).length; const room = c.unlimited ? n : Math.max(0, 4 - have);
-        if (room < n) out.report.push({ bad: true, msg: `„${c.name}“: nur 4 Kopien erlaubt (${n} angegeben)` });
-        if (hero && !dbLegal(c, hero)) out.report.push({ bad: true, msg: `„${c.name}“ passt nicht zu ${hero.name}` });
+        if (room < n) out.report.push({ bad: true, msg: tr`„${c.name}“: nur 4 Kopien erlaubt (${n} angegeben)` });
+        if (hero && !dbLegal(c, hero)) out.report.push({ bad: true, msg: tr`„${c.name}“ passt nicht zu ${hero.name}` });
         for (let i = 0; i < Math.min(n, room); i++) res.push(c.id);
     });
     out.cards = res;
@@ -309,10 +309,10 @@ let DB_IO_MODE = 'import';
 function openDbIO(mode) {
     DB_IO_MODE = mode;
     const ta = document.getElementById('db-io-text');
-    document.getElementById('db-io-title').textContent = mode === 'import' ? '📥 Deck importieren' : '📤 Deck exportieren';
+    document.getElementById('db-io-title').textContent = mode === 'import' ? tr('📥 Deck importieren') : tr('📤 Deck exportieren');
     document.getElementById('db-io-help').innerHTML = mode === 'import'
-        ? 'Eine Karte pro Zeile, z. B. <code>4 Weeble</code>, <code>4x Weeble</code> oder <code>4Weeble</code>. Ohne Zahl zählt die Karte einmal; ein Heldenname wird zum Helden. <code>Name: …</code> setzt den Decknamen. Alles andere wird ignoriert. Das aktuelle Deck wird ersetzt.'
-        : 'Diese Liste kannst du kopieren und später wieder importieren.';
+        ? tr('Eine Karte pro Zeile, z. B. <code>4 Weeble</code>, <code>4x Weeble</code> oder <code>4Weeble</code>. Ohne Zahl zählt die Karte einmal; ein Heldenname wird zum Helden. <code>Name: …</code> setzt den Decknamen. Alles andere wird ignoriert. Das aktuelle Deck wird ersetzt.')
+        : tr('Diese Liste kannst du kopieren und später wieder importieren.');
     ta.value = mode === 'import' ? '' : dbExportText(); ta.readOnly = mode !== 'import';
     document.getElementById('db-io-report').innerHTML = '';
     document.getElementById('db-io-ok').style.display = mode === 'import' ? '' : 'none';
@@ -324,31 +324,31 @@ document.getElementById('db-import-btn').onclick = () => openDbIO('import');
 document.getElementById('db-export-btn').onclick = () => openDbIO('export');
 document.getElementById('db-io-cancel').onclick = () => { document.getElementById('db-io-modal').style.display = 'none'; };
 document.getElementById('db-io-copy').onclick = () => { const ta = document.getElementById('db-io-text'); ta.select();
-    (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject()).then(() => dbIoReport([{ msg: 'In die Zwischenablage kopiert.' }]), () => { document.execCommand('copy'); dbIoReport([{ msg: 'Kopiert.' }]); }); };
+    (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject()).then(() => dbIoReport([{ msg: tr('In die Zwischenablage kopiert.') }]), () => { document.execCommand('copy'); dbIoReport([{ msg: tr('Kopiert.') }]); }); };
 // Live-Vorschau beim Tippen: wie viele Karten erkannt wurden, was fehlt
 document.getElementById('db-io-text').addEventListener('input', () => { if (DB_IO_MODE !== 'import') return; const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
-    dbIoReport([{ msg: `${r.cards.length} Karten erkannt${r.heroId !== currentDeckBuilder.heroId ? ` · Held: ${CARDS[r.heroId].name}` : ''}` }, ...r.report]); });
+    dbIoReport([{ msg: tr`${r.cards.length} Karten erkannt${r.heroId !== currentDeckBuilder.heroId ? ` · Held: ${CARDS[r.heroId].name}` : ''}` }, ...r.report]); });
 function dbIoReport(items) { document.getElementById('db-io-report').innerHTML = items.map(x => `<div class="${x.bad ? 'bad' : 'ok'}">${x.bad ? '⚠' : '✔'} ${esc(x.msg)}</div>`).join(''); }
 document.getElementById('db-io-ok').onclick = () => {
     const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
-    if (!r.cards.length) { dbIoReport([{ bad: true, msg: 'Keine Karten erkannt.' }, ...r.report]); return; }
+    if (!r.cards.length) { dbIoReport([{ bad: true, msg: tr('Keine Karten erkannt.') }, ...r.report]); return; }
     currentDeckBuilder.heroId = r.heroId; currentDeckBuilder.cards = r.cards;
     if (r.name) { currentDeckBuilder.name = r.name; document.getElementById('db-name').value = r.name; }
     if (CARDS[r.heroId]) DBF.cls = CARDS[r.heroId].class;
     document.getElementById('db-io-modal').style.display = 'none';
     renderDBAll();
-    dbFlash(`${r.cards.length} Karten importiert${r.report.length ? ` – ${r.report.length} Hinweis(e)` : ''}`);
+    dbFlash(tr`${r.cards.length} Karten importiert${r.report.length ? ` – ${r.report.length} Hinweis(e)` : ''}`);
 };
 
 // --- BOOSTER ---
 // Ablauf: Pack schwebt → Klick: Schütteln, Lichtblitz, Funken → Karten fliegen in einen Fächer → Klick deckt auf
 // (Funken und Klang je Seltenheit) → Klick auf eine offene Karte holt sie groß in die Mitte.
 const BOOSTER_RAR = {
-    common: { label: 'Gewöhnlich', n: 14, notes: [523] },
-    uncommon: { label: 'Ungewöhnlich', n: 22, notes: [523, 659] },
-    rare: { label: 'Selten', n: 40, notes: [523, 659, 784] },
-    epic: { label: 'Episch', n: 70, notes: [523, 659, 784, 1047], big: true },
-    hero: { label: 'Held', n: 22, notes: [440, 554] },                                        // jeder Booster hat einen Helden
+    common: { label: tr('Gewöhnlich'), n: 14, notes: [523] },
+    uncommon: { label: tr('Ungewöhnlich'), n: 22, notes: [523, 659] },
+    rare: { label: tr('Selten'), n: 40, notes: [523, 659, 784] },
+    epic: { label: tr('Episch'), n: 70, notes: [523, 659, 784, 1047], big: true },
+    hero: { label: tr('Held'), n: 22, notes: [440, 554] },                                        // jeder Booster hat einen Helden
     herofoil: { label: 'Foil-Held', n: 60, notes: [392, 523, 659, 784], big: true },          // 10 % der Helden sind Foil
     ea: { label: 'Extended Art', n: 60, notes: [587, 740, 880, 1175], big: true },
     foil: { label: 'Foil', n: 60, notes: [587, 740, 880, 1175], big: true },                  // statt Extended Art, wenn Scans gewählt sind
@@ -436,7 +436,7 @@ function boosterPicker() {
     document.getElementById('booster-hint').classList.remove('show');
     document.getElementById('booster-actions').classList.remove('show');
     bModal().classList.remove('has-focus', 'opened');
-    const pk = document.getElementById('booster-picker'); pk.innerHTML = '<div class="bp-title">Welchen Booster möchtest du öffnen?</div>';
+    const pk = document.getElementById('booster-picker'); pk.innerHTML = tr('<div class="bp-title">Welchen Booster möchtest du öffnen?</div>');
     const row = document.createElement('div'); row.className = 'bp-row'; pk.appendChild(row);
     BOOSTER_SETS.forEach((b, i) => {
         const img = b.imgs[Math.floor(Math.random() * b.imgs.length)];
@@ -591,7 +591,7 @@ function boosterActions() {
     const left = BOOSTER.cards.filter(c => !c.flipped).length;
     document.getElementById('booster-reveal-all').style.display = left ? '' : 'none';
     document.getElementById('booster-again').classList.toggle('pulse', !left);
-    document.getElementById('booster-count').textContent = left ? `${BOOSTER.cards.length - left} / ${BOOSTER.cards.length} aufgedeckt` : 'Alle Karten aufgedeckt';
+    document.getElementById('booster-count').textContent = left ? `${BOOSTER.cards.length - left} / ${BOOSTER.cards.length} aufgedeckt` : tr('Alle Karten aufgedeckt');
 }
 document.getElementById('booster-reveal-all').onclick = (e) => {
     e.stopPropagation();
@@ -631,7 +631,7 @@ function importTourneyDecks() {
         }
         done.push(i + 1);
         if (!hero || !r.cards.length) return;
-        const name = head ? `Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
+        const name = head ? tr`Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
         if (list.some(d => d.name === name)) return;
         list.push({ id, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards });
     });
@@ -651,16 +651,16 @@ function openDeckOverview() {
         const title = parts.length > 2 ? parts.slice(0, 2).join(' · ') : parts.join(' · '), event = parts.length > 2 ? parts.slice(2).join(' · ') : '';
         btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name" title="${esc(deck.name)}">${esc(title)}</div>`
             + (event ? `<div class="deck-event">${esc(event)}</div>` : '')
-            + `<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
+            + tr`<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
         btn.onclick = () => openDeckView(deck.id);
         return btn;
     };
-    grid.insertAdjacentHTML('beforeend', '<div class="deck-grid-head">Deine Decks</div>');
-    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = '<div class="deck-plus">✚</div><div class="deck-name">Neues Deck</div>';
+    grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Deine Decks</div>'));
+    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = tr('<div class="deck-plus">✚</div><div class="deck-name">Neues Deck</div>');
     nb.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(); };
     grid.appendChild(nb);
     loadCustomDecks().forEach(d => grid.appendChild(tile(d, true)));
-    grid.insertAdjacentHTML('beforeend', '<div class="deck-grid-head">Start-Decks</div>');
+    grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Start-Decks</div>'));
     GAME_DECKS.filter(d => !String(d.id).startsWith('t_')).forEach(d => grid.appendChild(tile(d, false)));
     document.getElementById("deck-overview-modal").style.display = "flex";
 }
@@ -669,7 +669,7 @@ function openDeckView(deckId) {
     const deck = custom ? loadCustomDecks().find(d => d.id === deckId) : GAME_DECKS.find(d => d.id === deckId);
     if (!deck) return;
     const title = document.getElementById("deck-view-title");
-    title.textContent = `${deck.name} – ${deck.cards.length} Karten`;
+    title.textContent = tr`${deck.name} – ${deck.cards.length} Karten`;
     title.style.color = deck.faction === 'Alliance' ? '#60a5fa' : '#f87171';
     // Aktionen: Spielen, Bearbeiten (eigene) bzw. als Kopie bearbeiten (Start-Decks), Löschen
     let acts = document.getElementById('deck-view-actions');
@@ -677,9 +677,9 @@ function openDeckView(deckId) {
     acts.innerHTML = '';
     const mk = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; acts.appendChild(b); };
     const closeAll = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "none"; };
-    mk('▶ Spielen', 'success', () => { closeAll(); initGame(deck.id, null); });
-    mk(custom ? '✎ Bearbeiten' : '✎ Als Kopie bearbeiten', '', () => { closeAll(); openDeckBuilder(deck, !custom); });
-    if (custom) mk('🗑 Löschen', 'danger', () => { if (!confirm(`„${deck.name}“ löschen?`)) return; saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); });
+    mk(tr('▶ Spielen'), 'success', () => { closeAll(); initGame(deck.id, null); });
+    mk(custom ? tr('✎ Bearbeiten') : tr('✎ Als Kopie bearbeiten'), '', () => { closeAll(); openDeckBuilder(deck, !custom); });
+    if (custom) mk(tr('🗑 Löschen'), 'danger', () => { if (!confirm(tr`„${deck.name}“ löschen?`)) return; saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); });
     const content = document.getElementById("deck-view-content"); content.innerHTML = "";
     const counts = {}; deck.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     const sortedIds = [...new Set(deck.cards)].sort((a, b) => (CARDS[a].cost||0) - (CARDS[b].cost||0));
@@ -703,12 +703,12 @@ function getDeckClass(deck) { if (deck.class) return deck.class; const hero = CA
 
 // Karten-Auswertung: Δ = Winrate wenn früh gezogen − Winrate wenn im Deck, aber nicht früh gezogen
 function renderCardDeltaTable(list) {
-    if (!list.length) return `<div style="color:var(--text-dim);font-size:11px;">Keine Karten mit ausreichender Stichprobe.</div>`;
+    if (!list.length) return tr`<div style="color:var(--text-dim);font-size:11px;">Keine Karten mit ausreichender Stichprobe.</div>`;
     const pct = v => (v * 100).toFixed(1) + '%';
-    let h = `<table><tr><th>Karte</th><th>Typ</th><th>Im Deck</th><th>Früh gezogen</th><th>WR gezogen</th><th>WR nicht gezogen</th><th>Δ</th></tr>`;
+    let h = tr`<table><tr><th>Karte</th><th>Typ</th><th>Im Deck</th><th>Früh gezogen</th><th>WR gezogen</th><th>WR nicht gezogen</th><th>Δ</th></tr>`;
     for (const r of list) {
         const col = r.delta >= 0 ? '#4ade80' : '#f87171';
-        const sig = Math.abs(r.delta) >= 2 * r.se ? '' : ' style="opacity:.6" title="Unterschied liegt im Zufallsbereich (< 2 Standardfehler)"';
+        const sig = Math.abs(r.delta) >= 2 * r.se ? '' : tr(' style="opacity:.6" title="Unterschied liegt im Zufallsbereich (< 2 Standardfehler)"');
         h += `<tr${sig}><td>${esc(r.name)}</td><td>${esc(r.type)}</td><td>${r.g}</td><td>${r.pg} (${pct(r.playRate)})</td><td>${pct(r.wrP)}</td><td>${pct(r.wrN)}</td><td style="color:${col};font-weight:bold;">${r.delta >= 0 ? '+' : ''}${(r.delta * 100).toFixed(1)}</td></tr>`;
     }
     return h + `</table>`;
@@ -716,20 +716,20 @@ function renderCardDeltaTable(list) {
 function renderCardAnalysis(cardStats, totalGames) {
     const minEach = Math.max(6, Math.floor(totalGames / 150));
     const A = analyzeCardStats(cardStats, minEach);
-    let html = `<h3 style="color:var(--gold);">Karten nach Manakosten</h3>
+    let html = tr`<h3 style="color:var(--gold);">Karten nach Manakosten</h3>
         <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Für jede Karte zählen nur Spiele, in denen sie im Deck war. Verglichen wird die Winrate der Spiele, in denen sie <b>früh gezogen</b> wurde (Starthand nach Mulligan oder eine der nächsten ${SIM_EARLY_DRAWS} Karten), mit denen, in denen nicht (Δ in Prozentpunkten). Ob man eine Karte früh zieht, entscheidet allein das Mischen – anders als „gespielt“ hängt es nicht davon ab, ob man gerade vorne liegt. So hat eine Karte auch keinen Vorteil nur dadurch, dass sie in einem starken Deck steckt. Mindestens ${minEach} Spiele je Gruppe; blasse Zeilen liegen im Zufallsbereich.</div>`;
     const keys = Object.keys(A.byCost).map(Number).sort((a, b) => a - b);
     for (const k of keys) {
         const list = A.byCost[k];
         const n = Math.min(3, Math.floor(list.length / 2) || 1);
-        html += `<h4 style="color:var(--gold);margin:10px 0 4px;">Kosten ${k}${k === 8 ? '+' : ''} <span style="color:var(--text-dim);font-weight:normal;">(${list.length} Karten)</span></h4>`;
-        html += `<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(list.slice(0, n))}`;
-        if (list.length > n) html += `<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(list.slice(-n).reverse())}`;
+        html += tr`<h4 style="color:var(--gold);margin:10px 0 4px;">Kosten ${k}${k === 8 ? '+' : ''} <span style="color:var(--text-dim);font-weight:normal;">(${list.length} Karten)</span></h4>`;
+        html += tr`<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(list.slice(0, n))}`;
+        if (list.length > n) html += tr`<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(list.slice(-n).reverse())}`;
     }
-    html += `<h3 style="color:var(--gold);">Quests (früh gezogen)</h3>`;
+    html += tr`<h3 style="color:var(--gold);">Quests (früh gezogen)</h3>`;
     const nq = Math.min(5, Math.ceil(A.quests.length / 2));
-    html += `<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(A.quests.slice(0, nq))}`;
-    if (A.quests.length > nq) html += `<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(A.quests.slice(nq).reverse().slice(0, nq))}`;
+    html += tr`<div style="font-size:11px;color:#4ade80;">Beste</div>${renderCardDeltaTable(A.quests.slice(0, nq))}`;
+    if (A.quests.length > nq) html += tr`<div style="font-size:11px;color:#f87171;margin-top:4px;">Schlechteste</div>${renderCardDeltaTable(A.quests.slice(nq).reverse().slice(0, nq))}`;
     return html;
 }
 
@@ -754,17 +754,17 @@ function simProgressUI(title) {
     let stop = document.getElementById("sim-stop-btn");
     if (!stop) {
         const close = document.getElementById("sim-close-btn");
-        stop = document.createElement("button"); stop.id = "sim-stop-btn"; stop.textContent = "Abbrechen & auswerten"; stop.style.marginRight = "8px";
+        stop = document.createElement("button"); stop.id = "sim-stop-btn"; stop.textContent = tr("Abbrechen & auswerten"); stop.style.marginRight = "8px";
         close.parentNode.insertBefore(stop, close);
     }
-    stop.onclick = () => { SIM_STOP.req = true; stop.disabled = true; stop.textContent = "Breche ab…"; };
-    stop.disabled = false; stop.textContent = "Abbrechen & auswerten"; stop.style.display = "";
+    stop.onclick = () => { SIM_STOP.req = true; stop.disabled = true; stop.textContent = tr("Breche ab…"); };
+    stop.disabled = false; stop.textContent = tr("Abbrechen & auswerten"); stop.style.display = "";
     ui.done = () => { stop.style.display = "none"; };
     ui.step = (done, total) => {
         const ms = performance.now() - ui.t0;
         ui.bar.style.width = `${(done / total) * 100}%`;
         const rem = Math.ceil(ms / done * (total - done) / 1000);
-        ui.eta.textContent = rem > 60 ? `Noch ca. ${Math.floor(rem / 60)}m ${rem % 60}s` : `Noch ca. ${rem}s`;
+        ui.eta.textContent = rem > 60 ? tr`Noch ca. ${Math.floor(rem / 60)}m ${rem % 60}s` : tr`Noch ca. ${rem}s`;
         ui.progress.textContent = `Simuliere... ${done}/${total} (${(ms / 1000).toFixed(1)}s)`;
     };
     return ui;
@@ -774,7 +774,7 @@ function simProgressUI(title) {
 // Alle Simulations-Tests laufen über diese Funktion – nur die Paarungen wechseln.
 // pairs (optional): Liste von [deckA, deckB] oder Funktionen, die bei jedem Spiel ein neues Paar liefern
 // (All-Cards-Test: Zufallsdecks). Ohne pairs: jedes Deck aus decks gegen jedes.
-async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU vs CPU – Deck-Simulation", pairs = null) {
+async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = tr("CPU vs CPU – Deck-Simulation"), pairs = null) {
     const ui = simProgressUI(title);
     const cardStats = {}; let firstWins = 0, secondWins = 0, totalGames = 0, timeouts = 0;
     const factionStats = {}, classStats = {}, deckStats = {};
@@ -788,7 +788,7 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
     for (let g = 0; g < gamesPerMatchup && !stopReason; g++) {
         try { for (let mi = 0; mi < matchups.length; mi++) {
             const m = matchups[mi], [deckA, deckB] = typeof m === 'function' ? m() : m;
-            if (SIM_STOP.req) { stopReason = 'vom Nutzer abgebrochen'; break; }
+            if (SIM_STOP.req) { stopReason = tr('vom Nutzer abgebrochen'); break; }
             let res;
             try { res = simulateOneGame(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
             totalGames++; if (res.timeout) timeouts++;
@@ -799,31 +799,31 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
             recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
             ui.step(totalGames, totalPlanned);
             await simYield();
-        } } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = `Fehler: ${e.message}`; }
+        } } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = tr`Fehler: ${e.message}`; }
     }
     ui.done();
     const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
-    const secs = ((performance.now() - ui.t0) / 1000).toFixed(1), tmo = timeouts ? ` (${timeouts} nach Zug-/Zeitlimit gewertet)` : '';
-    if (stopReason) ui.progress.textContent = `Abgebrochen (${stopReason}) – ${totalGames} von ${totalPlanned} Spielen (${pct(totalGames, totalPlanned)}) in ${secs}s${tmo}.`;
-    else { ui.progress.textContent = `Fertig – ${totalGames} Spiele in ${secs}s${tmo}.`; ui.bar.style.width = "100%"; }
+    const secs = ((performance.now() - ui.t0) / 1000).toFixed(1), tmo = timeouts ? tr` (${timeouts} nach Zug-/Zeitlimit gewertet)` : '';
+    if (stopReason) ui.progress.textContent = tr`Abgebrochen (${stopReason}) – ${totalGames} von ${totalPlanned} Spielen (${pct(totalGames, totalPlanned)}) in ${secs}s${tmo}.`;
+    else { ui.progress.textContent = tr`Fertig – ${totalGames} Spiele in ${secs}s${tmo}.`; ui.bar.style.width = "100%"; }
     ui.eta.textContent = "";
     const wrTable = (title, entries, label) => {
-        let h = `<h3 style="color:var(--gold);">${title}</h3><table><tr><th>${label}</th><th>Spiele</th><th>Siege</th><th>Winrate</th></tr>`;
+        let h = tr`<h3 style="color:var(--gold);">${title}</h3><table><tr><th>${label}</th><th>Spiele</th><th>Siege</th><th>Winrate</th></tr>`;
         for (const [k, s] of entries) { const color = s.wins / s.games >= 0.5 ? '#4ade80' : '#f87171'; h += `<tr><td>${esc(k)}</td><td>${s.games}</td><td>${s.wins}</td><td style="color:${color};font-weight:bold;">${pct(s.wins, s.games)}</td></tr>`; }
         return h + `</table>`;
     };
     const sorted = o => Object.entries(o).sort((a, b) => (b[1].wins / b[1].games) - (a[1].wins / a[1].games));
-    let html = stopReason ? `<div style="color:#fbbf24;font-weight:bold;margin-bottom:8px;">⚠️ Abgebrochen (${esc(stopReason)}): ${totalGames} von ${totalPlanned} Spielen gespielt (${pct(totalGames, totalPlanned)}). Die Auswertung umfasst nur diese Spiele (gespielt wird in Runden – jede Paarung einmal pro Runde).</div>` : '';
+    let html = stopReason ? tr`<div style="color:#fbbf24;font-weight:bold;margin-bottom:8px;">⚠️ Abgebrochen (${esc(stopReason)}): ${totalGames} von ${totalPlanned} Spielen gespielt (${pct(totalGames, totalPlanned)}). Die Auswertung umfasst nur diese Spiele (gespielt wird in Runden – jede Paarung einmal pro Runde).</div>` : '';
     try {
-    html += `<h3 style="color:var(--gold);">Startspieler-Winchance</h3>`;
-    html += `<table><tr><th>Rolle</th><th>Siege</th><th>Winrate</th></tr><tr><td>Spieler 1 (beginnt)</td><td>${firstWins}</td><td style="color:#4ade80;font-weight:bold;">${pct(firstWins, totalGames)}</td></tr><tr><td>Spieler 2</td><td>${secondWins}</td><td style="color:#f87171;font-weight:bold;">${pct(secondWins, totalGames)}</td></tr><tr><td>Gesamt</td><td>${totalGames}</td><td>–</td></tr></table>`;
+    html += `<h3 style="color:var(--gold);">${tr('Startspieler-Winchance')}</h3>`;
+    html += tr`<table><tr><th>Rolle</th><th>Siege</th><th>Winrate</th></tr><tr><td>Spieler 1 (beginnt)</td><td>${firstWins}</td><td style="color:#4ade80;font-weight:bold;">${pct(firstWins, totalGames)}</td></tr><tr><td>Spieler 2</td><td>${secondWins}</td><td style="color:#f87171;font-weight:bold;">${pct(secondWins, totalGames)}</td></tr><tr><td>Gesamt</td><td>${totalGames}</td><td>–</td></tr></table>`;
     html += wrTable('Decks', sorted(deckStats), 'Deck');
-    html += wrTable('Fraktionen', sorted(factionStats), 'Fraktion');
-    html += wrTable('Klassen', sorted(classStats), 'Klasse');
+    html += wrTable(tr('Fraktionen'), sorted(factionStats), tr('Fraktion'));
+    html += wrTable(tr('Klassen'), sorted(classStats), tr('Klasse'));
     html += renderCardAnalysis(cardStats, totalGames);
-    } catch (e) { console.error("Auswertung abgebrochen:", e); html += `<div style="color:#f87171;">Fehler in der Auswertung: ${esc(e.message)} – angezeigt ist der Teil bis dahin.</div>`; }
+    } catch (e) { console.error("Auswertung abgebrochen:", e); html += tr`<div style="color:#f87171;">Fehler in der Auswertung: ${esc(e.message)} – angezeigt ist der Teil bis dahin.</div>`; }
     ui.content.innerHTML = html;
-    addLog(`🧪 ${title}: ${totalGames} Spiele${stopReason ? ` (abgebrochen, ${pct(totalGames, totalPlanned)})` : ''}.`, "log-turn");
+    addLog(tr`🧪 ${title}: ${totalGames} Spiele${stopReason ? ` (abgebrochen, ${pct(totalGames, totalPlanned)})` : ''}.`, "log-turn");
 }
 // Turnier-Decks (js/tourneydecks.js) für die Simulation: direkt aus den Listen, unabhängig von "Deine Decks"
 function tourneySimDecks() {
@@ -838,7 +838,7 @@ function tourneySimDecks() {
 }
 async function runTourneySimulation(gamesPerMatchup) {
     const decks = tourneySimDecks();
-    await runSimulation(gamesPerMatchup, decks, `Turnierdeck-Simulation (${decks.length} Decks)`);
+    await runSimulation(gamesPerMatchup, decks, tr`Turnierdeck-Simulation (${decks.length} Decks)`);
 }
 
 // All-Cards-Test: jedes Spiel zwei zufällige Helden mit Zufallsdecks aus allen für sie legalen Karten
@@ -856,7 +856,7 @@ function loadQuickTest() {
     G = buildLateGameState(a, b);
     G.real = true; G.humans = [1];
     UI.reset();
-    addLog("⚡ Late-Game-Test geladen: viele Ressourcen, Handkarten, Ausrüstung, Fähigkeiten, Allies und Friedhofskarten.", "log-turn");
+    addLog(tr("⚡ Late-Game-Test geladen: viele Ressourcen, Handkarten, Ausrüstung, Fähigkeiten, Allies und Friedhofskarten."), "log-turn");
     render();
 }
 
@@ -874,6 +874,6 @@ function loadMaskTest() {
     forceMask(G.p1.hero.armors); forceMask(G.p2.hero.armors);
     G.p1.hero.hasDamageMask = true; G.p1.hero.maskId = 1; G.p1.hero.maskOpacity = 1;
     G.p2.hero.hasDamageMask = true; G.p2.hero.maskId = 3; G.p2.hero.maskOpacity = 1;
-    addLog("🩹 Masken-Test geladen (100%)!", "log-turn");
+    addLog(tr("🩹 Masken-Test geladen (100%)!"), "log-turn");
     render();
 }

@@ -4,6 +4,8 @@ Browser-Spiel des World of Warcraft TCG, Set *Heroes of Azeroth* (Karten 1–361
 
 Kommunikation mit dem Nutzer auf **Deutsch**.
 
+Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen im Menükopf, gemerkt in `localStorage`). Texte stehen im Code auf Deutsch und laufen durch `tr('…')` bzw. ``tr`… ${x} …` ``; die englische Fassung steht in `js/i18n_en.js` (Schlüssel = deutscher Text, Platzhalter `{0}`, `{1}` …). **Jeder neue sichtbare Text** braucht `tr` und einen Eintrag in `i18n_en.js` – Regeltest #92 meldet fehlende. Nie übersetzen: Kennungen (`src:`, `k:`, Vergleiche), Kartennamen und Kartentexte (die sind englisch).
+
 ## Feste Regeln (immer einhalten)
 
 1. **Nichts ungefragt ändern.** Karten fixen, falschen Code korrigieren, Bugs beheben und Regelverstöße beseitigen ist erwünscht. **UI, Art, Effekte/Animationen, Layout und Bedienung nur nach ausdrücklicher Anfrage ändern** – sonst nur reiner Gameplay-Code.
@@ -18,6 +20,7 @@ Kommunikation mit dem Nutzer auf **Deutsch**.
 
 | Datei | Inhalt |
 |---|---|
+| `i18n_en.js`, `i18n.js` | Englische Übersetzungen `I18N_EN`; `tr`, `LANG`, `setLang`, `translateDom` (feste HTML-Texte) |
 | `utils.js` | Hilfsfunktionen (z. B. `shuffleDeck`) |
 | `cards.js` | Kartendaten `CARDS[id]` – Werte, Typzeilen, Regeltexte (Set 1, IDs 1–361) |
 | `cards2.js`, `cards3.js` | Set 2 *Through the Dark Portal* (IDs 1001–1319) und Set 3 *Fires of Outland* (IDs 2001–2246), aus der Card Reference erzeugt; Tokens 9101+/9201+ |
@@ -54,7 +57,7 @@ const fs = require('fs'), vm = require('vm');
 const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['utils','cards','cards2','cards3','cards4','cards5','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','ai','simcore','tests'])
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','ai','simcore','tests'])
   vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));

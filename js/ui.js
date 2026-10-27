@@ -52,8 +52,8 @@ function renderDeckZone(player, prefix) {
     const n = player.graveyard.length;
     // Kartengroße Ablage neben dem Helden: oberste Karte offen, Anzahl als Plakette; leer = gestrichelter Platz
     st.classList.toggle("empty", n === 0);
-    if (n === 0) { st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); st.innerHTML = '<span class="grave-label">Friedhof</span>'; return; }
-    st.classList.add("grave-btn"); st.title = "Friedhof ansehen";
+    if (n === 0) { st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); st.innerHTML = tr('<span class="grave-label">Friedhof</span>'); return; }
+    st.classList.add("grave-btn"); st.title = tr("Friedhof ansehen");
     const top = player.graveyard[n - 1];
     const node = createCardDOM({ ...top, uid: 'gy_top_' + top.uid, damage: 0, exhausted: false, hasDamageMask: false, isFoil: false }, true, null, { noDamage: true, stats: false });
     node.style.setProperty('--cw', '100%'); st.appendChild(node);
@@ -62,13 +62,13 @@ function renderDeckZone(player, prefix) {
 }
 function openGraveyard(player) {
     if (!player.graveyard.length) return;
-    document.getElementById("graveyard-title").textContent = `Friedhof – ${player.id === 1 ? 'Du' : 'CPU'} (${player.graveyard.length} Karten)`;
+    document.getElementById("graveyard-title").textContent = tr`Friedhof – ${player.id === 1 ? tr('Du') : 'CPU'} (${player.graveyard.length} Karten)`;
     const box = document.getElementById("graveyard-content"); box.innerHTML = "";
     // Set 2/3: Karten, die du gerade aus diesem Friedhof spielen darfst (Dramla Lifebender, Readiness, Greed Before Need)
     const playable = new Set(getLegalActions(G, 1).filter(a => a.type === 'PLAY_CARD' && a.gyUid).map(a => a.gyUid));
     player.graveyard.forEach(c => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false));
         if (playable.has(c.uid)) {
-            const b = document.createElement("button"); b.textContent = "▶ Spielen"; b.className = "gy-play-btn";
+            const b = document.createElement("button"); b.textContent = tr("▶ Spielen"); b.className = "gy-play-btn";
             b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'PLAY_CARD', handIdx: -1, gyUid: c.uid }); };
             wrap.appendChild(b);
         }
@@ -92,7 +92,7 @@ function renderResourceTray(player, containerId, isHuman) {
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
             if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
                 wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
-                wrap.title = "Klicken: Quest abschließen";
+                wrap.title = tr("Klicken: Quest abschließen");
                 wrap.onclick = () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx });
             }
             activeRow.appendChild(wrap);
@@ -132,8 +132,8 @@ const MANA_SHOWN = {};
 function manaBadge(player) {
     const cur = getReadyRes(player), tot = player.resources.length;
     const el = document.createElement('div'); el.className = 'mana-badge' + (cur === 0 ? ' empty' : '');
-    el.title = `${cur} von ${tot} Ressourcen verfügbar`;
-    el.innerHTML = `<div class="mana-gem"><span>${cur}</span></div><div class="mana-txt"><b>verfügbar</b><small>von ${tot}</small></div>`;
+    el.title = tr`${cur} von ${tot} Ressourcen verfügbar`;
+    el.innerHTML = tr`<div class="mana-gem"><span>${cur}</span></div><div class="mana-txt"><b>verfügbar</b><small>von ${tot}</small></div>`;
     const prev = MANA_SHOWN[player.id];
     MANA_SHOWN[player.id] = cur;
     if (prev !== undefined && prev !== cur) {
@@ -216,17 +216,17 @@ function render() {
     // Positionen vor dem Neuzeichnen merken: Karten, die das Spiel verlassen, sterben an ihrem alten Platz
     const prevRects = new Map();
     if (G.fxq && G.fxq.length) document.querySelectorAll('#arena [data-uid]').forEach(n => prevRects.set(n.dataset.uid, n.getBoundingClientRect()));
-    document.getElementById("turn-badge").textContent = `Zug ${G.turn}`;
+    document.getElementById("turn-badge").textContent = tr`Zug ${G.turn}`;
     document.getElementById("btn-end-turn").disabled = !canMain();
     document.getElementById("btn-cancel-action").style.display = UI.attacker ? "block" : "none";
     const undoBtn = document.getElementById("btn-undo");
     if (undoBtn) {
         const ok = typeof canUndo === 'function' && canUndo();
         undoBtn.disabled = !ok;
-        undoBtn.title = ok ? `Rückgängig: ${UNDO.stack[UNDO.stack.length - 1].desc}` : "Letzte eigene Aktion rückgängig machen";
+        undoBtn.title = ok ? tr`Rückgängig: ${UNDO.stack[UNDO.stack.length - 1].desc}` : tr("Letzte eigene Aktion rückgängig machen");
     }
     // Fortune Telling: umgedrehtes Deck – oberste Karte ist offen
-    const deckTxt = p => p.deck.length + (p.deckFaceUp && p.deck.length ? ` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
+    const deckTxt = p => p.deck.length + (p.deckFaceUp && p.deck.length ? tr` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
     document.getElementById("p1-deck-count").textContent = deckTxt(G.p1);
     document.getElementById("p1-grave-count").textContent = G.p1.graveyard.length;
     document.getElementById("p1-res-count").textContent = `${getReadyRes(G.p1)}/${G.p1.resources.length}`;
@@ -279,9 +279,9 @@ function renderTurnIndicator() {
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
     ti.className = mine ? 'me' : 'cpu';
-    ti.firstElementChild.textContent = mine ? '⚔ DEIN ZUG' : '⏳ ZUG DER CPU';
+    ti.firstElementChild.textContent = mine ? tr('⚔ DEIN ZUG') : tr('⏳ ZUG DER CPU');
     const eb = document.getElementById('btn-end-turn');
-    eb.textContent = mine ? 'Zug beenden' : 'Gegnerischer Zug';
+    eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
     eb.classList.toggle('cpu-turn', !mine);
     const done = nothingLeftToDo();
     document.getElementById('big-end-turn').style.display = done && !autoEndTurn() ? 'block' : 'none';
@@ -293,7 +293,7 @@ function autoEndTurn() { try { return localStorage.getItem(AUTO_END_KEY) !== 'of
 let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
     if (!done || !autoEndTurn() || G.gameOver) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } return; }
-    document.querySelector('#turn-indicator span').textContent = '⏩ ZUG ENDET …';
+    document.querySelector('#turn-indicator span').textContent = tr('⏩ ZUG ENDET …');
     if (_autoEndTimer) return;
     const turn = G.turn;
     _autoEndTimer = setTimeout(() => {
@@ -349,7 +349,7 @@ const KEYWORDS = [
     { name: 'Death Rattle', easy: 'Does something when it goes to the graveyard.', text: 'When this card enters a graveyard from anywhere, [triggered effect]. A card’s Death Rattle power is active only while that card is in a graveyard and that power hasn’t been lost.', re: /\bDeath Rattle\b/ },
     { name: 'Delve', easy: 'Look at your top 2 cards, keep any on top, put the rest on the bottom.', text: 'Look at the top two cards of your deck. Put any number of them on top of your deck in any order, and the rest on the bottom.', re: kwAt('Delve') },
     { name: 'Diplomacy', easy: 'Certain allies cost (1) less.', text: 'You pay (1) less to play [description] allies, to a minimum of (1).', re: /\bDiplomacy\b/ },
-    { name: 'Dual Shield', easy: 'Your hero can use two shields.', text: 'The controller of a hero with dual shield can have two Shields without violating uniqueness. Adding a Melee weapon or another Off-Hand equipment causes a uniqueness violation.', re: /\bDual Shield\b/i },
+    { name: 'Dual Shield', easy: 'Your hero can use two shields.', text: tr('The controller of a hero with dual shield can have two Shields without violating uniqueness. Adding a Melee weapon or another Off-Hand equipment causes a uniqueness violation.'), re: /\bDual Shield\b/i },
     { name: 'Dual Wield', easy: 'Your hero can use two weapons and hit with both.', text: 'The controller of a hero with dual wield or Two-Handed dual wield can have certain combinations of equipment that would normally violate uniqueness without violating uniqueness, and strike with two Melee weapons per combat.', re: /\bDual Wield\b/i },
     { name: 'Echo', easy: 'Gets copied if you control two allies of the same race.', text: 'When you play this ability, if you control two or more allies that share a [Horde] or [Alliance] race, copy this ability.', re: kwAt('Echo') },
     { name: 'Enrage', easy: 'When it comes into play, you may reveal your top card for a bonus.', text: 'As this card enters play, you may reveal the top card of your deck. One or more powers may be triggered based off the card you reveal this way.', re: kwAt('Enrage') },
@@ -522,10 +522,10 @@ function showGameOver() {
     const ov = document.getElementById('gameover'); if (!ov || !G) return;
     const won = G.winner === 1, draw = !G.winner;
     const title = document.getElementById('go-title');
-    title.textContent = draw ? 'UNENTSCHIEDEN' : (won ? 'SIEG!' : 'NIEDERLAGE');
+    title.textContent = draw ? tr('UNENTSCHIEDEN') : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
     title.className = draw ? '' : (won ? 'win' : 'lose');
     const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
-    document.getElementById('go-sub').textContent = draw ? 'Beide Helden sind gefallen.' : `${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
+    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
     box.innerHTML = ''; cap.textContent = '';
     const best = draw ? null : bestCardOf(G.winner);
@@ -533,10 +533,10 @@ function showGameOver() {
         const n = createCardDOM({ ...CARDS[best.id], uid: 'go_' + best.uid }, false);
         n.classList.add('no-fx'); box.appendChild(n);
         const parts = [];
-        if (best.dmg) parts.push(`${best.dmg} Schaden`);
-        if (best.heal) parts.push(`${best.heal} Heilung`);
-        if (best.kills) parts.push(`${best.kills} ${best.kills === 1 ? 'Ally besiegt' : 'Allies besiegt'}`);
-        cap.innerHTML = `<div class="go-best">Beste Karte von ${esc(winner.hero.name)}</div><div class="go-name">${esc(best.name)}</div><div class="go-stats">${esc(parts.join(' · '))}</div>`;
+        if (best.dmg) parts.push(tr`${best.dmg} Schaden`);
+        if (best.heal) parts.push(tr`${best.heal} Heilung`);
+        if (best.kills) parts.push(`${best.kills} ${best.kills === 1 ? tr('Ally besiegt') : tr('Allies besiegt')}`);
+        cap.innerHTML = tr`<div class="go-best">Beste Karte von ${esc(winner.hero.name)}</div><div class="go-name">${esc(best.name)}</div><div class="go-stats">${esc(parts.join(' · '))}</div>`;
     }
     ov.style.display = 'flex';
     ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
@@ -676,7 +676,7 @@ function decorateInPlay(node, c) {
         const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true })) > 0;
         if (canHit || usablePowers(c).length) node.classList.add('can-act');
         if (canMain() && isChar(c) && canAttackNow(G, c, G.p1)) {
-            const b = document.createElement("button"); b.textContent = "⚔ Angriff"; b.style.background = "#ea580c";
+            const b = document.createElement("button"); b.textContent = tr("⚔ Angriff"); b.style.background = "#ea580c";
             b.onclick = (e) => { e.stopPropagation(); UI.attacker = UI.attacker === uid ? null : uid; render(); };
             bar.appendChild(b);
             node.draggable = true;
@@ -719,7 +719,7 @@ function heroHpBar(p) {
     HP_PREV[p.id] = r;
     const bar = document.createElement('div');
     bar.className = 'hp-bar' + (r <= 0.3 ? ' low' : '') + (cur <= 5 ? ' critical' : '');
-    bar.title = `Leben: ${cur} / ${max}`;
+    bar.title = tr`Leben: ${cur} / ${max}`;
     bar.style.setProperty('--hpc', r > 0.6 ? '#22c55e' : r > 0.3 ? '#eab308' : '#ef4444');
     const track = document.createElement('div'); track.className = 'hp-track';
     const trail = document.createElement('div'); trail.className = 'hp-trail';
@@ -845,14 +845,14 @@ function openHandCardMenu(idx) {
     const card = G.p1.hand[idx]; if (!card) return;
     if (card.type === 'Quest') {
         if (!canMain()) return;
-        if (G.placedResource) { addLog("Du hast in diesem Zug schon eine Ressource gelegt.", "log-hit"); render(); return; }
+        if (G.placedResource) { addLog(tr("Du hast in diesem Zug schon eine Ressource gelegt."), "log-hit"); render(); return; }
         humanAct({ type: 'PLACE_RESOURCE', handIdx: idx, faceUp: true });
         return;
     }
     const err = canPlayCard(G, 1, card);
     // Kraft von der Hand (Obsidian Edged Blade): statt Spielen nutzbar
     const hp = getPowers(G, card).find(pw => !canUsePower(G, 1, card, pw));
-    if (hp && (err || confirm(`${card.name}: „${hp.label}“ (${hp.cost || 0}) nutzen?\nOK = Kraft nutzen, Abbrechen = Karte spielen`))) { humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }); return; }
+    if (hp && (err || confirm(tr`${card.name}: „${hp.label}“ (${hp.cost || 0}) nutzen?\nOK = Kraft nutzen, Abbrechen = Karte spielen`))) { humanAct({ type: 'ACTIVATE', srcUid: card.uid, key: hp.key }); return; }
     if (err) { addLog(`${card.name}: ${err}`, "log-hit"); render(); return; }
     humanAct({ type: 'PLAY_CARD', handIdx: idx });
 }
@@ -921,92 +921,92 @@ function flyNewOppCards(p, box) {
 // ---------------------------------------------------------------- Sprechblasen der CPU (nach Rasse des Helden)
 const BANTER = {
     Human: {
-        greet: ["Für das Licht und für Sturmwind!", "Ihr wollt Ärger? Den sollt Ihr haben."],
-        turn: ["Meine Runde.", "Nun zu mir.", "Für König und Vaterland!"],
-        think: ["Hm, lasst mich überlegen …", "Ein kluger Zug will bedacht sein.", "Was würde Lothar tun?"],
-        attack: ["Für die Allianz!", "Zum Angriff!", "Haltet stand, wenn Ihr könnt!"],
-        big: ["Sturmwind schickt Verstärkung!", "Seht her und staunt!"],
-        hurt: ["Nur ein Kratzer!", "Das wird Euch noch leidtun."],
-        low: ["Licht, steh mir bei …", "Ich … gebe nicht auf!"],
-        win: ["Sieg für die Allianz!", "Das Licht ist mit mir."],
-        lose: ["Ich habe … versagt …", "Gut gekämpft, Fremder."]
+        greet: [tr("Für das Licht und für Sturmwind!"), tr("Ihr wollt Ärger? Den sollt Ihr haben.")],
+        turn: [tr("Meine Runde."), tr("Nun zu mir."), tr("Für König und Vaterland!")],
+        think: [tr("Hm, lasst mich überlegen …"), tr("Ein kluger Zug will bedacht sein."), tr("Was würde Lothar tun?")],
+        attack: [tr("Für die Allianz!"), tr("Zum Angriff!"), tr("Haltet stand, wenn Ihr könnt!")],
+        big: [tr("Sturmwind schickt Verstärkung!"), tr("Seht her und staunt!")],
+        hurt: [tr("Nur ein Kratzer!"), tr("Das wird Euch noch leidtun.")],
+        low: [tr("Licht, steh mir bei …"), tr("Ich … gebe nicht auf!")],
+        win: [tr("Sieg für die Allianz!"), tr("Das Licht ist mit mir.")],
+        lose: [tr("Ich habe … versagt …"), tr("Gut gekämpft, Fremder.")]
     },
     Dwarf: {
-        greet: ["Bei meinem Bart, endlich ein Kampf!", "Eisenschmiede grüßt Euch – mit dem Hammer!"],
-        turn: ["Jetzt bin ich dran, Bursche!", "Aus dem Weg, ich hab zu tun!"],
-        think: ["Hmm … wo hab ich mein Bier hingestellt?", "Moment, Moment … ich rechne noch.", "Gut Ding will Weile haben."],
-        attack: ["Für Khaz Modan!", "Spürt meinen Hammer!", "Ha! Nehmt das!"],
-        big: ["Jetzt wird's ernst, Bursche!", "Frisch aus der Schmiede!"],
-        hurt: ["Ha! Das kitzelt nur!", "Mehr habt Ihr nicht drauf?"],
-        low: ["Bronzebart, gib mir Kraft …", "Nur noch … ein Krug …"],
-        win: ["Darauf trinken wir einen!", "Zwergenstahl siegt immer!"],
-        lose: ["Mein Bart … mein Stolz …", "Bringt mich … in die Taverne …"]
+        greet: [tr("Bei meinem Bart, endlich ein Kampf!"), tr("Eisenschmiede grüßt Euch – mit dem Hammer!")],
+        turn: [tr("Jetzt bin ich dran, Bursche!"), tr("Aus dem Weg, ich hab zu tun!")],
+        think: [tr("Hmm … wo hab ich mein Bier hingestellt?"), tr("Moment, Moment … ich rechne noch."), tr("Gut Ding will Weile haben.")],
+        attack: [tr("Für Khaz Modan!"), tr("Spürt meinen Hammer!"), tr("Ha! Nehmt das!")],
+        big: [tr("Jetzt wird's ernst, Bursche!"), tr("Frisch aus der Schmiede!")],
+        hurt: [tr("Ha! Das kitzelt nur!"), tr("Mehr habt Ihr nicht drauf?")],
+        low: [tr("Bronzebart, gib mir Kraft …"), tr("Nur noch … ein Krug …")],
+        win: [tr("Darauf trinken wir einen!"), tr("Zwergenstahl siegt immer!")],
+        lose: [tr("Mein Bart … mein Stolz …"), tr("Bringt mich … in die Taverne …")]
     },
     Gnome: {
-        greet: ["Zeit für Wissenschaft!", "Für Gnomeregan! Na ja, was davon übrig ist."],
-        turn: ["Testphase beginnt!", "Ah, mein Einsatz!"],
-        think: ["Berechne Wahrscheinlichkeiten …", "Moment, das Zahnrad klemmt.", "Hmm, Variante 42-B …"],
-        attack: ["Für Gnomeregan!", "Klein, aber gemein!", "Angriffsprotokoll aktiviert!"],
-        big: ["Mein neuestes Meisterwerk!", "Das hat Tüftler-Qualität!"],
-        hurt: ["Autsch! Das stand nicht im Bauplan!", "Kleine Fehlfunktion, nichts weiter."],
-        low: ["Notfallprotokoll aktivieren!", "Das ist … suboptimal."],
-        win: ["Brillant, wie berechnet.", "Wissenschaft triumphiert!"],
-        lose: ["Zurück ans Reißbrett …", "Ich hätte mehr Sprengstoff gebraucht."]
+        greet: [tr("Zeit für Wissenschaft!"), tr("Für Gnomeregan! Na ja, was davon übrig ist.")],
+        turn: [tr("Testphase beginnt!"), tr("Ah, mein Einsatz!")],
+        think: [tr("Berechne Wahrscheinlichkeiten …"), tr("Moment, das Zahnrad klemmt."), tr("Hmm, Variante 42-B …")],
+        attack: [tr("Für Gnomeregan!"), tr("Klein, aber gemein!"), tr("Angriffsprotokoll aktiviert!")],
+        big: [tr("Mein neuestes Meisterwerk!"), tr("Das hat Tüftler-Qualität!")],
+        hurt: [tr("Autsch! Das stand nicht im Bauplan!"), tr("Kleine Fehlfunktion, nichts weiter.")],
+        low: [tr("Notfallprotokoll aktivieren!"), tr("Das ist … suboptimal.")],
+        win: [tr("Brillant, wie berechnet."), tr("Wissenschaft triumphiert!")],
+        lose: [tr("Zurück ans Reißbrett …"), tr("Ich hätte mehr Sprengstoff gebraucht.")]
     },
     'Night Elf': {
-        greet: ["Elune wacht über uns.", "Der Wald hat Euch kommen hören."],
-        turn: ["Die Nacht gehört mir.", "Nun spricht die Wildnis."],
-        think: ["Die Sterne flüstern mir …", "Geduld ist eine Tugend der Kaldorei.", "Zehntausend Jahre … ich habe Zeit."],
-        attack: ["Für Teldrassil!", "Lautlos wie der Schatten!", "Elune führe meine Hand!"],
-        big: ["Die Wildnis antwortet meinem Ruf.", "Spürt die Macht der Natur!"],
-        hurt: ["Die Natur heilt alles.", "Ein Dorn im Fleisch, mehr nicht."],
-        low: ["Elune, verlass mich nicht …", "Der Traum ruft mich …"],
-        win: ["Ishnu-alah.", "Der Wald ist geschützt."],
-        lose: ["Ich kehre zum Smaragdgrünen Traum zurück …", "Mein Mondlicht … erlischt …"]
+        greet: [tr("Elune wacht über uns."), tr("Der Wald hat Euch kommen hören.")],
+        turn: [tr("Die Nacht gehört mir."), tr("Nun spricht die Wildnis.")],
+        think: [tr("Die Sterne flüstern mir …"), tr("Geduld ist eine Tugend der Kaldorei."), tr("Zehntausend Jahre … ich habe Zeit.")],
+        attack: [tr("Für Teldrassil!"), tr("Lautlos wie der Schatten!"), tr("Elune führe meine Hand!")],
+        big: [tr("Die Wildnis antwortet meinem Ruf."), tr("Spürt die Macht der Natur!")],
+        hurt: [tr("Die Natur heilt alles."), tr("Ein Dorn im Fleisch, mehr nicht.")],
+        low: [tr("Elune, verlass mich nicht …"), tr("Der Traum ruft mich …")],
+        win: ["Ishnu-alah.", tr("Der Wald ist geschützt.")],
+        lose: [tr("Ich kehre zum Smaragdgrünen Traum zurück …"), tr("Mein Mondlicht … erlischt …")]
     },
     Orc: {
-        greet: ["Lok'tar ogar!", "Ihr werdet die Stärke der Horde spüren!"],
-        turn: ["Jetzt kämpfe ich!", "Zug zug."],
-        think: ["Hmm … ein Orc denkt nach. Selten.", "Zug zug … Moment.", "Grom hätte schon angegriffen …"],
-        attack: ["Für die Horde!", "Blut und Donner!", "Sterbt, Schwächling!"],
-        big: ["Spürt die Macht der Horde!", "Die Horde ist stark!"],
-        hurt: ["Schwach!", "Ist das alles?"],
-        low: ["Ein Orc gibt niemals auf!", "Mein Blut … kocht noch!"],
-        win: ["Lok'tar! Sieg!", "Die Horde siegt!"],
-        lose: ["Ein … ehrenvoller … Tod …", "Für … die … Horde …"]
+        greet: ["Lok'tar ogar!", tr("Ihr werdet die Stärke der Horde spüren!")],
+        turn: [tr("Jetzt kämpfe ich!"), tr("Zug zug.")],
+        think: [tr("Hmm … ein Orc denkt nach. Selten."), tr("Zug zug … Moment."), tr("Grom hätte schon angegriffen …")],
+        attack: [tr("Für die Horde!"), tr("Blut und Donner!"), tr("Sterbt, Schwächling!")],
+        big: [tr("Spürt die Macht der Horde!"), tr("Die Horde ist stark!")],
+        hurt: [tr("Schwach!"), tr("Ist das alles?")],
+        low: [tr("Ein Orc gibt niemals auf!"), tr("Mein Blut … kocht noch!")],
+        win: [tr("Lok'tar! Sieg!"), tr("Die Horde siegt!")],
+        lose: [tr("Ein … ehrenvoller … Tod …"), tr("Für … die … Horde …")]
     },
     Troll: {
-        greet: ["Ihr seid schon so gut wie Voodoo, Mann!", "Willkommen im Dschungel, Mann!"],
-        turn: ["Meine Zeit, Mann!", "Jetzt geht's los, Mann."],
-        think: ["Die Loa flüstern mir was, Mann …", "Langsam, langsam … der Troll denkt nach.", "Hmm … welcher Zauber, Mann?"],
-        attack: ["Zeit zum Jagen, Mann!", "Ihr entkommt mir nich'!", "Spürt den Speer!"],
-        big: ["Haltet euch fern vom Voodoo, Mann!", "Die Geister sind mit mir!"],
-        hurt: ["Hehe, das kitzelt, Mann.", "Ein Troll heilt sich wieder, Mann."],
-        low: ["Die Loa rufen mich, Mann …", "Nich' gut, Mann. Gar nich' gut."],
-        win: ["Wir Trolle siegen immer, Mann!", "Voodoo wirkt, Mann!"],
-        lose: ["Ich komm' wieder, Mann …", "Die Loa … holen mich …"]
+        greet: [tr("Ihr seid schon so gut wie Voodoo, Mann!"), tr("Willkommen im Dschungel, Mann!")],
+        turn: [tr("Meine Zeit, Mann!"), tr("Jetzt geht's los, Mann.")],
+        think: [tr("Die Loa flüstern mir was, Mann …"), tr("Langsam, langsam … der Troll denkt nach."), tr("Hmm … welcher Zauber, Mann?")],
+        attack: [tr("Zeit zum Jagen, Mann!"), tr("Ihr entkommt mir nich'!"), tr("Spürt den Speer!")],
+        big: [tr("Haltet euch fern vom Voodoo, Mann!"), tr("Die Geister sind mit mir!")],
+        hurt: [tr("Hehe, das kitzelt, Mann."), tr("Ein Troll heilt sich wieder, Mann.")],
+        low: [tr("Die Loa rufen mich, Mann …"), tr("Nich' gut, Mann. Gar nich' gut.")],
+        win: [tr("Wir Trolle siegen immer, Mann!"), tr("Voodoo wirkt, Mann!")],
+        lose: [tr("Ich komm' wieder, Mann …"), tr("Die Loa … holen mich …")]
     },
     Tauren: {
-        greet: ["Möge die Erdmutter über uns wachen.", "Ich spüre den Herzschlag der Erde."],
-        turn: ["Die Ahnen rufen.", "Nun bin ich an der Reihe."],
-        think: ["Geduld … wie die Ebenen von Mulgore.", "Die Ahnen beraten mich …", "Hmm … muuuh. Ich meine: hmm."],
-        attack: ["Für Donnerfels!", "Die Herde stürmt!", "Spürt die Kraft der Erde!"],
-        big: ["Die Erde bebt!", "Die Ahnen stehen mir bei!"],
-        hurt: ["Ich bin wie der Fels.", "Das spüre ich kaum."],
-        low: ["Erdmutter, gib mir Kraft …", "Die Ahnen … warten …"],
-        win: ["Die Ahnen sind zufrieden.", "Die Erde ist im Gleichgewicht."],
-        lose: ["Ich kehre zur Erde zurück …", "Die Ahnen … rufen mich heim …"]
+        greet: [tr("Möge die Erdmutter über uns wachen."), tr("Ich spüre den Herzschlag der Erde.")],
+        turn: [tr("Die Ahnen rufen."), tr("Nun bin ich an der Reihe.")],
+        think: [tr("Geduld … wie die Ebenen von Mulgore."), tr("Die Ahnen beraten mich …"), tr("Hmm … muuuh. Ich meine: hmm.")],
+        attack: [tr("Für Donnerfels!"), tr("Die Herde stürmt!"), tr("Spürt die Kraft der Erde!")],
+        big: [tr("Die Erde bebt!"), tr("Die Ahnen stehen mir bei!")],
+        hurt: [tr("Ich bin wie der Fels."), tr("Das spüre ich kaum.")],
+        low: [tr("Erdmutter, gib mir Kraft …"), tr("Die Ahnen … warten …")],
+        win: [tr("Die Ahnen sind zufrieden."), tr("Die Erde ist im Gleichgewicht.")],
+        lose: [tr("Ich kehre zur Erde zurück …"), tr("Die Ahnen … rufen mich heim …")]
     },
     Undead: {
-        greet: ["Der Tod ist erst der Anfang.", "Lebende … wie niedlich."],
-        turn: ["Meine Runde. Ich hab ja ewig Zeit.", "Die Verlassenen erheben sich."],
-        think: ["Hmm … ich hab Zeit. Ewig viel Zeit.", "Mein Gehirn … arbeitet noch. Teilweise.", "Lasst mich nachdenken … falls ich das noch kann."],
-        attack: ["Für die Dunkle Fürstin!", "Spürt die Kälte des Grabes!", "Euer Leben gehört mir!"],
-        big: ["Die Seuche breitet sich aus!", "Erhebt euch, meine Diener!"],
-        hurt: ["Ich spüre keinen Schmerz mehr.", "Da fiel nur ein Stück ab. Halb so wild."],
-        low: ["Mein Körper zerfällt … schon wieder.", "Noch bin ich nicht tot. Also … toter."],
-        win: ["Willkommen im Tod.", "Noch einer für die Gruft."],
-        lose: ["Sterben? Darin hab ich Übung.", "Zurück ins Grab … wie langweilig."]
+        greet: [tr("Der Tod ist erst der Anfang."), tr("Lebende … wie niedlich.")],
+        turn: [tr("Meine Runde. Ich hab ja ewig Zeit."), tr("Die Verlassenen erheben sich.")],
+        think: [tr("Hmm … ich hab Zeit. Ewig viel Zeit."), tr("Mein Gehirn … arbeitet noch. Teilweise."), tr("Lasst mich nachdenken … falls ich das noch kann.")],
+        attack: [tr("Für die Dunkle Fürstin!"), tr("Spürt die Kälte des Grabes!"), tr("Euer Leben gehört mir!")],
+        big: [tr("Die Seuche breitet sich aus!"), tr("Erhebt euch, meine Diener!")],
+        hurt: [tr("Ich spüre keinen Schmerz mehr."), tr("Da fiel nur ein Stück ab. Halb so wild.")],
+        low: [tr("Mein Körper zerfällt … schon wieder."), tr("Noch bin ich nicht tot. Also … toter.")],
+        win: [tr("Willkommen im Tod."), tr("Noch einer für die Gruft.")],
+        lose: [tr("Sterben? Darin hab ich Übung."), tr("Zurück ins Grab … wie langweilig.")]
     }
 };
 const BANTER_ALWAYS = new Set(['greet', 'win', 'lose', 'low']);
@@ -1181,11 +1181,11 @@ function renderPendingPanel() {
     if ((d && !board) || (!d && !chain.length)) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
-    ch.innerHTML = chain.length ? `<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? 'Du' : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
+    ch.innerHTML = chain.length ? tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
     opts.innerHTML = '';
-    if (!d) { title.textContent = 'Kette'; prompt.textContent = 'Die CPU reagiert …'; return; }
-    title.textContent = d.protect ? '🛡 Angriff! Protector einsetzen?' : (d.src || 'Entscheidung');
-    prompt.textContent = d.prompt + (d.protect ? ' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.' : ' Klicke eine blau markierte Karte an.');
+    if (!d) { title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …'); return; }
+    title.textContent = d.protect ? tr('🛡 Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
+    prompt.textContent = d.prompt + (d.protect ? tr(' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.') : tr(' Klicke eine blau markierte Karte an.'));
     d.opts.forEach(o => {
         if (typeof o.v === 'string' && locate(G, o.v)) return;   // Karten wählt man auf dem Feld
         const b = document.createElement('button'); b.textContent = o.label;
@@ -1253,14 +1253,14 @@ function priorityChoices() {
     for (const a of getPriorityActions(G, 1)) {
         if (a.type === 'PLAY_CARD') {
             const c = G.p1.hand[a.handIdx]; if (!c || seen.has(c.uid)) continue; seen.add(c.uid);
-            out.push({ card: c, caption: `Spielen (${getPlayCost(G, G.p1, c, a.x || 0)})`, run: () => openHandCardMenu(a.handIdx) });
+            out.push({ card: c, caption: tr`Spielen (${getPlayCost(G, G.p1, c, a.x || 0)})`, run: () => openHandCardMenu(a.handIdx) });
         } else if (a.type === 'ACTIVATE') {
             const k = a.srcUid + '|' + a.key; if (seen.has(k)) continue; seen.add(k);
             const c = findCharacter(G, a.srcUid), pw = c && getPower(G, c, a.key); if (!c || !pw) continue;
             out.push({ card: c, caption: `${pw.flip ? '🔄 ' : ''}${pw.label}${pw.cost ? ` (${pw.cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: a.srcUid, key: a.key }) });
         } else if (a.type === 'COMPLETE_QUEST') {
             const r = G.p1.resources[a.resIdx]; if (!r || seen.has(r.card.uid)) continue; seen.add(r.card.uid);
-            out.push({ card: r.card, caption: 'Quest abschließen', run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
+            out.push({ card: r.card, caption: tr('Quest abschließen'), run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
         }
     }
     return out;
@@ -1285,14 +1285,14 @@ function renderChoiceModal(d) {
     const addButton = (label, cls, fn) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; btns.appendChild(b); };
     const addChoice = (card, caption, fn) => { const n = cardNode(card, "cm-card", caption); n.onclick = (e) => { e.stopPropagation(); fn(); }; cards.appendChild(n); };
     if (d.kind === 'priority') {
-        title.textContent = d.reason === 'combat' ? '⚔ Kampf – reagieren?' : 'Reagieren?';
+        title.textContent = d.reason === 'combat' ? tr('⚔ Kampf – reagieren?') : tr('Reagieren?');
         prompt.textContent = d.prompt;
         fillContext(chainContext());
         priorityChoices().forEach(ch => addChoice(ch.card, ch.caption, ch.run));
-        addButton('Passen', 'success', () => humanAct({ type: 'PASS' }));
+        addButton(tr('Passen'), 'success', () => humanAct({ type: 'PASS' }));
         return;
     }
-    title.textContent = d.protect ? '🛡 Angriff! Protector einsetzen?' : (d.src || 'Entscheidung');
+    title.textContent = d.protect ? tr('🛡 Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
     prompt.textContent = d.prompt;
     fillContext(decisionContext(d));
     d.opts.forEach(o => {

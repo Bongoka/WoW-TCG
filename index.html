@@ -45,7 +45,12 @@
 <div id="side-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-weight:900;color:var(--gold);font-size:15px;">WoW TCG</span>
-        <span id="turn-badge" style="background:#1a1512;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold;border:1px solid var(--border);">Turn 1</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+            <span id="turn-badge" style="background:#1a1512;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold;border:1px solid var(--border);">Turn 1</span>
+            <!-- Sprache: Englisch (Standard) / Deutsch, gemerkt in localStorage -->
+            <button class="lang-flag" data-lang="en" title="English"><svg viewBox="0 0 60 30" width="22" height="11"><clipPath id="uk-c"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath><path d="M0,0v30h60v-30z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" clip-path="url(#uk-c)" stroke="#C8102E" stroke-width="4"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg></button>
+            <button class="lang-flag" data-lang="de" title="Deutsch"><svg viewBox="0 0 5 3" width="18" height="11"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#DD0000"/><rect y="2" width="5" height="1" fill="#FFCE00"/></svg></button>
+        </span>
     </div>
     <div id="cpu-status-box" class="cpu-indicator" style="display:none;"><div class="spinner"></div><span id="cpu-status-text">CPU überlegt...</span></div>
     <div style="display:flex;gap:6px;">
@@ -314,6 +319,8 @@
     <canvas id="booster-fx"></canvas>
 </div>
 
+<script src="js/i18n_en.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/cards.js"></script>
 <script src="js/cards2.js"></script>

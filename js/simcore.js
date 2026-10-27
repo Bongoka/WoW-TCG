@@ -100,7 +100,7 @@ function randomLegalDeck(heroId, size = 60) {
         if ((cnt[id] || 0) >= 4 && !CARDS[id].unlimited) continue;
         cnt[id] = (cnt[id] || 0) + 1; cards.push(id);
     }
-    return { hero: heroId, cards, name: `Zufall ${CARDS[heroId].name}` };
+    return { hero: heroId, cards, name: tr`Zufall ${CARDS[heroId].name}` };
 }
 
 // ============================================================================

@@ -234,7 +234,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
             for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
         }
-        if (!best || score > best.score) best = { action: it.firstAction, score, reason: it.firstAction ? it.firstAction.desc : 'Zug beenden' };
+        if (!best || score > best.score) best = { action: it.firstAction, score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') };
     }
     return (best && best.action) ? best : null;
 }
