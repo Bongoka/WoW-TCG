@@ -315,7 +315,7 @@ function bootGame() {
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
     document.getElementById("btn-simulate").onclick = async () => {
-        const input = prompt("Wie viele Spiele pro Deck-Paar? Jedes wird doppelt gespielt (ohne / mit Münze). (Standard: 3)", "3");
+        const input = prompt("Wie viele Spiele pro Deck-Paar? (Standard: 3)", "3");
         if (input === null) return;
         const n = parseInt(input, 10);
         if (isNaN(n) || n < 1) { alert("Bitte eine Zahl ab 1."); return; }

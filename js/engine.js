@@ -757,7 +757,12 @@ function humanStopActions(s, pid, acts) {
     } else if (s.battle) {
         if (s.battle.step !== 'damage') return [];
         involved.add(s.battle.att); involved.add(s.battle.def);
-    } else return [];
+    } else {
+        // Zugende des Gegners: Karten mit "… this turn" (FX.endStop, z. B. Revenge, Gifte) gehen später nicht mehr
+        if (s.win && s.win.reason === 'end' && s.activePlayer !== pid)
+            return acts.filter(a => a.type === 'PLAY_CARD' && (() => { const c = a.gyUid ? findCharacter(s, a.gyUid) : getPlayer(s, pid).hand[a.handIdx]; return c && fx(c).endStop; })());
+        return [];
+    }
     const useful = (u, harm) => {
         if (link.has(u)) return true;
         if (!involved.has(u)) return false;
@@ -820,13 +825,11 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
     if (minOne > 0) cost = Math.max(Math.min(cost, 1), cost - minOne);                    // "… to a minimum of (1)"
     return Math.max(0, cost);
 }
-// Münze (nur Simulationstest, kein Teil der WoW-TCG-Regeln): p.coin = noch nicht benutzt, p.coinMana = +1 Mana bis Zugende
-function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length + (p.coinMana || 0); }
+function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length; }
 function payRes(p, n) {
     if (n <= 0) return true;
     if (getReadyRes(p) < n) return false;
     let paid = 0;
-    if (p.coinMana > 0) { paid = Math.min(n, p.coinMana); p.coinMana -= paid; }              // Münz-Mana zuerst (verfällt sonst)
     // Erst verdeckte Ressourcen, dann offene Quests
     for (const r of p.resources) if (!r.exhausted && !r.faceUp && paid < n) { r.exhausted = true; paid++; }
     for (const r of p.resources) if (!r.exhausted && paid < n) { r.exhausted = true; paid++; }
@@ -896,10 +899,18 @@ function canPlayCard(s, pid, card, opts = {}) {
     const f = fx(card);
     if (f.canPlay) { const e = f.canPlay(s, pid, card); if (e !== true && e) return e; }
     const minX = card.xCost ? ((f.xRange && f.xRange(s, pid, card).min) || 0) : 0;
+    if (!card.xCost && f.xRange && opts.x === undefined) { const xr = f.xRange(s, pid, card); if (xr.min > xr.max) return 'Kein gültiger Wert für X'; }
     const altCost = (f.altCost && f.altCost(s, pid, card)) || (f.alt && f.alt.can(s, pid, card));
     if (!altCost && getReadyRes(p) < getPlayCost(s, p, card, minX)) return 'Nicht genug Ressourcen';
-    // Pflichtziele vorhanden?
-    if (!targetsPossible(s, pid, f, card, opts.x !== undefined ? opts.x : (card.xCost ? minX : undefined), opts.mode)) return 'Kein legales Ziel';
+    // Pflichtziele vorhanden? Bei X-Kosten ohne festes X: irgendein bezahlbares X mit Ziel genügt
+    // (Mind Control: "target ally with cost X" – mit X = 0 gäbe es meist kein Ziel)
+    let xs = [opts.x !== undefined ? opts.x : (card.xCost ? minX : undefined)];
+    if (opts.x === undefined && card.xCost) {
+        const xr = f.xRange ? f.xRange(s, pid, card) : { min: 0, max: 9 };
+        const maxX = altCost ? xr.max : Math.min(xr.max, getReadyRes(p) - getPlayCost(s, p, card, 0));
+        for (let x = minX + 1; x <= maxX; x++) xs.push(x);
+    }
+    if (!xs.some(x => targetsPossible(s, pid, f, card, x, opts.mode))) return 'Kein legales Ziel';
     return null;
 }
 
@@ -945,9 +956,6 @@ function validateAction(s, a, pid) {
             if (a.faceUp && c.type !== 'Quest') return 'Nur Quests werden offen gelegt';
             return null;
         }
-        case 'USE_COIN':
-            if (!canActMain(s, pid)) return 'Münze nur in deiner Aktionsphase';
-            return p.coin ? null : 'Keine Münze';
         case 'COMPLETE_QUEST': {
             const r = p.resources[a.resIdx];
             if (!r || !r.faceUp || r.card.type !== 'Quest') return 'Keine offene Quest';
@@ -1026,7 +1034,6 @@ function doAction(s, a, pid) {
             flushBatch(s);
             return;
         }
-        case 'USE_COIN': p.coin = false; p.coinMana = (p.coinMana || 0) + 1; p.coinUsedTurn = s.turn; L(s, `🪙 ${p.hero.name} benutzt die Münze (+1 Mana in diesem Zug)`); return;
         case 'COMPLETE_QUEST': startQuest(s, p, a.resIdx); break;
         case 'PLAY_CARD': startPlay(s, p, a); break;
         case 'ACTIVATE': startPower(s, p, a); break;
@@ -1069,6 +1076,10 @@ EK.prepItem = (s) => {
             const maxAff = card.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max;
             const opts = []; for (let x = xr.min; x <= maxAff; x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
             if (!opts.length) return abortPrep(s, 'X nicht bezahlbar');
+            // Nur X anbieten, für die es Pflichtziele gibt (Mind Control: Ally mit Kosten X)
+            const withTgt = opts.filter(o => targetsPossible(s, p.id, f, card, o.v, it.mode));
+            if (!withTgt.length) return abortPrep(s, 'Kein legales Ziel');
+            opts.splice(0, opts.length, ...withTgt);
             ask(s, { pid: p.id, prompt: `${card.name}: Wähle X`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'x' }, keep: true });
             return;
         }
@@ -2102,7 +2113,6 @@ function turnStep(s, step) {
         while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, `⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
         s.activePlayer = next; s.turn++; s.placedResource = false; s.phase = 'start';
         s.lastTurnOf[next] = s.turn;
-        s.p1.coinMana = 0; s.p2.coinMana = 0;                                             // Münze (Test): Mana gilt nur einen Zug
         s.pe = (s.pe || []).filter(m => m.until === 'game' || m.turn >= s.turn - 1 || (m.untilTurn && m.untilTurn >= s.turn));
         // Alte "this turn"-Modifikatoren aufräumen (nur Speicher – tms() wertet ohnehin nur den aktuellen Zug)
         for (const pl of [s.p1, s.p2]) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);
@@ -2228,6 +2238,8 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     const xs = [];
     if (c.xCost || f.xRange) { const xr = f.xRange ? f.xRange(s, pid, c) : { min: 0, max: 9 }; const base = getPlayCost(s, p, c, 0); for (let x = xr.min; x <= (c.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max); x++) xs.push(x); if (!xs.length) return out; }
     else xs.push(undefined);
+    // Nur X mit Pflichtzielen (Mind Control: Ally mit Kosten X), sonst fiele das passende X oft aus der Stichprobe
+    if (xs[0] !== undefined && f.slots) { const ok = xs.filter(x => targetsPossible(s, pid, f, c, x)); xs.splice(0, xs.length, ...ok); if (!xs.length) return out; }
     for (const x of xs.length > 4 ? [xs[0], xs[Math.floor(xs.length / 2)], xs[xs.length - 1]] : xs) {
         const modes = f.modes ? f.modes(s, pid, c, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
         for (const mode of modes) {
@@ -2256,7 +2268,8 @@ function targetCombos(s, pid, slots, distinct) {
         cands.sort((a, b) => (sl.ai ? sl.ai(b, s) : aiTargetValue(s, pid, b, sl.harm)) - (sl.ai ? sl.ai(a, s) : aiTargetValue(s, pid, a, sl.harm)));
         const top = cands.slice(0, mx > 1 ? 4 : 6);
         const choices = [];
-        if (mx === 1) { top.forEach(u => choices.push([u])); if (mn === 0) choices.push([]); }
+        if (mx <= 0) choices.push([]);                                                     // "Destroy X target armor" mit X = 0
+        else if (mx === 1) { top.forEach(u => choices.push([u])); if (mn === 0) choices.push([]); }
         else {
             const n = Math.min(mx, top.length);
             choices.push(top.slice(0, n));
@@ -2315,7 +2328,6 @@ function getLegalActions(s, pid) {
         });
     }
     p.resources.forEach((r, i) => { if (r.faceUp && r.card.type === 'Quest' && !checkQuestCondition(s, p, r)) acts.push({ type: 'COMPLETE_QUEST', resIdx: i, actorId: pid, desc: `Quest: ${r.card.name}` }); });
-    if (p.coin) acts.push({ type: 'USE_COIN', actorId: pid, desc: 'Münze: +1 Mana in diesem Zug' });
     const seen = new Set();
     p.hand.forEach((c, i) => { if (seen.has(c.id)) return; seen.add(c.id); acts.push(...playVariants(s, pid, c, i, false)); });
     gyPlayables(s, pid).forEach(c => acts.push(...playVariants(s, pid, c, -1, false, c.uid)));

@@ -340,13 +340,13 @@ const bestWeaponAtk = (s, pid, pred) => Math.max(0, ...me(s, pid).hero.weapons.f
 FX[91] = { slots: slotChar('Erschöpftes Ziel', true, { exhausted: true }), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3 + bestWeaponAtk(s, it.pl, w => w.wsub === 'Dagger'), 'Melee'); } };
 FX[92] = { resolve: (s, it) => { drawCards(s, me(s, it.pl), 1); addPE(s, it.pl, { k: 'coldBlood' }); } };
 FX[93] = { slots: slotAlly('Erschöpfter Ally', true, { exhausted: true }), resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
-FX[94] = { slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; },
+FX[94] = { endStop: true, slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c) => { if (c.attachedTo) trig(s, { id: 94, k: 'ask', a: { host: c.attachedTo } }); } },
     k: { ask: (s, a) => { const h = findCharacter(s, a.host); if (!h) return; const pid = ctrlOf(s, h); const p = me(s, pid);
             if (getReadyRes(p) < 3) { exhaust(s, h); L(s, `Crippling Poison erschöpft ${h.name}.`); return; }
             ask(s, { pid, prompt: `Crippling Poison: (3) bezahlen, sonst wird ${h.name} erschöpft`, src: 'Crippling Poison', opts: [{ label: 'Bezahlen (3)', v: 1, ai: h.type === 'Hero' ? 0 : cardValue(s, h) > 8 ? 1 : 0 }, { label: 'Erschöpfen lassen', v: 0, ai: 0.5 }], k: '94:do', a, auto: false }); },
         do: (s, a, v) => { const h = findCharacter(s, a.host); if (!h) return; if (v && payRes(me(s, ctrlOf(s, h)), 3)) return; exhaust(s, h); } } };
-FX[95] = { slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(2, 'Nature') };
+FX[95] = { endStop: true, slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(2, 'Nature') };
 FX[96] = { slots: (s, pid) => [{ label: 'Ziel-Ausrüstung', cands: targetCands(s, pid, { equipment: true }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }], resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 // Combos im Friedhof: gedruckt "Combo", Tyler Falconbridge ("also a Combo while in a graveyard"), Filthy Tricks ("Cards in your graveyard are Combos")
 const combosInGy = (s, pid) => { const all = me(s, pid).ongoing.some(o => o.id === 2067); return me(s, pid).graveyard.filter(c => all || (c.subtypes || []).includes('Combo') || c.id === 2147); };

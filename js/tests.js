@@ -656,32 +656,358 @@ function runRuleTests() {
         advanceTurn(s, true); advanceTurn(s, true);
         assert(!x.exhausted, 'altes Leeroy-Verbot hat einen späteren Bereitmach-Schritt blockiert');
     });
-    test(87, 'Münz-Test: gleicher Seed ergibt dasselbe Spiel; Münze gibt einmal +1 Mana für einen Zug', () => {
+    test(87, 'Simulation: gleicher Seed ergibt dasselbe Spiel', () => {
         const A = deck('alliance_mage'), B = deck('horde_warrior'), orig = Math.random;
         let r1, r2;
         try { Math.random = seededRandom(42); r1 = simulateOneGame(A, B); Math.random = seededRandom(42); r2 = simulateOneGame(A, B); } finally { Math.random = orig; }
         assert(r1.winner === r2.winner && r1.turns === r2.turns && r1.p1Hp === r2.p1Hp && r1.p2Hp === r2.p2Hp, 'gleicher Seed, anderes Spiel');
-        // Münze: 2 Ressourcen + Münze → 3er-Karte spielbar; Münze danach weg, Münz-Mana verfällt am Zugende
-        const s = fresh('alliance_mage', 'horde_warrior', 2); s.real = false; res(s, 2, 2); const p = P(s, 2); p.hand = []; p.coin = true;
-        const three = Object.values(CARDS).find(c => c.type === 'Ally' && !c.set && !c.text && c.cost === 3 && c.faction !== 'Alliance' && cardMatchesPlayer(c, p));
-        assert(three, 'Testaufbau: keine 3er-Ally'); hand(s, 2, three.id);
-        assert(!getLegalActions(s, 2).some(a => a.type === 'PLAY_CARD'), 'ohne Münze spielbar');
-        const d = fastAiAction(s, 2);
-        assert(d && d.action.type === 'USE_COIN', 'KI nutzt die Münze nicht: ' + (d && d.action ? d.action.desc : '–'));
-        act(s, { type: 'USE_COIN' }, 2);
-        assert(!p.coin && getReadyRes(p) === 3, `nach Münze ${getReadyRes(p)} Mana`);
-        assert(!getLegalActions(s, 2).some(a => a.type === 'USE_COIN'), 'Münze zweimal nutzbar');
-        act(s, { type: 'PLAY_CARD', handIdx: 0 }, 2);
-        assert(p.allies.some(a => a.id === three.id) && getReadyRes(p) === 0, 'Karte nicht mit Münz-Mana bezahlt');
-        const s2 = fresh('alliance_mage', 'horde_warrior', 2); s2.real = false; res(s2, 2, 1); P(s2, 2).coin = true; P(s2, 2).hand = [];
-        act(s2, { type: 'USE_COIN' }, 2); advanceTurn(s2, true);
-        assert(P(s2, 2).coinMana === 0, 'Münz-Mana nicht verfallen');
+    });
+    test(88, 'Mind Control (2+X): Ziel-Ally mit Kosten X wählbar, Kontrolle wechselt', () => {
+        const s = fresh('alliance_priest', 'horde_warrior'); res(s, 1, 6); P(s, 1).hand = [];
+        const three = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && c.cost === 3 && !c.unique);
+        const t = put(s, 2, three.id); put(s, 2, Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && c.cost === 1).id);
+        hand(s, 1, 81);
+        assert(!canPlayCard(s, 1, P(s, 1).hand[0]), 'Mind Control nicht spielbar: ' + canPlayCard(s, 1, P(s, 1).hand[0]));
+        const mc = getLegalActions(s, 1).find(a => a.type === 'PLAY_CARD' && a.x === 3 && a.targets[0][0] === t.uid);
+        assert(mc, 'kein Angebot X=3 → 3er-Ally');
+        // Menschlicher Weg: X-Auswahl bietet nur X mit passendem Ziel (1 und 3, nicht 0/2/4)
+        const h = cloneState(s); h.humans = [1]; h.real = false;
+        applyAction(h, { type: 'PLAY_CARD', handIdx: 0, actorId: 1 }, true, 1);
+        const xs = h.pending && h.pending.opts.filter(o => o.v !== '__cancel').map(o => o.v).join(',');
+        assert(xs === '1,3', 'X-Auswahl: ' + xs);
+        act(s, mc, 1);
+        assert(P(s, 1).allies.includes(t) && !P(s, 2).allies.includes(t), 'Kontrolle nicht gewechselt');
+        assert(getReadyRes(P(s, 1)) === 1, `Kosten: noch ${getReadyRes(P(s, 1))} statt 1 Ressource übrig`);
+    });
+    test(89, 'Alle Karten: spielbar (auch in Kampf-/Ketten-Szenarien), für KI und Mensch auflösbar, Kräfte nutzbar', () => {
+        const f = runCardTests();
+        assert(!f.length, `${f.length} Probleme: ` + f.slice(0, 8).map(x => `${x.name}: ${x.problem}`).join(' · '));
+    });
+    test(90, 'Wirkung nach Text-Bausteinen (Werte, Schlüsselwörter, Schaden, Heilung, Zerstören, Anhänge)', () => {
+        const r = runCardTextTests();
+        assert(!r.fails.length, `${r.fails.length} Abweichungen: ` + r.fails.slice(0, 8).map(x => `${x.name}: ${x.problem}`).join(' · '));
+    });
+    test(91, 'Cruelty: Held hat +1 ATK, solange du eine Waffe kontrollierst', () => {
+        const h = Object.values(CARDS).find(c => c.type === 'Hero' && c.talent === 'Fury');
+        const s = newGameState(h.id, [1], 1, [1]); s.turn = 6; s.lastTurnOf = { 1: 6, 2: 5 };
+        put(s, 1, 1119);
+        assert(atkOf(s, P(s, 1).hero, {}) === 0, 'ohne Waffe schon +1');
+        put(s, 1, Object.values(CARDS).find(c => c.type === 'Weapon' && !c.text).id);
+        const w = atkOf(s, P(s, 1).hero, {});
+        P(s, 1).ongoing = [];
+        assert(w === 1 && atkOf(s, P(s, 1).hero, {}) === 0, `mit Waffe ${w} statt 1`);
     });
     test(63, 'Simulation mit Set-2/3-Helden läuft fehlerfrei', () => {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
     });
     return results;
+}
+
+// ============================================================================
+// KARTEN-TEST (alle Karten): Jede Karte wird auf einem vollen Spielfeld ausgespielt – über die KI-Varianten
+// und wie ein Mensch (erste Option jeder Abfrage). Kräfte im Spiel werden genutzt, Quests geprüft.
+// Findet: nicht spielbar trotz Zielen, keine Variante für die KI, Absturz, Karte bleibt hängen, kaputter Zustand.
+// Situationsabhängige Karten (Kampf, Kette, Stealth …) werden in SCENARIOS echt herbeigeführt.
+// Ergebnis: [{ id, name, problem }]. Karten aus CARD_ISSUES werden ausgelassen.
+// ============================================================================
+// Gemeinsame Helfer der Karten-Tests: Testheld für eine Karte, Allies/Ausrüstung ohne Text
+const ctHeroes = () => Object.values(CARDS).filter(c => c.type === 'Hero');
+const ctVanilla = cost => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.cost === cost);
+const ctPlain = type => Object.values(CARDS).find(c => c.type === type && !c.text && !c.isToken && !c.unique);
+const ctHeroFor = c => ctHeroes().find(h => (c.type === 'Hero' ? h.id === c.id : cardMatchesPlayer(c, { hero: h, faction: h.faction, className: h.class }) && (!c.talentReq || c.talentReq === h.talent)));
+function runCardTests(ids) {
+    const out = [];
+    const all = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id] && (!ids || ids.includes(c.id)));   // bekannte Abweichungen: bewusst nicht getestet
+    const heroes = ctHeroes(), vanilla = ctVanilla, plain = ctPlain, heroFor = ctHeroFor;
+    const ongoing = Object.values(CARDS).find(c => c.type === 'Ability' && c.ongoing && !c.attach && !c.unique && /^Ongoing: Allies you control have \+1 ATK/.test(c.text || '')) || Object.values(CARDS).find(c => c.type === 'Ability' && c.ongoing && !c.attach);
+    const zonesOk = s => {
+        const uids = new Set();
+        for (const p of [s.p1, s.p2]) for (const z of [p.hand, p.allies, p.graveyard, p.ongoing, p.removed, p.hero.weapons, p.hero.armors, p.resources.map(r => r.card)])
+            for (const c of z) {
+                if (!c || !CARDS[c.id]) return 'ungültige Karte in einer Zone';
+                if (uids.has(c.uid)) return `${c.name} liegt doppelt (${c.uid})`;
+                uids.add(c.uid);
+                if (!Number.isFinite(c.damage || 0)) return `${c.name}: Schaden ${c.damage}`;
+            }
+        for (const p of [s.p1, s.p2]) if (!Number.isFinite(p.hero.damage)) return 'Heldenschaden ' + p.hero.damage;
+        return null;
+    };
+    const setup = (c, h) => {
+        const opp = heroes.find(x => x.faction !== h.faction && !x.set) || heroes.find(x => x.id !== h.id);
+        const filler = Array(40).fill(vanilla(2).id);
+        const s = newGameState(h.id, filler, opp.id, filler);
+        s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false;
+        const mk = (pid, id, o = {}) => { const x = makeCardInst(id, false, pid); x.joinedTurn = 1; Object.assign(x, o); return x; };
+        for (const pid of [1, 2]) {
+            const p = getPlayer(s, pid);
+            for (let i = 0; i < 12; i++) p.resources.push({ card: mk(pid, vanilla(1).id), faceUp: false, exhausted: false });
+            [1, 2, 3, 4, 5, 6].forEach((k, i) => { const v = vanilla(k); if (v && (pid === 2 || k <= 3)) p.allies.push(mk(pid, v.id, i === 1 ? { damage: 1 } : i === 2 && pid === 2 ? { exhausted: true } : {})); });
+            p.graveyard.push(mk(pid, vanilla(3).id), mk(pid, plain('Weapon').id), mk(pid, ongoing.id));
+            p.hand = [mk(pid, vanilla(2).id), mk(pid, vanilla(4).id), mk(pid, plain('Armor').id)];
+        }
+        if (c.type !== 'Weapon') s.p1.hero.weapons.push(mk(1, plain('Weapon').id));             // für Gifte, Waffenverzauberungen
+        const o = s.p2; o.hero.weapons.push(mk(2, plain('Weapon').id)); o.hero.armors.push(mk(2, plain('Armor').id)); o.ongoing.push(mk(2, ongoing.id));
+        s.p1.hero.damage = 5; o.hero.damage = 5;
+        return s;
+    };
+    // Mensch: jede eigene Abfrage mit der ersten echten Option beantworten, Gegner/Prioritäten wie die KI
+    const humanRun = (s, a) => {
+        s.humans = [1];
+        if (!applyAction(s, { ...a, actorId: 1 }, true, 1)) return 'Aktion abgelehnt: ' + (validateAction(s, a, 1) || '?');
+        for (let n = 0; n < 60 && s.pending; n++) {
+            const d = s.pending; s.pending = null;
+            let v;
+            if (d.kind === 'priority') { passPriority(s); process(s); continue; }
+            if (d.pid === 1) { const o = (d.opts || []).find(x => x.v !== '__cancel'); if (!o) return 'Abfrage ohne Option: ' + d.prompt; v = o.v; }
+            else v = aiPick(s, d);
+            s.queue.unshift({ op: 'call', k: d.k, a: d.a, v }); process(s);
+        }
+        return s.pending ? 'hängt in Abfrage: ' + s.pending.prompt : null;
+    };
+    const tryRun = (fn) => { try { return fn(); } catch (e) { return 'Absturz: ' + e.message; } };
+    // Spiel laufen lassen (Gegner und eigene Pflicht-Entscheidungen wie die KI) bis Spieler 1 die Karte spielen kann:
+    // an einem eigenen Prioritätspunkt oder in der eigenen ruhigen Aktionsphase. Kein solcher Zeitpunkt → null
+    const findMoment = (s, uid) => {
+        let ended = false;
+        for (let n = 0; n < 300; n++) {
+            const c = s.p1.hand.find(x => x.uid === uid); if (!c || s.gameOver) return null;
+            const at = (s.pending && s.pending.kind === 'priority' && s.pending.pid === 1) || (!s.pending && isIdle(s) && s.activePlayer === 1);
+            if (at && !canPlayCard(s, 1, c)) return s;
+            // Gegnerzug ohne weitere Aktionen: weiter ins Zugende (dort bekommt Spieler 1 noch Priorität)
+            if (!s.pending && isIdle(s) && s.activePlayer === 2 && !ended) { ended = true; s.phase = 'end'; s.queue.push({ op: 'turn', step: 'endPhase' }); process(s); continue; }
+            if (!s.pending) return null;
+            const d = s.pending; s.pending = null;
+            if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) });
+            process(s);
+        }
+        return null;
+    };
+    const protector = Object.values(CARDS).find(c => c.type === 'Ally' && c.text === 'Protector' && !c.unique);
+    const atk = (s, pid, att, def) => applyAction(s, { type: 'ATTACK', attackerUid: att, defenderUid: def, actorId: pid }, true, pid);
+    const oppTurn = s => { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; };
+    const fresh2 = s => s.p2.allies.find(x => !x.exhausted);
+    const weakest = s => s.p2.allies.slice().sort((a, b) => hpOf(s, a) - hpOf(s, b))[0];
+    // Gegner spielt eine Fähigkeit auf den eigenen Helden (für Counterspell, Fizzle, Spell Reflection …)
+    const oppCast = s => {
+        oppTurn(s);
+        for (const ab of Object.values(CARDS)) {
+            if (ab.type !== 'Ability' || ab.ongoing || ab.isToken || (ab.cost || 0) > 3 || !cardMatchesPlayer(ab, s.p2)) continue;
+            s.p2.hand.unshift(makeCardInst(ab.id, false, 2));
+            const a = getLegalActions(s, 2).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0 && JSON.stringify(x.targets) === JSON.stringify([[s.p1.hero.uid]]));
+            if (a && applyAction(s, a, true, 2)) return true;
+            s.p2.hand.shift();
+        }
+        return false;
+    };
+    const SCENARIOS = [
+        ['Gegner-Ally greift Held an', s => { oppTurn(s); return atk(s, 2, fresh2(s).uid, s.p1.hero.uid); }],
+        ['Gegner-Held greift Held an', s => { oppTurn(s); return atk(s, 2, s.p2.hero.uid, s.p1.hero.uid); }],
+        ['Gegner-Ally greift eigenen Ally an', s => { oppTurn(s); return atk(s, 2, fresh2(s).uid, s.p1.allies[0].uid); }],
+        ['Eigener Held greift Ally an', s => atk(s, 1, s.p1.hero.uid, weakest(s).uid)],
+        ['Eigener Held greift Ally an, der überlebt', s => atk(s, 1, s.p1.hero.uid, s.p2.allies.slice().sort((a, b) => hpOf(s, b) - hpOf(s, a))[0].uid)],
+        ['Eigener Held greift Held an', s => { s.p2.allies = []; return atk(s, 1, s.p1.hero.uid, s.p2.hero.uid); }],
+        ['Gegner-Ally greift Held an, eigener Protector fängt ab', s => { oppTurn(s); const pr = makeCardInst(protector.id, false, 1); pr.joinedTurn = 1; s.p1.allies.push(pr); return atk(s, 2, fresh2(s).uid, s.p1.hero.uid); }],
+        ['Eigener Ally greift an, Protector fängt ab', s => { const pr = makeCardInst(protector.id, false, 2); pr.joinedTurn = 1; s.p2.allies.push(pr); return atk(s, 1, s.p1.allies[0].uid, s.p2.hero.uid); }],
+        ['Gegner spielt Fähigkeit', oppCast],
+        ['Held hat Stealth', s => { addTM(s.p1.hero, { k: 'stealth', turn: s.turn }); return true; }],
+        ['20 Ressourcen', s => { for (let i = 0; i < 10; i++) s.p1.resources.push({ card: makeCardInst(vanilla(1).id, false, 1), faceUp: false, exhausted: false }); return true; }],
+    ];
+    for (const c of all) {
+        const bad = msg => out.push({ id: c.id, name: c.name, problem: msg });
+        const h = heroFor(c); if (!h) { bad('kein passender Held'); continue; }
+        let s0; try { s0 = setup(c, c.type === 'Hero' ? c : h); } catch (e) { bad('Aufbau: ' + e.message); continue; }
+        if (c.type === 'Quest') {
+            const p = s0.p1; p.resources.push({ card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false });
+            const r = tryRun(() => { checkQuestCondition(s0, p, p.resources[p.resources.length - 1]); const qa = getLegalActions(s0, 1).find(a => a.type === 'COMPLETE_QUEST'); if (qa) { applyAction(s0, qa, true, 1); autoResolve(s0); } return zonesOk(s0); });
+            if (r) bad('Quest: ' + r);
+            continue;
+        }
+        if (c.type !== 'Hero') {
+            // Erst das ruhige Testfeld, dann die Szenarien: erster Zeitpunkt, an dem die Karte spielbar ist
+            const base = cloneState(s0); base.p1.hand.unshift(makeCardInst(c.id, false, 1));
+            const uid = base.p1.hand[0].uid;
+            let s = canPlayCard(base, 1, base.p1.hand[0]) ? null : base, why = canPlayCard(base, 1, base.p1.hand[0]), scen = '';
+            for (const [name, start] of (s ? [] : SCENARIOS)) {
+                const t = cloneState(base); t.humans = [1];
+                const m = tryRun(() => start(t) ? findMoment(t, uid) : null);
+                if (m && typeof m === 'object') { s = m; scen = ` [${name}]`; break; }
+            }
+            if (!s) bad('nicht spielbar: ' + why);
+            else {
+                const idx = () => s.p1.hand.findIndex(x => x.uid === uid);
+                const vars = getLegalActions(s, 1).filter(a => a.type === 'PLAY_CARD' && a.handIdx === idx());
+                if (!vars.length && !fx(c).aiSkip) bad('KI: keine Spielvariante' + scen);
+                for (const a of vars.slice(0, 4)) {
+                    const r = tryRun(() => { const t = cloneState(s); t.humans = []; if (!applyAction(t, a, true, 1)) return 'KI-Variante abgelehnt: ' + a.desc; autoResolve(t);
+                        if (t.p1.hand.some(x => x.uid === uid)) return 'KI: Karte blieb auf der Hand (' + a.desc + ')'; return zonesOk(t); });
+                    if (r) { bad(r + scen); break; }
+                }
+                const r = tryRun(() => { const t = cloneState(s); const e = humanRun(t, { type: 'PLAY_CARD', handIdx: idx() }); if (e) return 'Mensch: ' + e;
+                    if (t.p1.hand.some(x => x.uid === uid)) return 'Mensch: Karte blieb auf der Hand'; return zonesOk(t); });
+                if (r) bad(r + scen);
+            }
+        }
+        // Kräfte: Karte direkt ins Spiel (Held = Testheld) und jede angebotene Kraft-Variante nutzen
+        const sp = cloneState(s0); let src = sp.p1.hero;
+        if (c.type !== 'Hero') {
+            src = makeCardInst(c.id, false, 1); src.joinedTurn = 1;
+            if (c.type === 'Weapon') sp.p1.hero.weapons.push(src); else if (c.type === 'Armor' || c.type === 'Item') sp.p1.hero.armors.push(src);
+            else if (c.type === 'Ally') sp.p1.allies.push(src); else if (c.ongoing && !c.attach) sp.p1.ongoing.push(src); else src = null;
+        }
+        if (src && (fx(src).powers || []).length) {
+            const acts = getLegalActions(sp, 1).filter(a => a.type === 'ACTIVATE' && a.srcUid === src.uid);
+            for (const a of acts.slice(0, 4)) {
+                const r = tryRun(() => { const t = cloneState(sp); if (!applyAction(t, a, true, 1)) return 'Kraft abgelehnt: ' + a.desc; autoResolve(t); return zonesOk(t); });
+                if (r) { bad('Kraft: ' + r); break; }
+            }
+        }
+    }
+    return out;
+}
+
+// ============================================================================
+// WIRKUNGS-TEST NACH TEXT-BAUSTEINEN: Karten mit gleich aufgebautem Text funktionieren gleich. Jeder Baustein
+// prüft die exakte Wirkung an allen passenden Karten (Schaden, Heilung, Zerstören, Werte, Schlüsselwörter …).
+// Ergebnis: { groups: { Baustein: Anzahl Karten }, fails: [{ group, id, name, problem }] }
+// ============================================================================
+function runCardTextTests() {
+    const groups = {}, fails = [];
+    const T = c => (c.text || '').replace(/\s*<p>\s*/g, ' ').trim();
+    const KW = ['Protector', 'Ferocity', 'Elusive', 'Untargetable', 'Long-Range', 'Stealth'];
+    // Führende Schlüsselwörter ("Protector", "Stealth (This ally can't be protected against.)", "Elusive, Protector");
+    // "(1), [Activate] …" ist eine Kosten-Angabe, keine Erinnerung
+    const kwPrefix = t => { const out = []; let r = t; for (;;) { const m = r.match(/^(Protector|Ferocity|Elusive|Untargetable|Long-Range|Stealth)(\s*\((?![\dX]\))[^)]*\))?\s*,?\s*/); if (!m || (/^\s*\(/.test(r.slice(m[1].length)) && !m[2])) break; out.push(m[1]); r = r.slice(m[0].length); } return { kws: out, rest: r }; };
+    const clean = c => {
+        const h = ctHeroFor(c), opp = ctHeroes().find(x => x.faction !== h.faction && !x.set) || ctHeroes().find(x => x.id !== h.id);
+        const filler = Array(40).fill(ctVanilla(2).id);
+        const s = newGameState(h.id, filler, opp.id, filler);
+        s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false;
+        for (const p of [s.p1, s.p2]) { for (let i = 0; i < 12; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); p.hand = [1, 2, 3].map(k => makeCardInst(ctVanilla(k).id, false, p.id)); }
+        return s;
+    };
+    const put = (s, pid, id, o = {}) => { const p = getPlayer(s, pid), x = makeCardInst(id, false, pid); x.joinedTurn = 1; Object.assign(x, o);
+        const d = CARDS[id]; (d.type === 'Weapon' ? p.hero.weapons : d.type === 'Armor' || d.type === 'Item' ? p.hero.armors : d.type === 'Ally' ? p.allies : p.ongoing).push(x); return x; };
+    // Karte von der Hand spielen; pick wählt die Variante (Standard: die erste), Ergebnis: Fehlertext oder null
+    const play = (s, c, pick) => {
+        s.p1.hand.unshift(makeCardInst(c.id, false, 1));
+        const why = canPlayCard(s, 1, s.p1.hand[0]); if (why) return 'nicht spielbar: ' + why;
+        const vars = getLegalActions(s, 1).filter(a => a.type === 'PLAY_CARD' && a.handIdx === 0);
+        const a = pick ? vars.find(pick) : vars[0]; if (!a) return 'keine passende Spielvariante';
+        if (!applyAction(s, a, true, 1)) return 'abgelehnt: ' + a.desc;
+        autoResolve(s); return null;
+    };
+    const tgt = uid => a => JSON.stringify(a.targets) === JSON.stringify([[uid]]);
+    const left = (s, c) => hpOf(s, c) - (c.damage || 0);
+    const gone = (s, uid) => { const l = locate(s, uid); return !l || !isInPlayZone(l.zone); };
+    const B = [];   // [Name, Treffer?, Prüfung → Fehlertext | null]
+    // Allies: Kosten, Werte, Schlüsselwörter (nur gedruckte – keine fremden), Verhalten der Schlüsselwörter
+    B.push(['Ally ohne Text / nur Schlüsselwörter', c => c.type === 'Ally' && (!T(c) || (kwPrefix(T(c)).kws.length && !kwPrefix(T(c)).rest)), c => {
+        const s = clean(c), r0 = getReadyRes(s.p1), kws = kwPrefix(T(c)).kws;
+        const e = play(s, c); if (e) return e;
+        const a = s.p1.allies.find(x => x.id === c.id); if (!a) return 'nicht in der Party';
+        if (r0 - getReadyRes(s.p1) !== (c.cost || 0)) return `Kosten ${r0 - getReadyRes(s.p1)} statt ${c.cost}`;
+        if (atkOf(s, a) !== (c.atk || 0) || hpOf(s, a) !== (c.hp || 0)) return `Werte ${atkOf(s, a)}/${hpOf(s, a)} statt ${c.atk}/${c.hp}`;
+        const has = { Protector: hasProtector(s, a), Ferocity: hasFerocity(s, a), Elusive: hasElusive(s, a), Untargetable: kwHas(s, a, 'untargetable'), 'Long-Range': kwHas(s, a, 'longRange'), Stealth: kwHas(s, a, 'stealth') };
+        for (const k of KW) if (has[k] !== kws.includes(k)) return `${k}: ${has[k] ? 'vorhanden, aber nicht gedruckt' : 'fehlt'}`;
+        if (canAttackNow(s, a, s.p1) !== kws.includes('Ferocity')) return kws.includes('Ferocity') ? 'Ferocity: kann nicht sofort angreifen' : 'kann im Eintrittszug angreifen';
+        return null;
+    }]);
+    // Schlüsselwort-Verhalten an allen Allies, deren Text mit Schlüsselwörtern beginnt
+    B.push(['Schlüsselwort-Verhalten (Ally)', c => c.type === 'Ally' && kwPrefix(T(c)).kws.length, c => {
+        const kws = kwPrefix(T(c)).kws;
+        for (const k of kws) {
+            const s = clean(c); const a = put(s, 1, c.id);
+            if (k === 'Elusive') { const x = put(s, 2, ctVanilla(3).id); if (attackTargets(s, x).some(d => d.uid === a.uid)) return 'Elusive: kann angegriffen werden'; }
+            if (k === 'Untargetable') { if (targetCands(s, 2, { ally: true }).includes(a.uid)) return 'Untargetable: Gegner kann ihn als Ziel wählen'; }
+            if (k === 'Protector' && !hasProtector(s, a)) return 'Protector fehlt';
+            if (k === 'Ferocity') { const b = put(s, 1, c.id, { joinedTurn: 6 }); s.p1.allies.splice(s.p1.allies.indexOf(a), 1); if (!hasFerocity(s, b)) return 'Ferocity fehlt'; }
+            if (k === 'Long-Range' && atkOf(s, a) > 0) {
+                const d = put(s, 2, ctVanilla(4).id);
+                if (!atk1(s, a.uid, d.uid)) return 'Long-Range: Angriff nicht möglich';
+                if ((a.damage || 0) > 0) return `Long-Range: Verteidiger hat ${a.damage} Kampfschaden zugefügt`;
+            }
+            if (k === 'Stealth' && atkOf(s, a, { attacking: true }) > 0 && canAttackNow(s, a, s.p1)) {
+                const pr = put(s, 2, Object.values(CARDS).find(x => x.type === 'Ally' && x.text === 'Protector').id), h0 = s.p2.hero.damage;
+                if (!atk1(s, a.uid, s.p2.hero.uid)) return 'Stealth: Angriff nicht möglich';
+                if (pr.damage || s.p2.hero.damage === h0) return 'Stealth: Protector konnte schützen';
+            }
+        }
+        return null;
+    }]);
+    const atk1 = (s, att, def) => { if (!applyAction(s, { type: 'ATTACK', attackerUid: att, defenderUid: def, actorId: 1 }, true, 1)) return false; autoResolve(s); return true; };
+    B.push(['Waffe ohne Text', c => c.type === 'Weapon' && !T(c), c => {
+        const s = clean(c), r0 = getReadyRes(s.p1);
+        const e = play(s, c); if (e) return e;
+        const w = s.p1.hero.weapons.find(x => x.id === c.id); if (!w) return 'nicht ausgerüstet';
+        if (r0 - getReadyRes(s.p1) !== (c.cost || 0)) return `Kosten ${r0 - getReadyRes(s.p1)} statt ${c.cost}`;
+        const h0 = s.p2.hero.damage, r1 = getReadyRes(s.p1);
+        if (!atk1(s, s.p1.hero.uid, s.p2.hero.uid)) return 'Heldenangriff nicht möglich';
+        if (s.p2.hero.damage - h0 !== (c.atk || 0)) return `Angriff: ${s.p2.hero.damage - h0} Schaden statt ${c.atk}`;
+        if (r1 - getReadyRes(s.p1) !== (c.strike || 0)) return `Schlagkosten ${r1 - getReadyRes(s.p1)} statt ${c.strike}`;
+        return null;
+    }]);
+    B.push(['Rüstung ohne Text', c => c.type === 'Armor' && !T(c), c => {
+        const s = clean(c); const e = play(s, c); if (e) return e;
+        const a = s.p1.hero.armors.find(x => x.id === c.id); if (!a) return 'nicht ausgerüstet';
+        return defOf(s, a) === (c.def || 0) ? null : `DEF ${defOf(s, a)} statt ${c.def}`;
+    }]);
+    const DMG = /^Your hero deals (\d+) (?:\w+ )?damage to target (hero or ally|ally|hero)\.( Draw a card\.)?$/;
+    B.push(['Direktschaden auf ein Ziel', c => DMG.test(T(c)), c => {
+        const [, n, who, draw] = T(c).match(DMG); const s = clean(c);
+        const t = who.includes('hero') ? s.p2.hero : put(s, 2, ctVanilla(6).id), d0 = t.damage || 0, h0 = s.p1.hand.length;
+        const e = play(s, c, tgt(t.uid)); if (e) return e;
+        if (gone(s, t.uid) ? +n < hpOf(s, t) : (t.damage || 0) - d0 !== +n) return `${(t.damage || 0) - d0} Schaden statt ${n}`;
+        return s.p1.hand.length === h0 + (draw ? 1 : 0) ? null : `Handkarten ${s.p1.hand.length} statt ${h0 + (draw ? 1 : 0)}`;
+    }]);
+    const HEAL = /^Your hero heals (\d+) damage from target (hero or ally|ally|hero)\.( Draw a card\.)?$/;
+    B.push(['Heilung eines Ziels', c => HEAL.test(T(c)), c => {
+        const [, n, who, draw] = T(c).match(HEAL); const s = clean(c);
+        const t = who.includes('hero') ? s.p1.hero : put(s, 1, ctVanilla(6).id); t.damage = who.includes('hero') ? 15 : hpOf(s, t) - 1; const d0 = t.damage, h0 = s.p1.hand.length;
+        const e = play(s, c, tgt(t.uid)); if (e) return e;
+        const want = Math.max(0, d0 - +n);
+        if (t.damage !== want) return `Schaden danach ${t.damage} statt ${want}`;
+        return s.p1.hand.length === h0 + (draw ? 1 : 0) ? null : `Handkarten ${s.p1.hand.length} statt ${h0 + (draw ? 1 : 0)}`;
+    }]);
+    const DES = /^Destroy target (exhausted |damaged )?(ally|equipment|armor|ability)( with cost (\d+) or (more|less))?\.$/;
+    B.push(['Zerstören eines Ziels', c => DES.test(T(c)), c => {
+        const [, adj, noun, , n, ml] = T(c).match(DES); const s = clean(c);
+        const cost = n ? +n : 3;
+        const t = noun === 'ally' ? put(s, 2, ctVanilla(Math.min(6, Math.max(1, cost))).id, { exhausted: adj === 'exhausted ', damage: adj === 'damaged ' ? 1 : 0 })
+            : noun === 'ability' ? put(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem).id)
+            : put(s, 2, ctPlain(noun === 'armor' ? 'Armor' : 'Weapon').id);
+        // Gegenprobe: falsches Ziel (nicht erschöpft / unverletzt / Kosten außerhalb) ist nicht wählbar
+        if (adj || n) { const w = put(s, 2, ctVanilla(n ? (ml === 'more' ? +n - 1 : +n + 1) : 3).id); s.p1.hand.unshift(makeCardInst(c.id, false, 1));
+            const bad = getLegalActions(s, 1).some(a => a.type === 'PLAY_CARD' && a.handIdx === 0 && tgt(w.uid)(a)); s.p1.hand.shift(); if (bad) return 'unpassendes Ziel wählbar: ' + w.name; }
+        const e = play(s, c, tgt(t.uid)); if (e) return e;
+        return gone(s, t.uid) ? null : 'Ziel nicht zerstört';
+    }]);
+    const AOE = /^Your hero deals (\d+) (?:\w+ )?damage to each (opposing )?hero and ally\./;
+    B.push(['Schaden an jedem Helden und Ally', c => AOE.test(T(c)), c => {
+        const [, n, opp] = T(c).match(AOE); const s = clean(c);
+        const mine = put(s, 1, ctVanilla(6).id), theirs = put(s, 2, ctVanilla(6).id), h1 = s.p1.hero.damage, h2 = s.p2.hero.damage;
+        const e = play(s, c); if (e) return e;
+        if (s.p2.hero.damage - h2 !== +n) return `gegn. Held ${s.p2.hero.damage - h2} statt ${n}`;
+        if (!gone(s, theirs.uid) && theirs.damage !== +n) return `gegn. Ally ${theirs.damage} statt ${n}`;
+        const own = opp ? 0 : +n;
+        if (s.p1.hero.damage - h1 !== own) return `eigener Held ${s.p1.hero.damage - h1} statt ${own}`;
+        if (!gone(s, mine.uid) && (mine.damage || 0) !== own) return `eigener Ally ${mine.damage || 0} statt ${own}`;
+        return null;
+    }]);
+    const ATT = /^Attach to target (ally|hero or ally)\. Ongoing: Attached (?:ally|character) has (?:([+-]\d+) \/ ([+-]\d+)|([+-]\d+) ATK|\+(\d+) \[Health\])\.(?: |$)/;
+    B.push(['Angehängt: Werte ändern', c => ATT.test(T(c)), c => {
+        const m = T(c).match(ATT), da = +(m[2] || m[4] || 0), dh = +(m[3] || m[5] || 0);
+        const s = clean(c), a = put(s, 1, ctVanilla(4).id), a0 = atkOf(s, a), h0 = hpOf(s, a);
+        const e = play(s, c, tgt(a.uid)); if (e) return e;
+        if (atkOf(s, a) - a0 !== da || hpOf(s, a) - h0 !== dh) return `Änderung ${atkOf(s, a) - a0}/${hpOf(s, a) - h0} statt ${da}/${dh}`;
+        return null;
+    }]);
+    for (const [name, match, check] of B) {
+        const cards = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id] && match(c));
+        groups[name] = cards.length;
+        for (const c of cards) { let r; try { r = check(c); } catch (e) { r = 'Absturz: ' + e.message; } if (r) fails.push({ group: name, id: c.id, name: c.name, problem: r }); }
+    }
+    return { groups, fails };
 }
 
 function runAutomatedTests() {

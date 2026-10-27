@@ -11,6 +11,8 @@ Kommunikation mit dem Nutzer auf **Deutsch**.
 3. **Kartentexte:** Jede Karte muss **genau** so funktionieren wie ihr Text in `docs/wow_ocr_110329.pdf` (OCR der offiziellen Kartenliste). **Keine Annäherungen** – wenn etwas nicht exakt umsetzbar ist, dem Nutzer sagen statt vereinfachen.
    - Durchsuchbare Textfassungen (vom Nutzer eingefügt, gleicher Inhalt): `docs/wow_cr_v7.4.txt` (Regeln inkl. Glossar) und `docs/wow_ocr_110329.txt` (Kartentexte aller Sets). Diese statt der PDFs lesen/greppen.
 4. Nach jeder Gameplay-Änderung die Regeltests laufen lassen (siehe unten); alle müssen bestehen. Neue Regeln/Karten-Fixes bekommen einen eigenen Test in `js/tests.js`.
+   - `runCardTests()` spielt **jede** Karte (KI- und Menschenweg, Kräfte, Quests); situationsabhängige Karten über `SCENARIOS` (Kampf, Kette, Stealth …). `runCardTextTests()` prüft die exakte Wirkung je Text-Baustein. Beide laufen als Regeltest #89/#90.
+   - Bewusst nicht (vollständig) umgesetzte Karten stehen in `CARD_ISSUES` (cards.js): werden im Spiel mit ⚠ markiert und von den Karten-Tests ausgelassen.
 
 ## Struktur (`js/`, Ladereihenfolge wie in `index.html`)
 
@@ -64,6 +66,6 @@ Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit fes
 
 - Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
 - Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
-- Deck-Simulation: jedes Match läuft doppelt mit gleichem Seed (`simulateMatchPair`): ohne und mit Münze für Spieler 2 (nur Simulationstest, `p.coin`/`p.coinMana`). Der Turniertest spielt jedes Match nur einmal ohne Münze (`runSimulation(..., coinTest = false)`).
+- Alle Simulations-Tests (Start-Decks, Turnier-Decks, All-Cards) laufen über dieselbe Funktion `runSimulation(spiele, decks, titel, pairs)` – nur die Paarungen wechseln (`pairs`: feste Paare oder Funktionen, die je Spiel neue Decks liefern). In Runden: jede Paarung einmal pro Runde. Neue Tests nur als neue Paarungen anlegen, keine eigene Schleife.
 - „Abbrechen & auswerten“ / Schließen setzt `SIM_STOP.req`; bei Abbruch oder Fehler wertet `runSimulation` die bis dahin gespielten Spiele aus (mit Anteil in %).
 - In Simulationen antwortet die CPU nie mit Instants in Prioritätsfenstern (nur in echten Partien, `aiRespond`).

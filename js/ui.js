@@ -836,19 +836,6 @@ function renderPlayerHand(p) {
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });
             node.addEventListener('click', (e) => { if (e.target.closest('button')) return; openHandCardMenu(idx); });
-            const bar = document.createElement("div"); bar.className = "card-action-bar";
-            if (canMain()) {
-                const resBtn = document.createElement("button"); resBtn.textContent = "Ressource"; resBtn.style.background = "#059669"; resBtn.disabled = G.placedResource;
-                resBtn.onclick = (e) => { e.stopPropagation(); humanAct({ type: 'PLACE_RESOURCE', handIdx: idx, faceUp: false }); };
-                bar.appendChild(resBtn);
-            }
-            if (card.type !== 'Quest') {
-                const cost = getPlayCost(G, p, card, 0);
-                const playBtn = document.createElement("button"); playBtn.textContent = `Spielen (${card.xCost ? cost + '+X' : cost})`; playBtn.style.background = "#2563eb"; playBtn.disabled = !playable;
-                playBtn.onclick = (e) => { e.stopPropagation(); humanAct({ type: 'PLAY_CARD', handIdx: idx }); };
-                bar.appendChild(playBtn);
-            }
-            node.appendChild(bar);
         }
         slot.appendChild(node); box.appendChild(slot);
     });

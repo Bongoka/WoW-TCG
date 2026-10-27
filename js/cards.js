@@ -824,3 +824,9 @@ function applyOCR(map) {
     }
 }
 applyOCR(OCR);
+
+// Karten, die bewusst nicht (vollständig) umgesetzt sind: im Spiel überall mit ⚠ markiert (Karte, Zoom,
+// Deck-Builder) und vom Karten-Test ausgelassen. Wert: was abweicht.
+const CARD_ISSUES = {
+    305: 'Aufgeben funktioniert. Die gewählte Ausrüstung bleibt aber nicht für das nächste Spiel liegen – Spielserien gibt es hier nicht.',   // Hearthstone
+};

@@ -5,12 +5,10 @@
 // Δ = WR(gespielt) − WR(nicht gespielt). Quests: "gespielt" = abgeschlossen.
 // ============================================================================
 const SIM_MAX_TURNS = 60, SIM_MAX_MS = 6000, SIM_EARLY_DRAWS = 3;
-// opts.coin: Spieler 2 (nicht Startspieler) bekommt die Münze (Simulationstest, +1 Mana einmal pro Spiel)
-function simulateOneGame(deckA, deckB, opts = {}) {
+function simulateOneGame(deckA, deckB) {
     const s = newGameState(deckA.hero, deckA.cards, deckB.hero, deckB.cards);
     dealOpeningHands(s);
     for (const pid of [1, 2]) if (aiWantsMulligan(s, pid)) doMulligan(s, pid);
-    if (opts.coin) s.p2.coin = true;
     // Früh gezogen = Starthand nach Mulligan + die obersten SIM_EARLY_DRAWS Karten (Ziehen der ersten Züge).
     // Allein durch das Mischen bestimmt – anders als "gespielt" nicht vom Spielverlauf abhängig.
     for (const p of [s.p1, s.p2]) {
@@ -43,21 +41,13 @@ function simulateOneGame(deckA, deckB, opts = {}) {
         winner = h1 > h2 ? 1 : (h2 > h1 ? 2 : (Math.random() < 0.5 ? 1 : 2));
     }
     return {
-        winner, turns, timeout: !s.gameOver, coinTurn: opts.coin && !s.p2.coin ? s.p2.coinUsedTurn : null,
+        winner, turns, timeout: !s.gameOver,
         p1Hp: Math.max(0, hpOf(s, s.p1.hero) - s.p1.hero.damage), p2Hp: Math.max(0, hpOf(s, s.p2.hero) - s.p2.hero.damage),
         stats: { 1: s.p1.stats, 2: s.p2.stats }
     };
 }
-// Dasselbe Match zweimal mit identischem Zufall (gleiche Mischung, Starthände, Mulligans): ohne und mit Münze
+// Zufallsgenerator mit festem Seed (Math.random ersetzen): gleiches Spiel reproduzierbar, z. B. für Performance-Vergleiche
 function seededRandom(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-function simulateMatchPair(deckA, deckB) {
-    const seed = Math.floor(Math.random() * 4294967296), orig = Math.random;
-    try {
-        Math.random = seededRandom(seed); const plain = simulateOneGame(deckA, deckB);
-        Math.random = seededRandom(seed); const coin = simulateOneGame(deckA, deckB, { coin: true });
-        return { plain, coin };
-    } finally { Math.random = orig; }
-}
 // cardStats[id] = { g, w, pg, pw }  (g/w: Spiele/Siege mit der Karte im Deck; pg/pw: davon früh gezogen)
 // Früher zählte "gespielt" (Quests: abgeschlossen) – das hängt vom Spielverlauf ab: Wer vorne liegt, spielt mehr
 // teure Karten. Selbst eine Karte ohne jede Wirkung kam so auf +15 bis +28 Prozentpunkte. "Früh gezogen" entscheidet nur das Mischen.

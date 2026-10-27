@@ -201,7 +201,7 @@ function renderDBDeck(highlightId) {
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
             row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
-            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${esc(c.name)}</span>`
+            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="Nicht vollständig umgesetzt: ${esc(CARD_ISSUES[id])}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
             row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
             row.querySelector('[data-a="+"]').onclick = (e) => { e.stopPropagation(); dbAdd(id); };
@@ -771,44 +771,32 @@ function simProgressUI(title) {
 }
 
 // Jedes Deck gegen jedes (beide Reihenfolgen, inkl. Spiegel). decks: Start-Decks oder Turnier-Decks
-// coinTest: jedes Spiel doppelt (ohne / mit Münze für Spieler 2) – kostet die doppelte Zeit, im Turniertest aus
-async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU vs CPU – Deck-Simulation", coinTest = true) {
+// Alle Simulations-Tests laufen über diese Funktion – nur die Paarungen wechseln.
+// pairs (optional): Liste von [deckA, deckB] oder Funktionen, die bei jedem Spiel ein neues Paar liefern
+// (All-Cards-Test: Zufallsdecks). Ohne pairs: jedes Deck aus decks gegen jedes.
+async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU vs CPU – Deck-Simulation", pairs = null) {
     const ui = simProgressUI(title);
     const cardStats = {}; let firstWins = 0, secondWins = 0, totalGames = 0, timeouts = 0;
     const factionStats = {}, classStats = {}, deckStats = {};
-    const matchups = [];
-    for (const a of decks) for (const b of decks) matchups.push([a, b]);
-    // Jedes Spiel doppelt: gleiche Decks, gleicher Zufall (Mischen, Starthände) – einmal ohne, einmal mit Münze für Spieler 2
-    const perGame = coinTest ? 2 : 1, totalPlanned = matchups.length * gamesPerMatchup * perGame;
-    const coinCmp = { plain: { games: 0, p1: 0 }, coin: { games: 0, p1: 0 }, flipTo2: 0, flipTo1: 0, used: 0, usedTurns: {}, pairs: 0 };
+    const matchups = pairs ? pairs.slice() : [];
+    if (!pairs) for (const a of decks) for (const b of decks) matchups.push([a, b]);
+    const totalPlanned = matchups.length * gamesPerMatchup;
     const bump = (o, k, won) => { const e = o[k] || (o[k] = { games: 0, wins: 0 }); e.games++; if (won) e.wins++; };
     // Abbruch (Knopf/Schließen) oder unerwarteter Fehler: Schleife verlassen und das bisher Gesammelte auswerten
     let stopReason = null;
-    for (let mi = 0; mi < matchups.length && !stopReason; mi++) {
-        const [deckA, deckB] = matchups[mi];
-        try { for (let g = 0; g < gamesPerMatchup; g++) {
+    // In Runden: jede Runde spielt jede Paarung einmal – ein abgebrochener Test bleibt so ausgewogen
+    for (let g = 0; g < gamesPerMatchup && !stopReason; g++) {
+        try { for (let mi = 0; mi < matchups.length; mi++) {
+            const m = matchups[mi], [deckA, deckB] = typeof m === 'function' ? m() : m;
             if (SIM_STOP.req) { stopReason = 'vom Nutzer abgebrochen'; break; }
-            let results;
-            if (coinTest) {
-                let pair;
-                try { pair = simulateMatchPair(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
-                coinCmp.pairs++;
-                for (const [kind, r] of [['plain', pair.plain], ['coin', pair.coin]]) { coinCmp[kind].games++; if (r.winner === 1) coinCmp[kind].p1++; }
-                if (pair.plain.winner === 1 && pair.coin.winner === 2) coinCmp.flipTo2++;
-                if (pair.plain.winner === 2 && pair.coin.winner === 1) coinCmp.flipTo1++;
-                if (pair.coin.coinTurn) { coinCmp.used++; const t = Math.ceil(pair.coin.coinTurn / 2); coinCmp.usedTurns[t] = (coinCmp.usedTurns[t] || 0) + 1; }
-                results = [pair.plain, pair.coin];
-            } else {
-                try { results = [simulateOneGame(deckA, deckB)]; } catch (e) { console.error("Simulationsfehler:", e); continue; }
-            }
-            for (const res of results) {
-                totalGames++; if (res.timeout) timeouts++;
-                if (res.winner === 1) firstWins++; else secondWins++;
-                bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
-                bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
-                bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
-                recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
-            }
+            let res;
+            try { res = simulateOneGame(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
+            totalGames++; if (res.timeout) timeouts++;
+            if (res.winner === 1) firstWins++; else secondWins++;
+            bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
+            bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
+            bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
+            recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
             ui.step(totalGames, totalPlanned);
             await simYield();
         } } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = `Fehler: ${e.message}`; }
@@ -825,22 +813,10 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = "CPU v
         return h + `</table>`;
     };
     const sorted = o => Object.entries(o).sort((a, b) => (b[1].wins / b[1].games) - (a[1].wins / a[1].games));
-    let html = stopReason ? `<div style="color:#fbbf24;font-weight:bold;margin-bottom:8px;">⚠️ Abgebrochen (${esc(stopReason)}): ${totalGames} von ${totalPlanned} Spielen gespielt (${pct(totalGames, totalPlanned)}). Die Auswertung umfasst nur diese Spiele – die letzten Paarungen fehlen ganz.</div>` : '';
+    let html = stopReason ? `<div style="color:#fbbf24;font-weight:bold;margin-bottom:8px;">⚠️ Abgebrochen (${esc(stopReason)}): ${totalGames} von ${totalPlanned} Spielen gespielt (${pct(totalGames, totalPlanned)}). Die Auswertung umfasst nur diese Spiele (gespielt wird in Runden – jede Paarung einmal pro Runde).</div>` : '';
     try {
     html += `<h3 style="color:var(--gold);">Startspieler-Winchance</h3>`;
     html += `<table><tr><th>Rolle</th><th>Siege</th><th>Winrate</th></tr><tr><td>Spieler 1 (beginnt)</td><td>${firstWins}</td><td style="color:#4ade80;font-weight:bold;">${pct(firstWins, totalGames)}</td></tr><tr><td>Spieler 2</td><td>${secondWins}</td><td style="color:#f87171;font-weight:bold;">${pct(secondWins, totalGames)}</td></tr><tr><td>Gesamt</td><td>${totalGames}</td><td>–</td></tr></table>`;
-    // Münz-Test: jedes Match zweimal mit gleichem Zufall – Winrate des Startspielers ohne und mit Münze für Spieler 2
-    const cp = coinCmp, wr = k => pct(cp[k].p1, cp[k].games);
-    const used = Object.keys(cp.usedTurns).map(Number).sort((a, b) => a - b).map(t => `Runde ${t}: ${cp.usedTurns[t]}`).join(' · ');
-    if (coinTest) html += `<h3 style="color:var(--gold);">Münz-Test: Startspieler ohne / mit Münze für Spieler 2</h3>
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;">Jedes Match wurde zweimal direkt hintereinander gespielt – gleiche Decks, gleiche Mischung und Starthände. Beim zweiten Mal bekommt Spieler 2 die Münze (einmal pro Spiel: +1 Mana für einen Zug).</div>
-        <table><tr><th>Variante</th><th>Spiele</th><th>Siege Startspieler</th><th>Winrate Startspieler</th></tr>
-        <tr><td>Ohne Münze</td><td>${cp.plain.games}</td><td>${cp.plain.p1}</td><td style="font-weight:bold;">${wr('plain')}</td></tr>
-        <tr><td>Mit Münze für Spieler 2</td><td>${cp.coin.games}</td><td>${cp.coin.p1}</td><td style="font-weight:bold;">${wr('coin')}</td></tr></table>
-        <table><tr><th>Gleiches Match, anderer Ausgang</th><th>Anzahl</th></tr>
-        <tr><td>Ohne Münze Spieler 1 gewinnt → mit Münze Spieler 2</td><td>${cp.flipTo2} (${pct(cp.flipTo2, cp.pairs)})</td></tr>
-        <tr><td>Ohne Münze Spieler 2 gewinnt → mit Münze Spieler 1</td><td>${cp.flipTo1} (${pct(cp.flipTo1, cp.pairs)})</td></tr>
-        <tr><td>Münze benutzt</td><td>${cp.used} von ${cp.pairs} (${pct(cp.used, cp.pairs)})${used ? `<br><span style="font-size:11px;color:var(--text-dim);">${used}</span>` : ''}</td></tr></table>`;
     html += wrTable('Decks', sorted(deckStats), 'Deck');
     html += wrTable('Fraktionen', sorted(factionStats), 'Fraktion');
     html += wrTable('Klassen', sorted(classStats), 'Klasse');
@@ -862,30 +838,14 @@ function tourneySimDecks() {
 }
 async function runTourneySimulation(gamesPerMatchup) {
     const decks = tourneySimDecks();
-    await runSimulation(gamesPerMatchup, decks, `Turnierdeck-Simulation (${decks.length} Decks)`, false);
+    await runSimulation(gamesPerMatchup, decks, `Turnierdeck-Simulation (${decks.length} Decks)`);
 }
 
 // All-Cards-Test: jedes Spiel zwei zufällige Helden mit Zufallsdecks aus allen für sie legalen Karten
 async function runSimulationAllCards(numGames) {
-    const ui = simProgressUI("All-Cards-Test");
     const heroes = Object.values(CARDS).filter(c => c.type === 'Hero').map(c => c.id);
-    const cardStats = {}; let firstWins = 0, totalGames = 0;
-    for (let g = 0; g < numGames; g++) {
-        const dA = randomLegalDeck(heroes[Math.floor(Math.random() * heroes.length)]);
-        const dB = randomLegalDeck(heroes[Math.floor(Math.random() * heroes.length)]);
-        let res;
-        try { res = simulateOneGame(dA, dB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
-        totalGames++; if (res.winner === 1) firstWins++;
-        recordCardStats(cardStats, dA, 1, res); recordCardStats(cardStats, dB, 2, res);
-        ui.step(totalGames, numGames);
-        await simYield();
-    }
-    ui.progress.textContent = `Fertig – ${totalGames} Spiele.`; ui.bar.style.width = "100%";
-    const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
-    let html = `<h3 style="color:var(--gold);">Startspieler-Winchance</h3><table><tr><th>Rolle</th><th>Siege</th><th>Winrate</th></tr><tr><td>Spieler 1</td><td>${firstWins}</td><td>${pct(firstWins, totalGames)}</td></tr><tr><td>Spieler 2</td><td>${totalGames - firstWins}</td><td>${pct(totalGames - firstWins, totalGames)}</td></tr></table>`;
-    html += renderCardAnalysis(cardStats, totalGames);
-    ui.content.innerHTML = html;
-    addLog(`🎯 All-Cards-Test: ${totalGames} Spiele.`, "log-turn");
+    const rnd = () => randomLegalDeck(heroes[Math.floor(Math.random() * heroes.length)]);
+    await runSimulation(numGames, [], "All-Cards-Test", [() => [rnd(), rnd()]]);
 }
 
 // --- TEST-SETUPS ---

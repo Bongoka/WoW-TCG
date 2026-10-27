@@ -64,6 +64,11 @@
 #kw-boxes.show { opacity: 1; }
 .kw-box { background: linear-gradient(180deg, #2a2118, #120d09); border: 2px solid var(--gold-dark, #8a6d2b); border-radius: 6px; padding: 8px 10px; box-shadow: 0 6px 18px rgba(0,0,0,.75); }
 .kw-name { font: 900 14px/1.2 Georgia, serif; color: var(--gold-light, #f5d77a); margin-bottom: 4px; }
+/* Bekannte Abweichung vom Kartentext (CARD_ISSUES) */
+.kw-box.kw-issue { border-color: #dc2626; background: linear-gradient(180deg, #3a1414, #1a0808); }
+.kw-issue .kw-name { color: #fca5a5; }
+.cfx-issue { position: absolute; top: 4%; left: 50%; transform: translateX(-50%); z-index: 6; font-size: calc(var(--cw, 120px) * 0.16); line-height: 1; padding: 2% 5%; border-radius: 999px; background: rgba(127,29,29,.92); color: #fde047; border: 2px solid #fca5a5; box-shadow: 0 0 8px rgba(220,38,38,.8); pointer-events: auto; }
+.db-issue { color: #f87171; }
 .kw-text { font-size: 12.5px; line-height: 1.4; color: var(--text-main, #e8dcc8); font-style: italic; }
 #cfx-preview .cfx-stats-bar { display: none !important; }
 /* Friedhof: Karte spielen (Dramla Lifebender, Readiness, Greed Before Need) */

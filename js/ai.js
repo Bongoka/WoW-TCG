@@ -34,7 +34,6 @@ function evaluateState(s, pid) {
     if (myHp <= threat) score -= 50;
     // Eigene Handkarten nach Nutzen (spielbare, gute Karten mehr wert als tote); gegnerische Hand ist verdeckt: pauschal
     me.hand.forEach(c => score += handCardValue(s, me, c));
-    if (me.coin) score += 2;                                                                  // Münze (nur Simulationstest) noch übrig
     score -= opp.hand.length * 2.5;
     // Ressourcen sind bis 8 sehr wertvoll – jede verlorene kostet dauerhaft Tempo (z. B. Twig of the World Tree);
     // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
@@ -253,17 +252,6 @@ function fastAiAction(state, pid, maxCands = 40) {
     for (const act of cands.length > maxCands ? cands.slice(0, maxCands) : cands) {
         const sim = simApply(state, act, pid);
         if (!sim) continue;
-        if (act.type === 'USE_COIN') {
-            // Münze (Test): allein bringt sie nichts – zählt mit der besten Karte/Kraft, die erst damit bezahlbar wird
-            for (const f of aiDistinct(sim, getLegalActions(sim, pid))) {
-                if (f.type !== 'PLAY_CARD' && f.type !== 'ACTIVATE') continue;
-                if (!validateAction(state, f, pid)) continue;                            // ging auch ohne Münze
-                const s2 = simApply(sim, f, pid); if (!s2) continue;
-                const v = evaluateState(s2, pid);
-                if (v > bv) { bv = v; best = act; }
-            }
-            continue;
-        }
         if (sim.gameOver && sim.winner === pid) return { action: act, reason: 'Lethal' };
         const v = evaluateState(sim, pid);
         if (v > bv) { bv = v; best = act; }

@@ -177,7 +177,7 @@ FX[2063] = { slots: slotChar('Ziel', true), resolve: (s, it) => { it.attachTo = 
 // ============================================================================
 // FÄHIGKEITEN – Schurke
 // ============================================================================
-FX[2064] = { slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; },
+FX[2064] = { endStop: true, slots: poisonSlots, resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { exhausted: (s, c, d) => { if (d.uid === c.attachedTo) q(s, { op: 'call', k: 'E:discard', a: { pid: d.pid, n: 1, src: 'Anesthetic Poison' } }); } } };
 FX[2065] = { resolve: (s, it) => q(s, { op: 'call', k: '2065:pick', a: { pid: it.pl } }),
     k: { pick: (s, a) => { const po = [...s.p1.ongoing, ...s.p2.ongoing].filter(o => o.attachedTo && (o.subtypes || []).includes('Poison') && isChar(findCharacter(s, o.attachedTo)));
@@ -185,7 +185,7 @@ FX[2065] = { resolve: (s, it) => q(s, { op: 'call', k: '2065:pick', a: { pid: it
             ask(s, { pid: a.pid, prompt: 'Deadly Brew: Wähle ein angehängtes Gift', src: 'Deadly Brew', opts: po.map(o => ({ label: `${o.name} an ${nameOf(s, o.attachedTo)}`, v: o.uid, ai: ctrlOf(s, findCharacter(s, o.attachedTo)) !== a.pid ? 2 : -2 })), k: '2065:do', a }); },
         do: (s, a, v) => { const o = findCharacter(s, v); const p = me(s, a.pid); s._hidden = true; if (!o) { shuffleInPlace(p); return; } const i = p.deck.findIndex(id => CARDS[id].name === o.name);
             if (i >= 0) { const c = makeCardInst(p.deck.splice(i, 1)[0], false, p.id); c.attachedTo = o.attachedTo; c.joinedTurn = s.turn; p.ongoing.push(c); L(s, `🔎 ${c.name} wird an ${nameOf(s, o.attachedTo)} angehängt.`); } shuffleInPlace(p); } } };
-FX[2066] = { xRange: (s, pid) => ({ min: 1, max: Math.min(5, combosInGy(s, pid).length) }), slots: slotChar('Ziel', true),
+FX[2066] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), slots: slotChar('Ziel', true),
     addCost: (s, it) => removeCombos(s, it),
     resolve: (s, it) => { const t = T(it)[0]; if (!t) return; const poisoned = attachedTo(s, t).some(o => (o.subtypes || []).includes('Poison')); heroDmg(s, it.pl, t, (it.x || 0) * (poisoned ? 2 : 1), 'Nature'); } };
 FX[2067] = {};
@@ -257,7 +257,7 @@ FX[2097] = { alt: { label: 'Schild erschöpfen statt zu bezahlen', ai: 3, can: (
     resolve: (s, it) => { const u = T(it)[0]; const x = (s.chain || []).find(i => i.card && i.card.uid === u); if (!x) return; const h = heroOf(s, it.pl).uid; const nh = heroOf(s, x.pl).uid;
         x.targets = x.targets.map(arr => arr.map(v => v === h ? nh : v)); L(s, `Spell Reflection: ${x.card.name} zielt jetzt auf ${nameOf(s, nh)}.`); } };
 FX[2098] = { aura: { watk: (s, src, sp, w) => ctrlOf(s, w) === sp ? 2 : 0, def: (s, src, sp, a) => a.type === 'Armor' && ctrlOf(s, a) === sp ? 2 : 0 } };
-FX[2099] = { canPlay: (s, pid) => pes(s, pid, 'heroFatalAlly').length > 0 || 'Dein Held muss in diesem Zug einem Ally tödlichen Kampfschaden zugefügt haben',
+FX[2099] = { endStop: true, canPlay: (s, pid) => pes(s, pid, 'heroFatalAlly').length > 0 || 'Dein Held muss in diesem Zug einem Ally tödlichen Kampfschaden zugefügt haben',
     slots: slotAlly('Zweiter Ziel-Ally', true), resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 
 // ============================================================================

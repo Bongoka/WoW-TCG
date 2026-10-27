@@ -84,7 +84,12 @@
             img.src = cands[0];
         }
         face.appendChild(img);
-        
+        // Bekannte Abweichung vom Kartentext (CARD_ISSUES): Warnzeichen auf der Karte
+        if (typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[card.id]) {
+            const iss = el('div', 'cfx-issue'); iss.textContent = '⚠'; iss.title = 'Nicht vollständig umgesetzt: ' + CARD_ISSUES[card.id];
+            face.appendChild(iss);
+        }
+
         const foilClass = forceFoil !== null ? forceFoil : (card.isFoil ? randomFoil() : null);
         if (foilClass) { const foil = el('div', `cfx-foil ${foilClass}`); face.appendChild(foil); }
         face.appendChild(el('div', 'cfx-glare'));
@@ -175,8 +180,10 @@
     function fillKeywords(meta) {
         const k = ensureKw();
         const list = typeof cardKeywords === 'function' ? cardKeywords(meta.uid, meta.cardId) : [];
-        k.innerHTML = list.map(kw => `<div class="kw-box"><div class="kw-name">${escH(kw.name)}</div><div class="kw-text">${escH(kw.text)}</div></div>`).join('');
-        k.style.display = list.length ? 'flex' : 'none';
+        const issue = typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[meta.cardId];
+        k.innerHTML = (issue ? `<div class="kw-box kw-issue"><div class="kw-name">⚠ Nicht vollständig umgesetzt</div><div class="kw-text">${escH(issue)}</div></div>` : '')
+            + list.map(kw => `<div class="kw-box"><div class="kw-name">${escH(kw.name)}</div><div class="kw-text">${escH(kw.text)}</div></div>`).join('');
+        k.style.display = list.length || issue ? 'flex' : 'none';
     }
     function placeKeywords(x, y, W, previewRightOfCard) {
         const k = document.getElementById('kw-boxes'); if (!k || k.style.display === 'none') return;

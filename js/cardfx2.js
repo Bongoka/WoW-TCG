@@ -284,7 +284,7 @@ FX[1080] = { on: { dmg: (s, c, d, pid) => { if (d.combat && d.weapon && d.src ==
 FX[1081] = { modes: playerModes(-5, 4), resolve: (s, it) => alliesOf(me(s, it.mode)).forEach(a => { exhaust(s, a); addTM(a, { k: 'noReady' }); }) };
 FX[1082] = { slots: slotChar('2 Nahkampfschaden', true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; heroDmg(s, it.pl, t.uid, 2, 'Melee'); if (t.type === 'Hero') q(s, { op: 'call', k: '147:intr', a: { pid: it.pl, opp: ctrlOf(s, t) } }); } };
 FX[1083] = { aura: { kw: (s, src, sp, c, k) => k === 'stealth' && c.uid === heroOf(s, sp).uid } };
-FX[1084] = { slots: (s, pid) => [{ label: 'Held (von deinem Helden im Kampf getroffen)', cands: targetCands(s, pid, { hero: true, filter: c => tms(s, c, 'hitByHero').some(m => m.by === pid) }), harm: true }],
+FX[1084] = { endStop: true, slots: (s, pid) => [{ label: 'Held (von deinem Helden im Kampf getroffen)', cands: targetCands(s, pid, { hero: true, filter: c => tms(s, c, 'hitByHero').some(m => m.by === pid) }), harm: true }],
     resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c, d) => { const h = attachedChar(s, c); if (h && ctrlOf(s, h) === d.pid) trig(s, { id: 1084, k: 'ex', a: { pid: d.pid } }); } },
     k: { ex: (s, a) => { const p = me(s, a.pid); const rs = p.resources.filter(r => !r.exhausted); if (!rs.length) return;
@@ -299,7 +299,7 @@ FX[1087] = { slots: slotChar('1 Nahkampfschaden (Kampfschaden)', true), resolve:
 FX[1088] = { canPlay: stealthReq, resolve: (s, it) => [...alliesOf(s.p1), ...alliesOf(s.p2)].filter(a => a.exhausted).forEach(a => destroy(s, a)) };
 // Finishing Move: X Combos aus dem Friedhof entfernen (zusätzliche Kosten), X ≤ 5
 function removeCombosOnly(s, it) { let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } }
-FX[1089] = { xRange: (s, pid) => ({ min: 1, max: Math.min(5, combosInGy(s, pid).length) }),
+FX[1089] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }),
     slots: (s, pid, c, ctx) => [{ label: `Ziele (verteile ${ctx.x || 'X'} Nahkampfschaden)`, cands: targetCands(s, pid, CH), min: 1, max: Math.max(1, ctx.x || 1), harm: true }],
     addCost: (s, it) => { removeCombosOnly(s, it); divideAddCost((s2, it2) => it2.x || 0)(s, it); },
     resolve: (s, it) => T(it).forEach(u => heroDmg(s, it.pl, u, (it.extra.div || {})[u] || 0, 'Melee')) };
@@ -394,7 +394,7 @@ FX[1120] = { modes: () => [{ label: 'Zerstöre Ziel-Rüstung', v: 0 }, { label: 
     resolve: (s, it) => it.targets.flat().forEach(u => { const c = findCharacter(s, u); if (c) destroy(s, c); }) };
 FX[1121] = { slots: slotChar('Ziel', true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; exhaust(s, t); heroDmg(s, it.pl, t.uid, 1, 'Melee'); } };
 FX[1122] = { resolve: (s, it) => [...alliesOf(s.p1), ...alliesOf(s.p2)].filter(a => a.damage > 0).forEach(a => destroy(s, a)) };
-FX[1123] = { canPlay: (s, pid) => !s.battle || 'Nicht während eines Kampfes',
+FX[1123] = { endStop: true, canPlay: (s, pid) => !s.battle || 'Nicht während eines Kampfes',
     slots: (s, pid) => { const h = heroOf(s, pid).uid; return [{ label: 'Ally, der deinen Helden ohne Kampfschaden angegriffen hat', cands: targetCands(s, pid, { ally: true, filter: c => tms(s, c, 'attacked').some(m => m.def === h) && !tms(s, c, 'dealtDmg').some(m => m.to === h && m.cmb) }), harm: true }]; },
     resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 FX[1124] = { slots: slotChar('Ziel', true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1 + bestWeaponAtk(s, it.pl, w => w.slot === 'Melee'), 'Melee'); } };
