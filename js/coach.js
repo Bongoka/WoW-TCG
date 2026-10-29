@@ -5,7 +5,8 @@
 // Kartennamen in den Listen unten sind gegen docs/wow_ocr_110329.txt geprüft.
 // ============================================================================
 const COACH_MIN = 60;
-const COACH_MAX_STRENGTHS = 3, COACH_MAX_ISSUES = 5, COACH_MAX_RECS = 3;
+// Erste Runde bewusst kurz: die 2 besten positiven Punkte (Smart zählt mit) und die wichtigste Schwäche, noch keine Karten
+const COACH_MAX_POSITIVE = 2, COACH_MAX_ISSUES = 1, COACH_MAX_RECS = 0;
 
 // Text ohne Erinnerungstexte in Klammern (z. B. „(Has Protector. Destroy this card when you strike with a weapon …)“)
 const coachTxt = c => (c.text || '').replace(/\([^)]*\)/g, ' ');
@@ -40,8 +41,12 @@ function coachStats(hero, ids) {
     S.xCost = S.nonQ.filter(c => c.xCost);
     // Kopien je Name
     S.copies = {}; cards.forEach(c => S.copies[c.name] = (S.copies[c.name] || 0) + 1);
-    S.singles = Object.keys(S.copies).filter(k => S.copies[k] === 1 && !(coachByName(k) || {}).unlimited).length;
-    S.core = Object.values(S.copies).filter(k => k >= 3).reduce((a, k) => a + k, 0);
+    // Einzelkopien zählen nur bei Karten, von denen mehrere sinnvoll sind (Ausrüstung: ein Teil je Slot; Unique: nur eins im Spiel)
+    const multi = k => { const c = coachByName(k) || {}; return !c.unlimited && !c.unique && !['Weapon', 'Armor', 'Item'].includes(c.type); };
+    S.singles = Object.keys(S.copies).filter(k => S.copies[k] === 1 && multi(k)).length;
+    S.nMulti = Object.keys(S.copies).filter(multi).reduce((a, k) => a + S.copies[k], 0);
+    S.core = Object.keys(S.copies).filter(k => S.copies[k] >= 3 && multi(k)).reduce((a, k) => a + S.copies[k], 0);
+    S.uniques = Object.keys(S.copies).filter(k => (coachByName(k) || {}).unique && (coachByName(k) || {}).type === 'Ally');
     // Mechaniken
     const t = (re, list = cards) => list.filter(c => re.test(coachTxt(c)));
     S.forms = cards.filter(c => c.limitTags && c.limitTags.Form);
@@ -115,7 +120,7 @@ const COACH_PLANS = [
 ];
 const COACH_CLASS = { Druid: 'Druid', Hunter: 'Hunter', Mage: 'Mage', Paladin: 'Paladin', Priest: 'Priest', Rogue: 'Rogue', Shaman: 'Shaman', Warlock: 'Warlock', Warrior: 'Warrior' };
 
-// Stärken: [Bedingung, Text] – die ersten COACH_MAX_STRENGTHS zutreffenden werden gezeigt
+// Stärken: [Bedingung, Text] – Reihenfolge = Priorität (die ersten erscheinen zuerst)
 const COACH_STRENGTHS = [
     [S => S.quests.length >= 12 && S.quests.length <= 17, S => `Great quest count (${S.quests.length}) – you'll draw plenty of extra cards.`],
     [S => S.raceMatch.length >= 3, S => `Your quests match your hero's race – double rewards from ${coachList(S.raceMatch, 2)}!`],
@@ -127,7 +132,7 @@ const COACH_STRENGTHS = [
     [S => S.totems.length >= 6 && S.needTotem.length >= 2, () => 'Totems plus Totemic Call – lots of value every turn.'],
     [S => S.forms.length >= 4 && S.needForm.length >= 2, () => 'Your Forms and Feral cards work great together.'],
     [S => S.c2 >= 10, S => `Strong turn 2 – ${S.c2} cards cost exactly 2.`],
-    [S => S.core >= S.n * 0.75, () => 'Very consistent – most of your cards are 3–4 copies.'],
+    [S => S.core >= S.nMulti * 0.75, () => 'Very consistent – most of your cards are 3–4 copies.'],
     [S => S.removal.length >= 8, S => `Plenty of answers to big threats (${S.removal.length} removal cards).`],
     [S => S.instants.length >= 8, S => `Lots of tricks on your opponent's turn (${S.instants.length} instants).`],
     [S => S.draw.length >= 6, () => "Great card draw – you won't run out of gas."],
@@ -136,6 +141,25 @@ const COACH_STRENGTHS = [
     [S => /weapon/i.test(S.heroText) && S.weapons.length >= 5, () => "Your weapons make the most of your hero's power."],
     [S => (S.hero.class === 'Druid' && S.plan.k === 'control') || (S.hero.class === 'Hunter' && ['aggro', 'swarm', 'beast'].includes(S.plan.k))
         || (S.hero.class === 'Warrior' && S.plan.k === 'weapon') || (S.hero.class === 'Mage' && S.plan.k === 'burn'), S => `This plan plays to the ${S.hero.class}'s strengths.`],
+];
+
+// „Smart“: besonders schlaue Entscheidungen – selten, eigene Farbe. [Bedingung, Text]
+// Einzelkopien gelten nur als bewusst gewählt, wenn das Deck sonst auf 3–4 Kopien baut (S.core)
+const coachHas = (S, name, k = 1) => (S.copies[name] || 0) >= k;
+const COACH_SMART = [
+    [S => S.core >= S.nMulti * 0.6 && S.armor.length >= 5 && Object.keys(S.slots).length >= 4 && Object.values(S.slots).every(k => k <= 4),
+        S => `You spread your equipment over ${Object.keys(S.slots).length} different slots – no dead duplicates. Smart!`],
+    [S => coachHas(S, 'Halnar Stands-Alone') && S.allies.length <= 6, S => `Halnar Stands-Alone with only ${S.allies.length} allies – he'll often be a 5 / 5 for (4). Smart!`],
+    [S => coachHas(S, 'Kailis Truearc') && S.allies.length >= 24, S => `Kailis Truearc with ${S.allies.length} allies – she'll almost always be a 3 / 3 for (1). Smart!`],
+    [S => coachHas(S, 'Totem of Coo', 4), () => 'Four Totem of Coo – each one draws more cards than the last. Smart!'],
+    [S => S.pets.length >= 4 && coachHas(S, 'Master of the Hunt') && coachHas(S, 'Protect the Master'), () => 'Pets with Master of the Hunt and Protect the Master – a really tough team. Smart!'],
+    [S => S.feralForms.length >= 4 && !S.weapons.length && coachHas(S, 'Swiftshift'), () => 'Forms, Swiftshift and no weapons – nothing in your deck breaks your Forms. Smart!'],
+    [S => S.stealthNeed.length >= 2 && S.stealthSrc.length >= 4, () => 'Plenty of Stealth for your Stealth-only cards – well planned. Smart!'],
+    [S => S.finishers.length >= 2 && S.combos.length >= 12, () => 'Lots of Combos to power your Finishing Moves. Smart!'],
+    [S => coachHas(S, 'Pact of Shadow') && S.discardSrc.length >= 6, () => 'Pact of Shadow plus lots of discard – every discard hurts your opponent twice. Smart!'],
+    [S => S.core >= S.nMulti * 0.6 && S.uniques.length >= 3 && S.uniques.every(k => S.copies[k] <= 2), () => 'Your Unique allies are only 1–2 copies each – no stuck duplicates. Smart!'],
+    [S => coachHas(S, "Raene's Cleansing") && S.quests.length >= 15, () => "Raene's Cleansing with lots of quests – double quest turns. Smart!"],
+    [S => coachHas(S, 'Blueleaf Tubers') && S.avg >= 3.4, () => 'Blueleaf Tubers in a slow deck – you will never run out of cards. Smart!'],
 ];
 
 // Schwächen: [Priorität (klein = schlimmer), Kennung, Bedingung, Text]
@@ -185,14 +209,13 @@ const COACH_ISSUES = [
     [63, 'hunter-slow', S => S.hero.class === 'Hunter' && S.avg > 3.5, () => 'Hunters win fast – try a lower curve.'],
     [64, 'lock-hurt', S => S.selfDmg.length >= 6 && S.heal.length < 2, () => 'Lots of self-damage and no healing – watch your health.'],
     [65, 'pala-nodmg', S => S.hero.class === 'Paladin' && S.dmgAb.length + S.weapons.length < 6 && S.allies.length < 15, () => 'Lots of support, few ways to deal damage.'],
-    // Kleinere Hinweise (ab COACH_MINOR): erscheinen nur über „I want more advice!“
     [70, 'few-instants', S => S.instants.length < 4, S => `Only ${S.instants.length} instants – you can rarely react on your opponent's turn.`],
     [71, 'no-sustain', S => S.heal.length + S.protect.length < 3, () => 'Hardly any healing or protection – once your hero is hurt, it stays hurt.'],
     [72, 'few-draw', S => S.draw.length < 2, () => 'Almost no cards that draw – your quests are your only fuel.'],
     [73, 'few-1', S => S.c01 < 3, S => `Only ${S.c01} cards cost 0–1 – your first turn is usually empty.`],
     [74, 'unique-copies', S => Object.keys(S.copies).some(k => S.copies[k] >= 3 && (coachByName(k) || {}).unique), S => { const k = Object.keys(S.copies).find(k => S.copies[k] >= 3 && (coachByName(k) || {}).unique); return `${S.copies[k]} copies of ${k} – it's Unique, so only one can be in play.`; }],
     [75, 'few-weapons', S => ['Warrior', 'Rogue', 'Hunter', 'Shaman', 'Paladin'].includes(S.hero.class) && S.weapons.length > 0 && S.weapons.length < 3 && S.plan.k !== 'swarm', S => `Only ${S.weapons.length} weapon(s) – your hero will rarely get to attack.`],
-    [76, 'loose-core', S => S.core < S.n * 0.5 && S.singles < 5, () => 'Less than half of your deck are 3–4 copies – it will play differently every game.'],
+    [76, 'loose-core', S => S.core < S.nMulti * 0.5 && S.singles < 5, () => 'Less than half of your deck are 3–4 copies – it will play differently every game.'],
     [77, 'big-nodraw', S => S.c6 >= 6 && S.draw.length < 3, S => `${S.c6} expensive cards but little card draw – you may run out of cheap plays first.`],
     [78, 'few-2-soft', S => S.c2 >= 7 && S.c2 < 10, S => `${S.c2} cards cost 2 – a few more would make turn 2 smoother.`],
     [79, 'few-3-soft', S => S.c3 >= 4 && S.c3 < 7, S => `${S.c3} cards cost 3 – your turn 3 could be stronger.`],
@@ -274,8 +297,8 @@ const COACH_RECS = [
 ];
 
 // Erste Runde: bis zu COACH_MAX_* Punkte; der Rest steht in R.more für „I want more advice!“ (je Runde COACH_MORE)
-const COACH_MORE = { strengths: 1, issues: 5, recs: 2 };
-const COACH_MINOR = 70;   // Hinweise ab dieser Priorität nie in der ersten Runde
+const COACH_MORE = { strengths: 1, smart: 1, issues: 3, recs: 3 };
+const COACH_MAX_SMART = 1;   // „Smart“ soll selten und besonders bleiben
 function coachAnalyze(heroId, cardIds) {
     const hero = CARDS[heroId];
     const n = (cardIds || []).length;
@@ -284,6 +307,8 @@ function coachAnalyze(heroId, cardIds) {
     const S = coachStats(hero, cardIds);
     S.plan = COACH_PLANS.find(p => p.when(S));
     const strengths = COACH_STRENGTHS.filter(([w]) => w(S)).map(([, t]) => ({ text: t(S) }));
+    const smart = COACH_SMART.filter(([w]) => w(S)).map(([, t]) => ({ text: t(S) }));
+    const nSmart = Math.min(smart.length, COACH_MAX_SMART);
     const issues = COACH_ISSUES.filter(([, , w]) => w(S)).map(([prio, id, , t]) => ({ prio, id, text: t(S) })).sort((a, b) => a.prio - b.prio);
     const inDeck = new Set(S.cards.map(c => c.name)), seen = new Set();
     const recs = COACH_RECS.filter(([name, , w]) => !inDeck.has(name) && w(S))
@@ -292,41 +317,137 @@ function coachAnalyze(heroId, cardIds) {
         .sort((a, b) => b.weight - a.weight || a.i - b.i)
         .map(r => ({ id: r.card.id, why: r.why }));
     return { ok: true, n, plan: { k: S.plan.k, label: S.plan.label, desc: S.plan.desc }, cls: COACH_CLASS[hero.class] || hero.class,
-        strengths: strengths.slice(0, COACH_MAX_STRENGTHS), issues: issues.filter(x => x.prio < COACH_MINOR).slice(0, COACH_MAX_ISSUES), recs: recs.slice(0, COACH_MAX_RECS),
-        more: { strengths: strengths.slice(COACH_MAX_STRENGTHS), issues: issues.filter(x => x.prio >= COACH_MINOR || issues.filter(y => y.prio < COACH_MINOR).indexOf(x) >= COACH_MAX_ISSUES), recs: recs.slice(COACH_MAX_RECS) } };
+        smart: smart.slice(0, nSmart), strengths: strengths.slice(0, COACH_MAX_POSITIVE - nSmart), issues: issues.slice(0, COACH_MAX_ISSUES), recs: recs.slice(0, COACH_MAX_RECS),
+        more: { strengths: strengths.slice(COACH_MAX_POSITIVE - nSmart), smart: smart.slice(nSmart), issues: issues.slice(COACH_MAX_ISSUES), recs: recs.slice(COACH_MAX_RECS) } };
 }
 
 // --- Oberfläche (Deck-Builder) ---
-const COACH = { run: 0 };
+// Ab 60 Karten erwacht der Held: seine Karte oben rechts wird zum Avatar (Kopf schaut aus einem Loch) und bietet per
+// Sprechblase Tipps an. Die Tipps laufen als Chat links über den Karten – die Deckliste bleibt sichtbar.
+const COACH = { run: 0, heroId: null, lastN: null, greeted: false };
 const coachSleep = ms => new Promise(r => setTimeout(r, ms));
-function coachUpdateBtn(n) {
-    const b = COACH.btn || (COACH.btn = document.getElementById('db-coach-btn')); if (!b) return;
-    const slot = document.getElementById('db-hero-slot');
-    if (slot && b.parentNode !== slot) slot.appendChild(b);                 // sitzt im Heldenfeld (wird bei jedem Neuzeichnen geleert)
-    const ready = n >= COACH_MIN && !!dbHero();
-    b.classList.toggle('ready', ready);
-    b.title = ready ? 'Ask the Deck Coach for tips' : !dbHero() ? 'Choose a hero to activate the Deck Coach!' : `Fill your deck up to 60 cards to activate the Deck Coach! (${n} / 60)`;
+const coachShortName = hero => hero.name.split(/,| the /)[0].trim();
+const coachPick = list => list[Math.floor(Math.random() * list.length)];
+
+// Begrüßung mit Flavor: Rasse + Klasse
+const COACH_HELLO_RACE = {
+    Human: ['Well met, friend!', 'Hail, champion of the Alliance!'],
+    Dwarf: ['Oi! Pull up a stool, friend.', 'By my beard – sixty cards!'],
+    'Night Elf': ['Ishnu-alah, friend.', 'Elune light your path.'],
+    Gnome: ['Ooh, sixty cards! Let me run the numbers.', 'Greetings! Time to tinker!'],
+    Draenei: ['The Light be with you, friend.', 'The Naaru smile upon you.'],
+    Orc: ["Lok'tar ogar!", 'Zug zug! Sixty cards, ready for battle.'],
+    Tauren: ['May the Earth Mother watch over you.', 'Peace, friend. Sit with me a while.'],
+    Troll: ["Hey mon, lookin' good!", "Ya got sixty cards, mon. Respect."],
+    Undead: ['The Dark Lady watches over you.', 'Ah… fresh cards. How lively.'],
+    'Blood Elf': ['Ah, there you are. Sixty cards – how elegant.', 'Our enemies will fall, and your deck will help.'],
+};
+const COACH_HELLO_CLASS = {
+    Warrior: 'My blade is ready – want a few battle tips for your deck?',
+    Hunter: "I've been tracking your deck. Want some tips for the hunt?",
+    Mage: "I've studied your deck closely. Care for a few arcane insights?",
+    Paladin: 'The Light shows me a few things about your deck. Want to hear them?',
+    Priest: 'Let me share some wisdom about your deck. Shall I?',
+    Rogue: "Psst… I've got a few tricks for your deck. Interested?",
+    Shaman: 'The elements whisper about your deck. Want to hear what they say?',
+    Warlock: 'I sense power in your deck… and a few weaknesses. Want to know them?',
+    Druid: 'Nature always finds its balance. Want a few tips for your deck?',
+};
+const coachHello = hero => `${coachPick(COACH_HELLO_RACE[hero.race] || ['Hey there!'])} ${COACH_HELLO_CLASS[hero.class] || 'Want a few tips for your deck?'}`;
+
+// Gesicht je Held: [x, y] Mitte des Kopfes als Anteil der Karte, Zoom (Kartenbreite / Kreisdurchmesser) – von Hand mit Fadenkreuz
+// zentriert und vom Nutzer in der Test-Szene „Avatar-Köpfe ausrichten“ (openFaceEditor) feinjustiert
+const COACH_FACE = { 1: [.504, .215, 3.236], 2: [.629, .238, 2.44], 3: [.391, .181, 4.62], 4: [.558, .18, 5.55], 5: [.457, .217, 3.4], 6: [.539, .158, 8.102], 7: [.51, .226, 2.86], 8: [.47, .213, 4.184],
+    9: [.5, .187, 4.81], 10: [.624, .368, 3.585], 11: [.49, .276, 2.6], 12: [.451, .25, 3.2], 13: [.491, .322, 2.18], 14: [.56, .182, 4.37], 15: [.497, .221, 3.301], 16: [.63, .301, 3],
+    1001: [.401, .205, 3.4], 1002: [.397, .237, 3.17], 1003: [.419, .248, 3.46], 1004: [.513, .247, 4.464], 1005: [.581, .313, 2.63], 1006: [.477, .264, 2.711], 1007: [.547, .245, 2.462], 1008: [.568, .177, 5.493],
+    1009: [.503, .245, 3.2], 1010: [.485, .234, 3.4], 1011: [.605, .257, 2.8], 1012: [.671, .359, 2.499], 1013: [.51, .192, 4.572], 1014: [.443, .24, 3], 1015: [.51, .257, 3.082], 1016: [.568, .33, 3.2],
+    1017: [.543, .284, 4.06], 1018: [.53, .261, 3], 2001: [.547, .251, 3], 2002: [.51, .27, 3.6], 2003: [.254, .296, 2.6], 2004: [.455, .258, 2.986], 2005: [.47, .289, 3], 2006: [.448, .22, 3.03],
+    2007: [.418, .244, 2.8], 2008: [.576, .231, 2.898], 2009: [.548, .242, 3.137], 2010: [.63, .322, 2.87], 2011: [.433, .267, 4.547], 2012: [.615, .323, 2.913], 2013: [.37, .205, 3.2], 2014: [.487, .406, 4.285],
+    2015: [.447, .27, 2.759], 2016: [.46, .213, 3], 2017: [.507, .244, 3.6], 2018: [.531, .269, 2.309] };
+
+
+const COACH_CARD_AR = 1.3966;   // Höhe / Breite der Kartenbilder
+function coachFaceStyle(id) {
+    const [fx, fy, s] = COACH_FACE[id] || [.5, .26, 2.5], h = s * COACH_CARD_AR;
+    const clamp = v => Math.max(0, Math.min(100, v * 100)).toFixed(1);
+    return `background-size: ${s * 100}% auto; background-position: ${clamp((fx * s - .5) / (s - 1))}% ${clamp((fy * h - .5) / (h - 1))}%;`;
 }
-function openDeckCoach() {
-    const n = currentDeckBuilder.cards.length;
-    if (!dbHero()) { dbFlash('Choose a hero to activate the Deck Coach!'); return; }
-    if (n < COACH_MIN) { dbFlash(`Fill your deck up to 60 cards to activate the Deck Coach! (${n} / 60)`); return; }
+const coachImgs = hero => getImageCandidates(hero.id, 'full').slice(0, 4).map(u => `url("${u}")`).join(', ');
+
+// Neues Deck im Builder: alles zurücksetzen (ohne „erwachen“-Animation beim Öffnen)
+function coachReset() { closeDeckCoach(); COACH.heroId = null; COACH.lastN = null; COACH.greeted = false; }
+// Nach jedem Neuzeichnen der Deckliste: Avatar zeigen / entfernen, beim Erreichen von 60 Karten mit Animation
+function coachUpdateBtn(n) {
+    const hero = dbHero(), slot = document.getElementById('db-hero-slot'); if (!slot) return;
+    const prev = COACH.lastN; COACH.lastN = n;
+    const ava = slot.querySelector('.coach-hero-ava'), card = slot.querySelector('.db-hs-card');
+    if (!hero || n < COACH_MIN) {
+        if (ava) ava.remove(); if (card) card.style.display = '';
+        closeDeckCoach(); COACH.heroId = null; COACH.greeted = false; return;
+    }
+    if (COACH.heroId !== hero.id) { closeDeckCoach(); COACH.greeted = false; }
+    if (ava) return;                                                       // steht schon
+    COACH.heroId = hero.id;
+    coachAwaken(slot, hero, prev !== null && prev < COACH_MIN);
+}
+// Die Heldenkarte wird zum Avatar. grand = gerade 60 erreicht: Balken leuchtet golden, Klang, Karte zoomt aufs Gesicht.
+function coachAwaken(slot, hero, grand) {
+    const card = slot.querySelector('.db-hs-card'); if (!card) return;
+    const ava = document.createElement('div'); ava.className = 'coach-hero-ava'; ava.title = `${hero.name} – your Deck Coach`;
+    ava.style.backgroundImage = coachImgs(hero);
+    ava.onclick = e => { e.stopPropagation(); if (!coachOpen()) openCoachIntro(); };
+    const face = coachFaceStyle(hero.id);
+    const greet = () => { if (!COACH.greeted) { COACH.greeted = true; openCoachIntro(); } };
+    if (!grand) {
+        ava.setAttribute('style', ava.getAttribute('style') + ';' + face);
+        card.style.display = 'none'; card.before(ava); setTimeout(greet, 350); return;
+    }
+    // 1) Balken voll + golden, Klang
+    const bar = document.querySelector('.db-progress');
+    if (bar) { bar.classList.remove('coach-glow'); void bar.offsetWidth; bar.classList.add('coach-glow'); }
+    [523, 659, 784, 1047].forEach((f, i) => boosterTone(f, .5, 'triangle', .06, i * .09));
+    boosterTone(1568, .9, 'sine', .03, .4);
+    // 2) Karte → Kreis, Ausschnitt zoomt aufs Gesicht; der Kopf steigt zum Schluss aus dem „Loch“
+    const r = card.getBoundingClientRect();
+    ava.classList.add('waking');
+    ava.style.cssText += `;width:${r.width}px;height:${r.height}px;border-radius:8px;background-size:100% auto;background-position:0 0`;
+    card.style.display = 'none'; card.before(ava);
+    setTimeout(() => {
+        ava.style.cssText = `background-image:${coachImgs(hero)};` + face;          // CSS-Übergänge zur Endform
+        ava.style.backgroundPositionY = 'calc(' + face.match(/background-position: [\d.]+% ([\d.]+)%/)[1] + '% + 14px)';
+    }, 500);
+    setTimeout(() => { ava.style.cssText = `background-image:${coachImgs(hero)};` + face; ava.classList.add('pop'); }, 1350);
+    setTimeout(() => { ava.classList.remove('waking'); greet(); }, 1900);
+}
+
+// Chat-Fenster links über den Karten (zeigt mit einer Spitze nach rechts zum Helden)
+const coachOpen = () => { const b = document.getElementById('db-coach'); return !!b && b.style.display !== 'none'; };
+function coachBox() {
     let box = document.getElementById('db-coach');
     if (!box) {
         box = document.createElement('div'); box.id = 'db-coach';
-        box.innerHTML = '<div class="coach-head"><span class="coach-bulb">💡</span><b>Deck Coach</b><button class="coach-close danger" title="Close">✖</button></div><div class="coach-body"></div>';
-        document.querySelector('#deck-builder-modal .db-deck').appendChild(box);
+        box.innerHTML = '<button class="coach-close" title="Close">✖</button><div class="coach-body"></div>';
+        document.querySelector('#deck-builder-modal .db-pool').appendChild(box);
         box.querySelector('.coach-close').onclick = closeDeckCoach;
         box.querySelector('.coach-body').onclick = () => { COACH.skip = true; };
     }
     box.style.display = 'flex';
-    coachPlay(box.querySelector('.coach-body'), coachAnalyze(currentDeckBuilder.heroId, currentDeckBuilder.cards));
+    return box;
 }
-function closeDeckCoach() { COACH.run++; const b = document.getElementById('db-coach'); if (b) b.style.display = 'none'; dbHoverHide(); }
+function closeDeckCoach() { COACH.run++; const b = document.getElementById('db-coach'); if (b) b.style.display = 'none'; if (typeof dbHoverHide === 'function') dbHoverHide(); }
+// Begrüßung: „Hey, willst du Tipps?“ – Antwort-Button startet die Analyse
+async function openCoachIntro() {
+    const hero = dbHero(); if (!hero || currentDeckBuilder.cards.length < COACH_MIN) return;
+    const body = coachBox().querySelector('.coach-body'); body.innerHTML = '';
+    const C = coachChat(body, hero);
+    if (!await C.say('coach-plain', coachHello(hero))) return;
+    C.replies([['Sure! Bring it on!', () => coachPlay(C, coachAnalyze(currentDeckBuilder.heroId, currentDeckBuilder.cards))],
+        ['Not now', closeDeckCoach]]);
+}
 
-// Nachrichten nacheinander: kurz „denkt nach“ (Punkte), dann tippt der Text. Klick ins Popup = Rest der Runde sofort.
-async function coachPlay(body, R) {
-    const run = ++COACH.run; COACH.skip = false; body.innerHTML = '';
+// Chat-Grundbausteine: Nachricht „denkt nach“ (Punkte) und tippt dann; Klick ins Fenster = Rest sofort
+function coachChat(body, hero) {
+    const run = ++COACH.run; COACH.skip = false;
     const alive = () => run === COACH.run;
     const wait = async ms => { for (const end = Date.now() + ms; !COACH.skip && alive() && Date.now() < end;) await coachSleep(20); return alive(); };
     const scroll = () => { body.scrollTop = body.scrollHeight; };
@@ -338,22 +459,39 @@ async function coachPlay(body, R) {
             d.textContent = '';
             for (let i = 0; i < text.length && !COACH.skip; i += 2) {
                 d.textContent = text.slice(0, i + 2); if (i % 12 === 0) scroll();
-                await coachSleep(/[.!–]/.test(text[i + 1] || '') ? 35 : 8);
+                await coachSleep(/[.!?–]/.test(text[i + 1] || '') ? 35 : 8);
                 if (!alive()) return false;
             }
         }
         d.innerHTML = html || esc(text); scroll();
         return wait(80);
     };
-    const head = t => { const h = document.createElement('div'); h.className = 'coach-section'; h.textContent = t; body.appendChild(h); };
+    const me = text => { const m = document.createElement('div'); m.className = 'coach-me'; m.textContent = text; body.appendChild(m); scroll(); };
+    // Antwort-Buttons des Spielers; der gewählte erscheint als eigene Sprechblase
+    const replies = list => {
+        const row = document.createElement('div'); row.className = 'coach-replies'; body.appendChild(row);
+        list.forEach(([label, go], i) => {
+            const b = document.createElement('button'); b.className = 'coach-more' + (i ? ' alt' : ''); b.textContent = label;
+            b.onclick = e => { e.stopPropagation(); row.remove(); COACH.skip = false; if (i === 0) me(label); go(); };
+            row.appendChild(b);
+        });
+        scroll();
+    };
+    return { body, hero, alive, say, me, replies, scroll };
+}
+
+// Die Tipps: Plan, Stärken, Smart, Schwächen, Karten – danach „I want more advice!“
+async function coachPlay(C, R) {
+    const { body, say, scroll } = C;
     const cards = list => {
         const grid = document.createElement('div'); grid.className = 'coach-recs'; body.appendChild(grid);
         list.forEach((r, i) => {
             const c = CARDS[r.id], el = document.createElement('div'); el.className = 'coach-rec'; el.style.animationDelay = (COACH.skip ? 0 : i * 0.08) + 's';
             const img = createCardDOM({ ...c, uid: 'coach_' + c.id }, false); img.classList.add('coach-rec-card');
             img.onmouseenter = () => dbHoverShow(c.id, el); img.onmouseleave = dbHoverHide;
-            el.appendChild(img);
-            el.insertAdjacentHTML('beforeend', `<div class="coach-rec-why">${esc(r.why)}</div><button class="coach-add success">+ Add</button>`);
+            const wrap = document.createElement('div'); wrap.className = 'coach-rec-img'; wrap.appendChild(img);   // „+ Add“ liegt direkt auf der Karte
+            wrap.insertAdjacentHTML('beforeend', '<button class="coach-add success">+ Add</button>'); el.appendChild(wrap);
+            el.insertAdjacentHTML('beforeend', `<div class="coach-rec-why">${esc(r.why)}</div>`);
             const btn = el.querySelector('.coach-add');
             btn.onclick = (e) => {
                 e.stopPropagation(); const before = dbCount(c.id); dbAdd(c.id);
@@ -364,31 +502,79 @@ async function coachPlay(body, R) {
         });
         scroll();
     };
-    // Eine Runde Tipps: Stärken, Schwächen, Karten
-    const round = async (st, iss, recs, first) => {
-        if (st.length) { head(first ? "What's great" : 'More good news'); for (const s of st) if (!await say('coach-good', s.text + ' ✔')) return false; }
-        if (first || iss.length) head(first ? (iss.length ? 'What to improve' : 'Problems') : 'More to improve');
+    const round = async (st, sm, iss, recs, first) => {
+        for (const s of st) if (!await say('coach-good', s.text + ' ✔')) return false;
+        for (const s of sm) if (!await say('coach-smart', '✦ ' + s.text)) return false;
         if (first && !iss.length && !await say('coach-good', 'No real problems found – nice work! ✔')) return false;
+        if (iss.length && !await say('coach-plain', first ? (iss.length === 1 ? 'One thing you could improve:' : 'A few things you could improve:') : 'Here are some more things to look at:')) return false;
         for (const s of iss) if (!await say('coach-bad', s.text)) return false;
         if (recs.length) {
-            head(first ? 'Cards for your deck' : 'More cards for your deck');
-            if (!await say('coach-rec-intro', recs.length === 1 ? 'This card could fit your deck:' : 'These cards could fit your deck:')) return false;
+            if (!await say('coach-plain', recs.length === 1 ? 'This card could fit your deck:' : 'These cards could fit your deck:')) return false;
             cards(recs);
         }
         return true;
     };
-    // „I want more advice!“ unten, sobald der Coach fertig ist
-    const offerMore = () => {
-        const b = document.createElement('button'); b.className = 'coach-more'; b.textContent = 'I want more advice! 💡'; body.appendChild(b); scroll();
-        b.onclick = async (e) => {
-            e.stopPropagation(); b.remove(); COACH.skip = false;
-            const m = R.more, st = m.strengths.splice(0, COACH_MORE.strengths), iss = m.issues.splice(0, COACH_MORE.issues), recs = m.recs.splice(0, COACH_MORE.recs);
-            if (!st.length && !iss.length && !recs.length) { await say('coach-good', "That's all the advice I have for you – the rest of your deck looks great! ✔"); return; }
-            if (await round(st, iss, recs, false)) offerMore();
-        };
+    // Weitere Tipps nur anbieten, wenn es noch welche gibt – sonst sagt der Coach das gleich
+    const left = () => { const m = R.more; return m.strengths.length + m.smart.length + m.issues.length + m.recs.length; };
+    const offerMore = async () => {
+        if (!left()) { await say('coach-good', "That's all the advice I have for you – the rest of your deck looks great! ✔"); return; }
+        C.replies([['I want more advice! 💡', async () => {
+            const m = R.more, st = m.strengths.splice(0, COACH_MORE.strengths), sm = m.smart.splice(0, COACH_MORE.smart), iss = m.issues.splice(0, COACH_MORE.issues), recs = m.recs.splice(0, COACH_MORE.recs);
+            if (await round(st, sm, iss, recs, false)) offerMore();
+        }]]);
     };
     const planName = `${R.plan.label} ${R.cls}`;
     if (!await say('coach-intro', `Looks like a ${planName} deck! ${R.plan.desc}`, `Looks like a <b>${esc(planName)}</b> deck! ${esc(R.plan.desc)}`)) return;
-    if (await round(R.strengths, R.issues, R.recs, true)) offerMore();
+    if (await round(R.strengths, R.smart, R.issues, R.recs, true)) offerMore();
 }
-if (typeof document !== 'undefined' && document.getElementById('db-coach-btn')) document.getElementById('db-coach-btn').onclick = e => { e.stopPropagation(); openDeckCoach(); };   // nicht die Heldenauswahl öffnen
+
+// --- Test-Szene: Avatar-Köpfe von Hand ausrichten (Seitenmenü → Tests). Ziehen verschiebt den Kopf langsam, Mausrad zoomt
+// fein, Rechtsklick setzt zurück. „Code exportieren“ liefert die COACH_FACE-Tabelle zum Einfügen. Stand bleibt im Browser.
+const FACE_EDIT_KEY = 'wow_tcg_face_edit';
+function openFaceEditor() {
+    const orig = JSON.parse(JSON.stringify(COACH_FACE));
+    try { Object.assign(COACH_FACE, JSON.parse(localStorage.getItem(FACE_EDIT_KEY) || '{}')); } catch (e) {}
+    const save = () => { try { localStorage.setItem(FACE_EDIT_KEY, JSON.stringify(COACH_FACE)); } catch (e) {} };
+    const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken);
+    const box = document.createElement('div'); box.id = 'face-edit';
+    box.innerHTML = `<div class="fe-head"><b>${tr('Avatar-Köpfe ausrichten')}</b><span>${tr('Linke Maustaste ziehen: Kopf verschieben (langsam) · Mausrad: zoomen · Rechtsklick: zurücksetzen')}</span>`
+        + `<button class="fe-export success">${tr('Code exportieren')}</button><button class="fe-reset">${tr('Alles zurücksetzen')}</button><button class="fe-close danger">${tr('Schließen')}</button></div><div class="fe-grid"></div>`;
+    document.body.appendChild(box);
+    const grid = box.querySelector('.fe-grid');
+    const paint = (el, id) => { el.setAttribute('style', `background-image:${coachImgs(CARDS[id])};` + coachFaceStyle(id)); el.nextElementSibling.querySelector('i').textContent = COACH_FACE[id].join(' · '); };
+    heroes.forEach(h => {
+        const cell = document.createElement('div'); cell.className = 'fe-cell';
+        cell.innerHTML = `<div class="fe-ava"></div><div class="fe-name">${esc(h.name.split(',')[0])}<i></i></div>`;
+        const ava = cell.querySelector('.fe-ava'); grid.appendChild(cell); paint(ava, h.id);
+        let drag = null;
+        ava.onmousedown = e => { if (e.button !== 0) return; e.preventDefault(); drag = { x: e.clientX, y: e.clientY }; };
+        window.addEventListener('mousemove', e => {
+            if (!drag) return;
+            const f = COACH_FACE[h.id], D = ava.clientWidth, slow = 0.25;             // Kopf folgt der Maus mit einem Viertel der Strecke
+            f[0] = +(f[0] - (e.clientX - drag.x) * slow / (D * f[2])).toFixed(4);
+            f[1] = +(f[1] - (e.clientY - drag.y) * slow / (D * f[2] * COACH_CARD_AR)).toFixed(4);
+            drag = { x: e.clientX, y: e.clientY }; paint(ava, h.id);
+        });
+        window.addEventListener('mouseup', () => { if (drag) { drag = null; save(); } });
+        ava.onwheel = e => { e.preventDefault(); const f = COACH_FACE[h.id]; f[2] = +(f[2] * (e.deltaY < 0 ? 1.02 : 1 / 1.02)).toFixed(3); paint(ava, h.id); save(); };
+        ava.oncontextmenu = e => { e.preventDefault(); COACH_FACE[h.id] = [...orig[h.id]]; paint(ava, h.id); save(); };
+    });
+    box.querySelector('.fe-close').onclick = () => box.remove();
+    box.querySelector('.fe-reset').onclick = () => uiConfirm(tr('Alles zurücksetzen'), tr('Alle Änderungen verwerfen?'), tr('Alles zurücksetzen'), () => {
+        try { localStorage.removeItem(FACE_EDIT_KEY); } catch (e) {}
+        heroes.forEach(h => COACH_FACE[h.id] = [...orig[h.id]]); grid.querySelectorAll('.fe-ava').forEach((a, i) => paint(a, heroes[i].id));
+    });
+    box.querySelector('.fe-export').onclick = () => {
+        const n = v => String(+(+v).toFixed(3)).replace(/^0\./, '.');
+        const items = heroes.map(h => `${h.id}: [${COACH_FACE[h.id].map(n).join(', ')}]`), rows = [];
+        for (let i = 0; i < items.length; i += 8) rows.push(items.slice(i, i + 8).join(', '));
+        const code = 'const COACH_FACE = { ' + rows.join(',\n    ') + ' };';
+        const out = document.createElement('div'); out.className = 'fe-out';
+        out.innerHTML = `<div>${tr('Code kopieren und Claude schicken:')}</div><textarea readonly></textarea><button class="success">📋</button>`;
+        out.querySelector('textarea').value = code;
+        out.querySelector('button').onclick = () => { try { navigator.clipboard.writeText(code); } catch (e) {} out.querySelector('textarea').select(); showToast(tr('Kopiert!')); };
+        out.onclick = e => { if (e.target === out) out.remove(); };
+        box.appendChild(out); out.querySelector('textarea').select();
+    };
+}
+if (typeof document !== 'undefined' && document.getElementById('btn-face-edit')) document.getElementById('btn-face-edit').onclick = openFaceEditor;

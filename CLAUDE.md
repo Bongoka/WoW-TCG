@@ -38,7 +38,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
 | `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups |
-| `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Popup. Texte nur Englisch (ohne `tr`) |
+| `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Oberfläche: ab 60 Karten wird die Heldenkarte zum Avatar (`COACH_FACE` = Gesichtsausschnitt je Held), Chat links über den Karten. Texte nur Englisch (ohne `tr`) |
 
 Wichtige Engine-Konzepte:
 - Der Zustand ist reines JSON (keine Funktionen). Fortsetzungen nach Entscheidungen laufen über Schlüssel (`k: 'id:name'` → `FX[id].k[name]`, `'E:name'` → `EK[name]`).

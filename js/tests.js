@@ -768,14 +768,17 @@ function runRuleTests() {
     test(96, 'Deck Coach: erst ab 60 Karten, Empfehlungen legal und neu, Schwächen nach Priorität', () => {
         const missing = COACH_RECS.map(r => r[0]).filter(n => !coachByName(n));
         assert(!missing.length, 'Empfehlung ohne Karte: ' + missing.join(', '));
+        const noFace = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && !COACH_FACE[c.id]).map(c => c.name);
+        assert(!noFace.length, 'Held ohne Avatar-Ausschnitt: ' + noFace.join(', '));
         assert(!coachAnalyze(GAME_DECKS[0].hero, GAME_DECKS[0].cards.slice(0, 59)).ok, 'Analyse mit 59 Karten');
         for (const d of GAME_DECKS) {
             const R = coachAnalyze(d.hero, d.cards), hero = CARDS[d.hero];
-            assert(R.ok && R.strengths.length <= 3 && R.issues.length <= 5 && R.recs.length <= 3, d.id + ': Grenzen');
+            assert(R.ok && R.strengths.length + R.smart.length <= 2 && R.issues.length <= 1 && !R.recs.length, d.id + ': erste Runde kurz');
             assert(R.issues.every((x, i) => !i || R.issues[i - 1].prio <= x.prio), d.id + ': Reihenfolge');
-            assert(R.issues.every(x => x.prio < COACH_MINOR) && R.more.issues.every((x, i) => !i || R.more.issues[i - 1].prio <= x.prio), d.id + ': kleine Hinweise erst über „more advice“');
+            const allIss = [...R.issues, ...R.more.issues];
+            assert(allIss.every((x, i) => !i || allIss[i - 1].prio <= x.prio) && R.smart.length <= 1, d.id + ': „more advice“ setzt die Prioritäten fort');
             const allRecs = [...R.recs, ...R.more.recs].map(r => r.id);
-            assert(new Set(allRecs).size === allRecs.length && (!R.more.recs.length || R.recs.length === 3), d.id + ': weitere Tipps doppelt oder zu früh');
+            assert(new Set(allRecs).size === allRecs.length && !R.recs.length, d.id + ': weitere Tipps doppelt oder zu früh');
             for (const r of [...R.recs, ...R.more.recs]) assert(coachLegal(CARDS[r.id], hero) && !d.cards.includes(r.id), `${d.id}: Empfehlung ${CARDS[r.id].name}`);
         }
         // Gifte ohne Waffen und zu wenige Quests werden erkannt
@@ -784,9 +787,13 @@ function runRuleTests() {
         const poison = Object.values(CARDS).find(c => c.name === 'Deadly Poison').id, quest = Object.values(CARDS).find(c => c.name === 'Your Fortune Awaits You').id;
         const fill = k => Array.from({ length: k }, (_, i) => allies[i % allies.length]);
         let R = coachAnalyze(rogue.id, [poison, poison, poison, poison, ...Array(4).fill(quest), ...fill(52)]);
-        assert(R.issues[0].id === 'few-quests' && R.issues.some(x => x.id === 'dead-poison'), 'erkannt: ' + R.issues.map(x => x.id).join(','));
+        const iss = [...R.issues, ...R.more.issues];
+        assert(iss[0].id === 'few-quests' && iss.some(x => x.id === 'dead-poison'), 'erkannt: ' + iss.map(x => x.id).join(','));
         R = coachAnalyze(rogue.id, [...Array(14).fill(quest), ...fill(46)]);
-        assert(!R.issues.some(x => /quests/.test(x.id)) && R.strengths.some(x => /quest count/.test(x.text)), '14 Quests: ' + JSON.stringify(R.issues.map(x => x.id)));
+        assert(![...R.issues, ...R.more.issues].some(x => /quests/.test(x.id)) && [...R.strengths, ...R.more.strengths].some(x => /quest count/.test(x.text)), '14 Quests: ' + JSON.stringify(R.issues.map(x => x.id)));
+        // Ausrüstung als Einzelkopien ist schlau (ein Teil je Slot), keine Schwäche
+        const gear = Object.values(CARDS).filter(c => (c.type === 'Armor' || c.type === 'Weapon') && !c.isToken && coachLegal(c, rogue)).slice(0, 12).map(c => c.id);
+        assert(coachStats(rogue, gear).singles === 0, 'Ausrüstung zählt als Einzelkopie');
     });
     LANG = prevLang;
     return results;

@@ -29,7 +29,7 @@ function openDeckBuilder(deck = null, asCopy = false) {
     if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? tr`${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
     else currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
     DBF.cls = dbHero() ? dbHero().class : null;
-    if (typeof closeDeckCoach === 'function') closeDeckCoach();
+    if (typeof coachReset === 'function') coachReset();
     document.getElementById("db-name").value = currentDeckBuilder.name;
     renderDBAll();
 }
