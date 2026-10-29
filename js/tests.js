@@ -773,6 +773,7 @@ function runRuleTests() {
             const R = coachAnalyze(d.hero, d.cards), hero = CARDS[d.hero];
             assert(R.ok && R.strengths.length <= 3 && R.issues.length <= 5 && R.recs.length <= 3, d.id + ': Grenzen');
             assert(R.issues.every((x, i) => !i || R.issues[i - 1].prio <= x.prio), d.id + ': Reihenfolge');
+            assert(R.issues.every(x => x.prio < COACH_MINOR) && R.more.issues.every((x, i) => !i || R.more.issues[i - 1].prio <= x.prio), d.id + ': kleine Hinweise erst über „more advice“');
             const allRecs = [...R.recs, ...R.more.recs].map(r => r.id);
             assert(new Set(allRecs).size === allRecs.length && (!R.more.recs.length || R.recs.length === 3), d.id + ': weitere Tipps doppelt oder zu früh');
             for (const r of [...R.recs, ...R.more.recs]) assert(coachLegal(CARDS[r.id], hero) && !d.cards.includes(r.id), `${d.id}: Empfehlung ${CARDS[r.id].name}`);

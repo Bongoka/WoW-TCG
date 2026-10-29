@@ -185,6 +185,20 @@ const COACH_ISSUES = [
     [63, 'hunter-slow', S => S.hero.class === 'Hunter' && S.avg > 3.5, () => 'Hunters win fast – try a lower curve.'],
     [64, 'lock-hurt', S => S.selfDmg.length >= 6 && S.heal.length < 2, () => 'Lots of self-damage and no healing – watch your health.'],
     [65, 'pala-nodmg', S => S.hero.class === 'Paladin' && S.dmgAb.length + S.weapons.length < 6 && S.allies.length < 15, () => 'Lots of support, few ways to deal damage.'],
+    // Kleinere Hinweise (ab COACH_MINOR): erscheinen nur über „I want more advice!“
+    [70, 'few-instants', S => S.instants.length < 4, S => `Only ${S.instants.length} instants – you can rarely react on your opponent's turn.`],
+    [71, 'no-sustain', S => S.heal.length + S.protect.length < 3, () => 'Hardly any healing or protection – once your hero is hurt, it stays hurt.'],
+    [72, 'few-draw', S => S.draw.length < 2, () => 'Almost no cards that draw – your quests are your only fuel.'],
+    [73, 'few-1', S => S.c01 < 3, S => `Only ${S.c01} cards cost 0–1 – your first turn is usually empty.`],
+    [74, 'unique-copies', S => Object.keys(S.copies).some(k => S.copies[k] >= 3 && (coachByName(k) || {}).unique), S => { const k = Object.keys(S.copies).find(k => S.copies[k] >= 3 && (coachByName(k) || {}).unique); return `${S.copies[k]} copies of ${k} – it's Unique, so only one can be in play.`; }],
+    [75, 'few-weapons', S => ['Warrior', 'Rogue', 'Hunter', 'Shaman', 'Paladin'].includes(S.hero.class) && S.weapons.length > 0 && S.weapons.length < 3 && S.plan.k !== 'swarm', S => `Only ${S.weapons.length} weapon(s) – your hero will rarely get to attack.`],
+    [76, 'loose-core', S => S.core < S.n * 0.5 && S.singles < 5, () => 'Less than half of your deck are 3–4 copies – it will play differently every game.'],
+    [77, 'big-nodraw', S => S.c6 >= 6 && S.draw.length < 3, S => `${S.c6} expensive cards but little card draw – you may run out of cheap plays first.`],
+    [78, 'few-2-soft', S => S.c2 >= 7 && S.c2 < 10, S => `${S.c2} cards cost 2 – a few more would make turn 2 smoother.`],
+    [79, 'few-3-soft', S => S.c3 >= 4 && S.c3 < 7, S => `${S.c3} cards cost 3 – your turn 3 could be stronger.`],
+    [80, 'quests-low-soft', S => S.quests.length >= 12 && S.quests.length < 14, S => `${S.quests.length} quests – 14 to 16 give a bit more card draw.`],
+    [81, 'few-removal-soft', S => S.removal.length >= 3 && S.removal.length < 5, S => `Only ${S.removal.length} removal cards – big allies may cause trouble.`],
+    [82, 'singles-soft', S => S.singles >= 5 && S.singles < 10, S => `${S.singles} single copies – consider 3–4 of your favorites instead.`],
 ];
 
 // Empfehlungen: [Kartenname, Begründung, Bedingung, Gewicht]  (Gewicht: 4 = behebt Schwäche, 3 = Synergie, 2 = passt zum Plan, 1 = Klassen-Stapel)
@@ -260,7 +274,8 @@ const COACH_RECS = [
 ];
 
 // Erste Runde: bis zu COACH_MAX_* Punkte; der Rest steht in R.more für „I want more advice!“ (je Runde COACH_MORE)
-const COACH_MORE = { strengths: 2, issues: 3, recs: 3 };
+const COACH_MORE = { strengths: 1, issues: 5, recs: 2 };
+const COACH_MINOR = 70;   // Hinweise ab dieser Priorität nie in der ersten Runde
 function coachAnalyze(heroId, cardIds) {
     const hero = CARDS[heroId];
     const n = (cardIds || []).length;
@@ -277,8 +292,8 @@ function coachAnalyze(heroId, cardIds) {
         .sort((a, b) => b.weight - a.weight || a.i - b.i)
         .map(r => ({ id: r.card.id, why: r.why }));
     return { ok: true, n, plan: { k: S.plan.k, label: S.plan.label, desc: S.plan.desc }, cls: COACH_CLASS[hero.class] || hero.class,
-        strengths: strengths.slice(0, COACH_MAX_STRENGTHS), issues: issues.slice(0, COACH_MAX_ISSUES), recs: recs.slice(0, COACH_MAX_RECS),
-        more: { strengths: strengths.slice(COACH_MAX_STRENGTHS), issues: issues.slice(COACH_MAX_ISSUES), recs: recs.slice(COACH_MAX_RECS) } };
+        strengths: strengths.slice(0, COACH_MAX_STRENGTHS), issues: issues.filter(x => x.prio < COACH_MINOR).slice(0, COACH_MAX_ISSUES), recs: recs.slice(0, COACH_MAX_RECS),
+        more: { strengths: strengths.slice(COACH_MAX_STRENGTHS), issues: issues.filter(x => x.prio >= COACH_MINOR || issues.filter(y => y.prio < COACH_MINOR).indexOf(x) >= COACH_MAX_ISSUES), recs: recs.slice(COACH_MAX_RECS) } };
 }
 
 // --- Oberfläche (Deck-Builder) ---
