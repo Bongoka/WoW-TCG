@@ -126,7 +126,6 @@ body {
 .db-row.pulse { animation: dbPulse .6s ease; }
 @keyframes dbPulse { 0% { background: rgba(250,204,21,.45); } 100% { background: transparent; } }
 .db-row-cost { justify-self: center; width: 24px; height: 24px; border-radius: 50%; background: #0c3a5c; border: 1px solid #1c78b4; color: #b0d8ff; font: bold 11px/22px Georgia, serif; text-align: center; }
-#db-deck-cards.horde .db-row-cost { background: #4a0d12; border-color: #c41e2a; color: #ffc7cb; }   /* Horde-Decks: rote Kosten-Kreise */
 .db-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .db-row-n { text-align: center; font-weight: 900; color: var(--gold-light); }
 .db-row-btn { padding: 0; width: 22px; height: 22px; line-height: 20px; font-size: 14px; border-radius: 50%; }
@@ -906,6 +905,22 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #db-deck-cards .db-row-name { font-weight: bold; color: #f4ecdc; letter-spacing: .2px; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 10px rgba(0,0,0,.95); }
 #db-deck-cards .db-row-n { text-shadow: 0 0 4px #000, 0 1px 2px #000; }
 #db-deck-cards .db-row-btn { background: rgba(12,9,6,.75); }
-/* Kosten als glänzender Edelstein in Fraktionsfarbe */
-#db-deck-cards .db-row-cost { background: radial-gradient(circle at 35% 30%, #5fb3ea, #1c78b4 45%, #0a2f4b 100%); border: 1px solid #c9a84c; color: #fff; text-shadow: 0 1px 2px #000; box-shadow: 0 0 4px rgba(0,0,0,.8); }
-#db-deck-cards.horde .db-row-cost { background: radial-gradient(circle at 35% 30%, #f06a70, #c41e2a 45%, #4a0a0f 100%); border-color: #c9a84c; color: #fff; }
+/* Kosten auf der Original-Kugel aus dem Kartenrahmen (icons/cost/) */
+#db-deck-cards .db-row-cost { width: 26px; height: 26px; border: 0; border-radius: 50%; background: center/cover no-repeat; box-shadow: 0 1px 3px rgba(0,0,0,.8);
+    color: #fff; font: 900 13px/26px Georgia, serif; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 2px #000; }
+#db-deck-cards .db-row-cost.orb-quest { width: 20px; height: 26px; border-radius: 3px; background-size: contain; box-shadow: none; }
+/* Große Kosten-Kugeln wie in Hearthstone: ragen links über den Zeilenrand, große Zahl */
+#db-deck-cards .db-row { overflow: visible; grid-template-columns: 30px 1fr 22px 22px 22px; padding-left: 0; margin-left: 10px; }
+#db-deck-cards .db-row-art { border-radius: 0 5px 5px 0; }
+#db-deck-cards .db-row-cost { width: 40px; height: 40px; margin-left: -16px; z-index: 2; font: 900 19px/40px Georgia, serif; letter-spacing: -.5px;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 4px #000; box-shadow: 0 2px 5px rgba(0,0,0,.85); }
+#db-deck-cards .db-row-cost.orb-quest { width: 30px; height: 40px; margin-left: -12px; }
+/* Deckliste minimalistisch: − / + erst beim Überfahren, + bei 4 Kopien grau; die überfahrene Zeile wächst nach oben und unten */
+#db-deck-cards .db-row { transition: height .15s ease, margin .15s ease, border-color .15s, box-shadow .15s; }
+#db-deck-cards .db-row:hover { height: 42px; margin-top: -4px; margin-bottom: -1px; z-index: 3; box-shadow: 0 4px 14px rgba(0,0,0,.8), 0 0 0 1px rgba(201,168,76,.35); }
+#db-deck-cards .db-row-btn { opacity: 0; transition: opacity .15s; }
+#db-deck-cards .db-row:hover .db-row-btn { opacity: 1; }
+#db-deck-cards .db-row-btn:disabled { opacity: 0 !important; }
+#db-deck-cards .db-row:hover .db-row-btn:disabled { opacity: .35 !important; filter: grayscale(1); cursor: not-allowed; }
+#db-deck-cards .db-row-n { font: 900 18px/1 Georgia, serif; color: #fde68a; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 6px #000; }
+@media (hover: none) { #db-deck-cards .db-row-btn { opacity: 1; } #db-deck-cards .db-row-btn:disabled { opacity: .35 !important; } }

@@ -765,32 +765,39 @@ function runRuleTests() {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
     });
-    test(96, 'Deck Coach: erst ab 60 Karten, Empfehlungen legal und neu, Schwächen nach Priorität', () => {
+    test(96, 'Deck Coach: erst ab 60 Karten, Runden nach Priorität, Kartenvorschläge passen zu den Tipps', () => {
         const missing = COACH_RECS.map(r => r[0]).filter(n => !coachByName(n));
         assert(!missing.length, 'Empfehlung ohne Karte: ' + missing.join(', '));
         const noFace = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && !COACH_FACE[c.id]).map(c => c.name);
         assert(!noFace.length, 'Held ohne Avatar-Ausschnitt: ' + noFace.join(', '));
         assert(!coachAnalyze(GAME_DECKS[0].hero, GAME_DECKS[0].cards.slice(0, 59)).ok, 'Analyse mit 59 Karten');
         for (const d of GAME_DECKS) {
-            const R = coachAnalyze(d.hero, d.cards), hero = CARDS[d.hero];
-            assert(R.ok && R.strengths.length + R.smart.length <= 2 && R.issues.length <= 1 && !R.recs.length, d.id + ': erste Runde kurz');
-            assert(R.issues.every((x, i) => !i || R.issues[i - 1].prio <= x.prio), d.id + ': Reihenfolge');
-            const allIss = [...R.issues, ...R.more.issues];
-            assert(allIss.every((x, i) => !i || allIss[i - 1].prio <= x.prio) && R.smart.length <= 1, d.id + ': „more advice“ setzt die Prioritäten fort');
-            const allRecs = [...R.recs, ...R.more.recs].map(r => r.id);
-            assert(new Set(allRecs).size === allRecs.length && !R.recs.length, d.id + ': weitere Tipps doppelt oder zu früh');
-            for (const r of [...R.recs, ...R.more.recs]) assert(coachLegal(CARDS[r.id], hero) && !d.cards.includes(r.id), `${d.id}: Empfehlung ${CARDS[r.id].name}`);
+            const R = coachAnalyze(d.hero, d.cards), hero = CARDS[d.hero], f = R.rounds[0];
+            assert(R.ok && f.strengths.length + f.smart.length <= 2 && f.issues.length <= 1 && f.recs.length <= 2, d.id + ': erste Runde kurz');
+            assert(f.recs.every(r => f.issues[0] && r.fix === f.issues[0].id), d.id + ': erste Runde zeigt nur Karten zum Tipp');
+            const allIss = R.rounds.flatMap(r => r.issues);
+            assert(allIss.every((x, i) => !i || allIss[i - 1].prio <= x.prio), d.id + ': „more advice“ setzt die Prioritäten fort');
+            const allRecs = R.rounds.flatMap(r => r.recs);
+            assert(new Set(allRecs.map(r => r.id)).size === allRecs.length, d.id + ': Karte doppelt vorgeschlagen');
+            for (const r of allRecs) {
+                const c = CARDS[r.id];
+                assert(coachLegal(c, hero) && !d.cards.includes(r.id), `${d.id}: Empfehlung ${c.name}`);
+                assert(!r.fix || COACH_FIX[r.fix].match(c), `${d.id}: ${c.name} passt nicht zum Tipp ${r.fix}`);
+            }
+            assert(R.rounds.every((r, i) => !i || r.strengths.length + r.smart.length + r.issues.length + r.recs.length), d.id + ': leere Runde');
         }
-        // Gifte ohne Waffen und zu wenige Quests werden erkannt
+        // Gifte ohne Waffen und zu wenige Quests werden erkannt – und die Vorschläge beheben genau das
         const rogue = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Rogue');
         const allies = Object.values(CARDS).filter(c => c.type === 'Ally' && !c.text && !c.isToken && coachLegal(c, rogue)).map(c => c.id);
         const poison = Object.values(CARDS).find(c => c.name === 'Deadly Poison').id, quest = Object.values(CARDS).find(c => c.name === 'Your Fortune Awaits You').id;
         const fill = k => Array.from({ length: k }, (_, i) => allies[i % allies.length]);
         let R = coachAnalyze(rogue.id, [poison, poison, poison, poison, ...Array(4).fill(quest), ...fill(52)]);
-        const iss = [...R.issues, ...R.more.issues];
+        const iss = R.rounds.flatMap(r => r.issues), recs = R.rounds.flatMap(r => r.recs);
         assert(iss[0].id === 'few-quests' && iss.some(x => x.id === 'dead-poison'), 'erkannt: ' + iss.map(x => x.id).join(','));
+        assert(R.rounds[0].recs.length === 2 && R.rounds[0].recs.every(r => CARDS[r.id].type === 'Quest'), 'zu wenige Quests → Quests vorgeschlagen');
+        assert(recs.some(r => r.fix === 'dead-poison' && CARDS[r.id].type === 'Weapon'), 'Gifte ohne Waffen → Waffe vorgeschlagen');
         R = coachAnalyze(rogue.id, [...Array(14).fill(quest), ...fill(46)]);
-        assert(![...R.issues, ...R.more.issues].some(x => /quests/.test(x.id)) && [...R.strengths, ...R.more.strengths].some(x => /quest count/.test(x.text)), '14 Quests: ' + JSON.stringify(R.issues.map(x => x.id)));
+        assert(!R.rounds.flatMap(r => r.issues).some(x => /quests/.test(x.id)) && R.rounds.flatMap(r => r.strengths).some(x => /quest count/.test(x.text)), '14 Quests');
         // Ausrüstung als Einzelkopien ist schlau (ein Teil je Slot), keine Schwäche
         const gear = Object.values(CARDS).filter(c => (c.type === 'Armor' || c.type === 'Weapon') && !c.isToken && coachLegal(c, rogue)).slice(0, 12).map(c => c.id);
         assert(coachStats(rogue, gear).singles === 0, 'Ausrüstung zählt als Einzelkopie');

@@ -5,8 +5,6 @@
 // Kartennamen in den Listen unten sind gegen docs/wow_ocr_110329.txt geprüft.
 // ============================================================================
 const COACH_MIN = 60;
-// Erste Runde bewusst kurz: die 2 besten positiven Punkte (Smart zählt mit) und die wichtigste Schwäche, noch keine Karten
-const COACH_MAX_POSITIVE = 2, COACH_MAX_ISSUES = 1, COACH_MAX_RECS = 0;
 
 // Text ohne Erinnerungstexte in Klammern (z. B. „(Has Protector. Destroy this card when you strike with a weapon …)“)
 const coachTxt = c => (c.text || '').replace(/\([^)]*\)/g, ' ');
@@ -17,6 +15,16 @@ const coachList = (list, max = 3) => { const n = coachNames(list); return n.slic
 // „need“ / „needs“ je nach Anzahl verschiedener Namen
 const coachVerb = (list, one, many) => coachNames(list).length > 1 ? many : one;
 
+// Kartentext-Muster für Kennzahlen und passende Kartenvorschläge
+const COACH_RE = {
+    stealth: /Your hero has Stealth|has Stealth this turn|gains? Stealth/,
+    dmg: /deals? (\d+|X|\d\+X|melee damage)[^.]*damage|deals? \d+ \w+ damage/,
+    removal: /Destroy target (\w+ )*(ally|hero or ally)|Destroy all|Remove target ally|can't attack or protect|can't ready|deals? ([3-9]|X|\d\+X|melee damage)[^.]*to (target|each)|Interrupt target|each opposing/,
+    heal: /heals? (\d+|X|all)/,
+    protect: /Prevent all damage|prevent \d|Protector|Untargetable|Divine Shield|Ice Block/,
+    draw: /draws? (a|two|three|\d) cards?|Search your deck|Put a revealed/,
+    discard: /(its controller|target player|target opponent|that player) discards/,
+};
 // Kennzahlen des Decks
 function coachStats(hero, ids) {
     const cards = ids.map(id => CARDS[id]).filter(Boolean);
@@ -58,15 +66,15 @@ function coachStats(hero, ids) {
     S.poisons = cards.filter(c => (c.subtypes || []).includes('Poison'));
     S.combos = cards.filter(c => (c.subtypes || []).includes('Combo'));
     S.finishers = t(/Finishing Move/);
-    S.stealthSrc = t(/Your hero has Stealth|has Stealth this turn|gains? Stealth/);
+    S.stealthSrc = t(COACH_RE.stealth);
     S.stealthNeed = t(/Play only if your hero has Stealth/);
-    S.dmgAb = t(/deals? (\d+|X|\d\+X|melee damage)[^.]*damage|deals? \d+ \w+ damage/, S.abilities);
-    S.removal = t(/Destroy target (\w+ )*(ally|hero or ally)|Destroy all|Remove target ally|can't attack or protect|can't ready|deals? ([3-9]|X|\d\+X|melee damage)[^.]*to (target|each)|Interrupt target|each opposing/, S.nonQ);
-    S.heal = t(/heals? (\d+|X|all)/, S.nonQ);
-    S.protect = t(/Prevent all damage|prevent \d|Protector|Untargetable|Divine Shield|Ice Block/, S.nonQ);
-    S.draw = t(/draws? (a|two|three|\d) cards?|Search your deck|Put a revealed/, S.nonQ);
+    S.dmgAb = t(COACH_RE.dmg, S.abilities);
+    S.removal = t(COACH_RE.removal, S.nonQ);
+    S.heal = t(COACH_RE.heal, S.nonQ);
+    S.protect = t(COACH_RE.protect, S.nonQ);
+    S.draw = t(COACH_RE.draw, S.nonQ);
     S.instants = S.nonQ.filter(c => c.instant && c.type === 'Ability');
-    S.discardSrc = t(/(its controller|target player|target opponent|that player) discards/, S.nonQ);
+    S.discardSrc = t(COACH_RE.discard, S.nonQ);
     S.selfDmg = t(/put \d+ damage on your hero/, S.nonQ);
     S.bigAllies = S.allies.filter(c => cost(c) >= 5);
     S.cheapAllies = S.allies.filter(c => cost(c) <= 2);
@@ -296,9 +304,49 @@ const COACH_RECS = [
         .map(([cls, n, why]) => [n, why, S => S.hero.class === cls, 1]),
 ];
 
-// Erste Runde: bis zu COACH_MAX_* Punkte; der Rest steht in R.more für „I want more advice!“ (je Runde COACH_MORE)
+// Karten, die einen Tipp beheben: { Bedingung an die Karte, Begründung }
+const coachCost = c => c.type === 'Quest' ? -1 : (c.cost || 0);
+const coachIs = (c, re) => re.test(coachTxt(c));
+const COACH_FIX = {};
+const coachFix = (ids, match, why) => ids.forEach(id => COACH_FIX[id] = { match, why });
+coachFix(['few-quests', 'some-quests', 'quests-low-soft'], c => c.type === 'Quest', 'Another quest – more cards over the game.');
+coachFix(['curve-early', 'hunter-slow', 'many-6', 'many-8', 'curve-high'], c => c.type !== 'Quest' && coachCost(c) <= 2, 'A cheap card for your early turns.');
+coachFix(['few-1'], c => c.type !== 'Quest' && coachCost(c) <= 1, 'A 1-drop to start fast.');
+coachFix(['few-2', 'few-2-soft'], c => c.type !== 'Quest' && coachCost(c) === 2, 'A solid play for turn 2.');
+coachFix(['few-3', 'few-3-soft', 'many-45'], c => c.type !== 'Quest' && coachCost(c) === 3, 'Fills the gap at 3 cost.');
+coachFix(['many-1'], c => c.type !== 'Quest' && coachCost(c) >= 3 && coachCost(c) <= 5, 'A stronger mid-game card.');
+coachFix(['few-removal', 'few-removal-soft'], c => c.type !== 'Quest' && coachIs(c, /Destroy target|Destroy all|Remove target ally|Attach to target (hero or )?ally[^.]*\. Ongoing: Attached (character|ally) can't|deals? ([3-9]|X|\d\+X)[^.]*damage to (target|each)|Interrupt target/), 'Answers a dangerous ally.');
+coachFix(['no-sustain', 'squishy', 'lock-hurt'], c => c.type !== 'Quest' && (coachIs(c, COACH_RE.heal) || coachIs(c, /Prevent all damage|prevent \d|Protector/)), 'Keeps your hero alive.');
+coachFix(['few-draw', 'weapon-draw', 'big-nodraw'], c => coachIs(c, COACH_RE.draw), 'Draws you extra cards.');
+coachFix(['few-instants'], c => c.type === 'Ability' && c.instant, "A trick for your opponent's turn.");
+coachFix(['dead-weapon', 'dead-poison', 'few-weapons'], c => c.type === 'Weapon', 'A weapon for your hero.');
+coachFix(['dead-pet'], c => !!c.isPet, 'Another Pet for your Pet cards.');
+coachFix(['dead-form'], c => !!(c.limitTags && c.limitTags.Form) && /non-Feral ability/.test(c.text || ''), 'A Form for your Feral cards.');
+coachFix(['dead-totem'], c => !!c.totem, 'A totem for Totemic Call.');
+coachFix(['dead-stealth'], c => coachIs(c, COACH_RE.stealth), 'Gives your hero Stealth.');
+coachFix(['dead-finisher'], c => (c.subtypes || []).includes('Combo'), 'A Combo to power your finishers.');
+coachFix(['dead-discard'], c => coachIs(c, COACH_RE.discard), 'Makes your opponent discard.');
+coachFix(['no-damage', 'pala-nodmg', 'draw-nowin'], c => c.type === 'Ability' && coachIs(c, COACH_RE.dmg), 'Deals direct damage.');
+coachFix(['alone-swarm', 'quest-allies', 'quest-grave'], c => c.type === 'Ally' && coachCost(c) <= 3, 'A cheap ally to fill your board.');
+coachFix(['quest-big'], c => c.type === 'Ally' && coachCost(c) >= 5, 'A big ally for your quest.');
+coachFix(['quest-equip'], c => ['Weapon', 'Armor', 'Item'].includes(c.type), 'More equipment for your quest.');
+coachFix(['quest-abil'], c => c.type === 'Ability' && !!c.ongoing, 'An ability that stays in play.');
+// Beliebtheit in den Turnierdecks (falls geladen) – damit Vorschläge aus dem ganzen Kartenpool gute Karten sind
+let COACH_POP = null;
+function coachPop(name) {
+    if (!COACH_POP) {
+        COACH_POP = {};
+        if (typeof TOURNEY_DECKS !== 'undefined') TOURNEY_DECKS.forEach(t => t.split('\n').forEach(l => {
+            const m = l.match(/^(\d+)\s+(.+)$/); if (m) COACH_POP[m[2].trim()] = (COACH_POP[m[2].trim()] || 0) + +m[1];
+        }));
+    }
+    return COACH_POP[name] || 0;
+}
+
+// Runden: die erste ist kurz (2 positive Punkte, der wichtigste Tipp und Karten genau dafür); „I want more advice!“ zeigt
+// jeweils die nächste Runde. Kartenvorschläge gehören zu den Tipps der Runde, danach kommen allgemeine Empfehlungen.
+const COACH_MAX_POSITIVE = 2, COACH_MAX_SMART = 1;   // „Smart“ soll selten und besonders bleiben
 const COACH_MORE = { strengths: 1, smart: 1, issues: 3, recs: 3 };
-const COACH_MAX_SMART = 1;   // „Smart“ soll selten und besonders bleiben
 function coachAnalyze(heroId, cardIds) {
     const hero = CARDS[heroId];
     const n = (cardIds || []).length;
@@ -308,17 +356,39 @@ function coachAnalyze(heroId, cardIds) {
     S.plan = COACH_PLANS.find(p => p.when(S));
     const strengths = COACH_STRENGTHS.filter(([w]) => w(S)).map(([, t]) => ({ text: t(S) }));
     const smart = COACH_SMART.filter(([w]) => w(S)).map(([, t]) => ({ text: t(S) }));
-    const nSmart = Math.min(smart.length, COACH_MAX_SMART);
     const issues = COACH_ISSUES.filter(([, , w]) => w(S)).map(([prio, id, , t]) => ({ prio, id, text: t(S) })).sort((a, b) => a.prio - b.prio);
-    const inDeck = new Set(S.cards.map(c => c.name)), seen = new Set();
-    const recs = COACH_RECS.filter(([name, , w]) => !inDeck.has(name) && w(S))
-        .map(([name, why, , weight], i) => ({ card: coachByName(name), why, weight, i }))
-        .filter(r => r.card && !seen.has(r.card.name) && seen.add(r.card.name) && coachLegal(r.card, hero) && !CARD_ISSUES[r.card.id])
-        .sort((a, b) => b.weight - a.weight || a.i - b.i)
-        .map(r => ({ id: r.card.id, why: r.why }));
-    return { ok: true, n, plan: { k: S.plan.k, label: S.plan.label, desc: S.plan.desc }, cls: COACH_CLASS[hero.class] || hero.class,
-        smart: smart.slice(0, nSmart), strengths: strengths.slice(0, COACH_MAX_POSITIVE - nSmart), issues: issues.slice(0, COACH_MAX_ISSUES), recs: recs.slice(0, COACH_MAX_RECS),
-        more: { strengths: strengths.slice(COACH_MAX_POSITIVE - nSmart), smart: smart.slice(nSmart), issues: issues.slice(COACH_MAX_ISSUES), recs: recs.slice(COACH_MAX_RECS) } };
+    const used = new Set(S.cards.map(c => c.name));
+    const ok = c => !!c && !used.has(c.name) && coachLegal(c, hero) && !CARD_ISSUES[c.id];
+    // Kuratierte Empfehlungen (mit eigener Begründung), sortiert nach Gewicht
+    const curated = COACH_RECS.filter(([, , w]) => w(S)).map(([name, why, , weight], i) => ({ card: coachByName(name), why, weight, i }))
+        .filter(r => r.card).sort((a, b) => b.weight - a.weight || a.i - b.i);
+    const take = (card, why, fix = null) => { used.add(card.name); return { id: card.id, why, fix }; };
+    // Karten für einen Tipp: zuerst kuratierte, sonst aus dem ganzen Pool (Turnier-Favoriten und Klassenkarten zuerst)
+    const pool = Object.values(CARDS).filter(c => c.type !== 'Hero' && !c.isToken);
+    const fixFor = (issue, k) => {
+        const f = COACH_FIX[issue.id], out = []; if (!f) return out;
+        const cond = c => /Play only if/.test(c.text || '') && issue.id !== 'dead-stealth';   // Karten mit Bedingung nicht als Lösung
+        for (const r of curated) if (out.length < k && ok(r.card) && !cond(r.card) && f.match(r.card)) out.push(take(r.card, r.why, issue.id));
+        if (out.length < k) {
+            const own = c => (c.allowedClasses || []).includes(hero.class) ? 1 : 0;
+            const cand = pool.filter(c => ok(c) && !cond(c) && f.match(c)).sort((a, b) => coachPop(b.name) - coachPop(a.name) || own(b) - own(a) || a.name.localeCompare(b.name));
+            for (const c of cand) { if (out.length >= k) break; out.push(take(c, f.why, issue.id)); }
+        }
+        return out;
+    };
+    const general = k => { const out = []; for (const r of curated) if (out.length < k && ok(r.card)) out.push(take(r.card, r.why)); return out; };
+    const nSmart = Math.min(smart.length, COACH_MAX_SMART);
+    const first = { smart: smart.splice(0, nSmart), strengths: strengths.splice(0, COACH_MAX_POSITIVE - nSmart), issues: issues.splice(0, 1) };
+    first.recs = first.issues.length ? fixFor(first.issues[0], 2) : [];
+    const rounds = [first];
+    for (;;) {
+        const r = { strengths: strengths.splice(0, COACH_MORE.strengths), smart: smart.splice(0, COACH_MORE.smart), issues: issues.splice(0, COACH_MORE.issues), recs: [] };
+        for (const x of r.issues) r.recs.push(...fixFor(x, 1));
+        r.recs.push(...general(COACH_MORE.recs - r.recs.length));
+        if (!r.strengths.length && !r.smart.length && !r.issues.length && !r.recs.length) break;
+        rounds.push(r);
+    }
+    return { ok: true, n, plan: { k: S.plan.k, label: S.plan.label, desc: S.plan.desc }, cls: COACH_CLASS[hero.class] || hero.class, rounds };
 }
 
 // --- Oberfläche (Deck-Builder) ---
@@ -508,24 +578,30 @@ async function coachPlay(C, R) {
         if (first && !iss.length && !await say('coach-good', 'No real problems found – nice work! ✔')) return false;
         if (iss.length && !await say('coach-plain', first ? (iss.length === 1 ? 'One thing you could improve:' : 'A few things you could improve:') : 'Here are some more things to look at:')) return false;
         for (const s of iss) if (!await say('coach-bad', s.text)) return false;
-        if (recs.length) {
-            if (!await say('coach-plain', recs.length === 1 ? 'This card could fit your deck:' : 'These cards could fit your deck:')) return false;
-            cards(recs);
+        // Erst die Karten zu den Tipps dieser Runde, dann allgemeine Empfehlungen
+        const fixes = recs.filter(r => r.fix), other = recs.filter(r => !r.fix);
+        if (fixes.length) {
+            if (!await say('coach-plain', fixes.length === 1 ? 'This card could help with that:' : 'These cards could help with that:')) return false;
+            cards(fixes);
+        }
+        if (other.length) {
+            if (!await say('coach-plain', fixes.length ? 'These could also fit your deck:' : other.length === 1 ? 'This card could fit your deck:' : 'These cards could fit your deck:')) return false;
+            cards(other);
         }
         return true;
     };
-    // Weitere Tipps nur anbieten, wenn es noch welche gibt – sonst sagt der Coach das gleich
-    const left = () => { const m = R.more; return m.strengths.length + m.smart.length + m.issues.length + m.recs.length; };
+    // Weitere Tipps nur anbieten, wenn es noch eine Runde gibt – sonst sagt der Coach das gleich
+    let next = 1;
     const offerMore = async () => {
-        if (!left()) { await say('coach-plain', "That's all the advice I have for you – the rest of your deck looks great!"); return; }
-        C.replies([['I want more advice! 💡', async () => {
-            const m = R.more, st = m.strengths.splice(0, COACH_MORE.strengths), sm = m.smart.splice(0, COACH_MORE.smart), iss = m.issues.splice(0, COACH_MORE.issues), recs = m.recs.splice(0, COACH_MORE.recs);
-            if (await round(st, sm, iss, recs, false)) offerMore();
+        if (next >= R.rounds.length) { await say('coach-plain', "That's all the advice I have for you – the rest of your deck looks great!"); return; }
+        C.replies([['I want more advice!', async () => {
+            const r = R.rounds[next++];
+            if (await round(r.strengths, r.smart, r.issues, r.recs, false)) offerMore();
         }]]);
     };
-    const planName = `${R.plan.label} ${R.cls}`;
-    if (!await say('coach-intro', `Looks like a ${planName} deck! ${R.plan.desc}`, `Looks like a <b>${esc(planName)}</b> deck! ${esc(R.plan.desc)}`)) return;
-    if (await round(R.strengths, R.smart, R.issues, R.recs, true)) offerMore();
+    const planName = `${R.plan.label} ${R.cls}`, r0 = R.rounds[0], an = /^[AEIOU]/.test(planName) ? 'an' : 'a';
+    if (!await say('coach-intro', `Looks like ${an} ${planName} deck! ${R.plan.desc}`, `Looks like ${an} <b>${esc(planName)}</b> deck! ${esc(R.plan.desc)}`)) return;
+    if (await round(r0.strengths, r0.smart, r0.issues, r0.recs, true)) offerMore();
 }
 
 // --- Test-Szene: Avatar-Köpfe von Hand ausrichten (Seitenmenü → Tests). Ziehen verschiebt den Kopf langsam, Mausrad zoomt

@@ -5,11 +5,15 @@ const DB_KEY = 'wow_tcg_custom_decks';
 // Farben wie die Titelleiste der Karten: Quests orange-braun, Ausrüstung grau
 const DB_TYPES = [
     { k: 'Ally', label: 'Allies', color: '#1c78b4', is: c => c.type === 'Ally' },
-    { k: 'Ability', label: tr('Fähigkeiten'), color: '#a855f7', is: c => c.type === 'Ability' },
+    { k: 'Ability', label: tr('Fähigkeiten'), color: '#9b4fd1', is: c => c.type === 'Ability' },
     { k: 'Equipment', label: tr('Ausrüstung'), color: '#8f959b', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
     { k: 'Quest', label: 'Quests', color: '#c8642a', is: c => c.type === 'Quest' },
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
+// Kosten-Kugel je Karte (icons/cost/, ausgeschnitten aus den Kartenrahmen) und ihre Farbe (Mittelwert der Kugel)
+const dbOrb = c => c.type === 'Ally' ? (c.faction === 'Alliance' ? 'alliance' : c.faction === 'Horde' ? 'horde' : 'neutral')
+    : c.type === 'Quest' ? 'quest' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equip' : 'ability';
+const DB_ORB_COLOR = { alliance: '#1c78b4', horde: '#c41e2a', neutral: '#d0b509', ability: '#9b4fd1', equip: '#8f959b', quest: '#c8642a' };
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
 const DBF = { type: 'All', cost: 'all', cls: null };
 const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
@@ -213,9 +217,15 @@ function renderDBDeck(highlightId) {
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
             const art = document.createElement('div'); art.className = 'db-row-art';
             art.style.backgroundImage = getImageCandidates(id, 'ea').slice(0, 4).map(u => `url("${u}")`).join(', ');
-            row.prepend(art); row.style.setProperty('--tc', t.color);
+            row.prepend(art);
+            // Kosten auf der Original-Kugel der Karte (Ally je Fraktion, Fähigkeit lila, Ausrüstung grau, Quest-Schild); Streifen links in derselben Farbe
+            const orb = dbOrb(c), cost = row.querySelector('.db-row-cost');
+            cost.style.backgroundImage = `url("icons/cost/${orb}.png")`; cost.classList.add('orb-' + orb); if (orb === 'quest') cost.textContent = ''; else if (cost.textContent.length > 2) cost.style.fontSize = '12px';   // „1+X“ passt sonst nicht auf die Kugel
+            row.style.setProperty('--tc', DB_ORB_COLOR[orb]);
             row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
-            row.querySelector('[data-a="+"]').onclick = (e) => { e.stopPropagation(); dbAdd(id); };
+            const plus = row.querySelector('[data-a="+"]');
+            plus.disabled = counts[id] >= dbMax(c);                                    // 4 Kopien: + grau und ohne Wirkung
+            plus.onclick = (e) => { e.stopPropagation(); dbAdd(id); };
             row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
             box.appendChild(row);
         });
