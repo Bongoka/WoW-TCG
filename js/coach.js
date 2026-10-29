@@ -517,7 +517,7 @@ async function coachPlay(C, R) {
     // Weitere Tipps nur anbieten, wenn es noch welche gibt – sonst sagt der Coach das gleich
     const left = () => { const m = R.more; return m.strengths.length + m.smart.length + m.issues.length + m.recs.length; };
     const offerMore = async () => {
-        if (!left()) { await say('coach-good', "That's all the advice I have for you – the rest of your deck looks great! ✔"); return; }
+        if (!left()) { await say('coach-plain', "That's all the advice I have for you – the rest of your deck looks great!"); return; }
         C.replies([['I want more advice! 💡', async () => {
             const m = R.more, st = m.strengths.splice(0, COACH_MORE.strengths), sm = m.smart.splice(0, COACH_MORE.smart), iss = m.issues.splice(0, COACH_MORE.issues), recs = m.recs.splice(0, COACH_MORE.recs);
             if (await round(st, sm, iss, recs, false)) offerMore();

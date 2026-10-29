@@ -95,7 +95,7 @@ body {
 .db-curve-box { flex: 1.2; } .db-types-box { flex: 1; }
 .db-curve { display: flex; align-items: flex-end; gap: 4px; height: 92px; }
 .db-curve-col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; }
-.db-curve-stack { display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; min-height: 0; transition: height .3s ease; }
+.db-curve-stack { flex-shrink: 0; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; min-height: 0; transition: height .3s ease; }
 .db-curve-n { font-size: 10px; text-align: center; color: var(--text-main); height: 12px; }
 .db-curve-l { font-size: 10px; text-align: center; color: var(--text-dim); border-top: 1px solid var(--border); margin-top: 2px; }
 .db-typebar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: #000; border: 1px solid var(--border); }
@@ -125,7 +125,8 @@ body {
 .db-row.illegal .db-row-name { color: #f87171; text-decoration: line-through; }
 .db-row.pulse { animation: dbPulse .6s ease; }
 @keyframes dbPulse { 0% { background: rgba(250,204,21,.45); } 100% { background: transparent; } }
-.db-row-cost { justify-self: center; width: 24px; height: 24px; border-radius: 50%; background: #1e3a5f; border: 1px solid #4a7aab; color: #b0d4ff; font: bold 11px/22px Georgia, serif; text-align: center; }
+.db-row-cost { justify-self: center; width: 24px; height: 24px; border-radius: 50%; background: #0c3a5c; border: 1px solid #1c78b4; color: #b0d8ff; font: bold 11px/22px Georgia, serif; text-align: center; }
+#db-deck-cards.horde .db-row-cost { background: #4a0d12; border-color: #c41e2a; color: #ffc7cb; }   /* Horde-Decks: rote Kosten-Kreise */
 .db-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .db-row-n { text-align: center; font-weight: 900; color: var(--gold-light); }
 .db-row-btn { padding: 0; width: 22px; height: 22px; line-height: 20px; font-size: 14px; border-radius: 50%; }
@@ -840,7 +841,7 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 @keyframes coachRing { from { transform: scale(1); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
 /* Chat-Fenster: oben rechts über den Karten, Spitze zeigt nach rechts zum Helden */
 .db-pool { position: relative; }
-#db-coach { position: absolute; top: 84px; right: 12px; z-index: 30; width: min(460px, calc(100% - 24px)); max-height: calc(100% - 92px); display: none; flex-direction: column;
+#db-coach { position: absolute; top: 84px; right: 12px; z-index: 500; width: min(460px, calc(100% - 24px)); max-height: calc(100% - 92px); display: none; flex-direction: column;
     border: 1px solid var(--gold); border-radius: 14px; background: linear-gradient(180deg, rgba(34,26,16,.97), rgba(14,10,7,.97));
     box-shadow: 0 12px 40px rgba(0,0,0,.75), 0 0 20px rgba(250,204,21,.25); animation: coachIn .25s ease-out; }
 #db-coach::after { content: ''; position: absolute; right: -11px; top: 16px; border: 11px solid transparent; border-right: 0; border-left-color: var(--gold); }
@@ -889,3 +890,22 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #face-edit .fe-name i { display: block; font-style: normal; font-size: 10px; color: #7c6f5c; }
 #face-edit .fe-out { position: absolute; inset: 0; background: rgba(0,0,0,.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #e8dcc6; }
 #face-edit .fe-out textarea { width: min(900px, 92vw); height: 50vh; font: 12px monospace; background: #120d09; color: #e8dcc6; border: 1px solid var(--gold); border-radius: 6px; padding: 8px; }
+/* Deckliste wie in Hearthstone: jede Zeile zeigt rechts einen Ausschnitt der Karte, der nach links ins Dunkle ausblendet */
+#db-deck-cards .db-row { position: relative; overflow: hidden; height: 34px; margin-bottom: 3px; padding: 0 6px 0 3px; border-radius: 5px;
+    background: linear-gradient(180deg, #1c1712, #0f0c09); border: 1px solid #3a2f24; border-left: 3px solid var(--tc, #3a2f24);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 1px 3px rgba(0,0,0,.5); transition: border-color .15s, transform .15s; }
+#db-deck-cards .db-row > :not(.db-row-art) { position: relative; z-index: 1; }
+.db-row-art { position: absolute; top: 0; bottom: 0; right: 76px; width: 58%; z-index: 0; pointer-events: none;
+    background-repeat: no-repeat; background-size: 140% auto; background-position: 55% 30%; filter: saturate(1.1) brightness(.9);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.4) 22%, #000 50%, #000 80%, transparent 100%); mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.4) 22%, #000 50%, #000 80%, transparent 100%);
+    transition: filter .2s, background-position .4s ease; }
+/* Rechts unter − / Anzahl / + leicht abdunkeln, damit sie lesbar bleiben */
+#db-deck-cards .db-row::after { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 80px; z-index: 0; pointer-events: none; background: linear-gradient(90deg, rgba(8,6,4,0), rgba(8,6,4,.55) 30%); }
+#db-deck-cards .db-row:hover { border-color: var(--gold-dark); border-left-color: var(--tc, var(--gold)); background: linear-gradient(180deg, #241d15, #120e0a); }
+#db-deck-cards .db-row:hover .db-row-art { filter: saturate(1.25) brightness(1.08); background-position: 55% 26%; }
+#db-deck-cards .db-row-name { font-weight: bold; color: #f4ecdc; letter-spacing: .2px; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 10px rgba(0,0,0,.95); }
+#db-deck-cards .db-row-n { text-shadow: 0 0 4px #000, 0 1px 2px #000; }
+#db-deck-cards .db-row-btn { background: rgba(12,9,6,.75); }
+/* Kosten als glänzender Edelstein in Fraktionsfarbe */
+#db-deck-cards .db-row-cost { background: radial-gradient(circle at 35% 30%, #5fb3ea, #1c78b4 45%, #0a2f4b 100%); border: 1px solid #c9a84c; color: #fff; text-shadow: 0 1px 2px #000; box-shadow: 0 0 4px rgba(0,0,0,.8); }
+#db-deck-cards.horde .db-row-cost { background: radial-gradient(circle at 35% 30%, #f06a70, #c41e2a 45%, #4a0a0f 100%); border-color: #c9a84c; color: #fff; }

@@ -2,11 +2,12 @@
 // Deck = { id, hero, faction, class, name, cards: [Karten-IDs] }. Eigene Decks liegen im Browser (localStorage).
 // Größe frei (unter/über 60 erlaubt, nur farblich markiert); max. 4 Kopien je Karte außer "Unlimited".
 const DB_KEY = 'wow_tcg_custom_decks';
+// Farben wie die Titelleiste der Karten: Quests orange-braun, Ausrüstung grau
 const DB_TYPES = [
-    { k: 'Ally', label: 'Allies', color: '#3b82f6', is: c => c.type === 'Ally' },
+    { k: 'Ally', label: 'Allies', color: '#1c78b4', is: c => c.type === 'Ally' },
     { k: 'Ability', label: tr('Fähigkeiten'), color: '#a855f7', is: c => c.type === 'Ability' },
-    { k: 'Equipment', label: tr('Ausrüstung'), color: '#d97706', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
-    { k: 'Quest', label: 'Quests', color: '#10b981', is: c => c.type === 'Quest' },
+    { k: 'Equipment', label: tr('Ausrüstung'), color: '#8f959b', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
+    { k: 'Quest', label: 'Quests', color: '#c8642a', is: c => c.type === 'Quest' },
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
@@ -157,6 +158,10 @@ function dbFlash(msg) {
 }
 function renderDBDeck(highlightId) {
     const cards = currentDeckBuilder.cards, n = cards.length, hero = dbHero();
+    // Fraktionsfarbe wie die Kosten-Kugel der Ally-Karten: Allianz blau, Horde rot (Ally-Gruppe, Kurve, Kosten-Kreise)
+    const horde = !!hero && hero.faction === 'Horde';
+    DB_TYPES[0].color = horde ? '#c41e2a' : '#1c78b4';
+    document.getElementById('db-deck-cards').classList.toggle('horde', horde);
     // Fortschritt bis 60: gelb darunter, grün genau 60, rot darüber (erlaubt)
     const fill = document.getElementById('db-progress-fill');
     fill.style.width = Math.min(100, n / 60 * 100) + '%';
@@ -171,7 +176,7 @@ function renderDBDeck(highlightId) {
     buckets.forEach((b, i) => {
         const tot = Object.values(b).reduce((x, y) => x + y, 0);
         const col = document.createElement('div'); col.className = 'db-curve-col'; col.title = tr`Kosten ${i === 7 ? '7+' : i}: ${tot} Karten`;
-        const stack = document.createElement('div'); stack.className = 'db-curve-stack'; stack.style.height = (tot / maxB * 100) + '%';
+        const stack = document.createElement('div'); stack.className = 'db-curve-stack'; stack.style.height = `calc((100% - 30px) * ${tot / maxB})`;   // Höhe ohne Zahl darüber und Kosten darunter, sonst staucht Flexbox hohe Balken
         DB_TYPES.forEach(t => { if (b[t.k]) { const seg = document.createElement('div'); seg.style.flex = b[t.k]; seg.style.background = t.color; stack.appendChild(seg); } });
         col.innerHTML = `<div class="db-curve-n">${tot || ''}</div>`; col.appendChild(stack);
         const lab = document.createElement('div'); lab.className = 'db-curve-l'; lab.textContent = i === 7 ? '7+' : i; col.appendChild(lab);
@@ -205,6 +210,10 @@ function renderDBDeck(highlightId) {
             row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
             row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
+            // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
+            const art = document.createElement('div'); art.className = 'db-row-art';
+            art.style.backgroundImage = getImageCandidates(id, 'ea').slice(0, 4).map(u => `url("${u}")`).join(', ');
+            row.prepend(art); row.style.setProperty('--tc', t.color);
             row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
             row.querySelector('[data-a="+"]').onclick = (e) => { e.stopPropagation(); dbAdd(id); };
             row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
