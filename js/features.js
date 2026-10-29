@@ -29,6 +29,7 @@ function openDeckBuilder(deck = null, asCopy = false) {
     if (deck) currentDeckBuilder = { id: asCopy ? null : deck.id, heroId: deck.hero, name: asCopy ? tr`${deck.name} (Kopie)` : deck.name, cards: [...deck.cards] };
     else currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
     DBF.cls = dbHero() ? dbHero().class : null;
+    if (typeof closeDeckCoach === 'function') closeDeckCoach();
     document.getElementById("db-name").value = currentDeckBuilder.name;
     renderDBAll();
 }
@@ -161,6 +162,7 @@ function renderDBDeck(highlightId) {
     fill.style.width = Math.min(100, n / 60 * 100) + '%';
     fill.className = n < 60 ? 'under' : n === 60 ? 'exact' : 'over';
     const cnt = document.getElementById('db-count'); cnt.textContent = `${n} / 60`; cnt.className = fill.className;
+    if (typeof coachUpdateBtn === 'function') coachUpdateBtn(n);
     // Manakurve (ohne Quests), gestapelt nach Typ
     const curve = document.getElementById('db-curve'); curve.innerHTML = '';
     const buckets = Array.from({ length: 8 }, () => ({}));

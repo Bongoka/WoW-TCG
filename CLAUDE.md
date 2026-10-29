@@ -38,6 +38,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
 | `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups |
+| `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Popup. Texte nur Englisch (ohne `tr`) |
 
 Wichtige Engine-Konzepte:
 - Der Zustand ist reines JSON (keine Funktionen). Fortsetzungen nach Entscheidungen laufen über Schlüssel (`k: 'id:name'` → `FX[id].k[name]`, `'E:name'` → `EK[name]`).
@@ -67,7 +68,7 @@ const fs = require('fs'), vm = require('vm');
 const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','ai','simcore','tests'])
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','ai','simcore','coach','tests'])
   vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));

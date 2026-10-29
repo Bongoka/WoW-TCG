@@ -765,6 +765,28 @@ function runRuleTests() {
         const hs = Object.values(CARDS).filter(c => c.type === 'Hero' && c.set >= 2).map(c => c.id);
         for (let i = 0; i < 4; i++) simulateOneGame(randomLegalDeck(hs[(i * 5) % hs.length]), randomLegalDeck(hs[(i * 11 + 3) % hs.length]));
     });
+    test(96, 'Deck Coach: erst ab 60 Karten, Empfehlungen legal und neu, Schwächen nach Priorität', () => {
+        const missing = COACH_RECS.map(r => r[0]).filter(n => !coachByName(n));
+        assert(!missing.length, 'Empfehlung ohne Karte: ' + missing.join(', '));
+        assert(!coachAnalyze(GAME_DECKS[0].hero, GAME_DECKS[0].cards.slice(0, 59)).ok, 'Analyse mit 59 Karten');
+        for (const d of GAME_DECKS) {
+            const R = coachAnalyze(d.hero, d.cards), hero = CARDS[d.hero];
+            assert(R.ok && R.strengths.length <= 3 && R.issues.length <= 5 && R.recs.length <= 3, d.id + ': Grenzen');
+            assert(R.issues.every((x, i) => !i || R.issues[i - 1].prio <= x.prio), d.id + ': Reihenfolge');
+            const allRecs = [...R.recs, ...R.more.recs].map(r => r.id);
+            assert(new Set(allRecs).size === allRecs.length && (!R.more.recs.length || R.recs.length === 3), d.id + ': weitere Tipps doppelt oder zu früh');
+            for (const r of [...R.recs, ...R.more.recs]) assert(coachLegal(CARDS[r.id], hero) && !d.cards.includes(r.id), `${d.id}: Empfehlung ${CARDS[r.id].name}`);
+        }
+        // Gifte ohne Waffen und zu wenige Quests werden erkannt
+        const rogue = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Rogue');
+        const allies = Object.values(CARDS).filter(c => c.type === 'Ally' && !c.text && !c.isToken && coachLegal(c, rogue)).map(c => c.id);
+        const poison = Object.values(CARDS).find(c => c.name === 'Deadly Poison').id, quest = Object.values(CARDS).find(c => c.name === 'Your Fortune Awaits You').id;
+        const fill = k => Array.from({ length: k }, (_, i) => allies[i % allies.length]);
+        let R = coachAnalyze(rogue.id, [poison, poison, poison, poison, ...Array(4).fill(quest), ...fill(52)]);
+        assert(R.issues[0].id === 'few-quests' && R.issues.some(x => x.id === 'dead-poison'), 'erkannt: ' + R.issues.map(x => x.id).join(','));
+        R = coachAnalyze(rogue.id, [...Array(14).fill(quest), ...fill(46)]);
+        assert(!R.issues.some(x => /quests/.test(x.id)) && R.strengths.some(x => /quest count/.test(x.text)), '14 Quests: ' + JSON.stringify(R.issues.map(x => x.id)));
+    });
     LANG = prevLang;
     return results;
 }
