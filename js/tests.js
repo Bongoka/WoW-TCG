@@ -808,6 +808,19 @@ function runRuleTests() {
         // Ausrüstung als Einzelkopien ist schlau (ein Teil je Slot), keine Schwäche
         const gear = Object.values(CARDS).filter(c => (c.type === 'Armor' || c.type === 'Weapon') && !c.isToken && coachLegal(c, rogue)).slice(0, 12).map(c => c.id);
         assert(coachStats(rogue, gear).singles === 0, 'Ausrüstung zählt als Einzelkopie');
+        // Zu viel vom Gleichen (Discard, Heilung, nur gegen Allies …): gute Decks bekommen den Tipp nicht, überladene schon
+        const MANY = ['many-discard', 'many-heal', 'many-anti-ally', 'many-anti-equip', 'many-anti-abil', 'pump-noattack'];
+        for (const d of [...GAME_DECKS, ...(typeof loadCustomDecks === 'function' ? loadCustomDecks() : [])]) {
+            const R = coachAnalyze(d.hero, d.cards); if (!R.ok) continue;                    // unfertige eigene Decks
+            const hit = R.rounds.flatMap(r => r.issues).filter(x => MANY.includes(x.id)).map(x => x.id);
+            assert(!hit.length, `${d.name}: unnötiger Tipp ${hit.join(', ')}`);
+        }
+        const byText = (h, re) => Object.values(CARDS).filter(c => !c.isToken && c.type !== 'Quest' && coachLegal(c, h) && re.test(coachTxt(c))).map(c => c.id);
+        for (const [id, re] of [['many-heal', COACH_RE.heal], ['many-anti-ally', /[Dd]estroy target (opposing )?ally|damage to target ally\b/]]) {
+            const h = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken).sort((a, b) => byText(b, re).length - byText(a, re).length)[0];
+            const pick = byText(h, re), deck = [...Array(14)].map((_, i) => pick[i % pick.length]).concat(fill(46));
+            assert(coachAnalyze(h.id, deck).rounds.flatMap(r => r.issues).some(x => x.id === id), `${id} nicht erkannt (${h.name})`);
+        }
     });
     // Alle offenen Prioritäts-Abfragen passen, sonstige Entscheidungen wie die KI
     const passAll = s => { let n = 0; while (s.pending && n++ < 60) { const d = s.pending; applyAction(s, d.kind === 'priority' ? { type: 'PASS', actorId: d.pid } : { type: 'CHOOSE', v: aiPick(s, d), actorId: d.pid }, true, d.pid); } };

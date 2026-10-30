@@ -159,7 +159,7 @@ function netStart() {
     if (Math.random() < 0.5) { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; }
     G.netReady = { 1: false, 2: false };                                                  // Mulligan beider Spieler (CR 101.2) vor dem ersten Zug
     dealOpeningHands(G); refreshDisplay(G);
-    NET.inGame = true; NET.logBuf = []; NET.peer.ready = false; netAnnounce(); netSyncRoom();   // nach der Partie wieder "nicht bereit"
+    NET.inGame = true; NET.logBuf = []; NET.acks = 0; NET.peer.ready = false; netAnnounce(); netSyncRoom();   // nach der Partie wieder "nicht bereit"
     netHideModal(); UI.reset();
     netPub(netRoom(NET.code, 'h'), { t: 'start' });
     netPush();
@@ -174,6 +174,7 @@ function netHostGuestMull(m) {
 function netHostGuestAct(a) {
     if (!G || !G.online || G.gameOver || !a) return;
     if (!netBothReady()) { netPub(netRoom(NET.code, 'h'), { t: 'err', why: tr('Warte auf den Mulligan des Gegners …') }); return; }
+    NET.acks++;                                                                           // jede Gast-Aktion wird bestätigt (auch abgelehnte)
     const act = { ...a, actorId: 2 };
     const why = validateAction(G, act, 2);
     if (why || !applyAction(G, act, false, 2)) { netPub(netRoom(NET.code, 'h'), { t: 'err', why: why || tr('Aktion abgelehnt') }); netPush(); return; }
@@ -184,7 +185,9 @@ function netHostGuestAct(a) {
 // Zustand an den Gast (inkl. Animations-Ereignissen und neuer Log-Zeilen)
 function netPush() {
     if (NET.role !== 'host' || !G || !G.online) return;
-    netPub(netRoom(NET.code, 'h'), { t: 'state', state: { ...G, _undo: null }, logs: NET.logBuf.splice(0) });
+    // ack: Zahl der verarbeiteten Gast-Aktionen; sum: Prüfsumme aus Sicht des Gasts (Gleichlauf-Kontrolle)
+    const st = { ...G, _undo: null };
+    netPub(netRoom(NET.code, 'h'), { t: 'state', state: st, logs: NET.logBuf.splice(0), ack: NET.acks, sum: choiceSig(netMirror(st)) });
 }
 
 // ---------------------------------------------------------------- Gast
@@ -231,28 +234,37 @@ function netGuestStart() {
     if (typeof pickMatchBackground === 'function') pickMatchBackground();
     document.getElementById("log-area").innerHTML = "";
     NET.inGame = true; NET.mullOpen = false; NET.me.ready = false; G = null;
+    NET.sent = 0; NET.lastAck = 0; NET.sync = { ok: 0, diff: 0 };
     netHideModal(); UI.reset();
 }
 // Zustand vom Host: gespiegelt übernehmen. Das Objekt G bleibt dasselbe (Oberfläche merkt sich z. B. das Spielende daran)
 function netGuestState(m) {
     if (!NET.inGame) return;
+    // Veraltet: enthält eigene, schon lokal ausgeführte Aktionen noch nicht – der nächste Zustand bringt alles mit
+    if ((m.ack || 0) < NET.sent) return;
+    const own = (m.ack || 0) > NET.lastAck;                                                // bestätigt eigene Aktion(en)
+    NET.lastAck = m.ack || 0;
+    if (own && G && m.sum) { if (choiceSig(G) === m.sum) NET.sync.ok++; else { NET.sync.diff++; console.warn('Online: lokaler Stand weicht vom Host ab (Zufall oder Ablehnung) – übernehme Host-Stand'); } }
     const s = netMirror(m.state);
-    s.real = true; s.humans = [1]; s.online = true;
+    s.real = true; s.humans = [1, 2]; s.online = true;                                     // Spieler 2 (Host) entscheidet selbst – lokal nie per KI
     const was = G ? G.activePlayer : null, first = !G;
     if (G) { for (const k of Object.keys(G)) delete G[k]; Object.assign(G, s); } else G = s;
-    (m.logs || []).forEach(l => addLog(l[0], l[1], l[2] ? 3 - l[2] : 0));                     // Farben aus Sicht des Gasts
-    if (NET.awaiting) { NET.awaiting = false; UI.reset(); }
+    if (!own) (m.logs || []).forEach(l => addLog(l[0], l[1], l[2] ? 3 - l[2] : 0));       // Farben aus Sicht des Gasts
     if (first) { refreshDisplay(G); render(); netMulligan(() => render()); return; }
-    render(); playEventAnimations();
+    if (own) { G.fxq = []; render(); } else { render(); playEventAnimations(); }
     if (was !== G.activePlayer || !NET.mullOpen) netTurnBanner();
 }
 function netGuestAct(action) {
-    if (!G || G.gameOver || UI.busy || NET.awaiting) return false;
+    if (!G || G.gameOver || UI.busy) return false;
     if (!netBothReady()) { showToast(tr('Warte auf den Mulligan des Gegners …')); return false; }
     const why = validateAction(G, { ...action, actorId: 1 }, 1);
     if (why) { showToast(why); return false; }
-    NET.awaiting = true;
-    netPub(netRoom(NET.code, 'g'), { t: 'act', a: action });
+    // Sofort lokal ausführen (gleiche Engine, gespiegelter Zustand) – fühlt sich an wie offline; der Host rechnet
+    // verbindlich nach und schickt seinen Stand, der den lokalen ersetzt (bei Zufall oder Ablehnung)
+    NET.sent++;
+    netPub(netRoom(NET.code, 'g'), { t: 'act', a: action, n: NET.sent });
+    applyAction(G, { ...action, actorId: 1 }, false, 1);
+    UI.reset(); render(); playEventAnimations();
     return true;
 }
 // Spieler-IDs tauschen: Spieler 1 ⇄ 2 in allen Feldern, die eine Spieler-ID tragen
@@ -464,3 +476,27 @@ function netBackground() { if (netPopupsOn() && location.protocol !== 'file:') n
 // Host: Log-Zeilen der Partie sammeln und mit dem nächsten Zustand an den Gast schicken
 const _netAddLog = addLog;
 addLog = (msg, cls, pid) => { _netAddLog(msg, cls, pid); if (NET.role === 'host' && NET.inGame) NET.logBuf.push([msg, cls || '', pid || 0]); };
+
+// Selbsttest (Konsole/Tests): spielt die eigene Seite einer Online-Partie mit der vorhandenen KI (gleiche Entscheidung
+// wie die CPU), bis die Partie vorbei ist. In zwei Tabs (Host und Gast) gestartet, läuft so eine ganze Partie über den
+// Broker. Ergebnis beim Gast: wie oft der sofort lokal gerechnete Stand mit dem des Hosts übereinstimmte (NET.sync).
+async function netAutoPlay(maxMs = 600000) {
+    const t0 = Date.now(), wait = ms => new Promise(r => setTimeout(r, ms));
+    while (Date.now() - t0 < maxMs && NET.inGame && !(G && G.gameOver)) {
+        await wait(250);
+        if (!G || UI.busy) continue;
+        if (NET.mullOpen) { const k = document.getElementById('hs-mull-keep'); if (k && k.offsetParent && !k.disabled) k.click(); else { const b = [...document.querySelectorAll('#decision-actions button')][0]; if (b) b.click(); } continue; }
+        if (!netBothReady()) continue;
+        const d = G.pending;
+        if (d && d.pid === 1) {
+            if (d.kind === 'priority') { const o = respondOptions(G, 1)[0]; humanAct(o ? o.a : { type: 'PASS' }); }
+            else humanAct({ type: 'CHOOSE', v: aiPick(G, d) });
+            continue;
+        }
+        if (G.activePlayer !== 1 || !canActMain(G, 1)) continue;
+        const dec = await cpuDecide(G, 1, 'normal');
+        if (!G || !canActMain(G, 1)) continue;
+        if (dec && dec.action && !validateAction(G, dec.action, 1)) humanAct(dec.action); else humanAct({ type: 'END_TURN' });
+    }
+    return { role: NET.role, turn: G && G.turn, gameOver: !!(G && G.gameOver), winner: G && G.winner, sync: NET.sync || null, ms: Date.now() - t0 };
+}

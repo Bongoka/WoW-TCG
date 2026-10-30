@@ -75,6 +75,11 @@ function coachStats(hero, ids) {
     S.draw = t(COACH_RE.draw, S.nonQ);
     S.instants = S.nonQ.filter(c => c.instant && c.type === 'Ability');
     S.discardSrc = t(COACH_RE.discard, S.nonQ);
+    // Karten, die nur eine Kartenart des Gegners treffen – nutzlos, wenn er davon wenig spielt
+    S.antiAlly = t(/[Dd]estroy target (opposing )?ally|damage to (target|each) (opposing )?all(y|ies)\b|Remove target ally|each opposing ally|opposing allies (have|get) -|Exhaust target (opposing )?ally/, S.nonQ);
+    S.antiEquip = t(/[Dd]estroy (target|all|each) (\w+ )?(armor|weapon|item|equipment)|destroys an? (\w+ )?(equipment|armor|weapon)/, S.nonQ);
+    S.antiAbil = t(/[Dd]estroy (target|all|each) (\w+ )?abilit|Interrupt target (\w+ )?ability|destroys an ability|Interrupt all/, S.nonQ);
+    S.pump = t(/\+\d+ ATK (this turn|until)/, S.nonQ);
     S.selfDmg = t(/put \d+ damage on your hero/, S.nonQ);
     S.bigAllies = S.allies.filter(c => cost(c) >= 5);
     S.cheapAllies = S.allies.filter(c => cost(c) <= 2);
@@ -113,10 +118,12 @@ function coachStats(hero, ids) {
 }
 
 // Plan des Decks: Klassen-Pläne zuerst, dann allgemeine
+// Plan-Namen beschreiben das Deck, nie die Talentrichtung des Helden ("Beast Mastery", "Feral" …) – sonst hieße ein
+// Marksmanship-Jäger mit vielen Pets fälschlich "Beast Master"
 const COACH_PLANS = [
-    { k: 'feral', label: 'Feral', when: S => S.feralForms.length >= 4, desc: 'Your hero shifts into animal forms and fights up close.' },
-    { k: 'beast', label: 'Beast Master', when: S => S.pets.length >= 4 && S.hero.class === 'Hunter', desc: 'A loyal Pet leads the charge.' },
-    { k: 'demon', label: 'Demon', when: S => S.pets.length >= 4 && S.hero.class === 'Warlock', desc: 'Your demons do the dirty work.' },
+    { k: 'feral', label: 'Shapeshifter', when: S => S.feralForms.length >= 4, desc: 'Your hero shifts into animal forms and fights up close.' },
+    { k: 'beast', label: 'Pet', when: S => S.pets.length >= 4 && S.hero.class === 'Hunter', desc: 'A loyal Pet leads the charge.' },
+    { k: 'demon', label: 'Demon Pet', when: S => S.pets.length >= 4 && S.hero.class === 'Warlock', desc: 'Your demons do the dirty work.' },
     { k: 'totem', label: 'Totem', when: S => S.totems.length >= 6, desc: 'Totems give you value every single turn.' },
     { k: 'combo', label: 'Combo', when: S => S.combos.length >= 8 && S.hero.class === 'Rogue', desc: 'Cheap Combos set up big finishing moves.' },
     { k: 'swarm', label: 'Ally Swarm', when: S => S.allies.length >= 22, desc: 'You flood the board with allies and overwhelm your opponent.' },
@@ -197,6 +204,13 @@ const COACH_ISSUES = [
     [10, 'many-forms', S => S.forms.length > 8, S => `${S.forms.length} Forms – your hero can have only one at a time.`],
     [10, 'many-totems', S => Object.values(S.totemBy).some(k => k > 6), S => { const e = Object.keys(S.totemBy).find(k => S.totemBy[k] > 6); return `${S.totemBy[e]} cards are ${e}s – you can control only one of each element.`; }],
     [10, 'many-slot', S => Object.values(S.slots).some(k => k > 6), S => { const e = Object.keys(S.slots).find(k => S.slots[k] > 6); return `${S.slots[e]} equipment cards for the ${e} slot – you can wear only one.`; }],
+    // Zu viel vom Gleichen: wirkt nur, wenn der Gegner mitspielt (Handkarten, Allies, Ausrüstung, Fähigkeiten) bzw. etwas verletzt ist
+    [11, 'many-discard', S => S.discardSrc.length > 6, S => `${S.discardSrc.length} cards make your opponent discard – once their hand is empty, they do nothing.`],
+    [11, 'many-heal', S => S.heal.length > 12, S => `${S.heal.length} healing cards – healing does nothing while your hero and allies are at full health.`],
+    [12, 'many-anti-ally', S => S.antiAlly.length > 10, S => `${S.antiAlly.length} cards only hit allies – against an opponent with few allies they get stuck in your hand. Prefer cards that can also hit heroes.`],
+    [12, 'many-anti-equip', S => S.antiEquip.length > 6, S => `${S.antiEquip.length} cards only destroy equipment – useless if your opponent plays little of it.`],
+    [12, 'many-anti-abil', S => S.antiAbil.length > 8, S => `${S.antiAbil.length} cards only answer abilities – useless if your opponent plays few of them.`],
+    [14, 'pump-noattack', S => S.pump.length >= 7 && S.allies.length + S.weapons.length < 14, S => `${S.pump.length} combat tricks (+ATK this turn), but only ${S.allies.length + S.weapons.length} allies and weapons to use them with.`],
     [13, 'weapon-draw', S => S.weapons.length >= 10 && S.draw.length < 2 && S.quests.length < 12, S => `${S.weapons.length} weapons but little card draw – they'll replace each other.`],
     [15, 'over-60', S => S.n > COACH_MIN, S => `${S.n} cards – every card over 60 makes it harder to draw your best ones.`],
     [20, 'some-quests', S => S.quests.length >= 8 && S.quests.length < 12, S => `${S.quests.length} quests – a few more would help. Aim for 12–17.`],
@@ -326,8 +340,9 @@ coachFix(['dead-totem'], c => !!c.totem, 'A totem for Totemic Call.');
 coachFix(['dead-stealth'], c => coachIs(c, COACH_RE.stealth), 'Gives your hero Stealth.');
 coachFix(['dead-finisher'], c => (c.subtypes || []).includes('Combo'), 'A Combo to power your finishers.');
 coachFix(['dead-discard'], c => coachIs(c, COACH_RE.discard), 'Makes your opponent discard.');
+coachFix(['many-anti-ally'], c => c.type !== 'Quest' && /target hero or ally|each opposing hero and ally/.test(coachTxt(c)) && coachIs(c, COACH_RE.dmg), 'Hits heroes too – never stuck in your hand.');
 coachFix(['no-damage', 'pala-nodmg', 'draw-nowin'], c => c.type === 'Ability' && coachIs(c, COACH_RE.dmg), 'Deals direct damage.');
-coachFix(['alone-swarm', 'quest-allies', 'quest-grave'], c => c.type === 'Ally' && coachCost(c) <= 3, 'A cheap ally to fill your board.');
+coachFix(['alone-swarm', 'quest-allies', 'quest-grave', 'pump-noattack'], c => c.type === 'Ally' && coachCost(c) <= 3, 'A cheap ally to fill your board.');
 coachFix(['quest-big'], c => c.type === 'Ally' && coachCost(c) >= 5, 'A big ally for your quest.');
 coachFix(['quest-equip'], c => ['Weapon', 'Armor', 'Item'].includes(c.type), 'More equipment for your quest.');
 coachFix(['quest-abil'], c => c.type === 'Ability' && !!c.ongoing, 'An ability that stays in play.');
