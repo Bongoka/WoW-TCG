@@ -324,7 +324,7 @@ function netTurnBanner() {
 function netOnChat(m) {
     const line = { name: String(m.name || '?').slice(0, 24), text: String(m.text || '').slice(0, 300) };
     NET.chat.push(line); netRenderChat();
-    if (NET.inGame) showToast(`💬 ${line.name}: ${line.text}`, false, 4000);
+    if (NET.inGame) showToast(`${line.name}: ${line.text}`, false, 4000);
 }
 function netSay(text) {
     text = String(text || '').trim(); if (!text || !NET.code) return;
@@ -361,7 +361,7 @@ function netModal() {
     let m = document.getElementById('mp-modal');
     if (m) return m;
     m = document.createElement('div'); m.id = 'mp-modal';
-    m.innerHTML = `<div class="modal-box mp-box"><div class="mp-head"><b>🌐 ${tr('Online-Spiel')}</b><span id="mp-status"></span><button class="danger mp-x" title="${tr('Schließen')}">✖</button></div><div id="mp-body"></div></div>`;
+    m.innerHTML = `<div class="modal-box mp-box"><div class="mp-head"><b>${tr('Online-Spiel')}</b><span id="mp-status"></span><button class="danger mp-x" title="${tr('Schließen')}">×</button></div><div id="mp-body"></div></div>`;
     document.body.appendChild(m);
     m.querySelector('.mp-x').onclick = netHideModal;
     return m;
@@ -391,7 +391,7 @@ function netShowMenu() {
     body.innerHTML = `
         <div class="mp-row"><label>${tr('Dein Name')}</label><input id="mp-name" maxlength="20"></div>
         <div class="mp-row"><label>${tr('Dein Deck')}</label><span id="mp-deck-slot"></span></div>
-        <div class="mp-actions"><button id="mp-create" class="success">✚ ${tr('Lobby erstellen')}</button>
+        <div class="mp-actions"><button id="mp-create" class="success">${tr('Lobby erstellen')}</button>
             <span class="mp-join"><input id="mp-code" maxlength="8" placeholder="${tr('Code')}"><button id="mp-join">${tr('Beitreten')}</button></span></div>
         <div class="mp-sub">${tr('Offene Lobbys')}</div><div id="mp-list"></div>`;
     const name = body.querySelector('#mp-name'); name.value = netName();
@@ -418,7 +418,7 @@ function netShowRoom() {
     netModal().style.display = 'flex';
     const body = document.getElementById('mp-body'); if (!body) return;
     body.innerHTML = `
-        <div class="mp-code-row">${tr('Lobby-Code')}: <code id="mp-room-code">${esc(NET.code)}</code><button id="mp-copy" title="${tr('Code kopieren')}">📋 ${tr('Kopieren')}</button></div>
+        <div class="mp-code-row">${tr('Lobby-Code')}: <code id="mp-room-code">${esc(NET.code)}</code><button id="mp-copy" title="${tr('Code kopieren')}">${tr('Kopieren')}</button></div>
         <div id="mp-players"></div>
         <div class="mp-row"><label>${tr('Dein Deck')}</label><span id="mp-deck-slot"></span></div>
         <div id="mp-chat"></div>
@@ -444,11 +444,11 @@ function netRenderRoom() {
     const guest = NET.role === 'host' ? NET.peer : (NET.room && NET.room.guest) || { name: netName(), deckName: hd ? hd.name : '', ready: NET.me.ready };
     const slot = (p, label, ready) => `<div class="mp-player${p ? '' : ' empty'}"><span class="mp-role">${label}</span>` +
         (p ? `<b>${esc(p.name)}</b><span>${esc(p.deckName || '')}${p.hero && CARDS[p.hero] ? ' · ' + esc(CARDS[p.hero].name) : ''}</span>${ready ? `<em>${ready}</em>` : ''}` : `<span>${tr('Warte auf einen Gegner …')}</span>`) + `</div>`;
-    box.innerHTML = slot(host, 'Host') + slot(guest, tr('Gast'), guest ? (guest.ready ? tr('✔ bereit') : tr('nicht bereit')) : '');
+    box.innerHTML = slot(host, 'Host') + slot(guest, tr('Gast'), guest ? (guest.ready ? tr('✓ bereit') : tr('nicht bereit')) : '');
     const go = document.getElementById('mp-go');
     if (go) {
-        if (NET.role === 'host') { go.textContent = tr('⚔ Spiel starten'); go.disabled = !(NET.peer && NET.peer.ready && NET.peer.deck && hd); }
-        else { go.textContent = NET.me.ready ? tr('✔ Bereit') : tr('Bereit'); go.disabled = !NET.peer; go.classList.toggle('on', NET.me.ready); }
+        if (NET.role === 'host') { go.textContent = tr('Spiel starten'); go.disabled = !(NET.peer && NET.peer.ready && NET.peer.deck && hd); }
+        else { go.textContent = NET.me.ready ? tr('✓ Bereit') : tr('Bereit'); go.disabled = !NET.peer; go.classList.toggle('on', NET.me.ready); }
     }
 }
 function netRenderChat() {
@@ -460,9 +460,9 @@ function netRenderChat() {
 function netPopup(l) {
     if (!netPopupsOn() || NET.role) return;
     const p = document.createElement('div'); p.className = 'mp-popup';
-    p.innerHTML = `<div>🌐 <b>${esc(l.name)}</b> ${tr('sucht einen Gegner')}<br><span>${esc(l.deck || '')}${l.hero && CARDS[l.hero] ? ' · ' + esc(CARDS[l.hero].name) : ''}</span></div>`;
+    p.innerHTML = `<div><b>${esc(l.name)}</b> ${tr('sucht einen Gegner')}<br><span>${esc(l.deck || '')}${l.hero && CARDS[l.hero] ? ' · ' + esc(CARDS[l.hero].name) : ''}</span></div>`;
     const join = document.createElement('button'); join.className = 'success'; join.textContent = tr('Beitreten');
-    const x = document.createElement('button'); x.textContent = '✖'; x.className = 'mp-pop-x';
+    const x = document.createElement('button'); x.textContent = '×'; x.className = 'mp-pop-x';
     const close = () => { p.classList.add('out'); setTimeout(() => p.remove(), 300); };
     join.onclick = () => { close(); netModal().style.display = 'flex'; netShowMenu(); netJoin(l.code); };
     x.onclick = close;

@@ -512,7 +512,7 @@ function coachBox() {
     let box = document.getElementById('db-coach');
     if (!box) {
         box = document.createElement('div'); box.id = 'db-coach';
-        box.innerHTML = '<button class="coach-close" title="Close">✖</button><div class="coach-body"></div>';
+        box.innerHTML = '<button class="coach-close" title="Close">×</button><div class="coach-body"></div>';
         document.querySelector('#deck-builder-modal .db-pool').appendChild(box);
         box.querySelector('.coach-close').onclick = closeDeckCoach;
         box.querySelector('.coach-body').onclick = () => { COACH.skip = true; };
@@ -580,7 +580,7 @@ async function coachPlay(C, R) {
             const btn = el.querySelector('.coach-add');
             btn.onclick = (e) => {
                 e.stopPropagation(); const before = dbCount(c.id); dbAdd(c.id);
-                const k = dbCount(c.id); if (k > before) { btn.textContent = `✔ Added (${k})`; btn.classList.add('added'); }
+                const k = dbCount(c.id); if (k > before) { btn.textContent = `✓ Added (${k})`; btn.classList.add('added'); }
                 if (k >= dbMax(c)) btn.disabled = true;
             };
             grid.appendChild(el);
@@ -588,9 +588,9 @@ async function coachPlay(C, R) {
         scroll();
     };
     const round = async (st, sm, iss, recs, first) => {
-        for (const s of st) if (!await say('coach-good', s.text + ' ✔')) return false;
+        for (const s of st) if (!await say('coach-good', s.text + ' ✓')) return false;
         for (const s of sm) if (!await say('coach-smart', '✦ ' + s.text)) return false;
-        if (first && !iss.length && !await say('coach-good', 'No real problems found – nice work! ✔')) return false;
+        if (first && !iss.length && !await say('coach-good', 'No real problems found – nice work! ✓')) return false;
         if (iss.length && !await say('coach-plain', first ? (iss.length === 1 ? 'One thing you could improve:' : 'A few things you could improve:') : 'Here are some more things to look at:')) return false;
         for (const s of iss) if (!await say('coach-bad', s.text)) return false;
         // Erst die Karten zu den Tipps dieser Runde, dann allgemeine Empfehlungen
@@ -661,7 +661,7 @@ function openFaceEditor() {
         for (let i = 0; i < items.length; i += 8) rows.push(items.slice(i, i + 8).join(', '));
         const code = 'const COACH_FACE = { ' + rows.join(',\n    ') + ' };';
         const out = document.createElement('div'); out.className = 'fe-out';
-        out.innerHTML = `<div>${tr('Code kopieren und Claude schicken:')}</div><textarea readonly></textarea><button class="success">📋</button>`;
+        out.innerHTML = `<div>${tr('Code kopieren und Claude schicken:')}</div><textarea readonly></textarea><button class="success"></button>`;
         out.querySelector('textarea').value = code;
         out.querySelector('button').onclick = () => { try { navigator.clipboard.writeText(code); } catch (e) {} out.querySelector('textarea').select(); showToast(tr('Kopiert!')); };
         out.onclick = e => { if (e.target === out) out.remove(); };

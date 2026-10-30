@@ -22,12 +22,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="manifest" href="manifest.json?v=202610302048">
+    <link rel="manifest" href="manifest.json?v=202610302213">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>WoW TCG – Azeroth vs CPU</title>
-    <link rel="stylesheet" href="css/style.css?v=202610302048">
-    <link rel="stylesheet" href="css/cards.css?v=202610302048">
+    <link rel="stylesheet" href="css/style.css?v=202610302213">
+    <link rel="stylesheet" href="css/cards.css?v=202610302213">
 </head>
 <body>
 <!-- Hochformat auf Handy/Tablet: das Spiel gibt es nur im Querformat -->
@@ -37,7 +37,7 @@
 
 <div id="arena">
     <div class="player-row top-row">
-        <div class="deck-zone"><div class="deck-stack" id="p2-deck-stack">📚</div></div>
+        <div class="deck-zone"><div class="deck-stack" id="p2-deck-stack"></div></div>
         <div id="top-hand" class="opp-hand-tray"></div>
         <div id="top-resource-tray" class="resource-tray"></div>
         <div class="hero-dock horde" id="top-dock">
@@ -61,7 +61,7 @@
     </div>
 
     <div class="player-row bottom-row">
-        <div class="deck-zone"><div class="deck-stack" id="p1-deck-stack">📚</div></div>
+        <div class="deck-zone"><div class="deck-stack" id="p1-deck-stack"></div></div>
         <div id="bot-hand" class="hand-arc-container"></div>
         <div id="bot-resource-tray" class="resource-tray"></div>
         <div class="hero-dock alliance" id="bot-dock">
@@ -99,14 +99,14 @@
             <span>· Res <b id="p2-res-count">0/0</b></span>
         </div>
     </div>
-    <button id="btn-new-game">🎲 Neues Spiel (Zufällig)</button>
-    <button id="btn-online" style="border-color:#3b82f6; background:#1e3a5f; color:#bfdbfe;">🌐 Online-Spiel</button>
-    <button id="btn-decks" style="border-color:#8a6d2b;">📖 Deck Übersicht</button>
-    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
-    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
+    <button id="btn-new-game">Neues Spiel (Zufällig)</button>
+    <button id="btn-online" style="border-color:#3b82f6; background:#1e3a5f; color:#bfdbfe;">Online-Spiel</button>
+    <button id="btn-decks" style="border-color:#8a6d2b;">Deck Übersicht</button>
+    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">Deck Builder</button>
+    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">Booster öffnen</button>
     <!-- Selten gebraucht: Einstellungen und Tests (aufklappbar, startet eingeklappt) -->
     <details id="side-more">
-        <summary>⚙ Einstellungen &amp; Tests</summary>
+        <summary>Einstellungen &amp; Tests</summary>
         <div class="side-more-body">
             <div class="side-more-head">Einstellungen</div>
             <div style="display:flex;gap:6px;align-items:center;">
@@ -115,12 +115,12 @@
                     <option value="easy">Einfach</option><option value="normal">Normal</option><option value="hard" selected>Schwer</option>
                 </select>
             </div>
-            <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">⏩ Auto-Zugende: An</button>
-            <button id="btn-prio-mode" title="Automatisch: das Spiel hält nur an, wenn ein Instant, eine Kraft oder Quest gerade sinnvoll ist. Jedes Fenster: Anhalten in jedem Prioritätsfenster, in dem du etwas tun kannst.">⚡ Priorität: Automatisch</button>
-            <button id="btn-mp-popups" title="Hinweis einblenden, wenn jemand eine offene Online-Lobby erstellt">🌐 Lobby-Hinweise: An</button>
-            <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
-            <button id="btn-cpu-speed" title="Pausen im CPU-Zug (Klick aufs Spielfeld überspringt sie)">🐢 CPU-Tempo: Normal</button>
-            <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
+            <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">Auto-Zugende: An</button>
+            <button id="btn-prio-mode" title="Automatisch: das Spiel hält nur an, wenn ein Instant, eine Kraft oder Quest gerade sinnvoll ist. Jedes Fenster: Anhalten in jedem Prioritätsfenster, in dem du etwas tun kannst.">Priorität: Automatisch</button>
+            <button id="btn-mp-popups" title="Hinweis einblenden, wenn jemand eine offene Online-Lobby erstellt">Lobby-Hinweise: An</button>
+            <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">Mulligan: Standard</button>
+            <button id="btn-cpu-speed" title="Pausen im CPU-Zug (Klick aufs Spielfeld überspringt sie)">CPU-Tempo: Normal</button>
+            <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">Regeltexte: Casual</button>
             <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:11px;color:var(--text-dim);">Kartenbilder:</label>
                 <select id="cfg-img-style" title="Normal: bearbeitete Bilder, scharf, verbesserte Texte, mit Extended Art. Original-Scans: fotografierte Originalkarten (ohne Extended Art – im Booster gibt es dafür eine Foil-Karte). Normal + High Resolution: wie Normal, die große Kartenansicht in sehr hoher Auflösung." style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
@@ -131,16 +131,16 @@
             <div class="tm-box" title="Gilt auch für „Neues Spiel“. Zufall = wie bisher">
                 <label>Dein Deck<select id="tm-deck-p"></select></label>
                 <label>Gegner-Deck<select id="tm-deck-o"></select></label>
-                <div class="tm-btns"><button id="tm-play">▶ Spielen</button><button id="tm-sim" title="CPU vs CPU nur mit diesen beiden Decks (beide Reihenfolgen)">🧪 Simulieren</button></div>
+                <div class="tm-btns"><button id="tm-play">Spielen</button><button id="tm-sim" title="CPU vs CPU nur mit diesen beiden Decks (beide Reihenfolgen)">Simulieren</button></div>
             </div>
-            <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
-            <button id="btn-simulate-tourney" title="Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007">🏆 Turnierdeck-Simulation</button>
-            <button id="btn-simulate-all">🎯 All-Cards Test</button>
-            <button id="btn-run-tests">🛠 Regel- & KI-Tests</button>
-            <button id="btn-test-setup">⚡ Test-Setup</button>
-            <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
-            <button id="btn-face-edit">🙂 Avatar-Köpfe ausrichten</button>
-            <button id="btn-auto-turn" title="Die CPU spielt deinen aktuellen Zug (gleiche KI wie ihre Decks), beendet ihn aber nicht – Rückgängig bleibt möglich">🤖 CPU spielt meinen Zug (Debug)</button>
+            <button id="btn-simulate">CPU vs CPU Simulation</button>
+            <button id="btn-simulate-tourney" title="Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007">Turnierdeck-Simulation</button>
+            <button id="btn-simulate-all">All-Cards Test</button>
+            <button id="btn-run-tests">Regel- & KI-Tests</button>
+            <button id="btn-test-setup">Test-Setup</button>
+            <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">Masken-Test (100%)</button>
+            <button id="btn-face-edit">Avatar-Köpfe ausrichten</button>
+            <button id="btn-auto-turn" title="Die CPU spielt deinen aktuellen Zug (gleiche KI wie ihre Decks), beendet ihn aber nicht – Rückgängig bleibt möglich">CPU spielt meinen Zug (Debug)</button>
             <button id="btn-draw" style="font-size:10px;padding:3px;">+1 Karte ziehen (Debug)</button>
             <div>
                 <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
@@ -151,8 +151,8 @@
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">Log:</span>
         <span style="display:flex;gap:4px;">
-            <button id="btn-fullscreen" style="padding:2px 8px;font-size:10px;">⛶ Vollbild</button>
-            <button id="btn-sound" style="padding:2px 8px;font-size:10px;">🔊 Sound An</button>
+            <button id="btn-fullscreen" style="padding:2px 8px;font-size:10px;">Vollbild</button>
+            <button id="btn-sound" style="padding:2px 8px;font-size:10px;">Sound An</button>
         </span>
     </div>
     <div id="log-area"></div>
@@ -199,8 +199,8 @@
         <div id="go-caption"></div>
     </div>
     <div id="go-buttons">
-        <button id="go-again" class="success">⚔ Nochmal (gleiche Decks)</button>
-        <button id="go-new">🎲 Neues Spiel</button>
+        <button id="go-again" class="success">Nochmal (gleiche Decks)</button>
+        <button id="go-new">Neues Spiel</button>
         <button id="go-close">Zum Spielfeld</button>
     </div>
 </div>
@@ -209,7 +209,7 @@
     <div id="hs-mull-hint">Klicke Karten an, die du tauschen willst</div>
     <div id="hs-mull-cards"></div>
     <button id="hs-mull-keep" class="success">Behalten</button>
-    <button id="hs-mull-learn" class="learn-btn">📖 Lerne die Regeln</button>
+    <button id="hs-mull-learn" class="learn-btn">Lerne die Regeln</button>
 </div>
 
 <div id="sim-modal"><div id="sim-box" class="modal-box">
@@ -225,7 +225,7 @@
 <div id="deck-overview-modal"><div id="deck-overview-box" class="modal-box">
     <h2 style="margin-top:0;color:var(--gold);text-align:center;">Deck Übersicht</h2>
     <div class="deck-grid" id="deck-overview-grid"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;"><button id="deck-backup-btn" title="Alle eigenen Decks als Datei auf dem Gerät speichern">💾 Decks sichern</button><button id="deck-restore-btn" title="Decks aus einer Sicherungsdatei laden (vorhandene bleiben erhalten)">📂 Wiederherstellen</button><input type="file" id="deck-restore-file" accept=".json,application/json" hidden><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;"><button id="deck-backup-btn" title="Alle eigenen Decks als Datei auf dem Gerät speichern">Decks sichern</button><button id="deck-restore-btn" title="Decks aus einer Sicherungsdatei laden (vorhandene bleiben erhalten)">Wiederherstellen</button><input type="file" id="deck-restore-file" accept=".json,application/json" hidden><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
 </div></div>
 
 <div id="graveyard-modal"><div id="graveyard-box" class="modal-box">
@@ -239,20 +239,20 @@
 <div id="deck-builder-modal"><div class="modal-box">
     <!-- Vollbild: links der Kartenpool (Suche, Filter-Pop-up, Menü), rechts in voller Höhe das Deck -->
     <div id="db-hero-picker"><div class="db-hp-box">
-        <div class="db-hp-head"><b id="db-hp-title">Held wählen</b><span id="db-hp-tools"></span><button id="db-hp-close" class="danger">✖</button></div>
+        <div class="db-hp-head"><b id="db-hp-title">Held wählen</b><span id="db-hp-tools"></span><button id="db-hp-close" class="danger">×</button></div>
         <div class="db-hp-grid" id="db-hp-grid"></div>
     </div></div>
     <div class="db-content">
         <div class="db-pool">
             <div class="db-toolbar">
-                <input type="text" id="db-search" placeholder="🔍 Karten suchen (Name oder Text)…">
-                <button id="db-filter-btn" title="Filter und Sortierung">⚙ Filter<span id="db-filter-badge"></span></button>
+                <input type="text" id="db-search" placeholder="Karten suchen (Name oder Text)…">
+                <button id="db-filter-btn" title="Filter und Sortierung">Filter<span id="db-filter-badge"></span></button>
                 <span id="db-pool-count" class="db-dim"></span>
                 <span class="db-zoom"><button id="db-zoom-out" title="Karten kleiner">−</button><button id="db-zoom-in" title="Karten größer">+</button></span>
-                <button id="db-new-btn" title="Leeres Deck beginnen">✚ Neu</button>
-                <button id="db-import-btn" title="Kartenliste einfügen">📥 Import</button>
-                <button id="db-export-btn" title="Deck als Kartenliste">📤 Export</button>
-                <button id="db-delete-btn" class="danger" title="Gespeichertes Deck löschen">🗑 Löschen</button>
+                <button id="db-new-btn" title="Leeres Deck beginnen">Neu</button>
+                <button id="db-import-btn" title="Kartenliste einfügen">Import</button>
+                <button id="db-export-btn" title="Deck als Kartenliste">Export</button>
+                <button id="db-delete-btn" class="danger" title="Gespeichertes Deck löschen">Löschen</button>
             </div>
             <!-- Filter für Fortgeschrittene: im Pop-up -->
             <div id="db-filter-pop">
@@ -298,9 +298,9 @@
             <div class="db-deck-head">
                 <div class="db-dh-row">
                     <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
-                    <button id="db-save-only-btn" class="success" title="Speichern">💾</button>
-                    <button id="db-save-btn" class="success" title="Speichern und mit diesem Deck spielen">▶</button>
-                    <button id="db-close-btn" class="danger" title="Schließen">✖</button>
+                    <button id="db-save-only-btn" class="success" title="Speichern">Speichern</button>
+                    <button id="db-save-btn" class="success" title="Speichern und mit diesem Deck spielen">Spielen</button>
+                    <button id="db-close-btn" class="danger" title="Schließen">×</button>
                 </div>
                 <div class="db-progress-row">
                     <div class="db-progress"><div id="db-progress-fill"></div><div class="db-progress-mark"></div></div>
@@ -338,7 +338,7 @@
     <textarea id="db-io-text" spellcheck="false"></textarea>
     <div id="db-io-report"></div>
     <div class="db-io-actions">
-        <button id="db-io-copy">📋 Kopieren</button>
+        <button id="db-io-copy">Kopieren</button>
         <button id="db-io-ok" class="success">Übernehmen</button>
         <button id="db-io-cancel" class="danger">Schließen</button>
     </div>
@@ -347,7 +347,7 @@
 <div id="booster-modal">
     <div id="booster-bg"><div class="booster-rays"></div><div class="booster-motes"></div></div>
     <div style="position: absolute; top: 20px; right: 20px; z-index: 1000000;">
-        <button id="booster-close-btn" class="danger">✕ Schließen</button>
+        <button id="booster-close-btn" class="danger">Schließen</button>
     </div>
     <div id="booster-stage">
         <div id="booster-picker"></div>
@@ -361,40 +361,40 @@
     </div>
     <div id="booster-actions">
         <span id="booster-count"></span>
-        <button id="booster-reveal-all">✨ Alle aufdecken</button>
-        <button id="booster-again" class="success">🎁 Noch einen öffnen</button>
+        <button id="booster-reveal-all">Alle aufdecken</button>
+        <button id="booster-again" class="success">Noch einen öffnen</button>
     </div>
     <div id="booster-flash"></div>
     <canvas id="booster-fx"></canvas>
 </div>
 
-<script src="js/i18n_en.js?v=202610302048"></script>
-<script src="js/i18n.js?v=202610302048"></script>
-<script src="js/utils.js?v=202610302048"></script>
-<script src="js/cards.js?v=202610302048"></script>
-<script src="js/cards2.js?v=202610302048"></script>
-<script src="js/cards3.js?v=202610302048"></script>
-<script src="js/cards4.js?v=202610302048"></script>
-<script src="js/cards5.js?v=202610302048"></script>
-<script src="js/decks.js?v=202610302048"></script>
-<script src="js/state.js?v=202610302048"></script>
-<script src="js/engine.js?v=202610302048"></script>
-<script src="js/cardfx.js?v=202610302048"></script>
-<script src="js/cardfx2.js?v=202610302048"></script>
-<script src="js/cardfx3.js?v=202610302048"></script>
-<script src="js/cardfx4.js?v=202610302048"></script>
-<script src="js/cardfx5.js?v=202610302048"></script>
-<script src="js/ai.js?v=202610302048"></script>
-<script src="js/renderer.js?v=202610302048"></script>
-<script src="js/ui.js?v=202610302048"></script>
-<script src="js/simcore.js?v=202610302048"></script>
-<script src="js/tests.js?v=202610302048"></script>
-<script src="js/tourneydecks.js?v=202610302048"></script>
-<script src="js/features.js?v=202610302048"></script>
-<script src="js/coach.js?v=202610302048"></script>
-<script src="js/backgrounds.js?v=202610302048"></script>
-<script src="js/tutorial.js?v=202610302048"></script>
-<script src="js/online.js?v=202610302048"></script>
-<script src="js/main.js?v=202610302048"></script>
+<script src="js/i18n_en.js?v=202610302213"></script>
+<script src="js/i18n.js?v=202610302213"></script>
+<script src="js/utils.js?v=202610302213"></script>
+<script src="js/cards.js?v=202610302213"></script>
+<script src="js/cards2.js?v=202610302213"></script>
+<script src="js/cards3.js?v=202610302213"></script>
+<script src="js/cards4.js?v=202610302213"></script>
+<script src="js/cards5.js?v=202610302213"></script>
+<script src="js/decks.js?v=202610302213"></script>
+<script src="js/state.js?v=202610302213"></script>
+<script src="js/engine.js?v=202610302213"></script>
+<script src="js/cardfx.js?v=202610302213"></script>
+<script src="js/cardfx2.js?v=202610302213"></script>
+<script src="js/cardfx3.js?v=202610302213"></script>
+<script src="js/cardfx4.js?v=202610302213"></script>
+<script src="js/cardfx5.js?v=202610302213"></script>
+<script src="js/ai.js?v=202610302213"></script>
+<script src="js/renderer.js?v=202610302213"></script>
+<script src="js/ui.js?v=202610302213"></script>
+<script src="js/simcore.js?v=202610302213"></script>
+<script src="js/tests.js?v=202610302213"></script>
+<script src="js/tourneydecks.js?v=202610302213"></script>
+<script src="js/features.js?v=202610302213"></script>
+<script src="js/coach.js?v=202610302213"></script>
+<script src="js/backgrounds.js?v=202610302213"></script>
+<script src="js/tutorial.js?v=202610302213"></script>
+<script src="js/online.js?v=202610302213"></script>
+<script src="js/main.js?v=202610302213"></script>
 </body>
 </html>

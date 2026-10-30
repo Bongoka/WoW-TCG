@@ -19,7 +19,7 @@ body {
 #match-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
 #match-bg.on { opacity: 1; }
 #match-bg .mbg-layer { position: absolute; inset: 0; background: center / cover no-repeat;
-    filter: blur(1.5px) saturate(.7) brightness(.58); }
+    filter: blur(1.5px) saturate(.45) brightness(.42); }
 #match-bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10,7,5,0) 0%, rgba(10,7,5,.35) 70%, rgba(5,3,2,.7) 100%); }
 #error-banner { display: none; position: fixed; top: 0; left: 0; right: 0; background: #7f1d1d; color: #fff; padding: 8px 12px; font-weight: bold; text-align: center; z-index: 1000000; border-bottom: 2px solid var(--gold); }
 
@@ -499,6 +499,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .cm-card:hover { transform: translateY(-6px); }
 .cm-card .card-wrapper, .cm-card .card-wrapper.hand-card { --cw: clamp(100px, 9vw, 150px); }
 .cm-card:hover .card-visual { box-shadow: 0 0 0 0.9cqw #facc15, 0 0 4cqw rgba(250,204,21,.75); }
+.cm-warn { margin-top: 8px; color: #f87171; font-weight: bold; }
+.cm-card.cm-picked .card-visual { box-shadow: 0 0 0 0.9cqw #ef4444, 0 0 4cqw rgba(239,68,68,.8); }
+.cm-card.cm-picked { transform: translateY(-6px); }
 .cm-caption { max-width: clamp(100px, 9vw, 150px); font-size: 11px; font-weight: bold; color: var(--gold-light); line-height: 1.3; }
 #cm-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 #cm-buttons button { padding: 8px 20px; font-size: 14px; }
@@ -1072,3 +1075,10 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .tm-box select { width: 100%; background: #0a0705; border: 1px solid var(--border); color: var(--text-main); padding: 3px; border-radius: 3px; font-size: 11px; }
 .tm-btns { display: flex; gap: 4px; }
 .tm-btns button { flex: 1; }
+/* Online: Gegner entscheidet gerade – mittig, Klicks gehen durch */
+#opp-thinking { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.96); z-index: 9400; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 34px; border-radius: 12px; background: rgba(10,7,5,.88); border: 1px solid var(--gold-dark); box-shadow: 0 10px 40px rgba(0,0,0,.8); }
+#opp-thinking.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#opp-thinking b { font: bold 26px Georgia, serif; color: var(--gold-light); animation: oppThink 1.6s ease-in-out infinite; }
+#opp-thinking span { font-size: 14px; color: var(--text-dim); }
+@keyframes oppThink { 50% { opacity: .55; } }

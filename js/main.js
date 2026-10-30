@@ -166,7 +166,7 @@ const MULLIGAN_KEY = 'wow_tcg_mulligan_mode';
 function mulliganMode() { try { return localStorage.getItem(MULLIGAN_KEY) === 'standard' ? 'standard' : 'hs'; } catch (e) { return 'hs'; } }   // Standard: Hearthstone-Stil
 function updateMulliganButton() {
     const b = document.getElementById("btn-mulligan-mode");
-    if (b) b.textContent = mulliganMode() === 'hs' ? tr("🃏 Mulligan: Hearthstone") : tr("🔄 Mulligan: Standard");
+    if (b) b.textContent = mulliganMode() === 'hs' ? tr("Mulligan: Hearthstone") : tr("Mulligan: Standard");
 }
 function toggleMulliganMode() {
     try { localStorage.setItem(MULLIGAN_KEY, mulliganMode() === 'hs' ? 'standard' : 'hs'); } catch (e) {}
@@ -174,7 +174,7 @@ function toggleMulliganMode() {
 }
 function updateRulesTextButton() {
     const b = document.getElementById("btn-rules-text");
-    if (b) b.textContent = rulesTextMode() === 'expert' ? tr("📜 Regeltexte: Expert") : tr("💬 Regeltexte: Casual");
+    if (b) b.textContent = rulesTextMode() === 'expert' ? tr("Regeltexte: Expert") : tr("Regeltexte: Casual");
 }
 function toggleRulesTextMode() {
     try { localStorage.setItem(RULES_TEXT_KEY, rulesTextMode() === 'expert' ? 'casual' : 'expert'); } catch (e) {}
@@ -231,7 +231,7 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
         openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
             { label: tr("Behalten"), cls: "success", action: startPlay },
             { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } },
-            { label: tr("📖 Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
+            { label: tr("Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
         ]);
     };
     // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
@@ -244,6 +244,16 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
     if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
+    // Karte würde ein Limit verletzen (Unique, zweite Waffe, Totem, Form …): vorher nachfragen (CR 414.3)
+    if (action.type === 'PLAY_CARD' && !action.limitOk) {
+        const card = action.gyUid ? G.p1.graveyard.find(c => c.uid === action.gyUid) : G.p1.hand[action.handIdx];
+        const v = card && limitWarning(card);
+        if (v) {
+            uiConfirm(tr`${card.name} spielen?`, tr`Achtung: ${v.label} – danach musst du eine dieser Karten zerstören: ${v.names}.`, tr('Trotzdem spielen'), () => humanAct({ ...action, limitOk: true }));
+            return false;
+        }
+    }
+    if (action.limitOk) { action = { ...action }; delete action.limitOk; }
     // Online: der Gast schickt seine Aktion an den Host, der Host rechnet erst, wenn beide den Mulligan hinter sich haben
     if (G.online) {
         if (NET.role === 'guest') return netGuestAct(action);
@@ -282,7 +292,7 @@ function cpuSleep(ms) {
     return new Promise(r => { const t = setTimeout(() => { CPU_SKIP.wake.delete(w); r(); }, ms * (cpuSpeed() === 'fast' ? 0.35 : 1)); const w = () => { clearTimeout(t); r(); }; CPU_SKIP.wake.add(w); });
 }
 function skipCpuPauses() { if (!_cpuRunning || CPU_SKIP.on) return; CPU_SKIP.on = true; CPU_SKIP.wake.forEach(w => w()); CPU_SKIP.wake.clear(); }
-function updCpuSpeedBtn() { const b = document.getElementById("btn-cpu-speed"); if (b) b.textContent = cpuSpeed() === 'fast' ? tr('⚡ CPU-Tempo: Schnell') : tr('🐢 CPU-Tempo: Normal'); }
+function updCpuSpeedBtn() { const b = document.getElementById("btn-cpu-speed"); if (b) b.textContent = cpuSpeed() === 'fast' ? tr('CPU-Tempo: Schnell') : tr('CPU-Tempo: Normal'); }
 
 // CPU-Entscheidung: im Hintergrund (js/aiworker.js), damit die Seite nicht einfriert. Geht kein Worker
 // (z. B. index.html direkt von der Festplatte geöffnet) oder antwortet er nicht, rechnet das Spiel wie bisher selbst.
@@ -433,7 +443,7 @@ function bootGame() {
     const fsBtn = document.getElementById("btn-fullscreen");
     const fsEl = document.documentElement, fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
     const enterFs = () => { const r = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen; if (!r || fsOn()) return; Promise.resolve(r.call(fsEl)).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {}); };
-    const updFs = () => { fsBtn.textContent = fsOn() ? tr('⛶ Vollbild aus') : tr('⛶ Vollbild'); };
+    const updFs = () => { fsBtn.textContent = fsOn() ? tr('Vollbild aus') : tr('Vollbild'); };
     fsBtn.onclick = () => { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else enterFs(); };
     document.addEventListener('fullscreenchange', updFs); document.addEventListener('webkitfullscreenchange', updFs);
     if (!(fsEl.requestFullscreen || fsEl.webkitRequestFullscreen)) fsBtn.style.display = 'none';   // z. B. iPhone: dort über den Startbildschirm
@@ -455,7 +465,7 @@ function bootGame() {
     document.getElementById("btn-new-game").onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
     document.getElementById("btn-online").onclick = openOnline;
     const popBtn = document.getElementById("btn-mp-popups");
-    const updPop = () => { popBtn.textContent = netPopupsOn() ? tr("🌐 Lobby-Hinweise: An") : tr("🌐 Lobby-Hinweise: Aus"); };
+    const updPop = () => { popBtn.textContent = netPopupsOn() ? tr("Lobby-Hinweise: An") : tr("Lobby-Hinweise: Aus"); };
     popBtn.onclick = () => { try { localStorage.setItem(NET_POPUP_KEY, netPopupsOn() ? "off" : "on"); } catch (e) {} updPop(); netBackground(); };
     updPop();
     setTimeout(netBackground, 3000);                                                      // im Hintergrund verbinden: Hinweise auf neue Lobbys
@@ -470,13 +480,13 @@ function bootGame() {
     // Simulationen: Anzahl über das spieleigene Eingabefenster (statt prompt)
     const simRun = async (fn) => { try { await fn(); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; } };
     document.getElementById("btn-simulate").onclick = () =>
-        uiAskNumber(tr('🧪 CPU vs CPU Simulation'), tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), 3, 1, n => simRun(() => runSimulation(n)));
+        uiAskNumber(tr('CPU vs CPU Simulation'), tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), 3, 1, n => simRun(() => runSimulation(n)));
     document.getElementById("btn-simulate-tourney").onclick = () => {
         const n0 = tourneySimDecks().length;
-        uiAskNumber(tr('🏆 Turnierdeck-Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runTourneySimulation(n)));
+        uiAskNumber(tr('Turnierdeck-Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runTourneySimulation(n)));
     };
     document.getElementById("btn-simulate-all").onclick = () =>
-        uiAskNumber(tr('🎯 All-Cards Test'), tr("Wie viele All-Cards-Spiele? (Standard: 100)"), 100, 10, n => simRun(() => runSimulationAllCards(n)));
+        uiAskNumber(tr('All-Cards Test'), tr("Wie viele All-Cards-Spiele? (Standard: 100)"), 100, 10, n => simRun(() => runSimulationAllCards(n)));
 
     const imgPathInput = document.getElementById("cfg-img-path");
     if (imgPathInput) {
@@ -495,11 +505,11 @@ function bootGame() {
     document.getElementById("arena").addEventListener('click', (e) => { if (G && G.activePlayer === 2 && !e.target.closest('.card-wrapper, button')) skipCpuPauses(); });
     updateRulesTextButton();
     const autoBtn = document.getElementById("btn-auto-end");
-    const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("⏩ Auto-Zugende: An") : tr("⏸ Auto-Zugende: Aus"); };
+    const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("Auto-Zugende: An") : tr("Auto-Zugende: Aus"); };
     autoBtn.onclick = () => { try { localStorage.setItem(AUTO_END_KEY, autoEndTurn() ? 'off' : 'on'); } catch (e) {} updAuto(); if (G) render(); };
     updAuto();
     const prioBtn = document.getElementById("btn-prio-mode");
-    const updPrio = () => { prioBtn.textContent = prioManual() ? tr("✋ Priorität: Jedes Fenster") : tr("⚡ Priorität: Automatisch"); };
+    const updPrio = () => { prioBtn.textContent = prioManual() ? tr("Priorität: Jedes Fenster") : tr("Priorität: Automatisch"); };
     prioBtn.onclick = () => { try { localStorage.setItem(PRIO_KEY, prioManual() ? "off" : "on"); } catch (e) {} updPrio(); if (G) G.stopAll = prioManual(); };
     updPrio();
     probeImageDirs(updateImgStyleOptions);
@@ -513,7 +523,7 @@ function bootGame() {
     more.open = false;                                                                  // startet immer eingeklappt
     // Sound und Schwierigkeit werden gemerkt
     const soundBtn = document.getElementById("btn-sound");
-    const updSound = () => { soundBtn.textContent = sfx.muted ? tr("🔇 Sound Aus") : tr("🔊 Sound An"); };
+    const updSound = () => { soundBtn.textContent = sfx.muted ? tr("Sound Aus") : tr("Sound An"); };
     try { sfx.muted = localStorage.getItem('wow_tcg_muted') === '1'; } catch (e) {}
     soundBtn.onclick = () => { sfx.muted = !sfx.muted; try { localStorage.setItem('wow_tcg_muted', sfx.muted ? '1' : '0'); } catch (e) {} updSound(); };
     updSound();

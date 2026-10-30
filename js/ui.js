@@ -60,7 +60,7 @@ function renderDeckZone(player, prefix) {
         const node = createCardDOM({ ...top, uid: 'gy_top_' + top.uid, damage: 0, exhausted: false, hasDamageMask: false, isFoil: false }, true, null, { noDamage: true, stats: false });
         node.style.setProperty('--cw', '100%'); st.appendChild(node);
     } else st.innerHTML = tr('<span class="grave-label">Friedhof</span>');
-    const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = `🪦 ${n}` + (nr ? ` · ⛔ ${nr}` : ''); st.appendChild(cnt);
+    const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = nr ? tr`${n} · ${nr} entfernt` : String(n); st.appendChild(cnt);
     st.onclick = () => openGraveyard(player);
 }
 function openGraveyard(player) {
@@ -72,14 +72,14 @@ function openGraveyard(player) {
     const playable = new Set(getLegalActions(G, 1).filter(a => a.type === 'PLAY_CARD' && a.gyUid).map(a => a.gyUid));
     const show = (c) => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false));
         if (playable.has(c.uid)) {
-            const b = document.createElement("button"); b.textContent = tr("▶ Spielen"); b.className = "gy-play-btn";
+            const b = document.createElement("button"); b.textContent = tr("Spielen"); b.className = "gy-play-btn";
             b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'PLAY_CARD', handIdx: -1, gyUid: c.uid }); };
             wrap.appendChild(b);
         }
         box.appendChild(wrap); };
     player.graveyard.forEach(show);
     if (removed.length) {
-        const h = document.createElement("div"); h.className = "gy-section"; h.textContent = tr`⛔ Aus dem Spiel entfernt (${removed.length})`; box.appendChild(h);
+        const h = document.createElement("div"); h.className = "gy-section"; h.textContent = tr`Aus dem Spiel entfernt (${removed.length})`; box.appendChild(h);
         removed.forEach(show);
     }
     document.getElementById("graveyard-modal").style.display = "flex";
@@ -285,7 +285,20 @@ function render() {
     syncAim();
     renderTurnIndicator();
     placeAttachments();
+    renderOppThinking();
     checkGameOverScreen();
+}
+// Online: der Gegner muss entscheiden (Reaktion, Wahl) – groß in der Mitte sagen, warum gerade nichts geht
+function renderOppThinking() {
+    let el = document.getElementById('opp-thinking');
+    const d = G.pending, w = G.win;
+    const deciding = G.online && !G.gameOver && ((d && d.pid === 2) || (!d && w && w.prio === 2));
+    const show = deciding && (G.activePlayer === 1 || G.chain.some(it => it.pl === 1) || !!G.battle);
+    if (!show) { if (el) el.classList.remove('show'); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'opp-thinking'; el.innerHTML = '<b></b><span></span>'; document.body.appendChild(el); }
+    el.firstChild.textContent = tr('Der Gegner überlegt …');
+    el.lastChild.textContent = d && d.kind === 'choose' ? tr('Er trifft gerade eine Entscheidung.') : tr('Er kann auf deine Aktion reagieren.');
+    el.classList.add('show');
 }
 
 // ---------------------------------------------------------------- Wer ist am Zug? / Großer End-Turn-Button
@@ -296,10 +309,11 @@ function renderTurnIndicator() {
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
     ti.className = mine ? 'me' : 'cpu';
-    ti.firstElementChild.textContent = mine ? tr('⚔ DEIN ZUG') : G.online ? tr('⏳ ZUG DES GEGNERS') : tr('⏳ ZUG DER CPU');
+    ti.firstElementChild.textContent = mine ? tr('DEIN ZUG') : G.online ? tr('ZUG DES GEGNERS') : tr('ZUG DER CPU');
     const eb = document.getElementById('btn-end-turn');
     eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
     eb.classList.toggle('cpu-turn', !mine);
+    eb.style.visibility = mine || over ? '' : 'hidden';                                   // Gegnerzug steht schon links (turn-indicator)
     const done = nothingLeftToDo();
     document.getElementById('big-end-turn').style.display = done && (!autoEndTurn() || G._noAutoEnd === G.turn) ? 'block' : 'none';
     scheduleAutoEnd(done);
@@ -328,7 +342,7 @@ let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
     const eb = document.getElementById('btn-end-turn');
     if (!done || !autoEndTurn() || G.gameOver || G._noAutoEnd === G.turn) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } eb.classList.remove('auto-ending'); return; }
-    document.querySelector('#turn-indicator span').textContent = tr('⏩ ZUG ENDET …');
+    document.querySelector('#turn-indicator span').textContent = tr('ZUG ENDET …');
     if (_autoEndTimer) return;
     eb.style.setProperty('--ae', AUTO_END_MS + 'ms'); eb.classList.remove('auto-ending'); void eb.offsetWidth; eb.classList.add('auto-ending');   // Balken läuft bis zum Zugende
     const turn = G.turn;
@@ -570,7 +584,9 @@ function screenShake(strength = 1) {
 }
 
 // ---------------------------------------------------------------- CPU spielt eine Karte: groß in der Mitte zeigen
+const SHOWCASED = new Set();   // schon groß gezeigte Karten (driveCpu zeigt vor dem Ausspielen, playFxEvents den Rest)
 async function showcaseCpuCard(card, handIdx) {
+    SHOWCASED.add(card.uid);
     const th = document.getElementById('top-hand');
     const slot = th && th.children[handIdx];
     const from = slot ? slot.getBoundingClientRect() : { left: window.innerWidth / 2 - 50, top: -160, width: 100, height: 140 };
@@ -589,6 +605,15 @@ async function showcaseCpuCard(card, handIdx) {
         { transform: 'none', opacity: 1 }
     ], { duration: 520, easing: 'cubic-bezier(.2,.8,.2,1)' }).finished;
     return ghost;
+}
+// Gegnerkarte, die nicht über driveCpu kam: kurz groß zeigen, dann an ihren Platz fliegen lassen
+async function showcasePlayed(uid, cost) {
+    const it = (G.chain || []).find(x => x.card && x.card.uid === uid), loc = it ? null : locate(G, uid);
+    const card = it ? it.card : loc && loc.c; if (!card) return;
+    const ghost = await showcaseCpuCard(card, -1);
+    await new Promise(r => setTimeout(r, 900));
+    await landShowcase(ghost, uid);
+    if (cost >= 7) screenShake(1.2);
 }
 // Danach fliegt sie an ihren Platz (Spielfeld) bzw. verblasst auf der Kette / im Friedhof
 async function landShowcase(ghost, uid) {
@@ -635,7 +660,7 @@ function showGameOver() {
         cap.innerHTML = tr`<div class="go-best">Beste Karte von ${esc(winner.hero.name)}</div><div class="go-name">${esc(best.name)}</div><div class="go-stats">${esc(parts.join(' · '))}</div>`;
     }
     // Online: zurück in die Lobby statt einer neuen Partie gegen die CPU
-    document.getElementById('go-again').textContent = G.online ? tr('↩ Zurück zur Lobby') : tr('⚔ Nochmal (gleiche Decks)');
+    document.getElementById('go-again').textContent = G.online ? tr('Zurück zur Lobby') : tr('Nochmal (gleiche Decks)');
     document.getElementById('go-new').style.display = G.online ? 'none' : '';
     ov.style.display = 'flex';
     ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
@@ -653,16 +678,16 @@ function checkGameOverScreen() {
 // ---------------------------------------------------------------- Schadenszahlen, Treffer-Effekte, Tod
 // Farbe und Symbol je Schadensart (CR: Melee, Ranged, Arcane, Fire, Frost, Holy, Nature, Shadow)
 const DMG_STYLE = {
-    Melee:  { c: ['#f8fafc', '#cbd5e1', '#94a3b8'], icon: '⚔' },
-    Ranged: { c: ['#fde68a', '#d6a35c', '#a16207'], icon: '🏹' },
-    Fire:   { c: ['#fde047', '#fb923c', '#ef4444'], icon: '🔥' },
-    Frost:  { c: ['#e0f2fe', '#7dd3fc', '#38bdf8'], icon: '❄' },
-    Arcane: { c: ['#f5d0fe', '#e879f9', '#a855f7'], icon: '✨' },
-    Nature: { c: ['#bbf7d0', '#4ade80', '#15803d'], icon: '🌿' },
-    Shadow: { c: ['#c4b5fd', '#7c3aed', '#3b0764'], icon: '🌑' },
-    Holy:   { c: ['#fffbeb', '#fde68a', '#facc15'], icon: '☀' }
+    Melee:  { c: ['#f8fafc', '#cbd5e1', '#94a3b8'], icon: '' },
+    Ranged: { c: ['#fde68a', '#d6a35c', '#a16207'], icon: '' },
+    Fire:   { c: ['#fde047', '#fb923c', '#ef4444'], icon: '' },
+    Frost:  { c: ['#e0f2fe', '#7dd3fc', '#38bdf8'], icon: '' },
+    Arcane: { c: ['#f5d0fe', '#e879f9', '#a855f7'], icon: '' },
+    Nature: { c: ['#bbf7d0', '#4ade80', '#15803d'], icon: '' },
+    Shadow: { c: ['#c4b5fd', '#7c3aed', '#3b0764'], icon: '' },
+    Holy:   { c: ['#fffbeb', '#fde68a', '#facc15'], icon: '' }
 };
-const HEAL_STYLE = { c: ['#dcfce7', '#86efac', '#22c55e'], icon: '✚' };
+const HEAL_STYLE = { c: ['#dcfce7', '#86efac', '#22c55e'], icon: '+' };
 function fxCenter(r) { return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 function burstParticles(r, colors, n, delay, rise) {
     const { x, y } = fxCenter(r);
@@ -721,7 +746,11 @@ function playFxEvents(prevRects) {
     G.fxq = [];
     let k = 0;
     for (const e of evs) {
-        if (e.t === 'play') { if (e.pid === 1 && e.cost >= 7) screenShake(1.2); continue; }   // CPU-Karten wackeln beim Landen (landShowcase)
+        if (e.t === 'play') {
+            if (e.pid === 1 && e.cost >= 7) screenShake(1.2);                                   // CPU-Karten wackeln beim Landen (landShowcase)
+            else if (e.pid === 2 && !SHOWCASED.has(e.uid)) showcasePlayed(e.uid, e.cost);       // Online-Gegner, CPU-Reaktionen im eigenen Zug
+            continue;
+        }
         const node = document.querySelector(`#arena [data-uid="${e.uid}"]`);
         const r = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
         if (!r || !r.width) continue;
@@ -809,12 +838,12 @@ function weaponSwing(c) {
 function cardActions(c) {
     const out = [];
     if (canMain() && isChar(c) && canAttackNow(G, c, G.p1))
-        out.push({ label: UI.attacker === c.uid ? tr('✖ Angriff abbrechen') : tr('⚔ Angreifen'), cls: 'success', run: () => { UI.attacker = UI.attacker === c.uid ? null : c.uid; UI.preStrike = null; render(); } });
+        out.push({ label: UI.attacker === c.uid ? tr('Angriff abbrechen') : tr('Angreifen'), cls: 'success', run: () => { UI.attacker = UI.attacker === c.uid ? null : c.uid; UI.preStrike = null; render(); } });
     if (weaponSwing(c))
-        out.push({ label: tr`⚔ Mit ${c.name} angreifen`, cls: 'success', run: () => { UI.attacker = G.p1.hero.uid; UI.preStrike = c.uid; render(); } });
+        out.push({ label: tr`Mit ${c.name} angreifen`, cls: 'success', run: () => { UI.attacker = G.p1.hero.uid; UI.preStrike = c.uid; render(); } });
     usablePowers(c).forEach(pw => {
         const cost = pw.cost === 'X' ? 'X' : (pw.cost || 0);
-        out.push({ label: `${pw.flip ? '🔄 ' : ''}${pw.label}${cost ? ` (${cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: c.uid, key: pw.key }) });
+        out.push({ label: `${pw.flip ? '' : ''}${pw.label}${cost ? ` (${cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: c.uid, key: pw.key }) });
     });
     return out;
 }
@@ -1209,7 +1238,7 @@ function openHsMulligan(onDone) {
     const makeSlot = (card) => {
         const slot = document.createElement("div"); slot.className = "hs-mull-card";
         slot.appendChild(createCardDOM(card, false));
-        const x = document.createElement("div"); x.className = "hs-mull-x"; x.textContent = "✖"; slot.appendChild(x);
+        const x = document.createElement("div"); x.className = "hs-mull-x"; x.textContent = "×"; slot.appendChild(x);
         slot.onclick = () => {
             if (keep.disabled) return;
             if (marked.has(card.uid)) marked.delete(card.uid); else marked.add(card.uid);
@@ -1356,7 +1385,7 @@ function animateAttack(attUid, defUid) {
         const dx = dRect.left - aRect.left, dy = dRect.top - aRect.top;
         sfx.play('hit');
         aEl.animate([{ transform: `translate(0px, 0px) scale(1)` }, { transform: `translate(${dx * 0.7}px, ${dy * 0.7}px) scale(1.2)`, offset: 0.5 }, { transform: `translate(0px, 0px) scale(1)` }], { duration: 400, easing: 'ease-in-out' });
-        setTimeout(() => { triggerShake(dEl); showFloatingText(dRect.left + dRect.width / 2, dRect.top + dRect.height / 2, `💥`, 'hit'); setTimeout(resolve, 250); }, 200);
+        setTimeout(() => { triggerShake(dEl); showFloatingText(dRect.left + dRect.width / 2, dRect.top + dRect.height / 2, ``, 'hit'); setTimeout(resolve, 250); }, 200);
     });
 }
 // weaponUid: Angriff über eine Waffe (gezogen oder gewählt) – der Held greift an und schlägt mit dieser Waffe zu,
@@ -1386,7 +1415,7 @@ function playEventAnimations() {
         pEl.animate([{ transform: 'translate(0,0) scale(1)' }, { transform: `translate(${dx}px, ${dy}px) scale(1.15)`, offset: 0.5 }, { transform: 'translate(0,0) scale(1)' }], { duration: 650, easing: 'ease-in-out' });
     }
     triggerShake(pEl);
-    const lab = document.createElement('div'); lab.className = 'protect-label'; lab.textContent = '🛡 PROTECTED';
+    const lab = document.createElement('div'); lab.className = 'protect-label'; lab.textContent = 'PROTECTED';
     lab.style.left = (pr.left + pr.width / 2) + 'px'; lab.style.top = (pr.top + pr.height / 2) + 'px';
     document.body.appendChild(lab); setTimeout(() => lab.remove(), 1600);
     sfx.play('hit');
@@ -1406,7 +1435,7 @@ function renderPendingPanel() {
     ch.innerHTML = chain.length ? tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
     opts.innerHTML = '';
     if (!d) { title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …'); return; }
-    title.textContent = d.protect ? tr('🛡 Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
+    title.textContent = d.protect ? tr('Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
     prompt.textContent = d.prompt + (d.protect ? tr(' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.') : tr(' Klicke eine blau markierte Karte an.'));
     d.opts.forEach(o => {
         if (typeof o.v === 'string' && locate(G, o.v)) return;   // Karten wählt man auf dem Feld
@@ -1416,8 +1445,21 @@ function renderPendingPanel() {
         opts.appendChild(b);
     });
 }
+// Würde diese Karte im Spiel ein Limit verletzen? Gleiche Prüfung wie die Engine (findLimitViolation) auf einer Kopie
+function limitWarning(card) {
+    const p = G.p1, h = p.hero, c = { ...card, uid: 'limit_probe' };
+    const t = { ...p, allies: [...p.allies], ongoing: [...(p.ongoing || [])], hero: { ...h, weapons: [...h.weapons], armors: [...h.armors] } };
+    if (card.type === 'Weapon') t.hero.weapons.push(c);
+    else if (card.type === 'Armor' || card.type === 'Item') t.hero.armors.push(c);
+    else if (card.type === 'Ally' || card.totem) t.allies.push(c);
+    else if (card.type === 'Ability' && card.limitTags) t.ongoing.push(c);
+    else return null;
+    const v = findLimitViolation(G, t);
+    if (!v || !v.cards.some(x => x.uid === 'limit_probe')) return null;
+    return { label: v.label, names: v.cards.map(x => x.name).join(', ') };
+}
 function boardChoice(d) {
-    if (!d || d.kind !== 'choose') return false;
+    if (!d || d.kind !== 'choose' || d.destroy) return false;                             // Zerstören: immer mittig mit Warnung
     let cards = 0;
     for (const o of d.opts) {
         if (o.card !== undefined) return false;
@@ -1479,7 +1521,7 @@ function priorityChoices() {
         } else if (a.type === 'ACTIVATE') {
             const k = a.srcUid + '|' + a.key; if (seen.has(k)) continue; seen.add(k);
             const c = findCharacter(G, a.srcUid), pw = c && getPower(G, c, a.key); if (!c || !pw) continue;
-            out.push({ card: c, caption: `${pw.flip ? '🔄 ' : ''}${pw.label}${pw.cost ? ` (${pw.cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: a.srcUid, key: a.key }) });
+            out.push({ card: c, caption: `${pw.flip ? '' : ''}${pw.label}${pw.cost ? ` (${pw.cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: a.srcUid, key: a.key }) });
         } else if (a.type === 'COMPLETE_QUEST') {
             const r = G.p1.resources[a.resIdx]; if (!r || seen.has(r.card.uid)) continue; seen.add(r.card.uid);
             out.push({ card: r.card, caption: tr('Quest abschließen'), run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
@@ -1511,16 +1553,24 @@ function renderChoiceModal(d) {
     const addButton = (label, cls, fn) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; btns.appendChild(b); };
     const addChoice = (card, caption, fn, cls) => { const n = cardNode(card, "cm-card", caption); if (cls) n.classList.add(cls); n.onclick = (e) => { e.stopPropagation(); fn(); }; cards.appendChild(n); };
     if (d.kind === 'priority') {
-        title.textContent = d.reason === 'combat' ? tr('⚔ Kampf – reagieren?') : tr('Reagieren?');
+        title.textContent = d.reason === 'combat' ? tr('Kampf – reagieren?') : tr('Reagieren?');
         prompt.textContent = d.prompt;
         fillContext(chainContext());
         priorityChoices().forEach(ch => addChoice(ch.card, ch.good ? tr`★ ${ch.caption}` : ch.caption, ch.run, ch.good ? 'cm-good' : 'cm-other'));
         addButton(tr('Passen'), 'success', () => humanAct({ type: 'PASS' }));
         return;
     }
-    title.textContent = d.protect ? tr('🛡 Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
+    title.textContent = d.protect ? tr('Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
     prompt.textContent = d.prompt;
     fillContext(decisionContext(d));
+    // Karte zerstören (Unique, zweite Waffe, Totem …): rote Warnung, erst auswählen, dann bestätigen
+    if (d.destroy) {
+        const w = document.createElement("div"); w.className = "cm-warn"; w.textContent = tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'); prompt.appendChild(w);
+        const picked = d.opts.find(o => o.v === UI.destroyPick);
+        d.opts.forEach(o => { const card = cardOfRef(o.v); if (card) addChoice(card, o.label, () => { UI.destroyPick = o.v; renderChoiceModal(d); }, o.v === UI.destroyPick ? 'cm-picked' : ''); });
+        if (picked) addButton(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
+        return;
+    }
     d.opts.forEach(o => {
         // Zahlen als Wert sind keine Karten-IDs (Ja/Nein = 1/0, Modi, X …) – Karten aus dem Deck tragen ihre ID in o.card
         const ref = o.card !== undefined ? o.card : (typeof o.v === 'number' ? null : o.v);

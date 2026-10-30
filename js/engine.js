@@ -23,7 +23,7 @@ function isReal(s) { return !!s.real; }
 function isHuman(s, pid) { return !!(s.humans && s.humans.includes(pid)); }
 // Log: knapp, ohne "[Held]"-Präfix – die Zeile gehört einem Spieler (pid: wer handelt bzw. wessen Karte), die Oberfläche färbt danach
 function L(s, msg, cls, pid) { if (isReal(s) && typeof addLog === 'function') addLog(logStrip(s, msg, !pid), cls || "", pid || s._logPid || s.activePlayer); }
-// Kartentexte (ohne eigene pid) beginnen oft mit dem Heldennamen ("👁 Thrall deckt auf: …"): Name weg, Rest groß
+// Kartentexte (ohne eigene pid) beginnen oft mit dem Heldennamen ("Thrall deckt auf: …"): Name weg, Rest groß
 function logStrip(s, msg, lead) {
     for (const p of [s.p1, s.p2]) {
         msg = msg.split(`[${p.hero.name}] `).join('');
@@ -649,7 +649,7 @@ function execStep(s, st) {
             if (!d.opts.length) { if (d.none !== undefined) callK(s, d.k, d.a, d.none); break; }
             if (d.opts.length === 1 && d.auto !== false && !d.keep) { callK(s, d.k, d.a, d.opts[0].v); break; }
             if (isHuman(s, d.pid)) {
-                if (d.cancel && !d.opts.some(o => o.v === '__cancel')) d.opts.push({ label: tr('✖ Abbrechen'), v: '__cancel', ai: -1e9 });
+                if (d.cancel && !d.opts.some(o => o.v === '__cancel')) d.opts.push({ label: tr('Abbrechen'), v: '__cancel', ai: -1e9 });
                 s.pending = { kind: 'choose', ...d }; break;
             }
             const v = aiPick(s, d);
@@ -710,7 +710,7 @@ function stateBased(s) {
     for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {   // Zugspieler repariert zuerst (CR 414.2)
         const v = findLimitViolation(s, p);
         if (v) {
-            ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label,
+            ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label, destroy: true,
                 opts: v.cards.map(c => ({ label: c.name, v: c.uid, ai: -(c.joinedTurn || 0) - cardValue(s, c) })), k: 'E:limitDestroy', a: {} });
             flushBatch(s); return true;
         }
@@ -2142,7 +2142,7 @@ function askProtect(s) {
     const prots = protectorsFor(s);
     if (!prots.length) { b.step = 'defend'; return; }
     const att = findCharacter(s, b.att), def = findCharacter(s, b.def);
-    const opts = prots.map(c => ({ label: tr`🛡 ${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
+    const opts = prots.map(c => ({ label: tr`${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
     opts.push({ label: tr('Durchlassen'), v: '__none', ai: 0 });
     ask(s, { pid: b.dpid, prompt: tr`${att.name} greift ${def.name} an. Mit einem Protector blocken?`, src: 'Protector', opts, k: 'E:protectDo', a: {}, keep: true, protect: true });
     flushBatch(s);
@@ -2178,7 +2178,7 @@ function askStrike(s, side) {
     if (!ws.length) { b.step = next; return; }
     const p = getPlayer(s, pid);
     const ctx = side === 'A' ? { attacking: true, target: findCharacter(s, b.def) } : { defending: true };
-    const opts = ws.map(w => ({ label: tr`⚔ Schlag mit ${w.name} (+${weaponAtk(s, w, ctx)} ATK, Kosten ${strikeCost(s, p, w)})`, v: w.uid, ai: 10 + weaponAtk(s, w, ctx) - strikeCost(s, p, w) * 0.5 }));
+    const opts = ws.map(w => ({ label: tr`Schlag mit ${w.name} (+${weaponAtk(s, w, ctx)} ATK, Kosten ${strikeCost(s, p, w)})`, v: w.uid, ai: 10 + weaponAtk(s, w, ctx) - strikeCost(s, p, w) * 0.5 }));
     opts.push({ label: tr('Ohne Waffe'), v: '__none', ai: 0 });
     ask(s, { pid, prompt: side === 'A' ? tr`Mit einer Waffe zuschlagen?` : tr`${c.name} verteidigt: Mit einer Waffe zurückschlagen?`, src: 'Waffenschlag', opts, k: 'E:strikeDo', a: { side }, keep: true });
     flushBatch(s);
@@ -2207,7 +2207,7 @@ EK.strikeDo = (s, a, v) => {
                 const more = strikeOptions(s, pid).filter(x => x.slot === 'Melee' && x.uid !== w.uid);
                 if (more.length) {
                     const ctx = a.side === 'A' ? { attacking: true, target: findCharacter(s, b.def) } : { defending: true };
-                    const opts = more.map(x => ({ label: tr`⚔ Zweiter Schlag mit ${x.name} (+${weaponAtk(s, x, ctx)} ATK, Kosten ${strikeCost(s, p, x)})`, v: x.uid, ai: 10 + weaponAtk(s, x, ctx) - strikeCost(s, p, x) * 0.5 }));
+                    const opts = more.map(x => ({ label: tr`Zweiter Schlag mit ${x.name} (+${weaponAtk(s, x, ctx)} ATK, Kosten ${strikeCost(s, p, x)})`, v: x.uid, ai: 10 + weaponAtk(s, x, ctx) - strikeCost(s, p, x) * 0.5 }));
                     opts.push({ label: tr('Kein zweiter Schlag'), v: '__none', ai: 0 });
                     ask(s, { pid, prompt: tr('Dual Wield: Mit einer zweiten Nahkampfwaffe zuschlagen?'), src: 'Dual Wield', opts, k: 'E:strikeDo', a, keep: true });
                     return;

@@ -213,7 +213,7 @@ function renderDBDeck(highlightId) {
         w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
     // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
     const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
-    if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>📥 Import</b> eine Kartenliste ein.</div>'); return; }
+    if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>Import</b> eine Kartenliste ein.</div>'); return; }
     const counts = {}; cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     DB_TYPES.forEach(t => {
         const ids = Object.keys(counts).map(Number).filter(id => t.is(CARDS[id])).sort((a, b) => (CARDS[a].cost || 0) - (CARDS[b].cost || 0) || CARDS[a].name.localeCompare(CARDS[b].name));
@@ -244,7 +244,7 @@ function renderDBDeck(highlightId) {
     // Auto-Fill am Ende der Liste: ergänzt fehlende Karten bis 60 (entfernt nie etwas, autoFillDeck in coach.js).
     // Erst ab 10 verschiedenen Karten – vorher soll der Spieler selbst die Richtung vorgeben
     if (n < 60 && new Set(cards).size >= 10 && hero && typeof autoFillDeck === 'function') {
-        const b = document.createElement('button'); b.className = 'db-autofill'; b.textContent = tr`✨ Auto-Fill (${60 - n} Karten)`;
+        const b = document.createElement('button'); b.className = 'db-autofill'; b.textContent = tr`Auto-Fill (${60 - n} Karten)`;
         b.title = tr('Ergänzt passende Karten bis 60 – nach Manakurve, deinen Karten und Klassen-Staples, Quests zuletzt');
         b.onclick = () => {
             const r = autoFillDeck(hero.id, currentDeckBuilder.cards);
@@ -354,7 +354,7 @@ let DB_IO_MODE = 'import';
 function openDbIO(mode) {
     DB_IO_MODE = mode;
     const ta = document.getElementById('db-io-text');
-    document.getElementById('db-io-title').textContent = mode === 'import' ? tr('📥 Deck importieren') : tr('📤 Deck exportieren');
+    document.getElementById('db-io-title').textContent = mode === 'import' ? tr('Deck importieren') : tr('Deck exportieren');
     document.getElementById('db-io-help').innerHTML = mode === 'import'
         ? tr('Eine Karte pro Zeile, z. B. <code>4 Weeble</code>, <code>4x Weeble</code> oder <code>4Weeble</code>. Ohne Zahl zählt die Karte einmal; ein Heldenname wird zum Helden. <code>Name: …</code> setzt den Decknamen. Alles andere wird ignoriert. Das aktuelle Deck wird ersetzt.')
         : tr('Diese Liste kannst du kopieren und später wieder importieren.');
@@ -373,7 +373,7 @@ document.getElementById('db-io-copy').onclick = () => { const ta = document.getE
 // Live-Vorschau beim Tippen: wie viele Karten erkannt wurden, was fehlt
 document.getElementById('db-io-text').addEventListener('input', () => { if (DB_IO_MODE !== 'import') return; const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
     dbIoReport([{ msg: tr`${r.cards.length} Karten erkannt${r.heroId !== currentDeckBuilder.heroId ? ` · Held: ${CARDS[r.heroId].name}` : ''}` }, ...r.report]); });
-function dbIoReport(items) { document.getElementById('db-io-report').innerHTML = items.map(x => `<div class="${x.bad ? 'bad' : 'ok'}">${x.bad ? '⚠' : '✔'} ${esc(x.msg)}</div>`).join(''); }
+function dbIoReport(items) { document.getElementById('db-io-report').innerHTML = items.map(x => `<div class="${x.bad ? 'bad' : 'ok'}">${x.bad ? '⚠' : '✓'} ${esc(x.msg)}</div>`).join(''); }
 document.getElementById('db-io-ok').onclick = () => {
     const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
     if (!r.cards.length) { dbIoReport([{ bad: true, msg: tr('Keine Karten erkannt.') }, ...r.report]); return; }
@@ -700,7 +700,7 @@ function openDeckOverview() {
         return btn;
     };
     grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Deine Decks</div>'));
-    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = tr('<div class="deck-plus">✚</div><div class="deck-name">Neues Deck</div>');
+    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = tr('<div class="deck-plus">+</div><div class="deck-name">Neues Deck</div>');
     nb.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(); };
     grid.appendChild(nb);
     loadCustomDecks().forEach(d => grid.appendChild(tile(d, true)));
@@ -914,7 +914,7 @@ function loadMaskTest() {
     window.dbDeleteVis = () => { del.style.display = saved() ? '' : 'none'; };
     del.onclick = () => {
         const deck = saved(); if (!deck) return;
-        uiConfirm(tr('🗑 Löschen'), tr`„${deck.name}“ löschen?`, tr('🗑 Löschen'), () => {
+        uiConfirm(tr('Löschen'), tr`„${deck.name}“ löschen?`, tr('Löschen'), () => {
             saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id));
             document.getElementById('db-close-btn').click(); openDeckOverview();
         });
@@ -947,7 +947,7 @@ function testMatchDecks() {
     const sp = document.getElementById('tm-deck-p'), so = document.getElementById('tm-deck-o');
     const fill = () => {
         const cur = testMatchDecks();
-        const opts = [`<option value="">${tr('🎲 Zufall')}</option>`]
+        const opts = [`<option value="">${tr('Zufall')}</option>`]
             .concat(loadCustomDecks().map(d => `<option value="${esc(d.id)}">★ ${esc(d.name)}</option>`))
             .concat(GAME_DECKS.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`)).join('');
         sp.innerHTML = opts; so.innerHTML = opts; sp.value = cur.p; so.value = cur.o;
@@ -961,7 +961,7 @@ function testMatchDecks() {
         const tm = testMatchDecks();
         const a = pickDeck(tm.p), b = pickDeck(tm.o);
         if (!a || !b) { showToast(tr('Wähle zuerst beide Decks (nicht Zufall).'), false, 3000); return; }
-        uiAskNumber(tr('🧪 Testmatch-Simulation'), tr`Wie viele Spiele? ${a.name} gegen ${b.name}, beide Reihenfolgen (Standard: 100)`, 100, 1,
+        uiAskNumber(tr('Testmatch-Simulation'), tr`Wie viele Spiele? ${a.name} gegen ${b.name}, beide Reihenfolgen (Standard: 100)`, 100, 1,
             n => runSimulation(Math.ceil(n / 2), [], tr`Testmatch: ${a.name} vs ${b.name}`, [[a, b], [b, a]]).catch(e => console.error(e)));
     };
 })();

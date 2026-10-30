@@ -25,7 +25,7 @@
         const text = el('div', 'cfx-text');
         text.innerHTML =
             `<div class="cfx-top"><span style="color:${color}">${escH(card.name)}</span><span class="cfx-cost">${card.cost !== undefined ? card.cost : ''}</span></div>` +
-            `<div class="cfx-sub">${escH(card.type)} ${card.protector ? '🛡' : ''} ${card.ferocity ? '⚡' : ''}</div>` +
+            `<div class="cfx-sub">${escH(card.type)}</div>` +
             `<div class="cfx-body">${escH(card.text || '')}</div>`;
         face.appendChild(text);
         

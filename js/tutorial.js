@@ -18,13 +18,13 @@ function openLearnMenu() {
     let m = document.getElementById('learn-modal');
     if (!m) { m = document.createElement('div'); m.id = 'learn-modal'; document.body.appendChild(m); }
     m.innerHTML = `<div class="learn-box">
-        <h2>${esc(tr('📖 Lerne die Regeln'))}</h2>
+        <h2>${esc(tr('Lerne die Regeln'))}</h2>
         <div class="learn-videos">${LEARN_VIDEOS.map(v => `
             <a class="learn-video" href="https://www.youtube.com/watch?v=${v.id}" target="_blank" rel="noopener">
-                <span class="learn-thumb"><img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()"><span class="learn-play">▶</span></span>
+                <span class="learn-thumb"><img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()"><span class="learn-play"></span></span>
                 <b>${esc(v.title)}</b><small>YouTube · ${v.len}</small></a>`).join('')}</div>
-        <button id="learn-tut" class="success">${esc(tr('🎓 Tutorial-Match starten (ca. 2 Min.)'))}</button>
-        <button id="learn-close">${esc(tr('✕ Zurück – neues Spiel'))}</button>
+        <button id="learn-tut" class="success">${esc(tr('Tutorial-Match starten (ca. 2 Min.)'))}</button>
+        <button id="learn-close">${esc(tr('Zurück – neues Spiel'))}</button>
     </div>`;
     m.style.display = 'flex';
     document.getElementById('learn-tut').onclick = () => { m.style.display = 'none'; startTutorial(); };
@@ -105,8 +105,8 @@ function tutFinish() {
         const box = document.getElementById('tut-box'); if (!box) return;
         document.getElementById('tut-labels').innerHTML = ''; document.getElementById('tut-rings').innerHTML = ''; document.getElementById('tut-arrow').innerHTML = '';
         box.className = 'tut-final';
-        box.innerHTML = `<h3>${esc(tr('🎉 Geschafft!'))}</h3><p>${esc(tr('Du kennst jetzt die Grundlagen: Ressourcen legen, Karten spielen, angreifen. Mehr steht in den Erklärungen zu den Schlüsselwörtern (Maus über eine Karte bzw. gedrückt halten) und in den Videos.'))}</p>
-            <div class="tut-actions"><button class="success" id="tut-new">${esc(tr('🎲 Neues Spiel'))}</button><button id="tut-learn">${esc(tr('📖 Lern-Menü'))}</button></div>`;
+        box.innerHTML = `<h3>${esc(tr('Geschafft!'))}</h3><p>${esc(tr('Du kennst jetzt die Grundlagen: Ressourcen legen, Karten spielen, angreifen. Mehr steht in den Erklärungen zu den Schlüsselwörtern (Maus über eine Karte bzw. gedrückt halten) und in den Videos.'))}</p>
+            <div class="tut-actions"><button class="success" id="tut-new">${esc(tr('Neues Spiel'))}</button><button id="tut-learn">${esc(tr('Lern-Menü'))}</button></div>`;
         box.style.left = '50%'; box.style.top = '50%'; box.style.transform = 'translate(-50%, -50%)';
         document.getElementById('tut-new').onclick = () => { tutStop(); initGame(); };
         document.getElementById('tut-learn').onclick = () => openLearnMenu();
