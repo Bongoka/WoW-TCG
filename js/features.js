@@ -171,6 +171,7 @@ function dbFlash(msg) {
     setTimeout(() => d.remove(), 2200);
 }
 function renderDBDeck(highlightId) {
+    if (window.dbDeleteVis) dbDeleteVis();
     const cards = currentDeckBuilder.cards, n = cards.length, hero = dbHero();
     // Fraktionsfarbe wie die Kosten-Kugel der Ally-Karten: Allianz blau, Horde rot (Ally-Gruppe, Kurve, Kosten-Kreise)
     const horde = !!hero && hero.faction === 'Horde';
@@ -890,32 +891,28 @@ function loadMaskTest() {
     render();
 }
 
-// Deck-Builder (Vollbild): Filter im Pop-up, Neu/Import/Export im Menü „⋯“. Ein Klick daneben schließt beide.
+// Deck-Builder (Vollbild): Filter im Pop-up, ein Klick daneben schließt es.
 // Am Filter-Knopf zeigt eine Zahl, wie viele Filter aktiv sind (Typ, Kosten, Set).
 (function () {
     const pop = document.getElementById('db-filter-pop'), fbtn = document.getElementById('db-filter-btn');
-    const menu = document.getElementById('db-more-menu'), mbtn = document.getElementById('db-more-btn');
     const badge = () => {
         const n = (document.querySelector('#db-type-chips .on') || {}).dataset?.type !== 'All' ? 1 : 0;
         const k = (document.querySelector('#db-cost-chips .on') || {}).dataset?.cost !== 'all' ? 1 : 0;
         const s = document.getElementById('db-set-filter').value !== 'all' ? 1 : 0;
         document.getElementById('db-filter-badge').textContent = n + k + s || '';
     };
-    fbtn.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); pop.classList.toggle('open'); fbtn.classList.toggle('on', pop.classList.contains('open')); };
-    mbtn.onclick = (e) => { e.stopPropagation(); pop.classList.remove('open'); fbtn.classList.remove('on'); menu.classList.toggle('open'); };
-    menu.addEventListener('click', () => menu.classList.remove('open'));
+    fbtn.onclick = (e) => { e.stopPropagation(); pop.classList.toggle('open'); fbtn.classList.toggle('on', pop.classList.contains('open')); };
     pop.addEventListener('click', (e) => { e.stopPropagation(); setTimeout(badge, 0); });
     pop.addEventListener('change', badge);
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#db-filter-pop, #db-filter-btn')) { pop.classList.remove('open'); fbtn.classList.remove('on'); }
-        if (!e.target.closest('.db-more')) menu.classList.remove('open');
     });
 })();
-// "⋯" → Löschen: nur für ein gespeichertes eigenes Deck sichtbar (früher in der Deck-Vorschau der Übersicht)
+// Löschen: nur für ein gespeichertes eigenes Deck sichtbar (renderDBDeck ruft dbDeleteVis)
 (function () {
     const del = document.getElementById('db-delete-btn');
     const saved = () => loadCustomDecks().find(d => d.id === currentDeckBuilder.id);
-    document.getElementById('db-more-btn').addEventListener('click', () => { del.style.display = saved() ? '' : 'none'; });
+    window.dbDeleteVis = () => { del.style.display = saved() ? '' : 'none'; };
     del.onclick = () => {
         const deck = saved(); if (!deck) return;
         uiConfirm(tr('🗑 Löschen'), tr`„${deck.name}“ löschen?`, tr('🗑 Löschen'), () => {
