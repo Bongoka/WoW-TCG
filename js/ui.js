@@ -213,6 +213,7 @@ document.addEventListener('mousemove', e => {
 // ---------------------------------------------------------------- Hauptzeichnen
 function render() {
     if (!G) return;
+    G.stopAll = prioManual();                                                            // Einstellung: in jedem Prioritätsfenster anhalten
     // Positionen vor dem Neuzeichnen merken: Karten, die das Spiel verlassen, sterben an ihrem alten Platz
     const prevRects = new Map();
     if (G.fxq && G.fxq.length) document.querySelectorAll('#arena [data-uid]').forEach(n => prevRects.set(n.dataset.uid, n.getBoundingClientRect()));
@@ -281,7 +282,7 @@ function renderTurnIndicator() {
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
     ti.className = mine ? 'me' : 'cpu';
-    ti.firstElementChild.textContent = mine ? tr('⚔ DEIN ZUG') : tr('⏳ ZUG DER CPU');
+    ti.firstElementChild.textContent = mine ? tr('⚔ DEIN ZUG') : G.online ? tr('⏳ ZUG DES GEGNERS') : tr('⏳ ZUG DER CPU');
     const eb = document.getElementById('btn-end-turn');
     eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
     eb.classList.toggle('cpu-turn', !mine);
@@ -304,6 +305,10 @@ document.addEventListener('click', (e) => {
 }, true);
 // Auto-Zugende (Einstellung, Standard an): ist nichts mehr möglich, endet der Zug nach kurzer Pause von selbst
 const AUTO_END_KEY = 'wow_tcg_auto_end_turn', AUTO_END_MS = 1100;
+// Priorität (Einstellung, Standard automatisch): "Jedes Fenster" hält in jedem Prioritätsfenster an, in dem du etwas tun
+// kannst (CR 410) – sonst nur, wenn eine Antwort gerade sinnvoll ist (respondOptions)
+const PRIO_KEY = 'wow_tcg_prio_manual';
+function prioManual() { if (typeof TUT !== 'undefined' && TUT.active) return false; try { return localStorage.getItem(PRIO_KEY) === 'on'; } catch (e) { return false; } }
 function autoEndTurn() { if (typeof TUT !== 'undefined' && TUT.active) return false; try { return localStorage.getItem(AUTO_END_KEY) !== 'off'; } catch (e) { return true; } }
 let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
@@ -615,6 +620,9 @@ function showGameOver() {
         if (best.kills) parts.push(`${best.kills} ${best.kills === 1 ? tr('Ally besiegt') : tr('Allies besiegt')}`);
         cap.innerHTML = tr`<div class="go-best">Beste Karte von ${esc(winner.hero.name)}</div><div class="go-name">${esc(best.name)}</div><div class="go-stats">${esc(parts.join(' · '))}</div>`;
     }
+    // Online: zurück in die Lobby statt einer neuen Partie gegen die CPU
+    document.getElementById('go-again').textContent = G.online ? tr('↩ Zurück zur Lobby') : tr('⚔ Nochmal (gleiche Decks)');
+    document.getElementById('go-new').style.display = G.online ? 'none' : '';
     ov.style.display = 'flex';
     ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
     if (best) box.animate([{ transform: 'rotate(-7deg) scale(.3) translateY(200px)', opacity: 0 }, { transform: 'rotate(-7deg) scale(1.08)', opacity: 1, offset: .7 }, { transform: 'rotate(-7deg) scale(1)', opacity: 1 }],
@@ -1103,7 +1111,7 @@ function heroRace(p) {
 }
 // Sagt eine passende Zeile, wenn die letzte nicht zu kurz her ist (wichtige Anlässe immer)
 function cpuSay(kind, chance = 1) {
-    if (!G || !G.real) return false;
+    if (!G || !G.real || G.online) return false;                                        // online: kein CPU-Geplapper
     const now = Date.now();
     if (!BANTER_ALWAYS.has(kind) && (now - _banter.last < 6000 || Math.random() > chance)) return false;
     const lines = BANTER[heroRace(G.p2)][kind]; if (!lines) return false;
@@ -1330,7 +1338,7 @@ function renderPendingPanel() {
     if ((d && !board) || (!d && !chain.length)) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
-    ch.innerHTML = chain.length ? tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
+    ch.innerHTML = chain.length ? tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
     opts.innerHTML = '';
     if (!d) { title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …'); return; }
     title.textContent = d.protect ? tr('🛡 Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));

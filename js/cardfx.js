@@ -79,7 +79,7 @@ EK.lookPickDo = (s, a, idx) => {
     const p = me(s, a.pid); const ids = p.looking || []; p.looking = null;
     if (idx >= 0) { const id = ids.splice(idx, 1)[0]; p.hand.push(makeCardInst(id, false, p.id)); L(s, tr`${p.hero.name} nimmt ${a.reveal || a.showTaken ? CARDS[id].name : tr(tr(tr(tr('eine Karte'))))} auf die Hand.`); }
     // Rest unter das Deck (Reihenfolge bleibt)
-    p.deck.unshift(...ids.reverse());
+    putBottom(s, p.id, ids);
 };
 // Deck durchsuchen (danach mischen)
 EK.search = (s, a) => {
@@ -583,7 +583,7 @@ FX[223] = { powers: [{ key: 'wilba', label: 'Charlotte (1/1 Spinne)', cost: 3, r
 FX[224] = { powers: [{ key: 'wyneth', label: tr('Zerstöre Untoten-Ally'), act: true, cost: 3, slots: slotAlly(tr('Untoter Ally'), true, { undead: true }), resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } }] };
 FX[225] = { leave: (s, snap, dest, info) => { if (dest === 'graveyard' && info.destroyed) { const o = foe(s, snap.wasCtrl); [o.hero, ...alliesOf(o)].forEach(c => dealDamage(s, { src: null, srcPl: snap.wasCtrl, tgt: c.uid, amt: 1, dt: 'Fire' })); } } };
 FX[227] = { enter: (s, c, pid) => q(s, { op: 'call', k: '227:bid', a: { uid: c.uid, owner: pid, bids: {} } }),
-    k: { bid: (s, a) => { const next = [1, 2].find(x => a.bids[x] === undefined); if (!next) { FX[227].k.settle(s, a); return; }
+    k: { bid: (s, a) => { const next = [s.activePlayer, s.activePlayer === 1 ? 2 : 1].find(x => a.bids[x] === undefined); if (!next) { FX[227].k.settle(s, a); return; }   // Zugspieler wählt zuerst (CR 802.1)
             const p = me(s, next); const left = hpOf(s, p.hero) - p.hero.damage; const opts = [];
             for (let n = 0; n <= Math.min(15, left - 1); n++) opts.push({ label: String(n), v: n, ai: next === a.owner ? (n === 2 ? 3 : -n * 0.3) : (n === 0 ? 1 : -n) });
             ask(s, { pid: next, prompt: tr('Barak the Shamed: Wähle geheim eine Zahl. Höchste Zahl erhält Barak und so viel Schaden.'), src: 'Barak the Shamed', opts, k: '227:set', a: { ...a, who: next }, auto: false }); },
@@ -767,7 +767,7 @@ FX[353] = { questNoPay: true, questCond: () => null, questExtra: (s, pid) => { s
 FX[354] = { reward: (s, pid) => q(s, { op: 'call', k: '354:look', a: { pid } }),
     k: { look: (s, a) => { const p = me(s, a.pid); const n = Math.min(3, p.deck.length); if (!n) return; const ids = p.deck.splice(p.deck.length - n, n).reverse(); p.looking = ids; s._hidden = true;
             ask(s, { pid: a.pid, prompt: tr`It's a Secret to Everybody: Welche Karte oben auf das Deck? (${ids.map(id => CARDS[id].name).join(', ')})`, src: "It's a Secret to Everybody", opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: CARDS[id].cost <= getReadyRes(p) + 1 ? CARDS[id].cost : -1 })), k: '354:do', a }); },
-        do: (s, a, i) => { const p = me(s, a.pid); const ids = p.looking; p.looking = null; const top = ids.splice(i, 1)[0]; p.deck.unshift(...ids.reverse()); p.deck.push(top); } } };
+        do: (s, a, i) => { const p = me(s, a.pid); const ids = p.looking; p.looking = null; const top = ids.splice(i, 1)[0]; p.deck.push(top); putBottom(s, p.id, ids); } } };
 FX[355] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 3, type: 'Ally', reveal: true, byQuest: true, src: "Kibler's Exotic Pets" } }) };
 FX[356] = { questCond: (s, pid) => alliesOf(me(s, pid)).filter(a => !a.exhausted).length >= 2 ? null : tr('Braucht 2 bereite Allies'),
     questExtra: (s, pid) => q(s, { op: 'call', k: '356:pick', a: { pid, left: 2 } }), reward: Qd(1),

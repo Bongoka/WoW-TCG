@@ -399,7 +399,8 @@ function heal(s, healerUid, tgtUid, amt) {
     }
     return v;
 }
-function putDamage(s, c, n) { if (c && n > 0) { c.damage = (c.damage || 0) + n; } }
+// "Put" damage (nicht "deal"): nie mehr als tödlicher Schaden (CR 405.3)
+function putDamage(s, c, n) { if (c && n > 0) { const d = c.damage || 0; c.damage = Math.min(d + n, Math.max(d, hpOf(s, c))); } }
 function drawCard(s, p, isSim) { return drawCards(s, p, 1); }
 function drawCards(s, p, n) {
     let got = 0;
@@ -409,7 +410,8 @@ function drawCards(s, p, n) {
         if ((p.ongoing || []).some(o => o.id === 124) && p.fk) {                         // Forbidden Knowledge
             q(s, { op: 'fkDraw', pid: p.id }); got++; continue;
         }
-        if (p.deck.length === 0) { lose(s, p.id, 'DECKOUT'); return got; }
+        // Ziehen aus leerem Deck: der Spieler ist "decked" und verliert bei der nächsten Vorprüfung (CR 410.6b, 102.1a)
+        if (p.deck.length === 0) { p.decked = true; return got; }
         const c = makeCardInst(p.deck.pop(), false, p.id);
         p.hand.push(c); got++;
         s._hidden = true;
@@ -529,7 +531,7 @@ function evt(s, name, data) {
         else f.on[name](s, e.c, data, e.pid);
     }
     if (EV[name]) {
-        if (EV_CHAIN[name]) asTrigger(s, { uid: null, id: null, name: EV_CHAIN[name] }, s.activePlayer, () => EV[name](s, data), data);
+        if (EV_CHAIN[name]) asTrigger(s, { uid: null, id: null, name: tr(EV_CHAIN[name]) }, s.activePlayer, () => EV[name](s, data), data);
         else EV[name](s, data);
     }
     // Set 2/3: Hooks für verzögerte Auslöser "this turn" (sie legen ihre Effekte selbst per pushTrig auf die Kette)
@@ -559,16 +561,61 @@ function asTrigger(s, c, pid, fn) {
     }
 }
 // PPP: wartende ausgelöste Effekte auf die Kette legen – die des Zugspielers zuerst (CR 410.5b)
+// Jeder Spieler wählt die Reihenfolge seiner eigenen wartenden Effekte (CR 708.1a): der zuerst gewählte kommt zuerst
+// auf die Kette und löst damit zuletzt auf. Gleiche Effekte (gleiche Quelle, gleiche Schritte) brauchen keine Wahl.
 function addWaitingTriggers(s) {
-    const w = s.waitTrig; s.waitTrig = [];
-    w.sort((a, b) => (a.pid === s.activePlayer ? 0 : 1) - (b.pid === s.activePlayer ? 0 : 1));
-    for (const t of w) {
-        s.chain.push({ kind: 'trigger', id: newUid('t_'), pl: t.pid, src: t.src, srcId: t.srcId, srcName: t.srcName, steps: t.steps, label: tr('Ausgelöster Effekt') });
-        L(s, tr`↯ ${t.srcName}: ausgelöster Effekt kommt auf die Kette.`);
+    const ap = s.activePlayer;
+    for (const pid of [ap, ap === 1 ? 2 : 1]) {
+        const mine = s.waitTrig.filter(t => t.pid === pid);
+        // Gefragt wird nur ein Mensch und nur, wenn die Reihenfolge das Ergebnis ändern kann (sonst unnötiger Halt)
+        if (mine.length > 1 && isHuman(s, pid) && new Set(mine.map(t => t.srcName + JSON.stringify(t.steps))).size > 1
+            && choiceMatters(s, mine, (c, t) => { const x = c.waitTrig.find(w => w.srcName === t.srcName && JSON.stringify(w.steps) === JSON.stringify(t.steps)); if (x) chainTrigger(c, x); addWaitingTriggers(c); })) {
+            mine.forEach(t => { if (!t.wid) t.wid = newUid('w_'); });
+            ask(s, { pid, prompt: tr('Mehrere ausgelöste Effekte: Welcher kommt zuerst auf die Kette (löst zuletzt auf)?'), src: tr('Ausgelöste Effekte'),
+                opts: mine.map((t, i) => ({ label: t.srcName, v: t.wid, card: t.srcId || undefined, ai: -i })), k: 'E:trigFirst', a: {}, keep: true });
+            flushBatch(s); return;
+        }
+        mine.forEach(t => chainTrigger(s, t));
     }
+    trigWindow(s);
+}
+// Ändert eine Wahl etwas? Jede Option in einer Kopie anwenden (apply(kopie, option)), alles bis zur nächsten Ruhe
+// durchspielen – mit gleichem Zufall – und die Ergebnisse vergleichen. Nur dann lohnt es, den Spieler zu fragen.
+function choiceMatters(s, opts, apply) {
+    if (typeof seededRandom !== 'function') return true;
+    const seed = Math.floor(Math.random() * 2147483647), rnd = Math.random;
+    let first = null;
+    try {
+        for (const o of opts) {
+            const c = cloneState(s);
+            Math.random = seededRandom(seed);
+            apply(c, o); process(c); autoResolve(c);
+            const sig = choiceSig(c);
+            if (first === null) first = sig; else if (sig !== first) return true;
+        }
+    } catch (e) { return true; } finally { Math.random = rnd; }
+    return false;
+}
+function choiceSig(c) {
+    const ids = a => a.map(x => x.id).sort().join(',');
+    const chars = a => a.map(x => x.id + ':' + (x.damage || 0) + ':' + !!x.exhausted + ':' + atkOf(c, x, {}) + '/' + hpOf(c, x)).sort().join(',');
+    return JSON.stringify([c.gameOver, c.winner, c.activePlayer, c.chain.length, ...[c.p1, c.p2].map(p => [chars([p.hero]), ids(p.hand), chars(p.allies), ids(p.graveyard), p.deck.length,
+        p.resources.map(r => !!r.exhausted + ':' + r.faceUp).sort().join(','), ids(p.ongoing || []), p.hero.weapons.map(w => w.id + ':' + !!w.exhausted + ':' + weaponAtk(c, w, {})).join(','), ids(p.hero.armors) + p.hero.armors.map(x => !!x.exhausted).join('')])]);
+}
+function chainTrigger(s, t) {
+    s.waitTrig = s.waitTrig.filter(x => x !== t);
+    s.chain.push({ kind: 'trigger', id: newUid('t_'), pl: t.pid, src: t.src, srcId: t.srcId, srcName: t.srcName, steps: t.steps, label: tr('Ausgelöster Effekt') });
+    L(s, tr`↯ ${t.srcName}: ausgelöster Effekt kommt auf die Kette.`);
+}
+// Danach bekommt der Zugspieler Priorität (CR 410.5)
+function trigWindow(s) {
     if (s.win) { s.win.prio = s.activePlayer; s.win.passes = 0; }
     else s.win = { prio: s.activePlayer, passes: 0 };
 }
+EK.trigFirst = (s, a, wid) => {
+    const t = (s.waitTrig || []).find(x => x.wid === wid); if (t) chainTrigger(s, t);
+    if (!s.waitTrig.length) trigWindow(s);   // sonst geht es beim nächsten Durchlauf mit den übrigen weiter
+};
 const EV = {};   // engine-eigene Reaktionen auf Ereignisse
 
 // Entscheidung anfordern. dec = {pid, prompt, opts:[{label, v, ai}], k:'id:name' | 'E:name', a:{...}, src}
@@ -642,11 +689,12 @@ function stateBased(s) {
         for (const a of dead) { L(s, tr`💀 ${a.name} erliegt seinen Wunden.`, "log-hit"); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
-    const heroDead = [s.p1, s.p2].filter(p => p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)) && !isIndestructible(s, p.hero));
+    // Held zerstört oder "decked" (aus leerem Deck ziehen müssen, CR 410.6b) – beide gleichzeitig: Unentschieden (CR 102.1a)
+    const heroDead = [s.p1, s.p2].filter(p => p.decked || (p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)) && !isIndestructible(s, p.hero)));
     if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, tr('Unentschieden!')); return true; }
-    if (heroDead.length === 1) { lose(s, heroDead[0].id, tr`${heroDead[0].hero.name} ist gefallen.`); return true; }
+    if (heroDead.length === 1) { const p = heroDead[0]; lose(s, p.id, p.decked ? 'DECKOUT' : tr`${p.hero.name} ist gefallen.`); return true; }
     // Unique + Tag-Limits (Pet(1), Totem-Tags, Ausrüstungsplätze)
-    for (const p of [s.p1, s.p2]) {
+    for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {   // Zugspieler repariert zuerst (CR 414.2)
         const v = findLimitViolation(s, p);
         if (v) {
             ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label,
@@ -690,7 +738,7 @@ function findLimitViolation(s, p) {
 // Für den menschlichen Spieler gilt das als sofortiges "Passen" (Bedienkomfort) – der Gegner darf antworten.
 function linkWindow(s, pid, ow) {
     const w = { prio: pid, passes: 0, reason: ow ? ow.reason : undefined, after: ow ? ow.after : undefined };
-    if (isHuman(s, pid)) { w.prio = pid === 1 ? 2 : 1; w.passes = 1; }
+    if (isHuman(s, pid) && !s.stopAll) { w.prio = pid === 1 ? 2 : 1; w.passes = 1; }   // "Jedes Fenster": Priorität behalten (CR 410.1)
     return w;
 }
 function openWindow(s, first, reason) {
@@ -705,83 +753,99 @@ function priorityStep(s) {
             s.queue.push({ op: 'resolveTop' });
             // Nach der Auflösung bekommt der Zugspieler wieder Priorität; das Fenster schließt erst nach
             // aufeinanderfolgendem Passen bei leerer Kette (CR 410.4). Ein Fenster der Aktionsphase ist
-            // der Ruhezustand selbst.
-            if (w.reason) s.win = { prio: s.activePlayer, passes: 0, reason: w.reason, after: w.after };
-            else closeWindow(s);
+            // der Ruhezustand selbst – auch nach einer Antwort auf das Passen des Zugspielers (CR 502.2):
+            // dann ist er wieder in seiner Aktionsphase, das Zugende fällt weg.
+            if (w.reason && w.reason !== 'action') s.win = { prio: s.activePlayer, passes: 0, reason: w.reason, after: w.after };
+            else s.win = null;
             return true;
         }
         closeWindow(s); return true;
     }
     const pid = w.prio;
-    if (isHuman(s, pid) && humanAutoPass(s, w, pid)) { passPriority(s); return true; }
-    // KI in Kopien/Simulation antwortet nie (aiRespond) – die Liste aller Instant-/Kraft-Varianten wäre umsonst
-    if (!isHuman(s, pid) && !isReal(s)) { passPriority(s); return true; }
-    const acts = getPriorityActions(s, pid);
-    if (!acts.length) { passPriority(s); return true; }
-    if (isHuman(s, pid)) {
-        if (!humanStopActions(s, pid, acts).length) { passPriority(s); return true; }
-        s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason }; return false;
-    }
-    const choice = aiRespond(s, pid, acts);
-    if (choice) { if (isReal(s)) s._oppDecided = true; doAction(s, choice, pid); }
-    else passPriority(s);
+    // Vorausschau der KI (Kopien, cloneState): dort antwortet niemand – sonst rechnete jede Kopie wieder Kopien durch
+    if (s.look && !isHuman(s, pid)) { passPriority(s); return true; }
+    // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
+    const opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    if (!opts.length) { passPriority(s); return true; }
+    if (isHuman(s, pid)) { s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason }; return false; }
+    if (isReal(s)) s._oppDecided = true;
+    doAction(s, opts[0].a, pid);
     return true;
 }
-// Bedienkomfort: Bei leerer Kette im Ready-/Draw-Fenster und im eigenen End-Fenster passt der Mensch automatisch
-function humanAutoPass(s, w, pid) {
-    // Angriffsvorschlag allein auf der Kette: reagieren kann man gleich danach im Angriffsfenster
-    if (s.chain.length === 1 && s.chain[0].kind === 'proposal') return true;
-    if (s.chain.length) return false;
-    if (w.reason === 'ready' || w.reason === 'draw') return true;
-    if (w.reason === 'end' && s.activePlayer === pid) return true;
-    return false;
-}
-// Bedienkomfort (kein Regelbestandteil – Passen ist immer erlaubt, CR 410): Der Mensch wird nur gefragt,
-// wenn er auf das aktuelle Geschehen tatsächlich reagieren kann. Alles, was er genauso gut später in der
-// eigenen Aktionsphase tun kann, ist kein Grund anzuhalten. Ist das Fenster offen, darf er weiterhin alles nutzen.
-//  - Quests abschließen hält nie an.
-//  - Kette: nur bei einem Link des Gegners. Relevant sind Karten/Kräfte, die den Link selbst als Ziel wählen
-//    können (z. B. Counterspell), einen beteiligten gegnerischen Gegenstand schädigend (Quelle, Ziele, Angreifer)
-//    oder einen beteiligten eigenen Gegenstand helfend (Ziel des Links, Verteidiger). Ungezielte Instants
-//    zählen, wenn der Link eigene Karten betrifft.
-//  - Kampf: nur im letzten Kampffenster (nach Protect Point und Verteidigung, CR 602) mit denselben Kriterien
-//    bezogen auf Angreifer und Verteidiger.
-//  - Ready-/Draw-/End-Fenster ohne Kette: nichts, worauf reagiert werden müsste.
-function humanStopActions(s, pid, acts) {
-    const involved = new Set(), link = new Set();
+// Wann eine Antwort überhaupt in Frage kommt (kein Regelbestandteil – Passen ist immer erlaubt, CR 410.2):
+//  - 'react': ein Link des Gegners liegt oben auf der Kette, oder ein Kampf steht im letzten Fenster vor dem
+//    Kampfschaden (CR 602). Ein Angriffsvorschlag allein zählt nicht – reagieren kann man im Kampffenster.
+//  - 'end': End-Fenster des gegnerischen Zugs bei leerer Kette. Bereite Ressourcen sind jetzt übrig (sie werden
+//    im eigenen Ready-Schritt ohnehin bereit) – die letzte Gelegenheit, sie in diesem Zug zu nutzen.
+//  - sonst nichts: Ready-/Draw-Fenster, eigenes Zugende, Passen in der Aktionsphase (CR 502.2: das End-Fenster folgt).
+function respondMoment(s, pid) {
     const top = s.chain[s.chain.length - 1];
-    if (top) {
-        if (top.pl === pid) return [];
-        [top.id, top.card && top.card.uid].forEach(u => { if (u) link.add(u); });
-        [top.src, top.att, top.def, ...(top.targets || []).flat()].forEach(u => { if (u) involved.add(u); });
-    } else if (s.battle) {
-        if (s.battle.step !== 'damage') return [];
-        involved.add(s.battle.att); involved.add(s.battle.def);
-    } else {
-        // Zugende des Gegners: Karten mit "… this turn" (FX.endStop, z. B. Revenge, Gifte) gehen später nicht mehr
-        if (s.win && s.win.reason === 'end' && s.activePlayer !== pid)
-            return acts.filter(a => a.type === 'PLAY_CARD' && (() => { const c = a.gyUid ? findCharacter(s, a.gyUid) : getPlayer(s, pid).hand[a.handIdx]; return c && fx(c).endStop; })());
-        return [];
+    if (top) return top.pl !== pid && top.kind !== 'proposal' && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
+    if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
+    if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
+    return null;
+}
+// Sinnvolle Antworten für pid, beste zuerst: [{a, gain}]. Der Mensch wird nur gefragt, wenn es eine gibt; die KI
+// spielt die beste. Für jede Instant-Karte, Kraft und Quest wird gleich bewertet (evaluateState):
+//  - 'react': die Antwort muss jetzt mehr bringen als Passen UND mehr als dieselbe Antwort nach der Auflösung
+//    (Counterspell, Schaden verhindern, Kampftricks). Was danach genauso gut geht (Innervate), hält nicht an.
+//  - 'end': die Antwort muss mehr bringen als Passen (die Ressourcen wären sonst verschenkt).
+const RESPOND_MAX = 8;
+function respondOptions(s, pid) {
+    const moment = respondMoment(s, pid);
+    if (!moment || typeof evaluateState !== 'function') return [];
+    const acts = respondCandidates(s, pid, getPriorityActions(s, pid));
+    if (!acts.length) return [];
+    const vPass = respondValue(s, pid, null, false);
+    if (vPass === null) return [];
+    // Der Mensch entscheidet selbst, ob sich ein teurer Konter lohnt: Antworten auf den Link selbst (Counterspell)
+    // halten immer an, sonst reicht beim Reagieren "kaum schlechter als Passen" (die Bewertung ist nur eine Schätzung)
+    const human = isHuman(s, pid), top = s.chain[s.chain.length - 1];
+    const onLink = a => !!top && (a.targets || []).flat().some(u => u === top.id || (top.card && u === top.card.uid));
+    const out = [];
+    for (const a of acts) {
+        const vNow = respondValue(s, pid, a, false);
+        if (vNow === null) continue;
+        if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
+        if (vNow <= vPass + (human && moment === 'react' ? -2 : 0.5)) continue;
+        if (moment === 'react') { const vLater = respondValue(s, pid, a, true); if (vLater !== null && vNow <= vLater + 0.5) continue; }
+        out.push({ a, gain: vNow - vPass });
     }
-    const useful = (u, harm) => {
-        if (link.has(u)) return true;
-        if (!involved.has(u)) return false;
-        if (harm === undefined) return true;
-        const mine = ctrlOf(s, findCharacter(s, u)) === pid;
-        return harm ? !mine : mine;
-    };
-    // Ungezielte Instants nur, wenn das Geschehen eigene Karten betrifft (Kampf, Angriff, eigenes Ziel)
-    const p = getPlayer(s, pid);
-    const hitsMe = [...involved].some(u => ctrlOf(s, findCharacter(s, u)) === pid);
-    return acts.filter(a => {
-        let f = null, src = null;
-        if (a.type === 'PLAY_CARD') { src = a.gyUid ? findCharacter(s, a.gyUid) : p.hand[a.handIdx]; f = src && fx(src); }
-        else if (a.type === 'ACTIVATE') { src = findCharacter(s, a.srcUid); f = src && getPower(s, src, a.key); }
-        if (!f) return false;
-        const slots = targetSlots(s, pid, f, src, { x: a.x, mode: a.mode });
-        if (!slots.length) return a.type === 'PLAY_CARD' && (!top || top.kind === 'proposal' || hitsMe);
-        return slots.some(sl => sl.cands.some(u => useful(u, sl.harm)));
-    });
+    return out.sort((x, y) => y.gain - x.gain);
+}
+// Je Karte/Kraft/Quest höchstens drei Varianten (Ziele sind schon nach KI-Wert sortiert), insgesamt RESPOND_MAX
+function respondCandidates(s, pid, acts) {
+    const p = getPlayer(s, pid), per = {}, out = [];
+    for (const a of acts) {
+        const k = a.type === 'ACTIVATE' ? a.srcUid + ':' + a.key : a.type === 'COMPLETE_QUEST' ? 'q' + a.resIdx : 'c' + (a.gyUid || (p.hand[a.handIdx] || {}).id);
+        if ((per[k] = (per[k] || 0) + 1) > 3) continue;
+        out.push(a); if (out.length >= RESPOND_MAX) break;
+    }
+    return out;
+}
+// Wert für pid, nachdem alles bis zur nächsten eigenen Entscheidung durchgelaufen ist (in einer Kopie):
+// act = null → passen; later → erst passen, dann dieselbe Aktion (gleiche Karte/Quelle/Ziele), falls noch möglich
+function respondValue(s, pid, act, later) {
+    const c = cloneState(s);
+    const settle = () => { process(c); autoResolve(c); };
+    try {
+        if (!act || later) passPriority(c); else doAction(c, act, pid);
+        settle();
+        if (later && !c.gameOver) {
+            const a = respondRelocate(s, c, pid, act); if (!a) return null;
+            if (!canActInstant(c, pid)) { if (c.win || c.pending) return null; c.win = { prio: pid, passes: 0 }; }
+            if (validateAction(c, a, pid)) return null;
+            doAction(c, a, pid); settle();
+        }
+        return evaluateState(c, pid);
+    } catch (e) { return null; }
+}
+// Dieselbe Aktion in einer späteren Kopie (Handposition und Quest-Platz können sich verschoben haben)
+function respondRelocate(s, c, pid, a) {
+    const p0 = getPlayer(s, pid), p = getPlayer(c, pid), b = { ...a };
+    if (a.type === 'PLAY_CARD' && !a.gyUid) { const u = p0.hand[a.handIdx].uid; b.handIdx = p.hand.findIndex(x => x.uid === u); if (b.handIdx < 0) return null; }
+    if (a.type === 'COMPLETE_QUEST') { const u = p0.resources[a.resIdx].card.uid; b.resIdx = p.resources.findIndex(r => r.card.uid === u); if (b.resIdx < 0) return null; }
+    return b;
 }
 function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = w.prio === 1 ? 2 : 1; }
 function priorityPrompt(s, pid) {
@@ -803,26 +867,31 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
     if (!card) return 0;
     let cost = (card.cost || 0) + (card.xCost ? (x || 0) : 0);
     if (card.type === 'Quest' || card.type === 'Hero') return 0;
+    // Erst Erhöhungen, dann Senkungen in beliebiger Reihenfolge (CR 707.1e): die "to a minimum of (1)"-Senkungen
+    // kommen zuerst – ihre Grenze gilt nur für sie selbst, danach dürfen die übrigen bis 0 senken
+    let less = 0;
+    const mod = v => { if (v > 0) cost += v; else less -= v; };
     // Nature's Swiftness: (5) weniger für die nächste Karte in diesem Zug
-    pes(s, p.id, 'nextCardLess').forEach(m => { if (!m.used) cost -= m.v; });
+    pes(s, p.id, 'nextCardLess').forEach(m => { if (!m.used) less += m.v; });
     // Set 2/3: eigene Kostenregel der Karte, Dauereffekte, "next ability/Pet this turn"
     const f = FX[card.id];
-    if (f && f.selfCost) cost += f.selfCost(s, p.id, card) || 0;
+    if (f && f.selfCost) mod(f.selfCost(s, p.id, card) || 0);
     let minOne = 0;
     for (const e of auraSrcs(s)) {
         const h = FX[e.c.id].aura.cost; if (!h) continue;
         const r = h(s, e.c, e.pid, p.id, card, targets); if (!r) continue;
-        if (typeof r === 'object') minOne += r.min1 || 0; else cost += r;
+        if (typeof r === 'object') minOne += r.min1 || 0; else mod(r);
     }
-    pes(s, p.id, 'nextAbilityLess').forEach(m => { if (!m.used && card.type === 'Ability') cost -= m.v; });
-    pes(s, p.id, 'nextPetLess').forEach(m => { if (!m.used && card.isPet) cost -= m.v; });
+    pes(s, p.id, 'nextAbilityLess').forEach(m => { if (!m.used && card.type === 'Ability') less += m.v; });
+    pes(s, p.id, 'nextPetLess').forEach(m => { if (!m.used && card.isPet) less += m.v; });
     // Staff of the Ruins: "(1) less … for each card in your graveyard with the same name as that ability"
-    pes(s, p.id, 'ruins').forEach(m => { if (!m.used && card.type === 'Ability') cost -= p.graveyard.filter(c => c.name === card.name).length; });
+    pes(s, p.id, 'ruins').forEach(m => { if (!m.used && card.type === 'Ability') less += p.graveyard.filter(c => c.name === card.name).length; });
     pes(s, p.id, 'abilitiesLessMin1').forEach(m => { if (card.type === 'Ability') minOne += m.v; });
     if (card.type === 'Ability' && card.school === 'Elemental' && (p.ongoing || []).some(o => o.id === 108)) {
         minOne += (p.ongoing || []).filter(o => o.id === 108).length;                     // Elemental Focus, min (1)
     }
     if (minOne > 0) cost = Math.max(Math.min(cost, 1), cost - minOne);                    // "… to a minimum of (1)"
+    cost -= less;
     return Math.max(0, cost);
 }
 function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length; }
@@ -1021,16 +1090,20 @@ function doAction(s, a, pid) {
         }
     } else if (s.win && s.win.prio === pid && a.type === 'PASS') { passPriority(s); return; }
     switch (a.type) {
-        case 'END_TURN': s.phase = 'end'; s.queue.push({ op: 'turn', step: 'endPhase' }); return;
+        // Der Zugspieler passt in seiner Aktionsphase (CR 502.2): der Gegner bekommt noch Priorität. Passt auch er,
+        // beginnt die End-Phase; fügt er einen Link hinzu, ist der Zugspieler danach wieder in seiner Aktionsphase.
+        case 'END_TURN': s.win = { prio: pid === 1 ? 2 : 1, passes: 1, reason: 'action', after: [{ op: 'turn', step: 'endPhase' }] }; return;
         case 'PLACE_RESOURCE': {
             const c = p.hand.splice(a.handIdx, 1)[0];
-            // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
-            p.resources.push({ card: c, faceUp: !!a.faceUp, exhausted: !!(a.faceUp && FX[c.id] && FX[c.id].resExhausted) });
-            evt(s, 'resEnters', { pid: p.id });                                                   // Shard of the Flame
             s.placedResource = true;
+            // Eine Ressource zu legen fügt sie der Kette hinzu (CR 412.1a, 705.2); verdeckt bleibt sie unbekannt (707.1a),
+            // unterbrechen kann man sie nicht (711.3) – sie heißt deshalb "res" statt "card". Ins Spiel kommt sie beim Auflösen.
+            s.chain.push({ kind: 'resource', id: newUid('r_'), pl: p.id, res: c, faceUp: !!a.faceUp, srcId: a.faceUp ? c.id : null,
+                srcName: a.faceUp ? c.name : tr('Verdeckte Karte'), label: tr('Ressource') });
             L(s, tr`[${p.hero.name}] Ressource: ${a.faceUp ? c.name + ' (offen)' : tr('verdeckt')}`);
             if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
             evt(s, 'handLeft', { pid: p.id, uid: c.uid });                                        // Evocation
+            s.win = linkWindow(s, p.id, s.win);
             flushBatch(s);
             return;
         }
@@ -1180,7 +1253,7 @@ function finishPrep(s) {
         addPE(s, p.id, { k: 'playedCard', id: it.card.id, type: it.card.type });              // Slow, Naolin Sunsurge …
         if (!it.fromGy) evt(s, 'handLeft', { pid: p.id, uid: it.card.uid });                  // Evocation
         s.chain.push(it);
-        L(s, `▶ [${p.hero.name}] spielt ${it.card.name}${it.x !== undefined && it.x !== null ? ` (X=${it.x})` : ''}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
+        L(s, tr`▶ [${p.hero.name}] spielt ${it.card.name}` + `${it.x !== undefined && it.x !== null ? ` (X=${it.x})` : ''}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
         fxEvent(s, { t: 'play', uid: it.card.uid, pid: p.id, cost: it.card.cost || 0 });
         statPlayed(s, p.id, it.card.id);
@@ -1201,6 +1274,12 @@ function resolveTop(s) {
     const p = getPlayer(s, it.pl);
     s.resolvingCard = null;
     s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
+    if (it.kind === 'resource') {
+        // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
+        p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
+        evt(s, 'resEnters', { pid: p.id });                                                   // Shard of the Flame
+        return;
+    }
     if (it.kind === 'trigger') {
         if (it.interrupted) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         it.steps.forEach(st => q(s, st));
@@ -1503,15 +1582,15 @@ function dmgStep(s, o) {
         if (o.dt === 'Ranged') amt += unattachedOngoing(pp, 34).length;                  // Aspect of the Hawk
         if (o.dt === 'Shadow') amt += unattachedOngoing(pp, 88).length;                  // Shadowform
         if (o.ability) amt += countCtrl(s, sp, 282);                                      // Chromatic Cloak
-        if (o.dt === 'Fire') for (let i = 0; i < unattachedOngoing(pp, 61).length; i++) amt *= 2; // World in Flames
     }
     if (t.type === 'Hero' && amt > 0) amt += unattachedOngoing(tp, 136).length;           // Berserker Stance (erhalten)
+    // Verdoppeln zuletzt: die Erhöhungen wählt der Verursacher (CR 717.4a) – erst alle +N, dann ×2
+    if (heroSrc && amt > 0 && o.dt === 'Fire') for (let i = 0; i < unattachedOngoing(getPlayer(s, sp), 61).length; i++) amt *= 2; // World in Flames
     // 2) Verhinderung
     let unprev = !!o.unprev;
     if (heroSrc && countCtrl(s, sp, 297) > 0) unprev = true;                              // Lionheart Helm
     if (o.weapon && o.combat) { const w = findCharacter(s, o.weapon); if (w && w.id === 312) unprev = true; } // Annihilator
     if (!unprev && auraAny(s, 'unprev', src, t, o)) unprev = true;                         // Surprise Attacks, Kelvor Valorshine … (Set 2/3)
-    const prevented = { holyShield: 0 };
     if (!unprev && amt > 0) {
         const all = () => { amt = 0; };
         // Set 2/3: Verhinderung durch Dauereffekte und "this turn"-Effekte
@@ -1527,20 +1606,37 @@ function dmgStep(s, o) {
         if (heroSrc) amt = Math.max(0, amt - unattachedOngoing(getPlayer(s, sp), 139).length); // Defensive Stance (verursacht)
         if (t.type === 'Hero') amt = Math.max(0, amt - unattachedOngoing(tp, 139).length);    // Defensive Stance (erhalten)
         amt = Math.max(0, amt - unattachedOngoing(tp, 66).length);                            // Devotion Aura
-        // "Prevent the next N" Schilde
-        for (const m of tms(s, t, 'shield')) {
-            if (amt <= 0) break;
-            if (m.srcUid && m.srcUid !== (src && src.uid)) continue;
-            if (m.allyCombat && !(o.combat && src && isAllyLike(src))) continue;              // Mana Shield: nur Kampfschaden von Allies
-            const pv = Math.min(m.v, amt); m.v -= pv; amt -= pv;
-            if (m.reflect && pv > 0) prevented.holyShield += pv;
+    }
+    dmgShields(s, { o, tgt: t.uid, amt, unprev, sp, tp: tp.id, heroSrc, src: src ? src.uid : null, reflect: 0 });
+}
+// "Prevent the next N"-Schilde. Welcher zuerst verbraucht wird, wählt der Besitzer des Ziels (CR 717.4b) – gefragt
+// wird der Mensch nur, wenn es einen Unterschied macht: verschiedene Schilde (z. B. Holy Shield wirft zurück) und
+// der Schaden verbraucht nicht alle.
+function dmgShields(s, c) {
+    const t = findCharacter(s, c.tgt), tp = getPlayer(s, c.tp), src = c.src ? findCharacter(s, c.src) : null, o = c.o;
+    if (t && !c.unprev) {
+        const ok = m => m.v > 0 && !(m.srcUid && m.srcUid !== c.src)
+            && !(m.allyCombat && !(o.combat && src && isAllyLike(src)));                   // Mana Shield: nur Kampfschaden von Allies
+        for (;;) {
+            const usable = tms(s, t, 'shield').filter(ok);
+            if (c.amt <= 0 || !usable.length) break;
+            let m = usable[0];
+            if (c.picked) { m = usable.find(x => x.sid === c.picked) || m; c.picked = null; }
+            else if (isHuman(s, c.tp) && c.amt < usable.reduce((n, x) => n + x.v, 0) && new Set(usable.map(x => JSON.stringify({ ...x, v: 0, sid: 0 }))).size > 1) {
+                usable.forEach(x => { if (!x.sid) x.sid = newUid('sh_'); });
+                ask(s, { pid: c.tp, prompt: tr`${t.name} erhält ${c.amt} Schaden: Welche Verhinderung zuerst?`, src: tr('Schadensverhinderung'),
+                    opts: usable.map(x => ({ label: shieldLabel(s, x), v: x.sid, ai: x.reflect ? 1 : 0 })), k: 'E:shieldPick', a: { c }, keep: true });
+                return;
+            }
+            const pv = Math.min(m.v, c.amt); m.v -= pv; c.amt -= pv;
+            if (m.reflect && pv > 0) c.reflect += pv;
         }
         t.tm = (t.tm || []).filter(m => !(m.k === 'shield' && m.v <= 0));
     }
-    const st = { ...o, amt, unprev, sp, tp: tp.id, heroSrc, reflect: prevented.holyShield };
-    if (prevented.holyShield > 0 && src) dealDamage(s, { src: tp.hero.uid, tgt: src.uid, amt: prevented.holyShield, dt: 'Holy' }); // Holy Shield
+    const st = { ...o, amt: c.amt, unprev: c.unprev, sp: c.sp, tp: c.tp, heroSrc: c.heroSrc, reflect: c.reflect };
+    if (c.reflect > 0 && src) dealDamage(s, { src: tp.hero.uid, tgt: src.uid, amt: c.reflect, dt: 'Holy' }); // Holy Shield
     // 3) Rüstung
-    if (t.type === 'Hero' && !unprev && amt > 0) {
+    if (t && t.type === 'Hero' && !c.unprev && c.amt > 0) {
         const armors = tp.hero.armors.filter(a => a.type === 'Armor' && !a.exhausted && defOf(s, a) > 0);
         if (armors.length) {
             s._batch.push({ op: 'call', k: 'E:armorAsk', a: { st }, v: null });
@@ -1548,6 +1644,11 @@ function dmgStep(s, o) {
         }
     }
     s._batch.push({ ...st, op: 'dmgApply' });
+}
+EK.shieldPick = (s, a, sid) => dmgShields(s, { ...a.c, picked: sid });
+function shieldLabel(s, m) {
+    return tr`Verhindert noch ${m.v}` + (m.reflect ? tr(' · wirft den Schaden zurück') : '') + (m.srcUid ? tr` · nur Schaden von ${nameOf(s, m.srcUid)}` : '')
+        + (m.allyCombat ? tr(' · nur Kampfschaden von Allies') : '') + (m.combat ? tr(' · nur in diesem Kampf') : '');
 }
 EK.armorAsk = (s, a) => {
     const st = a.st; const tp = getPlayer(s, st.tp);
@@ -1697,6 +1798,48 @@ EK.destroyOwnResource = (s, a) => {
     ask(s, { pid: p.id, prompt: tr('Zerstöre eine eigene Ressource'), src: tr('The Cruel Hand of Timmy'), opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Verdeckte Ressource ${i + 1}${r.exhausted ? tr(tr(tr(tr(' (erschöpft)')))) : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: 'E:destroyResDo', a: {} });
 };
 EK.destroyResDo = (s, a, uid) => destroyResource(s, uid);
+// "Each player destroys a resource/an ally he controls" (CR 802.1): erst wählt der Zugspieler, dann der nächste;
+// danach wird alles gleichzeitig zerstört
+function eachPlayerDestroys(s, kind, src) {
+    q(s, { op: 'call', k: 'E:eachPick', a: { kind, src, order: [s.activePlayer, s.activePlayer === 1 ? 2 : 1], picks: [] } });
+}
+EK.eachPick = (s, a) => {
+    const pid = a.order[a.picks.length];
+    if (pid === undefined) {
+        a.picks.forEach(u => { if (!u) return; if (a.kind === 'resource') destroyResource(s, u); else { const c = findCharacter(s, u); if (c) destroy(s, c); } });
+        return;
+    }
+    const p = getPlayer(s, pid);
+    const opts = a.kind === 'resource'
+        ? p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Verdeckte Ressource ${i + 1}${r.exhausted ? tr(' (erschöpft)') : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 }))
+        : playerDestroyList(s, p, a.kind).map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) }));
+    if (!opts.length) { EK.eachSet(s, a, null); return; }
+    ask(s, { pid, prompt: a.kind === 'resource' ? tr('Zerstöre eine eigene Ressource') : tr`${a.src}: Zerstöre eine eigene Karte`, src: a.src, opts, k: 'E:eachSet', a });
+};
+EK.eachSet = (s, a, v) => q(s, { op: 'call', k: 'E:eachPick', a: { ...a, picks: [...a.picks, v] } });
+
+// Mehrere Karten unter das Deck: der Besitzer wählt die Reihenfolge (CR 415.3c). Gefragt wird der Mensch nur, wenn
+// es verschiedene Karten sind und sie noch gezogen werden können (darüber liegen höchstens BOTTOM_ASK Karten).
+// then = { k, a }: geht danach weiter (z. B. "… then draw that many")
+const BOTTOM_ASK = 7;
+function putBottom(s, pid, ids, then = null) {
+    const p = getPlayer(s, pid);
+    if (ids.length > 1 && new Set(ids).size > 1 && isHuman(s, pid) && p.deck.length <= BOTTOM_ASK) {
+        q(s, { op: 'call', k: 'E:bottomPick', a: { pid, ids: ids.slice(), then } }); return;
+    }
+    p.deck.unshift(...ids.slice().reverse());                                             // ids[0] liegt zuoberst
+    if (then) q(s, { op: 'call', k: then.k, a: then.a });
+}
+EK.bottomPick = (s, a) => {
+    const p = getPlayer(s, a.pid);
+    if (a.ids.length <= 1) { p.deck.unshift(...a.ids); if (a.then) q(s, { op: 'call', k: a.then.k, a: a.then.a }); return; }
+    const seen = new Set();
+    const opts = a.ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: -i })).filter(o => !seen.has(o.card) && seen.add(o.card));
+    ask(s, { pid: a.pid, prompt: tr('Unter das Deck: Welche Karte kommt als Nächstes (liegt weiter oben)?'), src: tr('Reihenfolge unter dem Deck'), opts, k: 'E:bottomSet', a });
+};
+// Die gewählte Karte kommt unter das Deck, die nächste darunter
+EK.bottomSet = (s, a, i) => { const ids = a.ids.slice(); const id = ids.splice(i, 1)[0]; getPlayer(s, a.pid).deck.unshift(id); q(s, { op: 'call', k: 'E:bottomPick', a: { ...a, ids } }); };
+EK.drawN = (s, a) => drawCards(s, getPlayer(s, a.pid), a.n);
 function destroyResource(s, cardUid) {
     for (const p of [s.p1, s.p2]) {
         const i = p.resources.findIndex(r => r.card.uid === cardUid);
@@ -1771,7 +1914,7 @@ function makeToken(s, tokenId, pid, extra = {}) {
 // Forbidden Knowledge: statt zu ziehen eine entfernte Karte wählen
 function fkDraw(s, pid) {
     const p = getPlayer(s, pid);
-    if (!p.fk || !p.fk.length) { lose(s, pid, 'DECKOUT'); return; }
+    if (!p.fk || !p.fk.length) { p.decked = true; return; }
     const seen = new Set();
     const opts = p.fk.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; }).map(id => ({ label: CARDS[id].name, v: id, card: id, ai: (CARDS[id].cost || 0) }));
     ask(s, { pid, prompt: tr('Forbidden Knowledge: Wähle eine entfernte Karte'), src: 'Forbidden Knowledge', opts, k: 'E:fkPick', a: { pid } });
@@ -2402,21 +2545,6 @@ function aiPick(s, d) {
     for (const o of d.opts) { const v = o.ai !== undefined ? o.ai : 0; if (v > bv) { bv = v; best = o; } }
     return best.v;
 }
-// Antwort auf ein Prioritätsfenster: nur in echten Partien mit kurzer Simulation
-function aiRespond(s, pid, acts) {
-    if (!isReal(s) || !acts.length) return null;
-    if (typeof evaluateState !== 'function') return null;
-    const base = (() => { const c = cloneState(s); passPriority(c); process(c); autoResolve(c); return evaluateState(c, pid); })();
-    let best = null, bv = base + 4;
-    for (const a of acts.slice(0, 14)) {
-        const c = cloneState(s);
-        try { doAction(c, a, pid); process(c); autoResolve(c); } catch (e) { continue; }
-        const v = evaluateState(c, pid);
-        if (v > bv) { bv = v; best = a; }
-    }
-    return best;
-}
-
 // Hilfsfunktion für Tests/UI: Instant-Optionen für den menschlichen Spieler
 function humanPriorityOptions() { return G && G.pending && G.pending.kind === 'priority' ? getPriorityActions(G, G.pending.pid) : []; }
 

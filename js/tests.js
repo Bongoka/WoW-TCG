@@ -233,9 +233,13 @@ function runRuleTests() {
         advanceTurn(s, true);
         assert(P(s, 1).hand.length === 7, 'Hand ' + P(s, 1).hand.length);
     });
-    test(32, 'Deckout: Ziehen aus leerem Deck verliert', () => {
+    test(32, 'Deckout: Ziehen aus leerem Deck verliert bei der nächsten Vorprüfung, beide zugleich = Unentschieden (CR 410.6b, 102.1a)', () => {
         const s = fresh(); P(s, 1).deck = []; drawCards(s, P(s, 1), 1);
+        assert(!s.gameOver && P(s, 1).decked, 'Verlust schon vor der Vorprüfung');
+        process(s);
         assert(s.gameOver && s.winner === 2, 'Kein Deckout');
+        const s2 = fresh(); P(s2, 1).deck = []; P(s2, 2).deck = []; drawCards(s2, P(s2, 1), 1); drawCards(s2, P(s2, 2), 1); process(s2);
+        assert(s2.gameOver && s2.winner === null, 'Beide decked: kein Unentschieden');
     });
     test(33, 'Mulligan nur einmal', () => {
         const s = fresh(); dealOpeningHands(s);
@@ -315,17 +319,20 @@ function runRuleTests() {
         s2.humans = [2];
         applyAction(s2, { type: 'PLAY_CARD', handIdx: hand(s2, 1, 33), targets: [[P(s2, 2).hero.uid]], actorId: 1 }, true, 1);
         assert(s2.pending && s2.pending.kind === 'priority' && s2.pending.pid === 2, 'Nicht angehalten trotz Counterspell');
-        // Kampf: nur ein Halt (letztes Kampffenster), wenn ein Instant den Angreifer treffen kann
-        const s3 = fresh('alliance_mage', 'alliance_hunter'); res(s3, 2, 3); hand(s3, 2, 33); const a = put(s3, 1, 262);
-        s3.humans = [2];
-        applyAction(s3, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s3, 2).hero.uid, actorId: 1 }, true, 1);
-        let stops = 0, n = 0;
-        while (s3.pending && n++ < 50) {
-            const d = s3.pending;
-            if (d.kind === 'priority') { stops++; applyAction(s3, { type: 'PASS', actorId: 2 }, true, 2); }
-            else applyAction(s3, { type: 'CHOOSE', v: aiPick(s3, d), actorId: d.pid }, true, d.pid);
+        // Kampf: ein Halt (letztes Kampffenster) nur, wenn der Instant jetzt mehr bringt als danach – Arcane Shot
+        // tötet den angeschlagenen Angreifer vor dem Kampfschaden; beim unverletzten Angreifer wäre er danach gleich gut
+        for (const [dmg, want] of [[2, 1], [0, 0]]) {
+            const s3 = fresh('alliance_mage', 'alliance_hunter'); res(s3, 2, 3); hand(s3, 2, 33); const a = put(s3, 1, 262); a.damage = dmg;
+            s3.humans = [2];
+            applyAction(s3, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s3, 2).hero.uid, actorId: 1 }, true, 1);
+            let stops = 0, n = 0;
+            while (s3.pending && n++ < 50) {
+                const d = s3.pending;
+                if (d.kind === 'priority') { stops++; applyAction(s3, { type: 'PASS', actorId: 2 }, true, 2); }
+                else applyAction(s3, { type: 'CHOOSE', v: aiPick(s3, d), actorId: d.pid }, true, d.pid);
+            }
+            assert(stops === want && P(s3, 2).hero.damage === 5, `Kampf (${dmg} Schaden am Angreifer): ${stops} Halte, ${P(s3, 2).hero.damage} Schaden`);
         }
-        assert(stops === 1 && P(s3, 2).hero.damage === 5, `Kampf: ${stops} Halte, ${P(s3, 2).hero.damage} Schaden`);
     });
     test(44, 'KI: Held greift nicht mit 0 Angriff an', () => {
         const s = fresh('alliance_mage', 'alliance_hunter'); s.real = false;
@@ -802,6 +809,120 @@ function runRuleTests() {
         const gear = Object.values(CARDS).filter(c => (c.type === 'Armor' || c.type === 'Weapon') && !c.isToken && coachLegal(c, rogue)).slice(0, 12).map(c => c.id);
         assert(coachStats(rogue, gear).singles === 0, 'Ausrüstung zählt als Einzelkopie');
     });
+    // Alle offenen Prioritäts-Abfragen passen, sonstige Entscheidungen wie die KI
+    const passAll = s => { let n = 0; while (s.pending && n++ < 60) { const d = s.pending; applyAction(s, d.kind === 'priority' ? { type: 'PASS', actorId: d.pid } : { type: 'CHOOSE', v: aiPick(s, d), actorId: d.pid }, true, d.pid); } };
+    test(97, 'Priorität: Passt der Zugspieler in seiner Aktionsphase, darf der Gegner noch antworten (CR 502.2)', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter'); res(s, 2, 3); const k = hand(s, 2, 33);
+        s.humans = [1, 2]; s.stopAll = true;
+        applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+        assert(s.pending && s.pending.kind === 'priority' && s.pending.pid === 2 && s.phase === 'main', 'Gegner hat in der Aktionsphase keine Priorität');
+        assert(applyAction(s, { type: 'PLAY_CARD', handIdx: k, targets: [[P(s, 1).hero.uid]], actorId: 2 }, true, 2), 'Arcane Shot nicht spielbar');
+        passAll(s);
+        assert(P(s, 1).hero.damage === 1 && isIdle(s) && s.activePlayer === 1, 'Zugspieler ist danach nicht wieder in seiner Aktionsphase');
+        applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1); passAll(s);
+        assert(s.activePlayer === 2, 'Zug endet nach erneutem Passen nicht');
+    });
+    test(98, 'KI antwortet auch in Simulationen: Counterspell gegen tödliche Fähigkeit, Quest am gegnerischen Zugende', () => {
+        const s = fresh('alliance_hunter', 'alliance_mage'); res(s, 1, 5); res(s, 2, 3);
+        const j = hand(s, 1, 41); hand(s, 2, 51); P(s, 2).hero.damage = hpOf(s, P(s, 2).hero) - 2;
+        s.humans = [1];
+        applyAction(s, { type: 'PLAY_CARD', handIdx: j, targets: [[P(s, 2).hero.uid]], actorId: 1 }, true, 1); passAll(s);
+        assert(!s.gameOver && P(s, 2).graveyard.some(c => c.id === 51) && P(s, 1).graveyard.some(c => c.id === 41), 'KI hat Multi-Shot nicht unterbrochen');
+        // Quest mit Kartenzug: im End-Fenster des Gegners mit übrigen Ressourcen abschließen – "On your turn"-Quests nicht
+        const s2 = fresh(); res(s2, 2, 3); res(s2, 2, 1, 360); res(s2, 2, 1, 342); s2.humans = [1];
+        const q = P(s2, 2).resources.find(r => r.card.id === 342);
+        assert(checkQuestCondition(s2, P(s2, 2), q), '"On your turn"-Quest im gegnerischen Zug abschließbar');
+        applyAction(s2, { type: 'END_TURN', actorId: 1 }, true, 1); passAll(s2);
+        assert(s2.activePlayer === 2 && !P(s2, 2).resources.find(r => r.card.id === 360).faceUp && q.faceUp, 'KI hat die Quest im gegnerischen Zug nicht (richtig) abgeschlossen');
+    });
+    test(100, 'Ausgelöste Effekte: der Spieler wählt die Reihenfolge seiner eigenen (CR 708.1a) – gefragt nur, wenn sie etwas ändert', () => {
+        const trig = (name, id, st) => ({ pid: 1, src: null, srcId: id, srcName: name, steps: [st] });
+        const draw = { op: 'call', k: 'E:drawN', a: { pid: 1, n: 1 } }, discard = { op: 'call', k: 'E:discard', a: { pid: 1, n: 1, src: 'Test' } };
+        // Ziehen und Abwerfen bei leerer Hand: die Reihenfolge entscheidet, ob die Karte auf der Hand bleibt
+        const s = fresh(); s.humans = [1]; P(s, 1).hand = [];
+        s.waitTrig = [trig('Ziehen', 111, draw), trig('Abwerfen', 116, discard)]; process(s);
+        const d = s.pending;
+        assert(d && d.kind === 'choose' && d.k === 'E:trigFirst' && d.opts.length === 2, 'Keine Wahl der Reihenfolge');
+        doAction(s, { type: 'CHOOSE', v: d.opts.find(o => o.card === 116).v }, 1); execStep(s, s.queue.shift());
+        assert(s.chain.length === 1 && s.chain[0].srcId === 116, 'Gewählter Effekt liegt nicht zuunterst');
+        process(s); passAll(s);
+        assert(!s.chain.length && !s.waitTrig.length && P(s, 1).hand.length === 0 && P(s, 1).graveyard.length === 1, 'Ziehen hätte zuerst auflösen müssen');
+        // Zwei Effekte, deren Reihenfolge nichts ändert: kein Halt
+        const s2 = fresh(); s2.humans = [1]; const h = P(s2, 1).hand.length;
+        s2.waitTrig = [trig('Ziehen A', 111, draw), trig('Ziehen B', 116, draw)]; process(s2);
+        assert(!s2.pending && P(s2, 1).hand.length === h + 2, 'Unnötig angehalten (Reihenfolge egal)');
+        // KI wird nie gefragt
+        const s3 = fresh(); P(s3, 1).hand = []; s3.waitTrig = [trig('Ziehen', 111, draw), trig('Abwerfen', 116, discard)]; process(s3);
+        assert(!s3.pending, 'KI hängt bei der Reihenfolge');
+    });
+    test(104, 'Reihenfolge unter dem Deck (CR 415.3c): gefragt nur bei wenigen Karten darüber, sonst kein Halt', () => {
+        const s = fresh(); s.humans = [1]; P(s, 1).deck = P(s, 1).deck.slice(0, 3);
+        putBottom(s, 1, [192, 33, 41]); process(s);
+        assert(s.pending && s.pending.k === 'E:bottomSet' && s.pending.opts.length === 3, 'Keine Wahl bei kleinem Deck');
+        applyAction(s, { type: 'CHOOSE', v: s.pending.opts.find(o => o.card === 41).v, actorId: 1 }, true, 1);
+        applyAction(s, { type: 'CHOOSE', v: s.pending.opts.find(o => o.card === 192).v, actorId: 1 }, true, 1);
+        assert(!s.pending && JSON.stringify(P(s, 1).deck.slice(0, 3)) === JSON.stringify([33, 192, 41]), 'Falsche Reihenfolge: ' + P(s, 1).deck.slice(0, 3));
+        const s2 = fresh(); s2.humans = [1]; putBottom(s2, 1, [192, 33]); process(s2);
+        assert(!s2.pending && P(s2, 1).deck[0] === 33 && P(s2, 1).deck[1] === 192, 'Unnötig angehalten (großes Deck)');
+    });
+    test(105, 'Gleichzeitige Wahl (CR 802.1): erst der Zugspieler, dann zerstören beide zugleich', () => {
+        const s = fresh('alliance_hunter', 'alliance_mage', 2); res(s, 1, 2); res(s, 2, 2); s.humans = [1, 2];
+        eachPlayerDestroys(s, 'resource', 'Test'); process(s);
+        assert(s.pending && s.pending.pid === 2, 'Zugspieler wählt nicht zuerst');
+        applyAction(s, { type: 'CHOOSE', v: s.pending.opts[0].v, actorId: 2 }, true, 2);
+        assert(s.pending && s.pending.pid === 1 && P(s, 2).resources.length === 2, 'Zerstört, bevor alle gewählt haben');
+        applyAction(s, { type: 'CHOOSE', v: s.pending.opts[0].v, actorId: 1 }, true, 1);
+        assert(P(s, 1).resources.length === 1 && P(s, 2).resources.length === 1, 'Nicht beide zerstört');
+    });
+    test(106, 'Reihenfolge der Schadensverhinderung (CR 717.4b): gefragt nur bei verschiedenen Schilden, die nicht alle verbraucht werden', () => {
+        const mk = (shields) => { const s = fresh(); s.humans = [1]; const a = put(s, 2, 262); shields(s, a); dealDamage(s, { src: a.uid, tgt: P(s, 1).hero.uid, amt: 2 }); process(s); return { s, a }; };
+        const { s, a } = mk((s, a) => { addTM(P(s, 1).hero, { k: 'shield', v: 3, turn: s.turn }); addTM(P(s, 1).hero, { k: 'shield', v: 5, turn: s.turn, srcUid: a.uid, reflect: true }); });
+        assert(s.pending && s.pending.k === 'E:shieldPick' && s.pending.opts.length === 2, 'Keine Wahl der Verhinderung');
+        applyAction(s, { type: 'CHOOSE', v: s.pending.opts.find(o => /zurück|reflect/.test(o.label)).v, actorId: 1 }, true, 1); passAll(s);
+        assert(P(s, 1).hero.damage === 0 && (findCharacter(s, a.uid) || { damage: 2 }).damage >= 2, 'Holy Shield hat nicht zurückgeworfen');
+        const r2 = mk(s => { addTM(P(s, 1).hero, { k: 'shield', v: 3, turn: s.turn }); addTM(P(s, 1).hero, { k: 'shield', v: 1, turn: s.turn }); });
+        assert(!r2.s.pending && P(r2.s, 1).hero.damage === 0, 'Unnötig angehalten (gleichartige Schilde)');
+    });
+    if (typeof netMirror === 'function') test(101, 'Online: gespiegelter Zustand für den Gast (Spieler 1 ⇄ 2), zweimal gespiegelt = Original', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter'); res(s, 1, 2); res(s, 2, 3); hand(s, 2, 33); put(s, 2, 262);
+        s.humans = [1, 2]; s.stopAll = true; s.netReady = { 1: true, 2: false };
+        applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);                      // offenes Fenster mit Priorität für Spieler 2
+        const st = JSON.parse(JSON.stringify(s)), m = netMirror(st);
+        assert(m.p1.hero.uid === s.p2.hero.uid && m.p1.id === 1 && m.p1.hero.owner === 1 && m.p2.allies.length === 0, 'Gast ist nicht Spieler 1');
+        assert(m.activePlayer === 2 && m.pending && m.pending.pid === 1 && m.win.prio === 1 && m.netReady[2] === true && m.lastTurnOf[1] === s.lastTurnOf[2], 'Spieler-IDs nicht getauscht');
+        assert(JSON.stringify(netMirror(m)) === JSON.stringify(st), 'Zweimal gespiegelt ≠ Original');
+        assert(!validateAction(m, { type: 'PASS', actorId: 1 }, 1) && getPriorityActions(m, 1).some(a => a.type === 'PLAY_CARD'), 'Gast kann im gespiegelten Zustand nicht antworten');
+    });
+    test(102, 'Ressource legen ist ein Link auf der Kette (CR 412.1a), nicht unterbrechbar (711.3)', () => {
+        const s = fresh('alliance_hunter', 'alliance_mage'); s.placedResource = false; res(s, 2, 3); hand(s, 2, 51);
+        const n = P(s, 1).resources.length; hand(s, 1, 192);
+        s.humans = [1, 2]; s.stopAll = true;
+        applyAction(s, { type: 'PLACE_RESOURCE', handIdx: P(s, 1).hand.length - 1, faceUp: false, actorId: 1 }, true, 1);
+        assert(s.chain.length === 1 && s.chain[0].kind === 'resource' && P(s, 1).resources.length === n, 'Ressource nicht auf der Kette');
+        if (s.pending && s.pending.pid === 1) applyAction(s, { type: 'PASS', actorId: 1 }, true, 1);
+        assert(s.pending && s.pending.pid === 2, 'Gegner bekommt keine Priorität');
+        assert(!getPriorityActions(s, 2).some(a => a.type === 'PLAY_CARD' && CARDS[P(s, 2).hand[a.handIdx].id].name === 'Counterspell'), 'Ressource kann unterbrochen werden');
+        applyAction(s, { type: 'PASS', actorId: 2 }, true, 2); passAll(s);
+        assert(!s.chain.length && P(s, 1).resources.length === n + 1 && s.placedResource, 'Ressource nicht ins Spiel gekommen');
+    });
+    test(103, 'Kosten: "to a minimum of (1)" gilt nur für die eigene Senkung (CR 707.1e), "put damage" höchstens tödlich (CR 405.3)', () => {
+        const s = fresh('horde_shaman', 'alliance_mage'); put(s, 1, 108);
+        const fs = makeCardInst(109, false, 1);
+        assert(getPlayCost(s, P(s, 1), fs) === 1, 'Elemental Focus: Frost Shock sollte 1 kosten');
+        addPE(s, 1, { k: 'nextAbilityLess', v: 1 });
+        assert(getPlayCost(s, P(s, 1), fs) === 0, `Mit weiterer Senkung um 1: ${getPlayCost(s, P(s, 1), fs)} statt 0`);
+        const h = P(s, 1).hero, hp = hpOf(s, h); h.damage = hp - 2; putDamage(s, h, 5);
+        assert(h.damage === hp, `Put damage: ${h.damage} statt ${hp}`);
+    });
+    test(99, 'Priorität: Mensch hält am gegnerischen Zugende nur für eine lohnende Quest an', () => {
+        for (const [quest, want] of [[360, true], [342, false]]) {
+            const s = fresh(); res(s, 2, 3); res(s, 2, 1, quest); s.humans = [2];
+            applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+            const stop = !!(s.pending && s.pending.kind === 'priority' && s.pending.pid === 2 && s.win && s.win.reason === 'end');
+            assert(stop === want, `${CARDS[quest].name}: ${stop ? 'angehalten' : 'nicht angehalten'}`);
+            if (stop) { const i = P(s, 2).resources.findIndex(r => r.card.id === quest); assert(applyAction(s, { type: 'COMPLETE_QUEST', resIdx: i, actorId: 2 }, true, 2), 'Quest nicht abschließbar'); passAll(s); assert(!P(s, 2).resources[i].faceUp, 'Quest nicht umgedreht'); }
+        }
+    });
     LANG = prevLang;
     return results;
 }
@@ -931,7 +1052,7 @@ function runCardTests(ids) {
             const uid = base.p1.hand[0].uid;
             let s = canPlayCard(base, 1, base.p1.hand[0]) ? null : base, why = canPlayCard(base, 1, base.p1.hand[0]), scen = '';
             for (const [name, start] of (s ? [] : SCENARIOS)) {
-                const t = cloneState(base); t.humans = [1];
+                const t = cloneState(base); t.humans = [1]; t.stopAll = true;
                 const m = tryRun(() => start(t) ? findMoment(t, uid) : null);
                 if (m && typeof m === 'object') { s = m; scen = ` [${name}]`; break; }
             }

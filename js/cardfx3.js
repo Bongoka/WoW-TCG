@@ -298,7 +298,7 @@ FX[2110] = { aura: { strike: (s, src, sp, pid) => pid === sp ? -1 : 0 } };
 FX[2111] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.damage > 0) trig(s, { k: 'destroyUid', a: { uid: c.uid } }); } } };
 FX[2112] = { aura: { kw: (s, src, sp, c, k) => k === 'activateNow' && isAllyLike(c) && ctrlOf(s, c) === sp } };
 FX[2113] = { powers: [{ key: 'cadd', label: tr('Jeder Spieler zerstört eine Ressource'), act: true, cost: 5, aiSkip: (s, pid) => me(s, pid).resources.length - 5 <= foe(s, pid).resources.length,
-    resolve: (s, it) => [it.pl, it.pl === 1 ? 2 : 1].forEach(x => q(s, { op: 'call', k: 'E:destroyOwnResource', a: { pid: x } })) }] };
+    resolve: (s, it) => eachPlayerDestroys(s, 'resource', 'Caddrick Von Styler') }] };   // CR 802.1
 FX[2114] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 2114, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => yesNo(s, a.pid, tr('Celee Cogfreeze: Eine Karte ziehen und dann eine abwerfen?'), 'Celee Cogfreeze', '2114:do', a, true),
         do: (s, a, v) => { if (v && drawCards(s, me(s, a.pid), 1)) q(s, { op: 'call', k: 'E:discard', a: { pid: a.pid, n: 1, src: 'Celee Cogfreeze' } }); } } };

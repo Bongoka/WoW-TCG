@@ -137,7 +137,7 @@ function commitUndoSnapshot(snap, action) {
     UNDO.stack.push({ snap, desc: describeUndoAction(snap, action) });
     if (UNDO.stack.length > UNDO.max) UNDO.stack.shift();
 }
-function canUndo() { if (typeof TUT !== 'undefined' && TUT.active) return false; return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && isIdle(G); }
+function canUndo() { if (typeof TUT !== 'undefined' && TUT.active) return false; if (G && G.online) return false; return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && isIdle(G); }
 function undoLastAction() {
     if (!canUndo()) return;
     const { snap, desc } = UNDO.stack.pop();
@@ -180,6 +180,7 @@ function pickDeck(key) {
 }
 let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
 function initGame(seedPlayerDeck = null, seedOppDeck = null) {
+    if (typeof netLeaveGame === 'function') netLeaveGame();                             // neues Spiel beendet eine Online-Partie
     if (typeof tutStop === 'function') tutStop();                                       // neues Spiel beendet ein laufendes Tutorial
     UNDO.stack = [];
     if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
@@ -199,34 +200,54 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     refreshDisplay(G);
     resetBanter();
     const startPlay = () => {
-        showTurnBanner(tr("Dein Zug!")); setTimeout(() => cpuSay('greet'), 1400);
+        if (G.activePlayer === 2) { showTurnBanner(tr("CPU ist am Zug!")); setTimeout(driveCpu, 900); }
+        else showTurnBanner(tr("Dein Zug!"));
+        setTimeout(() => cpuSay('greet'), 1400);
         // Einmaliger Bedienhinweis beim allerersten Spiel
         let seen = true; try { seen = localStorage.getItem('wow_tcg_hint_seen') === '1'; localStorage.setItem('wow_tcg_hint_seen', '1'); } catch (e) {}
         if (!seen) setTimeout(() => showToast(matchMedia('(hover: none)').matches ? tr('Karten ziehen zum Ausspielen · gedrückt halten: Karte groß ansehen') : tr('Karten ziehen oder anklicken zum Ausspielen · Maus darüber: Karte groß ansehen'), false, 6000), 1800);
     };
-    if (mulliganMode() === 'hs') {
-        // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
-        UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
+    const mulligan = () => {
+        if (mulliganMode() === 'hs') {
+            // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
+            UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
+            render();
+            openHsMulligan(startPlay);
+            return;
+        }
         render();
-        openHsMulligan(startPlay);
-        return;
-    }
+        // Mulligan (CR 101.2: einmal)
+        openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
+            { label: tr("Behalten"), cls: "success", action: startPlay },
+            { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } },
+            { label: tr("📖 Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
+        ]);
+    };
+    // Wer den ersten Zug macht, wählt der Gewinner eines Zufallswurfs (CR 101.1) – die CPU wählt immer den ersten Zug
+    const cpuFirst = () => { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; };
     render();
-    // Mulligan (CR 101.2: einmal)
-    openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
-        { label: tr("Behalten"), cls: "success", action: startPlay },
-        { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } },
-        { label: tr("📖 Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
-    ]);
+    if (Math.random() < 0.5) {
+        openDecisionModal(tr("Münzwurf gewonnen"), tr("Du darfst wählen, wer den ersten Zug macht. Wer beginnt, zieht im ersten Zug keine Karte."), [
+            { label: tr("⚔ Ich beginne"), cls: "success", action: mulligan },
+            { label: tr("Die CPU beginnt"), action: () => { cpuFirst(); mulligan(); } }
+        ]);
+    } else { cpuFirst(); showToast(tr("Münzwurf: Die CPU hat gewonnen und beginnt."), false, 3500); mulligan(); }
 }
 
 // Menschliche Aktion ausführen; danach ggf. die CPU weiterlaufen lassen
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
     if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
+    // Online: der Gast schickt seine Aktion an den Host, der Host rechnet erst, wenn beide den Mulligan hinter sich haben
+    if (G.online) {
+        if (NET.role === 'guest') return netGuestAct(action);
+        if (NET.role !== 'host') { showToast(tr('Die Online-Partie ist beendet.')); return false; }
+        if (!netBothReady()) { showToast(tr('Warte auf den Mulligan des Gegners …')); return false; }
+    }
     const dmgBefore = G.p2.hero.damage;
     const why = validateAction(G, { ...action, actorId: 1 }, 1);
     const ok = applyAction(G, { ...action, actorId: 1 }, false, 1);
+    if (ok && G.online) netPush();
     if (!ok && why && typeof showToast === 'function') showToast(why);                 // Grund sichtbar auf dem Spielfeld
     UI.reset();
     render();
@@ -282,7 +303,7 @@ function cpuDecide(s, pid, difficulty) {
 // CPU steuern: läuft, solange die CPU am Zug ist und keine Entscheidung des Menschen offen ist
 let _cpuRunning = false;
 async function driveCpu() {
-    if (_cpuRunning || !G || G.gameOver) return;
+    if (_cpuRunning || !G || G.gameOver || G.online) return;                               // online: kein CPU-Gegner
     _cpuRunning = true;
     let steps = 0, announced = false;
     try {
@@ -399,6 +420,12 @@ function bootGame() {
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
     document.getElementById("btn-new-game").onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
+    document.getElementById("btn-online").onclick = openOnline;
+    const popBtn = document.getElementById("btn-mp-popups");
+    const updPop = () => { popBtn.textContent = netPopupsOn() ? tr("🌐 Lobby-Hinweise: An") : tr("🌐 Lobby-Hinweise: Aus"); };
+    popBtn.onclick = () => { try { localStorage.setItem(NET_POPUP_KEY, netPopupsOn() ? "off" : "on"); } catch (e) {} updPop(); netBackground(); };
+    updPop();
+    setTimeout(netBackground, 3000);                                                      // im Hintergrund verbinden: Hinweise auf neue Lobbys
     document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; document.getElementById("sim-modal").style.display = "none"; };   // laufende Simulation beenden
     document.getElementById("btn-decks").onclick = openDeckOverview;
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
@@ -424,8 +451,8 @@ function bootGame() {
         _cfgImgPath = imgPathInput.value.trim() || "AZEROTH-{id}-EA.png";
         imgPathInput.onchange = (e) => { _cfgImgPath = e.target.value.trim() || "AZEROTH-{id}-EA.png"; render(); };
     }
-    document.getElementById("go-again").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(..._lastDecks); };
-    document.getElementById("go-new").onclick = () => { document.getElementById("log-area").innerHTML = ""; initGame(); };
+    document.getElementById("go-again").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; initGame(..._lastDecks); };
+    document.getElementById("go-new").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; initGame(); };
     document.getElementById("go-close").onclick = hideGameOver;
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
@@ -439,6 +466,10 @@ function bootGame() {
     const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("⏩ Auto-Zugende: An") : tr("⏸ Auto-Zugende: Aus"); };
     autoBtn.onclick = () => { try { localStorage.setItem(AUTO_END_KEY, autoEndTurn() ? 'off' : 'on'); } catch (e) {} updAuto(); if (G) render(); };
     updAuto();
+    const prioBtn = document.getElementById("btn-prio-mode");
+    const updPrio = () => { prioBtn.textContent = prioManual() ? tr("✋ Priorität: Jedes Fenster") : tr("⚡ Priorität: Automatisch"); };
+    prioBtn.onclick = () => { try { localStorage.setItem(PRIO_KEY, prioManual() ? "off" : "on"); } catch (e) {} updPrio(); if (G) G.stopAll = prioManual(); };
+    updPrio();
     probeImageDirs(updateImgStyleOptions);
     // Kartenbilder: Normal, Original-Scans oder Normal + High Resolution
     const rerenderImgs = () => { if (G) render(); const db = document.getElementById("deck-builder-modal"); if (db && db.style.display === 'flex') renderDBAll(); };

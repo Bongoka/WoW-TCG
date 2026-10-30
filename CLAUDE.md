@@ -39,12 +39,13 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
 | `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups |
 | `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Oberfläche: ab 60 Karten wird die Heldenkarte zum Avatar (`COACH_FACE` = Gesichtsausschnitt je Held), Chat links über den Karten. Texte nur Englisch (ohne `tr`) |
+| `online.js` | Online-Multiplayer 1 gegen 1 (Menü „Online-Spiel“): Lobbys mit Code, Lobbyliste, Chat, Bereit/Start, Hinweis-Popups auf neue Lobbys. Läuft ohne eigenen Server über einen öffentlichen MQTT-Broker (`NET_BROKERS`). Der Host rechnet die Partie (`G.online`, `G.humans = [1, 2]`), der Gast schickt nur Aktionen und sieht den Zustand gespiegelt (`netMirror`: Spieler 1 ⇄ 2) – **neue Zustandsfelder mit Spieler-ID** müssen in `NET_PID_KEYS`/`NET_PID_MAPS` stehen |
 
 Wichtige Engine-Konzepte:
 - Der Zustand ist reines JSON (keine Funktionen). Fortsetzungen nach Entscheidungen laufen über Schlüssel (`k: 'id:name'` → `FX[id].k[name]`, `'E:name'` → `EK[name]`).
 - `s.real` = echte Partie (Log, Sound, Mensch); Kopien für KI/Simulation haben `real=false`, `humans=[]`.
 - Ausgelöste Effekte warten in `waitTrig` und kommen beim nächsten Prioritätspunkt auf die Kette (Zugspieler zuerst).
-- Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`).
+- Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`). Auch das Legen einer Ressource ist ein Kettenglied (`kind: 'resource'`, Karte in `res`, nicht unterbrechbar, CR 412.1a).
 - `cloneState` (eigene Tiefenkopie `deepCopy`, schneller als `structuredClone`) teilt nur die statischen Kartenlisten (`CLONE_SHARED`: `limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`, `allyTypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
 
 ## Veröffentlichen (GitHub Pages)
@@ -82,4 +83,4 @@ Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit fes
 - Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
 - Alle Simulations-Tests (Start-Decks, Turnier-Decks, All-Cards) laufen über dieselbe Funktion `runSimulation(spiele, decks, titel, pairs)` – nur die Paarungen wechseln (`pairs`: feste Paare oder Funktionen, die je Spiel neue Decks liefern). In Runden: jede Paarung einmal pro Runde. Neue Tests nur als neue Paarungen anlegen, keine eigene Schleife.
 - „Abbrechen & auswerten“ / Schließen setzt `SIM_STOP.req`; bei Abbruch oder Fehler wertet `runSimulation` die bis dahin gespielten Spiele aus (mit Anteil in %).
-- In Simulationen antwortet die CPU nie mit Instants in Prioritätsfenstern (nur in echten Partien, `aiRespond`).
+- Antworten in Prioritätsfenstern (Instants, Kräfte, Quests) wählen Mensch und KI über dieselbe Bewertung `respondOptions` (engine.js): bei einem gegnerischen Link oder im letzten Kampffenster nur, was jetzt mehr bringt als nach der Auflösung; am gegnerischen Zugende alles, was mehr bringt als Passen (übrige Ressourcen). Die KI antwortet so auch in Simulationen. In Kopien (`cloneState` setzt `look`) antwortet niemand – sonst rechnete jede Vorausschau wieder Kopien durch. `stopAll` (Kartentests, Einstellung „Priorität: Jedes Fenster“) lässt den Menschen in jedem Fenster anhalten.

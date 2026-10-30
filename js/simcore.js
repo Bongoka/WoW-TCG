@@ -32,7 +32,16 @@ function simulateOneGame(deckA, deckB) {
             steps++;
         }
         if (s.gameOver) break;
-        advanceTurn(s, true);
+        // Zug beenden wie ein Spieler: der Gegner bekommt noch Priorität (CR 502.2) – antwortet er, geht die Aktionsphase
+        // weiter. "Must attack if able" verbietet das Passen (CR 600.2): dann zuerst den Pflichtangriff.
+        const t = s.turn;
+        if (!applyAction(s, { type: 'END_TURN', actorId: pid }, true, pid)) {
+            const forced = getAttackActions(s, pid)[0];
+            if (forced && guard++ < 5000 && applyAction(s, forced, true, pid)) { autoResolve(s); continue; }
+            advanceTurn(s, true);
+        }
+        autoResolve(s);
+        if (s.turn === t && !s.gameOver && guard++ < 5000) continue;
         turns++;
     }
     let winner = s.winner;

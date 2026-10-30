@@ -69,7 +69,7 @@ function deepCopy(v) {
 }
 function cloneState(s) {
     const c = deepCopy({ ...s, _undo: null, fxq: null });
-    c.real = false; c.humans = [];
+    c.real = false; c.humans = []; c.look = true;   // Vorausschau: in Kopien antwortet niemand in Prioritätsfenstern
     return c;
 }
 

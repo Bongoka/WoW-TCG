@@ -22,12 +22,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="manifest" href="manifest.json?v=202610300023">
+    <link rel="manifest" href="manifest.json?v=202610300945">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>WoW TCG – Azeroth vs CPU</title>
-    <link rel="stylesheet" href="css/style.css?v=202610300023">
-    <link rel="stylesheet" href="css/cards.css?v=202610300023">
+    <link rel="stylesheet" href="css/style.css?v=202610300945">
+    <link rel="stylesheet" href="css/cards.css?v=202610300945">
 </head>
 <body>
 
@@ -98,6 +98,7 @@
         </div>
     </div>
     <button id="btn-new-game">🎲 Neues Spiel (Zufällig)</button>
+    <button id="btn-online" style="border-color:#3b82f6; background:#1e3a5f; color:#bfdbfe;">🌐 Online-Spiel</button>
     <button id="btn-decks" style="border-color:#8a6d2b;">📖 Deck Übersicht</button>
     <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">🛠 Deck Builder</button>
     <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">🎁 Booster öffnen</button>
@@ -113,6 +114,8 @@
                 </select>
             </div>
             <button id="btn-auto-end" title="Zug automatisch beenden, wenn nichts mehr möglich ist">⏩ Auto-Zugende: An</button>
+            <button id="btn-prio-mode" title="Automatisch: das Spiel hält nur an, wenn ein Instant, eine Kraft oder Quest gerade sinnvoll ist. Jedes Fenster: Anhalten in jedem Prioritätsfenster, in dem du etwas tun kannst.">⚡ Priorität: Automatisch</button>
+            <button id="btn-mp-popups" title="Hinweis einblenden, wenn jemand eine offene Online-Lobby erstellt">🌐 Lobby-Hinweise: An</button>
             <button id="btn-mulligan-mode" title="Mulligan-Art umschalten (gilt ab dem nächsten Spiel)">🔄 Mulligan: Standard</button>
             <button id="btn-cpu-speed" title="Pausen im CPU-Zug (Klick aufs Spielfeld überspringt sie)">🐢 CPU-Tempo: Normal</button>
             <button id="btn-rules-text" title="Keyword-Erklärungen: Casual (kurz & einfach) oder Expert (offizielle Regeltexte)">💬 Regeltexte: Casual</button>
@@ -350,32 +353,33 @@
     <canvas id="booster-fx"></canvas>
 </div>
 
-<script src="js/i18n_en.js?v=202610300023"></script>
-<script src="js/i18n.js?v=202610300023"></script>
-<script src="js/utils.js?v=202610300023"></script>
-<script src="js/cards.js?v=202610300023"></script>
-<script src="js/cards2.js?v=202610300023"></script>
-<script src="js/cards3.js?v=202610300023"></script>
-<script src="js/cards4.js?v=202610300023"></script>
-<script src="js/cards5.js?v=202610300023"></script>
-<script src="js/decks.js?v=202610300023"></script>
-<script src="js/state.js?v=202610300023"></script>
-<script src="js/engine.js?v=202610300023"></script>
-<script src="js/cardfx.js?v=202610300023"></script>
-<script src="js/cardfx2.js?v=202610300023"></script>
-<script src="js/cardfx3.js?v=202610300023"></script>
-<script src="js/cardfx4.js?v=202610300023"></script>
-<script src="js/cardfx5.js?v=202610300023"></script>
-<script src="js/ai.js?v=202610300023"></script>
-<script src="js/renderer.js?v=202610300023"></script>
-<script src="js/ui.js?v=202610300023"></script>
-<script src="js/simcore.js?v=202610300023"></script>
-<script src="js/tests.js?v=202610300023"></script>
-<script src="js/tourneydecks.js?v=202610300023"></script>
-<script src="js/features.js?v=202610300023"></script>
-<script src="js/coach.js?v=202610300023"></script>
-<script src="js/backgrounds.js?v=202610300023"></script>
-<script src="js/tutorial.js?v=202610300023"></script>
-<script src="js/main.js?v=202610300023"></script>
+<script src="js/i18n_en.js?v=202610300945"></script>
+<script src="js/i18n.js?v=202610300945"></script>
+<script src="js/utils.js?v=202610300945"></script>
+<script src="js/cards.js?v=202610300945"></script>
+<script src="js/cards2.js?v=202610300945"></script>
+<script src="js/cards3.js?v=202610300945"></script>
+<script src="js/cards4.js?v=202610300945"></script>
+<script src="js/cards5.js?v=202610300945"></script>
+<script src="js/decks.js?v=202610300945"></script>
+<script src="js/state.js?v=202610300945"></script>
+<script src="js/engine.js?v=202610300945"></script>
+<script src="js/cardfx.js?v=202610300945"></script>
+<script src="js/cardfx2.js?v=202610300945"></script>
+<script src="js/cardfx3.js?v=202610300945"></script>
+<script src="js/cardfx4.js?v=202610300945"></script>
+<script src="js/cardfx5.js?v=202610300945"></script>
+<script src="js/ai.js?v=202610300945"></script>
+<script src="js/renderer.js?v=202610300945"></script>
+<script src="js/ui.js?v=202610300945"></script>
+<script src="js/simcore.js?v=202610300945"></script>
+<script src="js/tests.js?v=202610300945"></script>
+<script src="js/tourneydecks.js?v=202610300945"></script>
+<script src="js/features.js?v=202610300945"></script>
+<script src="js/coach.js?v=202610300945"></script>
+<script src="js/backgrounds.js?v=202610300945"></script>
+<script src="js/tutorial.js?v=202610300945"></script>
+<script src="js/online.js?v=202610300945"></script>
+<script src="js/main.js?v=202610300945"></script>
 </body>
 </html>

@@ -454,9 +454,12 @@ FX[1144] = { slots: slotAlly('Ally +1/+1', false), resolve: (s, it) => { it.atta
 FX[1145] = { resolve: (s, it) => [...alliesOf(s.p1), ...alliesOf(s.p2)].forEach(a => destroy(s, a)) };
 FX[1146] = { slots: slotAlly(tr('Ally erhält Stealth'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; }, aura: { kw: (s, src, sp, c, k) => k === 'stealth' && c.uid === src.attachedTo } };
 // "Target player destroys a(n) … he controls" – der Spieler wählt selbst
+function playerDestroyList(s, p, kind) {
+    return kind === 'equipment' ? [...p.hero.weapons, ...p.hero.armors] : kind === 'ability' ? [...p.ongoing, ...totemsOf(p)].filter((c, i, a) => a.indexOf(c) === i) : kind === 'ally' ? alliesOf(p) : [...p.ongoing, ...alliesOf(p), ...p.hero.weapons, ...p.hero.armors].filter((c, i, a) => a.indexOf(c) === i);
+}
 function playerDestroys(s, pid, kind, src) {
     const p = me(s, pid);
-    const list = kind === 'equipment' ? [...p.hero.weapons, ...p.hero.armors] : kind === 'ability' ? [...p.ongoing, ...totemsOf(p)].filter((c, i, a) => a.indexOf(c) === i) : kind === 'ally' ? alliesOf(p) : [...p.ongoing, ...alliesOf(p), ...p.hero.weapons, ...p.hero.armors].filter((c, i, a) => a.indexOf(c) === i);
+    const list = playerDestroyList(s, p, kind);
     if (!list.length) return;
     ask(s, { pid, prompt: tr`${src}: Zerstöre eine eigene Karte`, src, opts: list.map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), k: 'E:optDestroy', a: {} });
 }
@@ -508,7 +511,7 @@ FX[1167] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl === pid && d.sna
         resolve: (s, it) => opposingChars(s, it.pl).forEach(x => dealDamage(s, { src: null, srcPl: it.pl, tgt: x.uid, amt: 1, dt: 'Nature' })) }],
     k: { pay: (s, a, uid) => { destroy(s, findCharacter(s, uid), { cause: 'cost' }); q(s, { op: 'call', k: 'E:finishPrep', a: {} }); } } };
 FX[1168] = { powers: [{ key: 'ilandre', label: tr('Hand unter das Deck, gleich viele ziehen'), act: true, aiSkip: (s, pid) => me(s, pid).hand.length < 3,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; s._hidden = true; drawCards(s, p, n); } }] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; const ids = p.hand.map(c => c.id); handLeftAll(s, p); p.hand = []; s._hidden = true; putBottom(s, p.id, ids, { k: 'E:drawN', a: { pid: p.id, n } }); } }] };
 FX[1169] = { selfCost: (s, pid) => -alliesOf(me(s, pid)).filter(a => !a.isToken && a.faction === 'Alliance' && a.type === 'Ally').length,
     aura: { noReady: (s, src, sp, c) => ctrlOf(s, c) !== sp && c.type !== 'Hero' } };
 FX[1171] = { aura: { atk: (s, src, sp, c) => isAllyLike(c) && c !== src && ctrlOf(s, c) === sp ? 1 : 0, hp: (s, src, sp, c) => isAllyLike(c) && c !== src && ctrlOf(s, c) === sp ? 1 : 0 } };
@@ -653,7 +656,7 @@ FX[1249] = { enter: (s, c, pid) => trig(s, { id: 1249, k: 'go', a: { pid } }),
     k: { go: (s, a) => { const p = me(s, a.pid); const n = Math.min(3, p.deck.length); const ids = p.deck.splice(p.deck.length - n, n).reverse(); s._hidden = true;
         L(s, tr`👁 ${p.hero.name} deckt auf: ${ids.map(id => CARDS[id].name).join(', ') || '–'}`);
         ids.filter(id => CARDS[id].type === 'Ability').forEach(id => p.hand.push(makeCardInst(id, false, p.id)));
-        p.deck.unshift(...ids.filter(id => CARDS[id].type !== 'Ability').reverse()); } } };
+        putBottom(s, p.id, ids.filter(id => CARDS[id].type !== 'Ability')); } } };
 FX[1250] = { powers: [{ key: 'eclipse', label: tr('Deck entfernen, Friedhof wird das Deck'), cost: 1, aiSkip: () => true,
     selfCost: (s, it, src) => { removeFromGame(s, src); },
     resolve: (s, it) => { const p = me(s, it.pl); p.deck.forEach(id => p.removed.push(makeCardInst(id, false, p.id))); p.deck = shuffleDeck(p.graveyard.filter(c => !c.isToken).map(c => c.id)); p.graveyard = []; s._hidden = true; L(s, tr`${p.hero.name}: Der Friedhof ist jetzt das Deck.`); } }] };
@@ -699,7 +702,7 @@ FX[1274] = { on: strikeLongRange, powers: [{ key: 'guru', label: tr('Zerstören:
 FX[1275] = { enter: (s, c, pid) => mayPick(s, pid, tr('Halberd of Smiting: Beschädigten Ally zerstören?'), 'Halberd of Smiting', targetCands(s, pid, { ally: true, damaged: true }), 'E:optDestroy', {}) };
 FX[1276] = { aura: { strike: (s, src, sp, pid, w) => w === src && s.battle && s.battle.def === heroOf(s, sp).uid ? -3 : 0 } };
 FX[1277] = { on: { drew: (s, c, d) => putDamage(s, heroOf(s, d.pid), 1) } };
-FX[1278] = { enter: (s, c, pid) => { [pid, pid === 1 ? 2 : 1].forEach(x => q(s, { op: 'call', k: 'E:destroyOwnResource', a: { pid: x } })); } };
+FX[1278] = { enter: (s, c, pid) => eachPlayerDestroys(s, 'resource', 'The Lobotomizer') };   // CR 802.1
 FX[1279] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability' && (d.card.allowedClasses || []).includes('Hunter')) me(s, pid).hero.weapons.filter(w => w.slot === 'Ranged').forEach(w => addTM(w, { k: 'atk', v: 1, turn: s.turn })); } } };
 FX[1281] = { powers: [{ key: 'fang', label: tr('Zerstören: Fähigkeit unterbrechen'), cost: 2, selfCost: selfDestroyThen, slots: chainAbilitySlot(tr('Fähigkeit auf der Kette')), resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } }] };
 FX[1282] = { entersExhausted: true, powers: [{ key: 'dom', label: tr('Zerstören: Kontrolle über Ally mit Kosten X'), act: true, myTurn: true, cost: 'X', xRange: () => ({ min: 0, max: 15 }), selfCost: selfDestroyThen,
@@ -731,7 +734,7 @@ FX[1288] = { on: { dmg: (s, c, d, pid) => { if (d.combat && (d.weapons || []).in
 // QUESTS
 // ============================================================================
 const onMyTurnQ = (s, pid) => s.activePlayer === pid ? null : tr('Nur in deinem Zug');
-RACE_CHOICE.handBottom = (s, pid) => { const p = me(s, pid); const n = p.hand.length; p.deck.unshift(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; s._hidden = true; drawCards(s, p, n); };
+RACE_CHOICE.handBottom = (s, pid) => { const p = me(s, pid); const n = p.hand.length; const ids = p.hand.map(c => c.id); handLeftAll(s, p); p.hand = []; s._hidden = true; putBottom(s, p.id, ids, { k: 'E:drawN', a: { pid: p.id, n } }); };
 FX[1289] = { reward: raceChoice('Night Elf', { key: 'handBottom', label: tr('Hand unter das Deck, gleich viele ziehen'), ai: (s, pid) => me(s, pid).hand.length >= 3 ? 1 : -1 }) };
 RACE_CHOICE.allyToHand = (s, pid) => chooseOwnAlly(s, pid, tr('Inoculation: Welchen eigenen Ally auf die Hand?'), 'Inoculation', 'E:optBounce', {}, c => -cardValue(s, c));
 FX[1290] = { questCond: onMyTurnQ, reward: raceChoice('Draenei', { key: 'allyToHand', label: tr('Eigenen Ally auf die Hand'), ai: () => -1 }) };
@@ -765,7 +768,7 @@ RACE_CHOICE.ferocity = (s, pid) => mustPick(s, pid, tr('Hidden Enemies: Ziel-All
 FX[1302] = { reward: raceChoice('Orc', { key: 'ferocity', label: tr('Ziel-Ally erhält Ferocity'), ai: (s, pid) => alliesOf(me(s, pid)).some(a => a.joinedTurn === s.turn) ? 3 : 0 }), k: { do: (s, a, v) => { const c = findCharacter(s, v); if (c) addTM(c, { k: 'ferocity', turn: s.turn }); } } };
 FX[1303] = { resExhausted: true, questNoPay: true, questCond: (s, pid, r) => r.exhausted ? tr('Die Quest ist erschöpft') : null,
     questExtra: (s, pid) => { const r = me(s, pid).resources.find(x => x.card.uid === s.questPrep.uid); if (r) r.exhausted = true; q(s, { op: 'call', k: 'E:questPay', a: {} }); }, reward: Qd(1) };
-RACE_CHOICE.plague = (s, pid) => { if (!alliesOf(me(s, pid)).length) return; [pid, pid === 1 ? 2 : 1].forEach(x => q(s, { op: 'call', k: 'E:playerDestroys', a: { pid: x, kind: 'ally', src: 'A New Plague' } })); };
+RACE_CHOICE.plague = (s, pid) => { if (!alliesOf(me(s, pid)).length) return; eachPlayerDestroys(s, 'ally', 'A New Plague'); };   // CR 802.1
 FX[1304] = { questCond: onMyTurnQ, reward: raceChoice('Undead', { key: 'plague', label: tr('Jeder Spieler zerstört einen eigenen Ally'), ai: (s, pid) => alliesOf(foe(s, pid)).length && alliesOf(me(s, pid)).length ? 1 : -2 }) };
 RACE_CHOICE.poison = (s, pid) => q(s, { op: 'call', k: '1305:pick', a: { pid } });
 FX[1305] = { reward: raceChoice('Tauren', { key: 'poison', label: tr('Karten aus dem Friedhof ins Deck mischen'), ai: () => 0.5 }),
@@ -795,7 +798,7 @@ FX[1315] = { reward: (s, pid) => q(s, { op: 'call', k: '1315:go', a: { pid } }),
             L(s, tr`👁 ${p.hero.name} deckt auf: ${ids.map(id => CARDS[id].name).join(', ') || '–'}`);
             ids.forEach(id => { if (FX[id] && FX[id].revealedByQuest) pushTrig(s, a.pid, id, [{ op: 'call', k: 'E:drawOne', a: { pid: a.pid } }]); });
             if (ids.length === 2 && CARDS[ids[0]].type !== CARDS[ids[1]].type) { p.looking = ids; ask(s, { pid: a.pid, prompt: tr('The Dying Balance: Welche Karte auf die Hand?'), src: 'The Dying Balance', opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: CARDS[id].cost || 0 })), k: 'E:lookPickDo', a: { pid: a.pid, reveal: true } }); return; }
-            p.deck.unshift(...ids.reverse()); } } };
+            putBottom(s, p.id, ids); } } };
 FX[1316] = { questCond: onMyTurnQ, reward: (s, pid) => mayPick(s, pid, tr('Finkle Einhorn: Ally mit Kosten 2 oder weniger aus dem Friedhof ins Spiel'), 'Finkle Einhorn', gyCands(s, pid, c => isAllyCard(c) && (c.cost || 0) <= 2), '1316:do', { pid }, u => 3 + (findCharacter(s, u).cost || 0)),
     k: { do: (s, a, v) => { if (v) fromGyToPlay(s, v, a.pid); } } };
 FX[1317] = { reward: (s, pid) => q(s, { op: 'call', k: '1317:go', a: { pid } }),
@@ -803,7 +806,7 @@ FX[1317] = { reward: (s, pid) => q(s, { op: 'call', k: '1317:go', a: { pid } }),
             L(s, tr`👁 ${p.hero.name} deckt auf: ${ids.map(id => CARDS[id].name).join(', ') || '–'}`);
             ids.forEach(id => { if (FX[id] && FX[id].revealedByQuest) pushTrig(s, a.pid, id, [{ op: 'call', k: 'E:drawOne', a: { pid: a.pid } }]); });
             ids.filter(id => CARDS[id].name === 'The Green Hills of Stranglethorn').forEach(id => p.hand.push(makeCardInst(id, false, p.id)));
-            p.deck.unshift(...ids.filter(id => CARDS[id].name !== 'The Green Hills of Stranglethorn').reverse()); } } };
+            putBottom(s, p.id, ids.filter(id => CARDS[id].name !== 'The Green Hills of Stranglethorn')); } } };
 FX[1318] = { questCond: (s, pid) => [...me(s, pid).hero.weapons, ...me(s, pid).hero.armors].some(e => !e.exhausted) ? null : tr('Braucht eine bereite Ausrüstung'),
     questExtra: (s, pid) => { const eq = [...me(s, pid).hero.weapons, ...me(s, pid).hero.armors].filter(e => !e.exhausted); ask(s, { pid, prompt: tr('Samophlange: Welche Ausrüstung erschöpfen?'), src: 'Samophlange', opts: eq.map(e => ({ label: e.name, v: e.uid, ai: -(e.cost || 0) })), k: '1318:pay', a: {} }); },
     reward: Qd(1), k: { pay: (s, a, v) => { exhaust(s, findCharacter(s, v)); q(s, { op: 'call', k: 'E:questPay', a: {} }); } } };

@@ -611,7 +611,7 @@ function boosterActions() {
     const left = BOOSTER.cards.filter(c => !c.flipped).length;
     document.getElementById('booster-reveal-all').style.display = left ? '' : 'none';
     document.getElementById('booster-again').classList.toggle('pulse', !left);
-    document.getElementById('booster-count').textContent = left ? `${BOOSTER.cards.length - left} / ${BOOSTER.cards.length} aufgedeckt` : tr('Alle Karten aufgedeckt');
+    document.getElementById('booster-count').textContent = left ? tr`${BOOSTER.cards.length - left} / ${BOOSTER.cards.length} aufgedeckt` : tr('Alle Karten aufgedeckt');
 }
 document.getElementById('booster-reveal-all').onclick = (e) => {
     e.stopPropagation();
