@@ -287,7 +287,7 @@ function renderTurnIndicator() {
     eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
     eb.classList.toggle('cpu-turn', !mine);
     const done = nothingLeftToDo();
-    document.getElementById('big-end-turn').style.display = done && !autoEndTurn() ? 'block' : 'none';
+    document.getElementById('big-end-turn').style.display = done && (!autoEndTurn() || G._noAutoEnd === G.turn) ? 'block' : 'none';
     scheduleAutoEnd(done);
     // Touch: angetippte eigene Karte zeigt ihre Knöpfe (Angriff, Kräfte) – auch nach dem Neuzeichnen
     if (UI.touchUid) { const n = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(UI.touchUid)}"]`); if (n && n.querySelector('.card-action-bar')) n.classList.add('touch-active'); else UI.touchUid = null; }
@@ -313,7 +313,7 @@ function autoEndTurn() { if (typeof TUT !== 'undefined' && TUT.active) return fa
 let _autoEndTimer = null;
 function scheduleAutoEnd(done) {
     const eb = document.getElementById('btn-end-turn');
-    if (!done || !autoEndTurn() || G.gameOver) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } eb.classList.remove('auto-ending'); return; }
+    if (!done || !autoEndTurn() || G.gameOver || G._noAutoEnd === G.turn) { if (_autoEndTimer) { clearTimeout(_autoEndTimer); _autoEndTimer = null; } eb.classList.remove('auto-ending'); return; }
     document.querySelector('#turn-indicator span').textContent = tr('⏩ ZUG ENDET …');
     if (_autoEndTimer) return;
     eb.style.setProperty('--ae', AUTO_END_MS + 'ms'); eb.classList.remove('auto-ending'); void eb.offsetWidth; eb.classList.add('auto-ending');   // Balken läuft bis zum Zugende
@@ -1271,6 +1271,8 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
     document.addEventListener('pointermove', (e) => {
         if (e.pointerType !== 'touch' || !TOUCH_DRAG.src) return;
         // Zoom per Gedrückthalten offen: nur ein deutliches Losziehen startet das Ziehen (Fingerzittern nicht)
+        // Finger noch über der Karte: kippt die Zoom-Karte (renderer.js), gezogen wird erst beim Verlassen der Karte
+        if (!TOUCH_DRAG.active && typeof touchZoomInside === 'function' && touchZoomInside(e.clientX, e.clientY)) return;
         const th = typeof touchZoomShown === 'function' && touchZoomShown() ? 30 : START_PX;
         if (!TOUCH_DRAG.active) { if (Math.hypot(e.clientX - TOUCH_DRAG.x0, e.clientY - TOUCH_DRAG.y0) > th) begin(e.clientX, e.clientY); }
         else move(e.clientX, e.clientY);

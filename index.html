@@ -22,12 +22,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="manifest" href="manifest.json?v=202610301037">
+    <link rel="manifest" href="manifest.json?v=202610301138">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>WoW TCG – Azeroth vs CPU</title>
-    <link rel="stylesheet" href="css/style.css?v=202610301037">
-    <link rel="stylesheet" href="css/cards.css?v=202610301037">
+    <link rel="stylesheet" href="css/style.css?v=202610301138">
+    <link rel="stylesheet" href="css/cards.css?v=202610301138">
 </head>
 <body>
 <!-- Hochformat auf Handy/Tablet: das Spiel gibt es nur im Querformat -->
@@ -135,6 +135,7 @@
             <button id="btn-test-setup">⚡ Test-Setup</button>
             <button id="btn-mask-test" style="border-color:#a855f7; background:#4c1d95; color:#e9d5ff;">🩹 Masken-Test (100%)</button>
             <button id="btn-face-edit">🙂 Avatar-Köpfe ausrichten</button>
+            <button id="btn-auto-turn" title="Die CPU spielt deinen aktuellen Zug (gleiche KI wie ihre Decks), beendet ihn aber nicht – Rückgängig bleibt möglich">🤖 CPU spielt meinen Zug (Debug)</button>
             <button id="btn-draw" style="font-size:10px;padding:3px;">+1 Karte ziehen (Debug)</button>
             <div>
                 <label style="font-size:10px;color:var(--text-dim);">Bild-Suchpfad:</label>
@@ -222,14 +223,6 @@
     <div style="text-align:right;margin-top:16px;"><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
 </div></div>
 
-<div id="deck-view-modal"><div id="deck-view-box" class="modal-box">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <h2 id="deck-view-title" style="margin:0;color:var(--gold);">Deck Details</h2>
-        <button id="deck-view-close-btn" class="danger">Schließen</button>
-    </div>
-    <div id="deck-view-content"></div>
-</div></div>
-
 <div id="graveyard-modal"><div id="graveyard-box" class="modal-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <h2 id="graveyard-title" style="margin:0;color:var(--gold);">Friedhof</h2>
@@ -239,28 +232,31 @@
 </div></div>
 
 <div id="deck-builder-modal"><div class="modal-box">
-    <!-- Kopf in einer Zeile: Titel, Deckname, Klassen-Icons, Aktionen. Das Heldenfeld steht oben in der Deckliste (rechts). -->
-    <div class="db-top">
-        <h2>🛠 Deck Builder</h2>
-        <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
-        <div id="db-class-bar"></div>
-        <div class="db-actions">
-            <button id="db-new-btn" title="Leeres Deck beginnen">✚ Neu</button>
-            <button id="db-import-btn" title="Kartenliste einfügen">📥 Import</button>
-            <button id="db-export-btn" title="Deck als Kartenliste">📤 Export</button>
-            <button id="db-save-only-btn" class="success" title="Speichern">💾 Speichern</button>
-            <button id="db-save-btn" class="success" title="Speichern und mit diesem Deck spielen">▶ Spielen</button>
-            <button id="db-close-btn" class="danger" title="Schließen">✖</button>
-        </div>
-    </div>
+    <!-- Vollbild: links der Kartenpool (Suche, Filter-Pop-up, Menü), rechts in voller Höhe das Deck -->
     <div id="db-hero-picker"><div class="db-hp-box">
         <div class="db-hp-head"><b id="db-hp-title">Held wählen</b><span id="db-hp-tools"></span><button id="db-hp-close" class="danger">✖</button></div>
         <div class="db-hp-grid" id="db-hp-grid"></div>
     </div></div>
     <div class="db-content">
         <div class="db-pool">
-            <div class="db-filters">
+            <div class="db-toolbar">
                 <input type="text" id="db-search" placeholder="🔍 Karten suchen (Name oder Text)…">
+                <button id="db-filter-btn" title="Filter und Sortierung">⚙ Filter<span id="db-filter-badge"></span></button>
+                <span id="db-pool-count" class="db-dim"></span>
+                <div class="db-more"><button id="db-more-btn" title="Weitere Aktionen">⋯</button>
+                    <div id="db-more-menu">
+                        <button id="db-new-btn" title="Leeres Deck beginnen">✚ Neu</button>
+                        <button id="db-import-btn" title="Kartenliste einfügen">📥 Import</button>
+                        <button id="db-export-btn" title="Deck als Kartenliste">📤 Export</button>
+                        <button id="db-delete-btn" class="danger" title="Gespeichertes Deck löschen">🗑 Löschen</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Filter für Fortgeschrittene: im Pop-up -->
+            <div id="db-filter-pop">
+                <div class="db-fp-title">Klasse</div>
+                <div id="db-class-bar"></div>
+                <div class="db-fp-title">Typ</div>
                 <div class="db-chips" id="db-type-chips">
                     <button data-type="All" class="on">Alle</button>
                     <button data-type="Ally">Allies</button>
@@ -268,52 +264,66 @@
                     <button data-type="Equipment">Ausrüstung</button>
                     <button data-type="Quest">Quests</button>
                 </div>
+                <div class="db-fp-title">Kosten</div>
                 <div class="db-chips" id="db-cost-chips">
-                    <button data-cost="all" class="on">Kosten: alle</button>
+                    <button data-cost="all" class="on">Alle</button>
                     <button data-cost="0">0</button><button data-cost="1">1</button><button data-cost="2">2</button><button data-cost="3">3</button>
                     <button data-cost="4">4</button><button data-cost="5">5</button><button data-cost="6">6</button><button data-cost="7">7+</button>
                 </div>
-                <select id="db-set-filter">
-                    <option value="all">Alle Sets</option>
-                    <option value="1">Heroes of Azeroth</option>
-                    <option value="2">Through the Dark Portal</option>
-                    <option value="3">Fires of Outland</option>
-                    <option value="4">Onyxia's Lair (Raid)</option>
-                    <option value="5">Molten Core (Raid)</option>
-                </select>
-                <select id="db-sort">
-                    <option value="set">Sortieren: Set</option>
-                    <option value="cost">Sortieren: Kosten</option>
-                    <option value="name">Sortieren: Name</option>
-                    <option value="type">Sortieren: Typ</option>
-                </select>
-                <span id="db-pool-count" class="db-dim"></span>
+                <div class="db-fp-row">
+                    <select id="db-set-filter">
+                        <option value="all">Alle Sets</option>
+                        <option value="1">Heroes of Azeroth</option>
+                        <option value="2">Through the Dark Portal</option>
+                        <option value="3">Fires of Outland</option>
+                        <option value="4">Onyxia's Lair (Raid)</option>
+                        <option value="5">Molten Core (Raid)</option>
+                    </select>
+                    <select id="db-sort">
+                        <option value="set">Sortieren: Set</option>
+                        <option value="cost">Sortieren: Kosten</option>
+                        <option value="name">Sortieren: Name</option>
+                        <option value="type">Sortieren: Typ</option>
+                    </select>
+                </div>
             </div>
             <div class="db-hint">Linksklick: hinzufügen · Rechtsklick: entfernen</div>
             <div class="db-scroll" id="db-pool-cards"></div>
         </div>
         <div class="db-deck">
-            <!-- Held: Klick öffnet die Auswahl aller (passenden) Helden mit Bildern -->
-            <div id="db-hero-slot" title="Held wählen"></div>
-            <div class="db-stats">
+            <!-- Fester Kopf: Deckname, Fortschritt, Speichern/Spielen/Schließen -->
+            <div class="db-deck-head">
+                <div class="db-dh-row">
+                    <input type="text" id="db-name" placeholder="Name des Decks" maxlength="40">
+                    <button id="db-save-only-btn" class="success" title="Speichern">💾</button>
+                    <button id="db-save-btn" class="success" title="Speichern und mit diesem Deck spielen">▶</button>
+                    <button id="db-close-btn" class="danger" title="Schließen">✖</button>
+                </div>
                 <div class="db-progress-row">
                     <div class="db-progress"><div id="db-progress-fill"></div><div class="db-progress-mark"></div></div>
                     <div id="db-count">0 / 60</div>
                 </div>
-                <div class="db-stat-cols">
-                    <div class="db-curve-box">
-                        <div class="db-stat-title">Manakurve</div>
-                        <div class="db-curve" id="db-curve"></div>
-                    </div>
-                    <div class="db-types-box">
-                        <div class="db-stat-title">Verteilung</div>
-                        <div class="db-typebar" id="db-typebar"></div>
-                        <div class="db-typelegend" id="db-typelegend"></div>
-                    </div>
-                </div>
-                <div id="db-warnings"></div>
             </div>
-            <div class="db-deck-list" id="db-deck-cards"></div>
+            <!-- Eine Scrollfläche: Held, Manakurve/Verteilung und die Deckliste – die Statistik fährt beim Scrollen nach oben weg -->
+            <div class="db-deck-scroll">
+                <!-- Held: Klick öffnet die Auswahl aller (passenden) Helden mit Bildern -->
+                <div id="db-hero-slot" title="Held wählen"></div>
+                <div class="db-stats">
+                    <div class="db-stat-cols">
+                        <div class="db-curve-box">
+                            <div class="db-stat-title">Manakurve</div>
+                            <div class="db-curve" id="db-curve"></div>
+                        </div>
+                        <div class="db-types-box">
+                            <div class="db-stat-title">Verteilung</div>
+                            <div class="db-typebar" id="db-typebar"></div>
+                            <div class="db-typelegend" id="db-typelegend"></div>
+                        </div>
+                    </div>
+                    <div id="db-warnings"></div>
+                </div>
+                <div class="db-deck-list" id="db-deck-cards"></div>
+            </div>
         </div>
     </div>
     <div id="db-hover"></div>
@@ -355,33 +365,33 @@
     <canvas id="booster-fx"></canvas>
 </div>
 
-<script src="js/i18n_en.js?v=202610301037"></script>
-<script src="js/i18n.js?v=202610301037"></script>
-<script src="js/utils.js?v=202610301037"></script>
-<script src="js/cards.js?v=202610301037"></script>
-<script src="js/cards2.js?v=202610301037"></script>
-<script src="js/cards3.js?v=202610301037"></script>
-<script src="js/cards4.js?v=202610301037"></script>
-<script src="js/cards5.js?v=202610301037"></script>
-<script src="js/decks.js?v=202610301037"></script>
-<script src="js/state.js?v=202610301037"></script>
-<script src="js/engine.js?v=202610301037"></script>
-<script src="js/cardfx.js?v=202610301037"></script>
-<script src="js/cardfx2.js?v=202610301037"></script>
-<script src="js/cardfx3.js?v=202610301037"></script>
-<script src="js/cardfx4.js?v=202610301037"></script>
-<script src="js/cardfx5.js?v=202610301037"></script>
-<script src="js/ai.js?v=202610301037"></script>
-<script src="js/renderer.js?v=202610301037"></script>
-<script src="js/ui.js?v=202610301037"></script>
-<script src="js/simcore.js?v=202610301037"></script>
-<script src="js/tests.js?v=202610301037"></script>
-<script src="js/tourneydecks.js?v=202610301037"></script>
-<script src="js/features.js?v=202610301037"></script>
-<script src="js/coach.js?v=202610301037"></script>
-<script src="js/backgrounds.js?v=202610301037"></script>
-<script src="js/tutorial.js?v=202610301037"></script>
-<script src="js/online.js?v=202610301037"></script>
-<script src="js/main.js?v=202610301037"></script>
+<script src="js/i18n_en.js?v=202610301138"></script>
+<script src="js/i18n.js?v=202610301138"></script>
+<script src="js/utils.js?v=202610301138"></script>
+<script src="js/cards.js?v=202610301138"></script>
+<script src="js/cards2.js?v=202610301138"></script>
+<script src="js/cards3.js?v=202610301138"></script>
+<script src="js/cards4.js?v=202610301138"></script>
+<script src="js/cards5.js?v=202610301138"></script>
+<script src="js/decks.js?v=202610301138"></script>
+<script src="js/state.js?v=202610301138"></script>
+<script src="js/engine.js?v=202610301138"></script>
+<script src="js/cardfx.js?v=202610301138"></script>
+<script src="js/cardfx2.js?v=202610301138"></script>
+<script src="js/cardfx3.js?v=202610301138"></script>
+<script src="js/cardfx4.js?v=202610301138"></script>
+<script src="js/cardfx5.js?v=202610301138"></script>
+<script src="js/ai.js?v=202610301138"></script>
+<script src="js/renderer.js?v=202610301138"></script>
+<script src="js/ui.js?v=202610301138"></script>
+<script src="js/simcore.js?v=202610301138"></script>
+<script src="js/tests.js?v=202610301138"></script>
+<script src="js/tourneydecks.js?v=202610301138"></script>
+<script src="js/features.js?v=202610301138"></script>
+<script src="js/coach.js?v=202610301138"></script>
+<script src="js/backgrounds.js?v=202610301138"></script>
+<script src="js/tutorial.js?v=202610301138"></script>
+<script src="js/online.js?v=202610301138"></script>
+<script src="js/main.js?v=202610301138"></script>
 </body>
 </html>

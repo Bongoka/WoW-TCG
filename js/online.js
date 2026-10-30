@@ -160,7 +160,6 @@ function netStart() {
     G.netReady = { 1: false, 2: false };                                                  // Mulligan beider Spieler (CR 101.2) vor dem ersten Zug
     dealOpeningHands(G); refreshDisplay(G);
     NET.inGame = true; NET.logBuf = []; NET.peer.ready = false; netAnnounce(); netSyncRoom();   // nach der Partie wieder "nicht bereit"
-    addLog(tr`=== ONLINE-PARTIE: ${hd.name} vs ${gd.name} ===`, "log-turn");
     netHideModal(); UI.reset();
     netPub(netRoom(NET.code, 'h'), { t: 'start' });
     netPush();
@@ -241,7 +240,7 @@ function netGuestState(m) {
     s.real = true; s.humans = [1]; s.online = true;
     const was = G ? G.activePlayer : null, first = !G;
     if (G) { for (const k of Object.keys(G)) delete G[k]; Object.assign(G, s); } else G = s;
-    (m.logs || []).forEach(l => addLog(l[0], l[1]));
+    (m.logs || []).forEach(l => addLog(l[0], l[1], l[2] ? 3 - l[2] : 0));                     // Farben aus Sicht des Gasts
     if (NET.awaiting) { NET.awaiting = false; UI.reset(); }
     if (first) { refreshDisplay(G); render(); netMulligan(() => render()); return; }
     render(); playEventAnimations();
@@ -464,4 +463,4 @@ function netPopupsOn() { try { return localStorage.getItem(NET_POPUP_KEY) !== 'o
 function netBackground() { if (netPopupsOn() && location.protocol !== 'file:') netConnect().catch(() => {}); }
 // Host: Log-Zeilen der Partie sammeln und mit dem nächsten Zustand an den Gast schicken
 const _netAddLog = addLog;
-addLog = (msg, cls) => { _netAddLog(msg, cls); if (NET.role === 'host' && NET.inGame) NET.logBuf.push([msg, cls || '']); };
+addLog = (msg, cls, pid) => { _netAddLog(msg, cls, pid); if (NET.role === 'host' && NET.inGame) NET.logBuf.push([msg, cls || '', pid || 0]); };

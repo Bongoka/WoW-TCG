@@ -138,7 +138,6 @@ function commitUndoSnapshot(snap, action) {
     const sig = pl => pl.deck.join(',');
     const deckChanged = sig(snap.p1) !== sig(G.p1) || sig(snap.p2) !== sig(G.p2);
     if (deckChanged || G._hidden || G._oppDecided || G.gameOver || action.type === 'END_TURN') {
-        if (UNDO.stack.length && action.type !== 'END_TURN') addLog(tr("Rückgängig hier nicht möglich (verdeckte Info / Zufall / Gegner hat entschieden) – Verlauf gelöscht."), "");
         UNDO.stack = [];
         return;
     }
@@ -205,7 +204,6 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     G.real = true; G.humans = [1];
     UI.reset();
     dealOpeningHands(G);
-    addLog(tr`=== PARTIE: ${pDeck.name} vs ${oDeck.name} ===`, "log-turn");
     if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
     refreshDisplay(G);
     resetBanter();
@@ -233,15 +231,10 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
             { label: tr("📖 Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
         ]);
     };
-    // Wer den ersten Zug macht, wählt der Gewinner eines Zufallswurfs (CR 101.1) – die CPU wählt immer den ersten Zug
-    const cpuFirst = () => { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; };
-    render();
-    if (Math.random() < 0.5) {
-        openDecisionModal(tr("Münzwurf gewonnen"), tr("Du darfst wählen, wer den ersten Zug macht. Wer beginnt, zieht im ersten Zug keine Karte."), [
-            { label: tr("⚔ Ich beginne"), cls: "success", action: mulligan },
-            { label: tr("Die CPU beginnt"), action: () => { cpuFirst(); mulligan(); } }
-        ]);
-    } else { cpuFirst(); showToast(tr("Münzwurf: Die CPU hat gewonnen und beginnt."), false, 3500); mulligan(); }
+    // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
+    // wer beginnt, zeigt das Banner nach dem Mulligan
+    if (Math.random() < 0.5) { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; }
+    mulligan();
 }
 
 // Menschliche Aktion ausführen; danach ggf. die CPU weiterlaufen lassen
@@ -340,7 +333,6 @@ async function driveCpu() {
                 continue;
             }
             updateCpuStatus(true, `CPU: ${dec.reason}`);
-            addLog(`[CPU] ${dec.reason}`, "log-cpu");
             const played = dec.action.type === 'PLAY_CARD' ? G.p2.hand[dec.action.handIdx] : null;
             if (dec.action.type === 'ATTACK') cpuSay('attack', 0.35);
             else if (played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
@@ -368,6 +360,33 @@ async function driveCpu() {
         if (!G.gameOver && G.activePlayer === 1 && isIdle(G) && G._turnBannerFor !== G.turn) { G._turnBannerFor = G.turn; }
     }
 }
+// Debug: die CPU spielt den aktuellen eigenen Zug mit derselben KI wie für ihre Decks (cpuDecide/searchBestAction),
+// beendet ihn aber nicht – jede Aktion läuft über humanAct, also bleibt "Rückgängig" möglich (soweit erlaubt)
+let _autoMine = false;
+async function autoPlayMyTurn() {
+    if (_autoMine || !G || G.gameOver || G.online || G.activePlayer !== 1) { if (G && G.activePlayer !== 1) showToast(tr('Nur in deinem Zug')); return; }
+    _autoMine = true;
+    G._noAutoEnd = G.turn;                                                                // Zug bleibt offen: kein Auto-Zugende, Rückgängig möglich
+    const g0 = G, wait = ms => new Promise(r => setTimeout(r, ms));
+    try {
+        for (let steps = 0; steps < 25 && G === g0 && !G.gameOver && G.activePlayer === 1; steps++) {
+            while (UI.busy) await wait(100);
+            const d = G.pending;
+            if (d && d.pid === 1) {                                                         // eigene Entscheidung wie die KI
+                if (d.kind === 'priority') { const o = respondOptions(G, 1)[0]; humanAct(o ? o.a : { type: 'PASS' }); }
+                else humanAct({ type: 'CHOOSE', v: aiPick(G, d) });
+                await wait(350); continue;
+            }
+            if (!canActMain(G, 1)) break;
+            updateCpuStatus(true, tr("CPU analysiert..."));
+            const dec = await cpuDecide(G, 1, document.getElementById("cfg-difficulty").value);
+            if (G !== g0 || !dec || !dec.action || !canActMain(G, 1)) break;
+            while (UI.busy) await wait(100);
+            if (!humanAct(dec.action)) break;
+            await wait(450);
+        }
+    } finally { _autoMine = false; updateCpuStatus(false); render(); }
+}
 
 function updateCpuStatus(active, text = "") {
     const box = document.getElementById("cpu-status-box"), txt = document.getElementById("cpu-status-text");
@@ -379,7 +398,7 @@ function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
     if (matchMedia('(hover: none)').matches) { const h = document.querySelector('.db-hint'); if (h) h.textContent = tr('Tippen: hinzufügen · „−“ in der Deckliste: entfernen'); }
     // Tastatur: Leertaste/Enter = Zug beenden, Strg+Z = Rückgängig, Esc = Fenster schließen / Abbrechen
-    const openModals = () => ['decision-modal', 'deck-builder-modal', 'sim-modal', 'deck-overview-modal', 'deck-view-modal', 'graveyard-modal', 'booster-modal', 'db-io-modal', 'choice-modal', 'hs-mulligan', 'gameover']
+    const openModals = () => ['decision-modal', 'deck-builder-modal', 'sim-modal', 'deck-overview-modal', 'graveyard-modal', 'booster-modal', 'db-io-modal', 'choice-modal', 'hs-mulligan', 'gameover']
         .map(id => document.getElementById(id)).filter(m => m && getComputedStyle(m).display !== 'none');
     document.addEventListener('keydown', (e) => {
         if (e.target.closest && e.target.closest('input, textarea, select')) return;
@@ -387,7 +406,7 @@ function bootGame() {
         if (e.key === 'Escape') {
             const dm = open.find(m => m.id === 'decision-modal');
             if (dm) { const b = [...dm.querySelectorAll('#decision-actions button')].find(x => x.textContent === tr('Abbrechen')); if (b) b.click(); return; }
-            const close = open.find(m => ['sim-modal', 'deck-view-modal', 'deck-overview-modal', 'graveyard-modal'].includes(m.id));
+            const close = open.find(m => ['sim-modal', 'deck-overview-modal', 'graveyard-modal'].includes(m.id));
             if (close) { if (close.id === 'sim-modal') document.getElementById('sim-close-btn').click(); else close.style.display = 'none'; }
             return;
         }
@@ -428,6 +447,7 @@ function bootGame() {
     document.getElementById("btn-undo").onclick = undoLastAction;
     document.getElementById("btn-test-setup").onclick = loadQuickTest;
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
+    document.getElementById("btn-auto-turn").onclick = autoPlayMyTurn;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
     document.getElementById("btn-new-game").onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
     document.getElementById("btn-online").onclick = openOnline;
@@ -441,7 +461,6 @@ function bootGame() {
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
     document.getElementById("graveyard-close-btn").onclick = () => { document.getElementById("graveyard-modal").style.display = "none"; };
     document.getElementById("graveyard-modal").onclick = (e) => { if (e.target.id === "graveyard-modal") e.target.style.display = "none"; };
-    document.getElementById("deck-view-close-btn").onclick = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "flex"; };
     document.getElementById("btn-deck-builder").onclick = () => openDeckBuilder();
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 

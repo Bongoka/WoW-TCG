@@ -606,7 +606,7 @@ function moveEquip(s, e, toPid) {
     const from = getPlayer(s, l.pid), to = getPlayer(s, toPid);
     const fa = from.hero.weapons.includes(e) ? from.hero.weapons : from.hero.armors; fa.splice(fa.indexOf(e), 1);
     (e.type === 'Weapon' ? to.hero.weapons : to.hero.armors).push(e);
-    L(s, tr`🔀 ${to.hero.name} kontrolliert jetzt ${e.name}.`); return true;
+    L(s, tr`🔀 ${e.name}`, '', to.id); return true;
 }
 FX[1226] = { enter: (s, c, pid) => mayPick(s, pid, tr("Nyn'jah: Gegnerische Ausrüstung bereit machen und kontrollieren?"), "Nyn'jah", targetCands(s, pid, { equipment: true, side: 'enemy' }), '1226:do', { uid: c.uid, pid }, u => 3 + (findCharacter(s, u).cost || 0)),
     k: { do: (s, a, v) => { if (!v) return; const e = findCharacter(s, v); const n = findCharacter(s, a.uid); if (!e) return; readyCard(s, e);

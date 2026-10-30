@@ -41,6 +41,10 @@ function evaluateState(s, pid) {
     score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
     // Ungenutztes Mana ist nichts wert – außer man hält es im eigenen Zug für ein Instant im gegnerischen Zug bereit
     if (s.activePlayer === pid) score += aiHoldValue(s, me);
+    // Ein noch nicht genutzter Helden-Flip (einmal pro Spiel) ist etwas wert – verschwendet man ihn ohne Wirkung
+    // (z. B. Gorebelly ohne Waffe), sinkt die Bewertung; genutzt wird er nur, wenn er mehr bringt
+    if (heroFlipLeft(me.hero)) score += AI_FLIP_VALUE;
+    if (heroFlipLeft(opp.hero)) score -= AI_FLIP_VALUE * 0.5;
     // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
     if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });
@@ -53,6 +57,8 @@ function evaluateState(s, pid) {
     return score;
 }
 
+const AI_FLIP_VALUE = 4;
+const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).some(pw => pw.flip));
 // Mana für den Zug des Gegners zurückhalten: Instants, die gerade dann wirken (unterbrechen, Schaden verhindern,
 // Kampftricks, Angreifer entfernen), lohnen sich nur mit bereitem Mana. Bewertet wird das wertvollste bezahlbare –
 // im Gegnerzug spielt man meist eins. Andere Instants (Karten ziehen …) spielt die KI ohnehin mit übrigem Mana am

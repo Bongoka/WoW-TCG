@@ -470,7 +470,8 @@ function coachAwaken(slot, hero, grand) {
     const greet = () => { if (!COACH.greeted) { COACH.greeted = true; openCoachIntro(); } };
     if (!grand) {
         ava.setAttribute('style', ava.getAttribute('style') + ';' + face);
-        card.style.display = 'none'; card.before(ava); setTimeout(greet, 350); return;
+        // Fertiges Deck geladen: Avatar still zeigen, keine Sprechblase – Tipps per Klick auf den Helden
+        card.style.display = 'none'; card.before(ava); return;
     }
     // 1) Balken voll + golden, Klang
     const bar = document.querySelector('.db-progress');
@@ -536,13 +537,12 @@ function coachChat(body, hero) {
         d.innerHTML = html || esc(text); scroll();
         return wait(80);
     };
-    const me = text => { const m = document.createElement('div'); m.className = 'coach-me'; m.textContent = text; body.appendChild(m); scroll(); };
-    // Antwort-Buttons des Spielers; der gewählte erscheint als eigene Sprechblase
+    // Antwort-Buttons des Spielers; nach dem Klick verschwinden sie (keine eigene Sprechblase des Spielers)
     const replies = list => {
         const row = document.createElement('div'); row.className = 'coach-replies'; body.appendChild(row);
         list.forEach(([label, go], i) => {
             const b = document.createElement('button'); b.className = 'coach-more' + (i ? ' alt' : ''); b.textContent = label;
-            b.onclick = e => { e.stopPropagation(); row.remove(); COACH.skip = false; if (i === 0) me(label); go(); };
+            b.onclick = e => { e.stopPropagation(); row.remove(); COACH.skip = false; go(); };
             row.appendChild(b);
         });
         scroll();

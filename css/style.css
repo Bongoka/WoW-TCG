@@ -30,18 +30,16 @@ body {
 .floating-text.hit { color: #ef4444; } .floating-text.heal { color: #10b981; } .floating-text.buff { color: #60a5fa; }
 @keyframes floatUp { 0%{transform:translate(-50%,-20%) scale(0.6);opacity:0} 20%{transform:translate(-50%,-50%) scale(1.5);opacity:1} 100%{transform:translate(-50%,-150%) scale(1);opacity:0} }
 
-#decision-modal, #sim-modal, #deck-overview-modal, #deck-view-modal, #graveyard-modal, #deck-builder-modal, #booster-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; backdrop-filter: blur(6px); z-index: 100000; }
+#decision-modal, #sim-modal, #deck-overview-modal, #graveyard-modal, #deck-builder-modal, #booster-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: none; align-items: center; justify-content: center; backdrop-filter: blur(6px); z-index: 100000; }
 .modal-box { background: linear-gradient(180deg, #1f1a16 0%, #110e0b 100%); border: 2px solid var(--gold); border-radius: 4px; padding: 24px; box-shadow: 0 0 30px rgba(201,168,76,0.2); color: var(--text-main); }
 #decision-box { max-width: 500px; text-align: center; }
 #sim-box { max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; }
 #deck-overview-box { max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; }
 #graveyard-box { max-width: 95vw; width: 95%; max-height: 92vh; overflow-y: auto; }
 #graveyard-content { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 20px 0; }
+.deck-view-card { width: var(--hand-w); height: var(--hand-h); transition: transform 0.2s; transform-origin: center bottom; }
 .grave-btn { cursor: pointer; }
 .grave-btn:hover { border-color: var(--gold); }
-#deck-view-box { max-width: 95vw; width: 95%; max-height: 92vh; overflow-y: auto; }
-#deck-view-content { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 20px 0; }
-.deck-view-card { width: var(--hand-w); height: var(--hand-h); transition: transform 0.2s; transform-origin: center bottom; }
 
 /* ---------------- Deck Builder ---------------- */
 #deck-builder-modal .modal-box { width: 96vw; height: 92vh; display: flex; flex-direction: column; padding: 14px 16px; }
@@ -260,8 +258,6 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .deck-btn.custom .deck-name { text-transform: none; padding: 0 6px; }
 .deck-btn.new { border: 2px dashed var(--gold-dark); color: var(--gold); }
 .deck-plus { font-size: 34px; line-height: 1; margin-bottom: 6px; }
-#deck-view-actions { display: flex; gap: 8px; margin-left: auto; margin-right: 12px; }
-#deck-view-actions button { padding: 7px 14px; }
 
 #turn-banner { position: fixed; top: 45%; left: 50%; transform: translate(-50%,-50%) scale(0.8); background: linear-gradient(180deg, #1f1a16 0%, #110e0b 100%); border: 2px solid var(--gold); padding: 14px 36px; border-radius: 4px; font-size: 26px; font-weight: 900; color: var(--gold-light); z-index: 10000; opacity: 0; pointer-events: none; transition: all 0.3s; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
 #turn-banner.show { opacity: 1; transform: translate(-50%,-50%) scale(1); }
@@ -856,7 +852,6 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .coach-good { color: #4ade80; background: rgba(34,197,94,.13); }
 .coach-bad { color: #fdba74; background: rgba(249,115,22,.1); border-left: 3px solid #f97316; }
 .coach-smart { color: #ddd6fe; background: linear-gradient(90deg, rgba(139,92,246,.22), rgba(56,189,248,.12)); border: 1px solid rgba(167,139,250,.55); box-shadow: 0 0 12px rgba(139,92,246,.3); font-weight: bold; }
-.coach-me { align-self: flex-start; max-width: 75%; padding: 6px 11px; border-radius: 4px 12px 12px 12px; font-size: 13px; color: #e0f2fe; background: rgba(56,189,248,.18); border: 1px solid rgba(56,189,248,.35); }
 .coach-dots { display: inline-flex; gap: 4px; padding: 3px 0; }
 .coach-dots i { width: 7px; height: 7px; border-radius: 50%; background: #d6c49c; animation: coachDot 1s ease-in-out infinite; }
 .coach-dots i:nth-child(2) { animation-delay: .15s; } .coach-dots i:nth-child(3) { animation-delay: .3s; }
@@ -987,3 +982,52 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #rotate-hint .rh-icon { font-size: 180px; animation: rhTurn 2.4s ease-in-out infinite; }
 @keyframes rhTurn { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
 @media (orientation: portrait) and (pointer: coarse) { #rotate-hint { display: flex; } }
+/* ===== Deck-Builder als Vollbild-Menü (Layout A): links Pool mit Suche, Filter-Pop-up und Menü, rechts das Deck in voller Höhe ===== */
+#deck-builder-modal { background: #0a0705; backdrop-filter: none; }
+#deck-builder-modal .modal-box { width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; padding: 8px; box-shadow: none; }
+.db-content { gap: 8px; }
+.db-deck { flex: 0 0 clamp(320px, 30%, 470px); overflow: hidden; }
+.db-toolbar { display: flex; gap: 8px; align-items: center; padding: 8px; background: #1a1512; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+.db-toolbar #db-search { flex: 1 1 auto; min-width: 0; }
+#db-filter-btn { white-space: nowrap; }
+#db-filter-btn.on { border-color: var(--gold); color: var(--gold-light); }
+#db-filter-badge:not(:empty) { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--gold); color: #1a1208; font-size: 11px; font-weight: bold; }
+.db-toolbar #db-pool-count { white-space: nowrap; }
+.db-more { position: relative; }
+#db-more-btn { font-size: 18px; line-height: 1; padding: 4px 12px; }
+#db-more-menu { display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 600; flex-direction: column; gap: 4px; padding: 6px;
+    background: #120d09; border: 1px solid var(--gold-dark); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.7); }
+#db-more-menu.open { display: flex; }
+#db-more-menu button { white-space: nowrap; text-align: left; }
+#db-filter-pop { display: none; position: absolute; left: 8px; top: 54px; z-index: 600; width: min(600px, calc(100% - 16px)); flex-direction: column; gap: 6px; padding: 12px;
+    background: #120d09; border: 1px solid var(--gold-dark); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.8); }
+#db-filter-pop.open { display: flex; }
+.db-fp-title { margin-top: 4px; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); }
+#db-filter-pop .db-chips { flex-wrap: wrap; align-self: flex-start; }
+.db-fp-row { display: flex; gap: 8px; margin-top: 6px; }
+.db-fp-row select { flex: 1; }
+/* Größere Karten im Pool */
+.db-scroll { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+/* Deck: fester Kopf, darunter eine gemeinsame Scrollfläche (Held, Statistik, Liste) */
+.db-deck-head { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; background: #1a1512; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
+.db-dh-row { display: flex; gap: 6px; align-items: center; }
+.db-dh-row #db-name { flex: 1; min-width: 0; width: auto; }
+.db-dh-row button { padding: 5px 11px; font-size: 15px; }
+.db-deck-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.db-deck-scroll .db-deck-list { flex: none; overflow: visible; }
+.db-deck-scroll #db-hero-slot { border-radius: 0; }
+.db-deck-scroll .db-stats { border-radius: 0; }
+#db-coach { top: 60px; }
+/* Kompaktere Deckzeilen */
+#db-deck-cards .db-row { height: 28px; margin-bottom: 2px; }
+#db-deck-cards .db-row-cost { width: 28px; height: 28px; margin-left: -11px; font: 900 15px/28px Georgia, serif; }
+#db-deck-cards .db-row-cost.orb-quest { width: 21px; height: 28px; margin-left: -8px; }
+#db-deck-cards .db-row:hover { height: 34px; margin-top: -3px; margin-bottom: -1px; }
+#db-deck-cards .db-row-n { font-size: 16px; }
+#db-deck-cards .db-row-name { font-size: 12.5px; }
+.db-group { margin: 8px 0 3px; }
+/* Log: minimalistisch – jede Zeile gehört einem Spieler (du blau, Gegner rot), Zugwechsel nur als Linie */
+.log-entry { padding: 2px 6px; border-bottom: 0; border-left: 3px solid transparent; border-radius: 2px; margin-bottom: 1px; }
+.log-entry.log-me { border-left-color: #3b82f6; background: rgba(59,130,246,.10); }
+.log-entry.log-opp { border-left-color: #ef4444; background: rgba(239,68,68,.10); }
+.log-sep { flex: none; height: 1px; margin: 5px 0; background: linear-gradient(90deg, transparent, var(--gold-dark), transparent); }

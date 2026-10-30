@@ -672,7 +672,8 @@ function openDeckOverview() {
         btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name" title="${esc(deck.name)}">${esc(title)}</div>`
             + (event ? `<div class="deck-event">${esc(event)}</div>` : '')
             + tr`<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
-        btn.onclick = () => openDeckView(deck.id);
+        // Klick: direkt in den Deck-Builder (Start-Decks als Kopie)
+        btn.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(deck, !custom); };
         return btn;
     };
     grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Deine Decks</div>'));
@@ -683,38 +684,6 @@ function openDeckOverview() {
     grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Start-Decks</div>'));
     GAME_DECKS.filter(d => !String(d.id).startsWith('t_')).forEach(d => grid.appendChild(tile(d, false)));
     document.getElementById("deck-overview-modal").style.display = "flex";
-}
-function openDeckView(deckId) {
-    const custom = String(deckId).startsWith('custom_');
-    const deck = custom ? loadCustomDecks().find(d => d.id === deckId) : GAME_DECKS.find(d => d.id === deckId);
-    if (!deck) return;
-    const title = document.getElementById("deck-view-title");
-    title.textContent = tr`${deck.name} – ${deck.cards.length} Karten`;
-    title.style.color = deck.faction === 'Alliance' ? '#60a5fa' : '#f87171';
-    // Aktionen: Spielen, Bearbeiten (eigene) bzw. als Kopie bearbeiten (Start-Decks), Löschen
-    let acts = document.getElementById('deck-view-actions');
-    if (!acts) { acts = document.createElement('div'); acts.id = 'deck-view-actions'; title.after(acts); }
-    acts.innerHTML = '';
-    const mk = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; acts.appendChild(b); };
-    const closeAll = () => { document.getElementById("deck-view-modal").style.display = "none"; document.getElementById("deck-overview-modal").style.display = "none"; };
-    mk(tr('▶ Spielen'), 'success', () => confirmLeaveGame(() => { closeAll(); initGame(deck.id, null); }));
-    mk(custom ? tr('✎ Bearbeiten') : tr('✎ Als Kopie bearbeiten'), '', () => { closeAll(); openDeckBuilder(deck, !custom); });
-    if (custom) mk(tr('🗑 Löschen'), 'danger', () => uiConfirm(tr('🗑 Löschen'), tr`„${deck.name}“ löschen?`, tr('🗑 Löschen'), () => { saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id)); document.getElementById("deck-view-modal").style.display = "none"; openDeckOverview(); }));
-    const content = document.getElementById("deck-view-content"); content.innerHTML = "";
-    const counts = {}; deck.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
-    const sortedIds = [...new Set(deck.cards)].sort((a, b) => (CARDS[a].cost||0) - (CARDS[b].cost||0));
-    sortedIds.forEach(id => {
-        const card = makeCardInst(id);
-        const wrapper = document.createElement("div"); wrapper.className = "deck-view-card";
-        const countBadge = document.createElement("div");
-        countBadge.style.cssText = "position:absolute;top:-8px;left:-8px;background:var(--gold);color:black;font-weight:900;font-size:12px;padding:2px 6px;border-radius:10px;z-index:100;pointer-events:none;";
-        countBadge.textContent = `x${counts[id]}`;
-        wrapper.appendChild(createCardDOM(card, false));
-        wrapper.appendChild(countBadge);
-        content.appendChild(wrapper);
-    });
-    document.getElementById("deck-overview-modal").style.display = "none";
-    document.getElementById("deck-view-modal").style.display = "flex";
 }
 
 // --- SIMULATIONEN ---
@@ -897,3 +866,38 @@ function loadMaskTest() {
     addLog(tr("🩹 Masken-Test geladen (100%)!"), "log-turn");
     render();
 }
+
+// Deck-Builder (Vollbild): Filter im Pop-up, Neu/Import/Export im Menü „⋯“. Ein Klick daneben schließt beide.
+// Am Filter-Knopf zeigt eine Zahl, wie viele Filter aktiv sind (Typ, Kosten, Set).
+(function () {
+    const pop = document.getElementById('db-filter-pop'), fbtn = document.getElementById('db-filter-btn');
+    const menu = document.getElementById('db-more-menu'), mbtn = document.getElementById('db-more-btn');
+    const badge = () => {
+        const n = (document.querySelector('#db-type-chips .on') || {}).dataset?.type !== 'All' ? 1 : 0;
+        const k = (document.querySelector('#db-cost-chips .on') || {}).dataset?.cost !== 'all' ? 1 : 0;
+        const s = document.getElementById('db-set-filter').value !== 'all' ? 1 : 0;
+        document.getElementById('db-filter-badge').textContent = n + k + s || '';
+    };
+    fbtn.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); pop.classList.toggle('open'); fbtn.classList.toggle('on', pop.classList.contains('open')); };
+    mbtn.onclick = (e) => { e.stopPropagation(); pop.classList.remove('open'); fbtn.classList.remove('on'); menu.classList.toggle('open'); };
+    menu.addEventListener('click', () => menu.classList.remove('open'));
+    pop.addEventListener('click', (e) => { e.stopPropagation(); setTimeout(badge, 0); });
+    pop.addEventListener('change', badge);
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#db-filter-pop, #db-filter-btn')) { pop.classList.remove('open'); fbtn.classList.remove('on'); }
+        if (!e.target.closest('.db-more')) menu.classList.remove('open');
+    });
+})();
+// "⋯" → Löschen: nur für ein gespeichertes eigenes Deck sichtbar (früher in der Deck-Vorschau der Übersicht)
+(function () {
+    const del = document.getElementById('db-delete-btn');
+    const saved = () => loadCustomDecks().find(d => d.id === currentDeckBuilder.id);
+    document.getElementById('db-more-btn').addEventListener('click', () => { del.style.display = saved() ? '' : 'none'; });
+    del.onclick = () => {
+        const deck = saved(); if (!deck) return;
+        uiConfirm(tr('🗑 Löschen'), tr`„${deck.name}“ löschen?`, tr('🗑 Löschen'), () => {
+            saveCustomDecks(loadCustomDecks().filter(d => d.id !== deck.id));
+            document.getElementById('db-close-btn').click(); openDeckOverview();
+        });
+    };
+})();

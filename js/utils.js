@@ -5,7 +5,12 @@ window.onerror = function(msg, url, line) {
 };
 
 function esc(str) { return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function addLog(msg, cls = "") { const box = document.getElementById("log-area"); if (!box) { console.log(msg); return; } const row = document.createElement("div"); row.className = "log-entry " + cls; row.textContent = msg; box.prepend(row); }
+// pid: Spieler, dem die Zeile gehört – Spieler 1 (du, unten) blau, Spieler 2 rot; 'log-sep' = Trennlinie beim Zugwechsel
+function addLog(msg, cls = "", pid = 0) {
+    const box = document.getElementById("log-area"); if (!box) { console.log(msg); return; }
+    if (cls === 'log-sep') { if (box.firstChild && !box.firstChild.classList.contains('log-sep')) { const sep = document.createElement("div"); sep.className = "log-sep"; box.prepend(sep); } return; }
+    const row = document.createElement("div"); row.className = "log-entry " + cls + (pid === 1 ? ' log-me' : pid === 2 ? ' log-opp' : ''); row.textContent = msg; box.prepend(row);
+}
 function triggerShake(el) { if (!el) return; el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
 function showFloatingText(x, y, text, type = 'hit') { const el = document.createElement("div"); el.className = `floating-text ${type}`; el.textContent = text; el.style.left = x + 'px'; el.style.top = y + 'px'; document.body.appendChild(el); setTimeout(() => el.remove(), 1200); }
 function showTurnBanner(text) { const b = document.getElementById("turn-banner"); if (!b) return; b.textContent = text; b.classList.add("show"); setTimeout(() => b.classList.remove("show"), 1500); }

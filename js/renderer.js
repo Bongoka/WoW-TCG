@@ -294,17 +294,31 @@
     const T = { timer: 0, wrap: null, x: 0, y: 0, shown: false, eatClick: false };
     const HOLD_MS = 380, MOVE_PX = 16;
     window.touchZoomShown = () => T.shown;
+    // Zoom offen: Finger über der gehaltenen Karte kippt die Zoom-Karte in 3D wie die Maus (Finger darüber = innerhalb)
+    window.touchZoomInside = (x, y) => {
+        if (!T.shown || !S.live) return false;
+        const r = S.live.wrap.getBoundingClientRect(), m = 10;
+        return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
+    };
+    const touchTilt = (x, y) => {
+        const L = S.live; if (!T.shown || !L || L.releasing) return;
+        const p = localPos(L.wrap, { clientX: x, clientY: y }); L.tx = p.x; L.ty = p.y;
+        if (!S.raf) S.raf = requestAnimationFrame(tick);
+    };
     const touchEnd = () => { clearTimeout(T.timer); if (T.shown) { release(); T.eatClick = true; setTimeout(() => { T.eatClick = false; }, 450); } T.shown = false; T.wrap = null; };
     document.addEventListener('pointerdown', (e) => {
         if (e.pointerType !== 'touch') return;
         const w = e.target && e.target.closest ? e.target.closest('.card-wrapper:not(#cfx-preview):not(.no-fx)') : null;
         clearTimeout(T.timer); T.wrap = w; T.shown = false; T.x = e.clientX; T.y = e.clientY;
-        if (w) T.timer = setTimeout(() => { if (T.wrap === w && w.isConnected) { enter(w); T.shown = true; } }, HOLD_MS);
+        if (w) T.timer = setTimeout(() => { if (T.wrap === w && w.isConnected) { enter(w); T.shown = true; touchTilt(T.x, T.y); } }, HOLD_MS);
     }, { passive: true });
     document.addEventListener('pointermove', (e) => {
-        if (e.pointerType !== 'touch' || !T.wrap || T.shown) return;                      // Zoom offen: bleibt bis zum Loslassen
+        if (e.pointerType !== 'touch' || !T.wrap) return;
+        if (T.shown) { touchTilt(e.clientX, e.clientY); return; }                         // Zoom offen: bleibt bis zum Loslassen, kippt mit
         if (Math.hypot(e.clientX - T.x, e.clientY - T.y) > MOVE_PX) { clearTimeout(T.timer); T.wrap = null; }
     }, { passive: true });
+    // Manche Handy-Browser brechen die Pointer-Events beim langen Drücken ab – Touch-Events laufen weiter
+    document.addEventListener('touchmove', (e) => { if (T.shown && e.touches.length) touchTilt(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
     document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') touchEnd(); }, { passive: true });
     // Bricht der Browser die Berührung ab (z. B. beim langen Drücken), bleibt ein offener Zoom bis zum echten Loslassen (touchend)
     document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch' && !T.shown) touchEnd(); }, { passive: true });
