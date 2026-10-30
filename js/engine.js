@@ -797,7 +797,8 @@ function priorityStep(s) {
 //  - sonst nichts: Ready-/Draw-Fenster, eigenes Zugende, Passen in der Aktionsphase (CR 502.2: das End-Fenster folgt).
 function respondMoment(s, pid) {
     const top = s.chain[s.chain.length - 1];
-    if (top) return top.pl !== pid && top.kind !== 'proposal' && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
+    // Auch auf einen gegnerischen Angriffsvorschlag: "can't attack" oder Ausschalten des Angreifers bricht ihn ab (CR 601.3)
+    if (top) return top.pl !== pid && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
     if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
     if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
     return null;
@@ -2068,7 +2069,8 @@ function startAttack(s, p, a) {
 function resolveProposal(s, it) {
     const att = findCharacter(s, it.att), def = findCharacter(s, it.def);
     const p = getPlayer(s, it.pl);
-    const legal = att && def && ctrlOf(s, att) === it.pl && !att.exhausted && attackTargets(s, att).includes(def)
+    // CR 601.3: Rechtmäßigkeit beim Auflösen neu prüfen – auch "can't attack" (Lt. Commander Dudefella, Frost Nova …)
+    const legal = att && def && canAttackNow(s, att, p) && attackTargets(s, att).includes(def)
         && isInPlayZone((locate(s, att.uid) || {}).zone) && isInPlayZone((locate(s, def.uid) || {}).zone);
     if (!legal) { L(s, tr`✖ Angriff ${att ? att.name : '?'} → ${def ? def.name : '?'} wurde unterbrochen.`, "log-hit"); return; }
     if (s.win) closeWindow(s);

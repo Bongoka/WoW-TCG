@@ -319,9 +319,9 @@ function runRuleTests() {
         s2.humans = [2];
         applyAction(s2, { type: 'PLAY_CARD', handIdx: hand(s2, 1, 33), targets: [[P(s2, 2).hero.uid]], actorId: 1 }, true, 1);
         assert(s2.pending && s2.pending.kind === 'priority' && s2.pending.pid === 2, 'Nicht angehalten trotz Counterspell');
-        // Kampf: ein Halt (letztes Kampffenster) nur, wenn der Instant jetzt mehr bringt als danach – Arcane Shot
-        // tötet den angeschlagenen Angreifer vor dem Kampfschaden; beim unverletzten Angreifer wäre er danach gleich gut
-        for (const [dmg, want] of [[2, 1], [0, 0]]) {
+        // Kampf: Halt (Angriffsvorschlag, CR 601.3, und letztes Kampffenster) nur, wenn der Instant jetzt mehr bringt als
+        // danach – Arcane Shot tötet den angeschlagenen Angreifer vor dem Kampfschaden; beim unverletzten wäre er danach gleich gut
+        for (const [dmg, want] of [[2, 2], [0, 0]]) {
             const s3 = fresh('alliance_mage', 'alliance_hunter'); res(s3, 2, 3); hand(s3, 2, 33); const a = put(s3, 1, 262); a.damage = dmg;
             s3.humans = [2];
             applyAction(s3, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s3, 2).hero.uid, actorId: 1 }, true, 1);
@@ -945,6 +945,31 @@ function runRuleTests() {
         const d = GAME_DECKS[0], r59 = autoFillDeck(d.hero, d.cards.slice(0, 59));
         assert(r59.add.length === 1, `59 Karten: ${r59.add.length} ergänzt`);
         assert(!autoFillDeck(d.hero, d.cards).add.length, '60 Karten: trotzdem ergänzt');
+    });
+    test(108, 'Angriffsvorschlag (CR 601.3): "can\'t attack" in Antwort auf den Vorschlag bricht den Angriff ab', () => {
+        // Spieler 2 greift mit einem Ally den Helden von Spieler 1 an; Spieler 1 antwortet, solange der Vorschlag auf der Kette liegt
+        const setup = () => {
+            const s = fresh('alliance_mage', 'horde_warrior', 2); s.humans = [1];
+            const att = put(s, 2, 262), dude = put(s, 1, 203); res(s, 1, 3);
+            applyAction(s, { type: 'ATTACK', attackerUid: att.uid, defenderUid: P(s, 1).hero.uid, actorId: 2 }, false, 2);
+            return { s, att, dude };
+        };
+        const finish = s => { let n = 0; while (s.pending && n++ < 50) { const d = s.pending; if (d.kind === 'priority') applyAction(s, { type: 'PASS', actorId: d.pid }, true, d.pid); else applyAction(s, { type: 'CHOOSE', v: aiPick(s, d), actorId: d.pid }, true, d.pid); } autoResolve(s); };
+        // Ohne Antwort: der Angriff trifft
+        let { s, att, dude } = setup(); finish(s);
+        assert(P(s, 1).hero.damage > 0, 'Ohne Antwort kein Schaden');
+        // Lt. Commander Dudefella: hält beim Vorschlag an (Automatik) und der Angreifer greift nicht an
+        ({ s, att, dude } = setup());
+        assert(s.pending && s.pending.kind === 'priority' && s.pending.pid === 1 && s.chain.some(it => it.kind === 'proposal'), 'Kein Halt beim Angriffsvorschlag');
+        assert(s.pending.good.some(k => k.startsWith(dude.uid)), 'Dudefella nicht als sinnvolle Antwort markiert');
+        const a = getPriorityActions(s, 1).find(x => x.srcUid === dude.uid && (x.targets || []).flat().includes(att.uid));
+        applyAction(s, { ...a, actorId: 1 }, true, 1); finish(s);
+        assert(att.damage === 1 && !s.battle && P(s, 1).hero.damage === 0, `Dudefella: Angreifer ${att.damage} Schaden, Held ${P(s, 1).hero.damage} Schaden`);
+        // Andere Sperren, die während des Vorschlags entstehen: Frost Trap ("can't attack this turn"), Pandamonium (Allies), Erschöpfen
+        for (const [why, f] of [['cantAttackAll', s => addPE(s, 1, { k: 'cantAttackAll' })], ['alliesCantAttack', s => addPE(s, 1, { k: 'alliesCantAttack' })], ['erschöpft', (s, x) => { x.exhausted = true; }]]) {
+            ({ s, att } = setup()); f(s, att); finish(s);
+            assert(P(s, 1).hero.damage === 0, `${why}: Angriff trotzdem durchgegangen (${P(s, 1).hero.damage} Schaden)`);
+        }
     });
     test(99, 'Priorität: Mensch hält am gegnerischen Zugende nur für eine lohnende Quest an', () => {
         for (const [quest, want] of [[360, true], [342, false]]) {
