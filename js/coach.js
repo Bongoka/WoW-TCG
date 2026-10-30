@@ -703,6 +703,29 @@ const AF_NEEDS = {
     totem: c => /If you control an? \w+ Totem/.test(coachTxt(c)),
     form: c => /While you control a (Bear|Cat) Form|for a Form/.test(coachTxt(c)),
 };
+// Wie gut passt eine Quest zu den Karten des Decks? Such- und Graveyard-Quests nach dem Anteil der Kartenart, die sie
+// brauchen (Kibler's Exotic Pets → Allies, Zapped Giants → Fähigkeiten …), Kosten-Quests nach den passenden Karten
+// (Finkle Einhorn → Allies mit Kosten ≤ 2). Ohne klaren Bezug: Rassen-Quest des Helden, The Princess Trapped und
+// Into the Maw of Madness sind immer gut.
+const AF_QUEST_ALWAYS = ['The Princess Trapped', 'Into the Maw of Madness'];
+function afQuestFit(c, S, hero) {
+    const t = coachTxt(c), n = Math.max(1, S.nonQ.length), share = k => (k / n - 0.35) * 80;
+    let v = 0;
+    const race = (c.text || '').match(/If your hero is an? ([A-Z][\w ]+?), you may/);
+    if (race) v += race[1] === hero.race ? 26 : 0;                                         // doppelte Belohnung
+    if (AF_QUEST_ALWAYS.includes(c.name)) v += 12;
+    if (/revealed ally|ally from your graveyard|allies in your graveyard|four or more allies|Exhaust (two allies|an ally) you control|ally you controlled|Horde allies you control/.test(t)) v += share(S.allies.length);
+    if (/revealed ability|abilities in your graveyard|three or more abilities|ability from your graveyard/.test(t)) v += share(S.abilities.length);
+    if (/revealed equipment|equipment from your graveyard|Exhaust an equipment/.test(t)) v += share(S.equip.length);
+    if (/opponent controls more allies than/.test(t)) v += (0.45 - S.allies.length / n) * 60;   // gut mit wenigen eigenen Allies
+    if (/ally with cost 2 or less/.test(t)) v += S.allies.filter(a => (a.cost || 0) <= 2).length * 2.4 - 8;   // Finkle Einhorn: je mehr billige Allies, desto besser
+    if (/ally with cost 5 or more/.test(t)) v += S.allies.filter(a => (a.cost || 0) >= 5).length * 1.6 - 8;
+    if (/cost 1, 2, or 3/.test(t)) v += share(S.nonQ.filter(x => (x.cost || 0) >= 1 && (x.cost || 0) <= 3).length) * 0.6;
+    if (/cost 3 or more/.test(t)) v += share(S.nonQ.filter(x => (x.cost || 0) >= 3).length) * 0.6;
+    if (/revealed quest/.test(t)) v -= 10;                                                 // findet nur weitere Quests
+    if (FX[c.id] && FX[c.id].questCond) v -= 4;                                            // Bedingung: schwerer zu erfüllen
+    return v;
+}
 function autoFillDeck(heroId, cardIds, size = 60) {
     const hero = CARDS[heroId]; if (!hero) return { error: 'hero', add: [] };
     const deck = cardIds.slice(), add = [];
@@ -778,16 +801,9 @@ function autoFillDeck(heroId, cardIds, size = 60) {
     // 3) Quests zuletzt: Anzahl nach den Kosten des fertigen Decks, Rest bis 60
     const S = coachStats(hero, deck), qWant = qTarget(avgOf(deck.map(id => CARDS[id]).filter(c => c && c.type !== 'Quest')));
     const qScore = c => {
-        let v = base[c.id] + (count(c.id) ? 15 : 0);
-        const m = (c.text || '').match(/If your hero is an? ([A-Z][\w ]+?), you may/); if (m && m[1] === hero.race) v += 20;   // doppelte Belohnung
-        if (c.name === "One Draenei's Junk . . ." && S.lo >= 18) v += 8;
-        if (c.name === "To Serve Kum'isha" && S.lo < 18) v += 8;
-        const pay = (c.text || '').match(/Pay \((\d+)\)/); if (pay) v -= Math.max(0, +pay[1] - 3) * 2;   // teure Quests seltener
-        if (FX[c.id] && FX[c.id].questCond) v -= 4;                                          // Bedingung: schwerer zu erfüllen
-        // Such-Quests ("Put a revealed ally/equipment/ability into your hand") nur, wenn das Deck davon genug hat
-        const find = (c.text || '').match(/[Pp]ut (?:a|all) revealed (\w+)/);
-        if (find) { const t = find[1].toLowerCase(), n = t.startsWith('all') ? S.allies.length : t.startsWith('equip') ? S.equip.length : t.startsWith('abilit') ? S.abilities.length : t.startsWith('quest') ? 0 : 20;
-            v += (n / Math.max(1, S.nonQ.length) - 0.3) * 40; }
+        // Beliebtheit zählt hier wenig – entscheidend ist, wie gut die Quest zu den Karten des Decks passt (afQuestFit)
+        let v = Math.min(5, coachPop(c.name) * 0.3) + Math.min(4, afStarterCount(c.id) * 0.3) + (count(c.id) ? 15 : 0) + afQuestFit(c, S, hero);
+        const pay = (c.text || '').match(/[Pp]ay \((\d+)\)/); if (pay) v -= Math.max(0, +pay[1] - 3) * 2;   // teure Quests seltener
         return v;
     };
     const qs = pool.filter(c => c.type === 'Quest');
