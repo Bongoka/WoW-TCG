@@ -37,6 +37,7 @@ body {
 #deck-overview-box { max-width: 900px; width: 90%; max-height: 85vh; overflow-y: auto; }
 #graveyard-box { max-width: 95vw; width: 95%; max-height: 92vh; overflow-y: auto; }
 #graveyard-content { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding: 20px 0; }
+#graveyard-content .gy-section { flex-basis: 100%; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); color: var(--gold); font-weight: bold; text-align: center; }
 .deck-view-card { width: var(--hand-w); height: var(--hand-h); transition: transform 0.2s; transform-origin: center bottom; }
 .grave-btn { cursor: pointer; }
 .grave-btn:hover { border-color: var(--gold); }
@@ -1066,3 +1067,8 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .db-toggle-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #a89880; transition: transform .15s, background .15s; }
 .db-toggle input:checked + .db-toggle-sw { background: var(--gold-dark); border-color: var(--gold); }
 .db-toggle input:checked + .db-toggle-sw::after { transform: translateX(16px); background: #fde68a; }
+.tm-box { display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: #0a0705; }
+.tm-box label { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--text-dim); }
+.tm-box select { width: 100%; background: #0a0705; border: 1px solid var(--border); color: var(--text-main); padding: 3px; border-radius: 3px; font-size: 11px; }
+.tm-btns { display: flex; gap: 4px; }
+.tm-btns button { flex: 1; }

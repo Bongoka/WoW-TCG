@@ -49,30 +49,39 @@ function renderDeckZone(player, prefix) {
     const st = document.getElementById(prefix + "-deck-stack");
     if (!st) return;
     st.innerHTML = "";
-    const n = player.graveyard.length;
-    // Kartengroße Ablage neben dem Helden: oberste Karte offen, Anzahl als Plakette; leer = gestrichelter Platz
+    const n = player.graveyard.length, nr = (player.removed || []).length;
+    // Kartengroße Ablage neben dem Helden: oberste Karte offen, Anzahl als Plakette; leer = gestrichelter Platz.
+    // Aus dem Spiel entfernte Karten (CR: removed-from-game zone) zeigt dasselbe Fenster in einem eigenen Abschnitt.
     st.classList.toggle("empty", n === 0);
-    if (n === 0) { st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); st.innerHTML = tr('<span class="grave-label">Friedhof</span>'); return; }
+    if (n === 0 && nr === 0) { st.onclick = null; st.classList.remove("grave-btn"); st.removeAttribute("title"); st.innerHTML = tr('<span class="grave-label">Friedhof</span>'); return; }
     st.classList.add("grave-btn"); st.title = tr("Friedhof ansehen");
-    const top = player.graveyard[n - 1];
-    const node = createCardDOM({ ...top, uid: 'gy_top_' + top.uid, damage: 0, exhausted: false, hasDamageMask: false, isFoil: false }, true, null, { noDamage: true, stats: false });
-    node.style.setProperty('--cw', '100%'); st.appendChild(node);
-    const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = `🪦 ${n}`; st.appendChild(cnt);
+    if (n) {
+        const top = player.graveyard[n - 1];
+        const node = createCardDOM({ ...top, uid: 'gy_top_' + top.uid, damage: 0, exhausted: false, hasDamageMask: false, isFoil: false }, true, null, { noDamage: true, stats: false });
+        node.style.setProperty('--cw', '100%'); st.appendChild(node);
+    } else st.innerHTML = tr('<span class="grave-label">Friedhof</span>');
+    const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = `🪦 ${n}` + (nr ? ` · ⛔ ${nr}` : ''); st.appendChild(cnt);
     st.onclick = () => openGraveyard(player);
 }
 function openGraveyard(player) {
-    if (!player.graveyard.length) return;
+    const removed = player.removed || [];
+    if (!player.graveyard.length && !removed.length) return;
     document.getElementById("graveyard-title").textContent = tr`Friedhof – ${player.id === 1 ? tr('Du') : 'CPU'} (${player.graveyard.length} Karten)`;
     const box = document.getElementById("graveyard-content"); box.innerHTML = "";
     // Set 2/3: Karten, die du gerade aus diesem Friedhof spielen darfst (Dramla Lifebender, Readiness, Greed Before Need)
     const playable = new Set(getLegalActions(G, 1).filter(a => a.type === 'PLAY_CARD' && a.gyUid).map(a => a.gyUid));
-    player.graveyard.forEach(c => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false));
+    const show = (c) => { const wrap = document.createElement("div"); wrap.className = "deck-view-card"; wrap.appendChild(createCardDOM({ ...c, damage: 0, exhausted: false }, false));
         if (playable.has(c.uid)) {
             const b = document.createElement("button"); b.textContent = tr("▶ Spielen"); b.className = "gy-play-btn";
             b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'PLAY_CARD', handIdx: -1, gyUid: c.uid }); };
             wrap.appendChild(b);
         }
-        box.appendChild(wrap); });
+        box.appendChild(wrap); };
+    player.graveyard.forEach(show);
+    if (removed.length) {
+        const h = document.createElement("div"); h.className = "gy-section"; h.textContent = tr`⛔ Aus dem Spiel entfernt (${removed.length})`; box.appendChild(h);
+        removed.forEach(show);
+    }
     document.getElementById("graveyard-modal").style.display = "flex";
 }
 

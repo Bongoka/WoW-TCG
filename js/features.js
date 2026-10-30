@@ -936,3 +936,57 @@ function loadMaskTest() {
     inn.onclick = () => { if (i < STEPS.length - 1) { i++; apply(); } };
     apply();
 })();
+
+// --- TESTMATCH: eigenes Deck und Gegner-Deck wählen (Menü „Tests“), gemerkt in localStorage.
+// Gilt für jedes neue Spiel ohne festes Deck; leer = Zufall. "Simulieren": CPU vs CPU nur mit diesen beiden Decks.
+const TM_KEY = 'wow_tcg_test_decks';
+function testMatchDecks() {
+    let v = {}; try { v = JSON.parse(localStorage.getItem(TM_KEY) || '{}') || {}; } catch (e) {}
+    return { p: pickDeck(v.p) ? v.p : '', o: pickDeck(v.o) ? v.o : '' };
+}
+(function () {
+    const sp = document.getElementById('tm-deck-p'), so = document.getElementById('tm-deck-o');
+    const fill = () => {
+        const cur = testMatchDecks();
+        const opts = [`<option value="">${tr('🎲 Zufall')}</option>`]
+            .concat(loadCustomDecks().map(d => `<option value="${esc(d.id)}">★ ${esc(d.name)}</option>`))
+            .concat(GAME_DECKS.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`)).join('');
+        sp.innerHTML = opts; so.innerHTML = opts; sp.value = cur.p; so.value = cur.o;
+    };
+    const save = () => { try { localStorage.setItem(TM_KEY, JSON.stringify({ p: sp.value, o: so.value })); } catch (e) {} };
+    window.addEventListener('load', fill);   // pickDeck steht erst in main.js (lädt danach)
+    // Eigene Decks können sich ändern: vor dem Aufklappen neu füllen
+    [sp, so].forEach(el => { el.addEventListener('mousedown', fill); el.addEventListener('focus', fill); el.addEventListener('change', save); });
+    document.getElementById('tm-play').onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
+    document.getElementById('tm-sim').onclick = () => {
+        const tm = testMatchDecks();
+        const a = pickDeck(tm.p), b = pickDeck(tm.o);
+        if (!a || !b) { showToast(tr('Wähle zuerst beide Decks (nicht Zufall).'), false, 3000); return; }
+        uiAskNumber(tr('🧪 Testmatch-Simulation'), tr`Wie viele Spiele? ${a.name} gegen ${b.name}, beide Reihenfolgen (Standard: 100)`, 100, 1,
+            n => runSimulation(Math.ceil(n / 2), [], tr`Testmatch: ${a.name} vs ${b.name}`, [[a, b], [b, a]]).catch(e => console.error(e)));
+    };
+})();
+
+// --- DECK-SICHERUNG: eigene Decks liegen im localStorage des Browsers (je Gerät und Adresse).
+// "Sichern" speichert sie als JSON-Datei, "Wiederherstellen" ergänzt sie daraus (gleiche ID = überschreiben).
+// Zusätzlich bittet das Spiel den Browser, den Speicher nicht automatisch zu räumen (Storage API persist).
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+document.getElementById('deck-backup-btn').onclick = () => {
+    const list = loadCustomDecks();
+    if (!list.length) { showToast(tr('Keine eigenen Decks zum Sichern.'), false, 3000); return; }
+    const blob = new Blob([JSON.stringify({ app: 'wow-tcg', saved: new Date().toISOString(), decks: list }, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `wow_tcg_decks_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    showToast(tr`${list.length} Decks gesichert`, false, 3000);
+};
+document.getElementById('deck-restore-btn').onclick = () => document.getElementById('deck-restore-file').click();
+document.getElementById('deck-restore-file').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let decks;
+    try { const j = JSON.parse(await f.text()); decks = Array.isArray(j) ? j : j.decks; } catch (err) { decks = null; }
+    decks = (decks || []).filter(d => d && d.id && CARDS[d.hero] && Array.isArray(d.cards));
+    if (!decks.length) { showToast(tr('Keine Decks in dieser Datei gefunden.'), false, 3000); return; }
+    const list = loadCustomDecks();
+    decks.forEach(d => { const i = list.findIndex(x => x.id === d.id); if (i >= 0) list[i] = d; else list.push(d); });
+    if (saveCustomDecks(list)) { showToast(tr`${decks.length} Decks wiederhergestellt`, false, 3000); openDeckOverview(); }
+};

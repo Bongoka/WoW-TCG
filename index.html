@@ -22,12 +22,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <link rel="manifest" href="manifest.json?v=202610301654">
+    <link rel="manifest" href="manifest.json?v=202610301736">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
     <title>WoW TCG – Azeroth vs CPU</title>
-    <link rel="stylesheet" href="css/style.css?v=202610301654">
-    <link rel="stylesheet" href="css/cards.css?v=202610301654">
+    <link rel="stylesheet" href="css/style.css?v=202610301736">
+    <link rel="stylesheet" href="css/cards.css?v=202610301736">
 </head>
 <body>
 <!-- Hochformat auf Handy/Tablet: das Spiel gibt es nur im Querformat -->
@@ -128,6 +128,11 @@
                 </select>
             </div>
             <div class="side-more-head">Tests</div>
+            <div class="tm-box" title="Gilt auch für „Neues Spiel“. Zufall = wie bisher">
+                <label>Dein Deck<select id="tm-deck-p"></select></label>
+                <label>Gegner-Deck<select id="tm-deck-o"></select></label>
+                <div class="tm-btns"><button id="tm-play">▶ Spielen</button><button id="tm-sim" title="CPU vs CPU nur mit diesen beiden Decks (beide Reihenfolgen)">🧪 Simulieren</button></div>
+            </div>
             <button id="btn-simulate">🧪 CPU vs CPU Simulation</button>
             <button id="btn-simulate-tourney" title="Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007">🏆 Turnierdeck-Simulation</button>
             <button id="btn-simulate-all">🎯 All-Cards Test</button>
@@ -220,7 +225,7 @@
 <div id="deck-overview-modal"><div id="deck-overview-box" class="modal-box">
     <h2 style="margin-top:0;color:var(--gold);text-align:center;">Deck Übersicht</h2>
     <div class="deck-grid" id="deck-overview-grid"></div>
-    <div style="text-align:right;margin-top:16px;"><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;"><button id="deck-backup-btn" title="Alle eigenen Decks als Datei auf dem Gerät speichern">💾 Decks sichern</button><button id="deck-restore-btn" title="Decks aus einer Sicherungsdatei laden (vorhandene bleiben erhalten)">📂 Wiederherstellen</button><input type="file" id="deck-restore-file" accept=".json,application/json" hidden><button id="deck-overview-close-btn" class="danger">Schließen</button></div>
 </div></div>
 
 <div id="graveyard-modal"><div id="graveyard-box" class="modal-box">
@@ -363,33 +368,33 @@
     <canvas id="booster-fx"></canvas>
 </div>
 
-<script src="js/i18n_en.js?v=202610301654"></script>
-<script src="js/i18n.js?v=202610301654"></script>
-<script src="js/utils.js?v=202610301654"></script>
-<script src="js/cards.js?v=202610301654"></script>
-<script src="js/cards2.js?v=202610301654"></script>
-<script src="js/cards3.js?v=202610301654"></script>
-<script src="js/cards4.js?v=202610301654"></script>
-<script src="js/cards5.js?v=202610301654"></script>
-<script src="js/decks.js?v=202610301654"></script>
-<script src="js/state.js?v=202610301654"></script>
-<script src="js/engine.js?v=202610301654"></script>
-<script src="js/cardfx.js?v=202610301654"></script>
-<script src="js/cardfx2.js?v=202610301654"></script>
-<script src="js/cardfx3.js?v=202610301654"></script>
-<script src="js/cardfx4.js?v=202610301654"></script>
-<script src="js/cardfx5.js?v=202610301654"></script>
-<script src="js/ai.js?v=202610301654"></script>
-<script src="js/renderer.js?v=202610301654"></script>
-<script src="js/ui.js?v=202610301654"></script>
-<script src="js/simcore.js?v=202610301654"></script>
-<script src="js/tests.js?v=202610301654"></script>
-<script src="js/tourneydecks.js?v=202610301654"></script>
-<script src="js/features.js?v=202610301654"></script>
-<script src="js/coach.js?v=202610301654"></script>
-<script src="js/backgrounds.js?v=202610301654"></script>
-<script src="js/tutorial.js?v=202610301654"></script>
-<script src="js/online.js?v=202610301654"></script>
-<script src="js/main.js?v=202610301654"></script>
+<script src="js/i18n_en.js?v=202610301736"></script>
+<script src="js/i18n.js?v=202610301736"></script>
+<script src="js/utils.js?v=202610301736"></script>
+<script src="js/cards.js?v=202610301736"></script>
+<script src="js/cards2.js?v=202610301736"></script>
+<script src="js/cards3.js?v=202610301736"></script>
+<script src="js/cards4.js?v=202610301736"></script>
+<script src="js/cards5.js?v=202610301736"></script>
+<script src="js/decks.js?v=202610301736"></script>
+<script src="js/state.js?v=202610301736"></script>
+<script src="js/engine.js?v=202610301736"></script>
+<script src="js/cardfx.js?v=202610301736"></script>
+<script src="js/cardfx2.js?v=202610301736"></script>
+<script src="js/cardfx3.js?v=202610301736"></script>
+<script src="js/cardfx4.js?v=202610301736"></script>
+<script src="js/cardfx5.js?v=202610301736"></script>
+<script src="js/ai.js?v=202610301736"></script>
+<script src="js/renderer.js?v=202610301736"></script>
+<script src="js/ui.js?v=202610301736"></script>
+<script src="js/simcore.js?v=202610301736"></script>
+<script src="js/tests.js?v=202610301736"></script>
+<script src="js/tourneydecks.js?v=202610301736"></script>
+<script src="js/features.js?v=202610301736"></script>
+<script src="js/coach.js?v=202610301736"></script>
+<script src="js/backgrounds.js?v=202610301736"></script>
+<script src="js/tutorial.js?v=202610301736"></script>
+<script src="js/online.js?v=202610301736"></script>
+<script src="js/main.js?v=202610301736"></script>
 </body>
 </html>

@@ -194,6 +194,9 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     UNDO.stack = [];
     if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
     const keys = GAME_DECKS.map(d => d.id);
+    // Ohne festes Deck: Auswahl aus dem Testmatch-Menü (Zufall = leer)
+    const tm = typeof testMatchDecks === 'function' ? testMatchDecks() : {};
+    seedPlayerDeck = seedPlayerDeck || tm.p; seedOppDeck = seedOppDeck || tm.o;
     const pKey = seedPlayerDeck || keys[Math.floor(Math.random() * keys.length)];
     let oKey = seedOppDeck || keys[Math.floor(Math.random() * keys.length)];
     if (oKey === pKey && keys.length > 1 && !seedOppDeck) oKey = keys[(keys.indexOf(pKey) + 1) % keys.length];
