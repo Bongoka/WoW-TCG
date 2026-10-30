@@ -669,3 +669,133 @@ function openFaceEditor() {
     };
 }
 if (typeof document !== 'undefined' && document.getElementById('btn-face-edit')) document.getElementById('btn-face-edit').onclick = openFaceEditor;
+
+// ============================================================================
+// AUTO-FILL im Deck-Builder: ergänzt ein angefangenes Deck auf 60 Karten – entfernt nie etwas.
+// 1. Absicht erkennen: Stil aus den Durchschnittskosten (aggro/midrange/control), Plan (Pets, Waffen, Schwarm …),
+//    Verhältnis Allies/Fähigkeiten und offene Bedürfnisse (Coach-Schwächen wie "few-removal", "no-sustain").
+// 2. Nicht-Quests nach Zielkurve: immer die Kostenstufe mit der größten Lücke auffüllen.
+//    Wahl: weitere Kopien vorhandener Karten > Synergie mit dem Plan > Klassen-Staples > Beliebtheit (Turnier-/
+//    Startdecks) > behebt eine Schwäche; Karten, deren Voraussetzung fehlt (Gifte ohne Waffen …), werden gemieden.
+// 3. Quests zuletzt – ihre Zahl hängt von den Kosten der übrigen Karten ab (teure Decks brauchen mehr Kartenzug).
+// Ergebnis: { add: [Karten-IDs], style, plan } (DOM-frei, testbar)
+// ============================================================================
+const AF_CURVE = {                                   // Anteile der Nicht-Quests je Kostenstufe 0–1, 2, 3, 4, 5, 6+
+    aggro: [.18, .28, .24, .14, .09, .07], midrange: [.12, .22, .22, .18, .13, .13], control: [.08, .18, .20, .20, .16, .18] };
+const afBucket = c => { const k = c.cost || 0; return k <= 1 ? 0 : Math.min(5, k - 1); };
+// Klassen-Staples: die kuratierten aus den Coach-Empfehlungen (Gewicht 1) plus ein paar Klassiker
+const AF_STAPLES = { Hunter: ['Fury'], Mage: ['Fire Blast'] };
+let AF_STARTER = null;
+function afStarterCount(id) {
+    if (!AF_STARTER) { AF_STARTER = {}; (typeof GAME_DECKS !== 'undefined' ? GAME_DECKS : []).forEach(d => new Set(d.cards).forEach(x => AF_STARTER[x] = (AF_STARTER[x] || 0) + 1)); }
+    return AF_STARTER[id] || 0;
+}
+function afIsStaple(c, hero) {
+    if ((AF_STAPLES[hero.class] || []).includes(c.name)) return true;
+    return COACH_RECS.some(r => r[0] === c.name && r[3] === 1 && r[2]({ hero }));
+}
+// Was eine Karte voraussetzt (wird gemieden, solange das Deck es nicht bietet)
+const AF_NEEDS = {
+    weapon: c => (c.subtypes || []).includes('Poison') || (c.type !== 'Weapon' && /weapons? you control|with a weapon|Dagger you control|weapon you control/.test(coachTxt(c))),
+    pet: c => !c.isPet && /Pets? you control|if you control a Pet/.test(coachTxt(c)),
+    stealth: c => /Play only if your hero has Stealth/.test(c.text || ''),
+    combo: c => /Finishing Move/.test(coachTxt(c)),
+    totem: c => /If you control an? \w+ Totem/.test(coachTxt(c)),
+    form: c => /While you control a (Bear|Cat) Form|for a Form/.test(coachTxt(c)),
+};
+function autoFillDeck(heroId, cardIds, size = 60) {
+    const hero = CARDS[heroId]; if (!hero) return { error: 'hero', add: [] };
+    const deck = cardIds.slice(), add = [];
+    const count = id => deck.filter(x => x === id).length;
+    const isQ = id => CARDS[id] && CARDS[id].type === 'Quest';
+    const maxCopies = c => c.unlimited ? 4 : c.unique ? 2 : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 2 : 4;
+    const pool = Object.values(CARDS).filter(c => coachLegal(c, hero) && !CARD_ISSUES[c.id] && !c.isToken);
+    const known = deck.map(id => CARDS[id]).filter(Boolean), nonQ0 = known.filter(c => c.type !== 'Quest');
+    // Stil und Plan aus dem Vorhandenen (wenige Karten: neutral)
+    const avgOf = list => list.length ? list.reduce((a, c) => a + (c.cost || 0), 0) / list.length : 3;
+    const avg0 = avgOf(nonQ0);
+    const style = nonQ0.length < 6 ? 'midrange' : avg0 <= 2.5 ? 'aggro' : avg0 >= 3.4 ? 'control' : 'midrange';
+    const S0 = coachStats(hero, deck);
+    const plan = nonQ0.length >= 6 ? ((COACH_PLANS.find(p => p.when(S0)) || {}).k || '') : '';
+    const allyShare = nonQ0.length >= 6 ? nonQ0.filter(c => c.type === 'Ally').length / nonQ0.length : (['Hunter', 'Warrior'].includes(hero.class) ? .5 : .42);
+    const qTarget = a => a <= 2.4 ? 13 : a <= 3.0 ? 14 : a <= 3.5 ? 15 : 16;
+    const nonQTarget = size - Math.max(known.length - nonQ0.length, qTarget(nonQ0.length < 6 ? 3.3 : avg0));   // wenige Karten: neutraler Durchschnitt
+    // Fester Wert je Karte (Beliebtheit, Staple, Klassenkarte) – einmal berechnet
+    // Beliebtheit gedeckelt, sonst bekäme jede Klasse dieselben neutralen Turnier-Allies; Klassenkarten bevorzugt
+    const base = {}; pool.forEach(c => base[c.id] = Math.min(15, coachPop(c.name) * 1.2) + afStarterCount(c.id) * 1.5 + (afIsStaple(c, hero) ? 14 : 0) + ((c.allowedClasses || []).includes(hero.class) ? 6 : 0)
+        - Math.max(0, (c.cost || 0) - 6) * 4);                                               // in der Stufe 6+ lieber 6er als 8er
+    const fixOf = S => (S.plan = COACH_PLANS.find(p => p.when(S)), COACH_ISSUES).filter(([, id, w]) => COACH_FIX[id] && !/curve|few-[123]|many-|quests|singles|core|over-60|hunter-slow/.test(id) && w(S)).map(([, id]) => COACH_FIX[id].match);
+    const score = (c, S, fixes) => {
+        let v = base[c.id];
+        const have = count(c.id); if (have) v += 15 + have * 2;                              // Absicht des Spielers: vorhandene Karten vervollständigen
+        const allies = S.nonQ.length ? S.allies.length / S.nonQ.length : allyShare;
+        if (c.type === 'Ally') v += (allyShare - allies) * 35; else if (c.type === 'Ability') v += (allies - allyShare) * 35;
+        if ((plan === 'beast' || plan === 'demon') && c.isPet) v += 8;
+        if (plan === 'weapon' && c.type === 'Weapon') v += 8;
+        if (plan === 'swarm' && c.type === 'Ally' && (c.cost || 0) <= 3) v += 6;
+        if (plan === 'burn' && c.type === 'Ability' && coachIs(c, COACH_RE.dmg)) v += 6;
+        if (plan === 'totem' && c.totem) v += 8;
+        if (plan === 'combo' && (c.subtypes || []).includes('Combo')) v += 8;
+        if (plan === 'feral' && c.limitTags && c.limitTags.Form) v += 6;
+        if (fixes.some(m => m(c))) v += 6;                                                   // behebt eine offene Schwäche
+        // Voraussetzung fehlt → meiden
+        if (AF_NEEDS.weapon(c) && S.weapons.length < 3) v -= 25;
+        if (AF_NEEDS.pet(c) && S.pets.length < 3) v -= 25;
+        if (AF_NEEDS.stealth(c) && S.stealthSrc.length < 3) v -= 25;
+        if (AF_NEEDS.combo(c) && S.combos.length < 6) v -= 25;
+        if (AF_NEEDS.totem(c) && S.totems.length < 4) v -= 25;
+        if (AF_NEEDS.form(c) && S.forms.length < 3) v -= 25;
+        // Formen (Bear/Cat Form …) werden von Waffen und Nicht-Feral-Fähigkeiten zerstört: dann diese meiden
+        if (S.feralForms.length >= 2 && (c.type === 'Weapon' || (c.type === 'Ability' && c.school !== 'Feral'))) v -= 18;
+        // Grenzen: nur ein Pet / eine Form im Spiel, Ausrüstung je Slot
+        if (c.isPet && S.pets.length >= (plan === 'beast' || plan === 'demon' ? 12 : 6)) v -= 30;
+        if (c.limitTags && c.limitTags.Form && S.forms.length >= 6) v -= 30;
+        if (c.type === 'Weapon' && S.weapons.length >= (plan === 'weapon' ? 14 : 8)) v -= 30;
+        if ((c.type === 'Armor' || c.type === 'Item') && c.slot && (S.slots[c.slot] || 0) >= 3) v -= 30;
+        return v;
+    };
+    const best = (cands, f) => cands.reduce((b, c) => { const v = f(c); return !b || v > b.v ? { c, v } : b; }, null);
+    const put = (c, n) => { for (let i = 0; i < n; i++) { deck.push(c.id); add.push(c.id); } };
+    const nonQNow = () => deck.filter(id => !isQ(id)).length;
+    // Eine Nicht-Quest-Karte wählen: Kostenstufe mit der größten Lücke zur Zielkurve
+    const fillOne = (target) => {
+        const nonQ = deck.map(id => CARDS[id]).filter(c => c && c.type !== 'Quest');
+        const have = [0, 0, 0, 0, 0, 0]; nonQ.forEach(c => have[afBucket(c)]++);
+        const want = AF_CURVE[style].map(f => f * target);
+        const order = [0, 1, 2, 3, 4, 5].sort((a, b) => (want[b] - have[b]) - (want[a] - have[a]));
+        const S = coachStats(hero, deck), fixes = fixOf(S);
+        for (const b of order) {
+            const pick = best(pool.filter(c => c.type !== 'Quest' && afBucket(c) === b && count(c.id) < maxCopies(c)), c => score(c, S, fixes));
+            if (!pick) continue;
+            const room = Math.max(1, Math.round(want[b] - have[b]));
+            put(pick.c, Math.max(1, Math.min(maxCopies(pick.c) - count(pick.c.id), ['Ally', 'Ability'].includes(pick.c.type) ? 3 : 2, room, Math.max(1, target - nonQ.length), size - deck.length)));
+            return true;
+        }
+        return false;
+    };
+    // 2) Nicht-Quests nach Zielkurve
+    for (let g = 0; g < 80 && nonQNow() < nonQTarget && deck.length < size; g++) if (!fillOne(nonQTarget)) break;
+    // 3) Quests zuletzt: Anzahl nach den Kosten des fertigen Decks, Rest bis 60
+    const S = coachStats(hero, deck), qWant = qTarget(avgOf(deck.map(id => CARDS[id]).filter(c => c && c.type !== 'Quest')));
+    const qScore = c => {
+        let v = base[c.id] + (count(c.id) ? 15 : 0);
+        const m = (c.text || '').match(/If your hero is an? ([A-Z][\w ]+?), you may/); if (m && m[1] === hero.race) v += 20;   // doppelte Belohnung
+        if (c.name === "One Draenei's Junk . . ." && S.lo >= 18) v += 8;
+        if (c.name === "To Serve Kum'isha" && S.lo < 18) v += 8;
+        const pay = (c.text || '').match(/Pay \((\d+)\)/); if (pay) v -= Math.max(0, +pay[1] - 3) * 2;   // teure Quests seltener
+        if (FX[c.id] && FX[c.id].questCond) v -= 4;                                          // Bedingung: schwerer zu erfüllen
+        // Such-Quests ("Put a revealed ally/equipment/ability into your hand") nur, wenn das Deck davon genug hat
+        const find = (c.text || '').match(/[Pp]ut (?:a|all) revealed (\w+)/);
+        if (find) { const t = find[1].toLowerCase(), n = t.startsWith('all') ? S.allies.length : t.startsWith('equip') ? S.equip.length : t.startsWith('abilit') ? S.abilities.length : t.startsWith('quest') ? 0 : 20;
+            v += (n / Math.max(1, S.nonQ.length) - 0.3) * 40; }
+        return v;
+    };
+    const qs = pool.filter(c => c.type === 'Quest');
+    for (let g = 0; g < 40 && deck.length < size; g++) {
+        const quests = deck.filter(isQ).length;
+        if (quests >= qWant) { if (!fillOne(size - quests)) break; continue; }             // genug Quests: Rest mit Karten nach Kurve
+        const q = best(qs.filter(c => count(c.id) < 4), qScore); if (!q) { if (!fillOne(size - quests)) break; continue; }
+        put(q.c, Math.min(4 - count(q.c.id), size - deck.length, Math.max(1, qWant - quests)));
+    }
+    return { add, style, plan };
+}

@@ -230,6 +230,19 @@ function renderDBDeck(highlightId) {
             box.appendChild(row);
         });
     });
+    // Auto-Fill am Ende der Liste: ergänzt fehlende Karten bis 60 (entfernt nie etwas, autoFillDeck in coach.js)
+    if (n < 60 && hero && typeof autoFillDeck === 'function') {
+        const b = document.createElement('button'); b.className = 'db-autofill'; b.textContent = tr`✨ Auto-Fill (${60 - n} Karten)`;
+        b.title = tr('Ergänzt passende Karten bis 60 – nach Manakurve, deinen Karten und Klassen-Staples, Quests zuletzt');
+        b.onclick = () => {
+            const r = autoFillDeck(hero.id, currentDeckBuilder.cards);
+            if (!r.add.length) { dbFlash(tr('Keine passenden Karten gefunden.')); return; }
+            currentDeckBuilder.cards.push(...r.add);
+            renderDBAll();
+            dbFlash(tr`${r.add.length} Karten ergänzt`);
+        };
+        box.appendChild(b);
+    }
 }
 // Vorschau beim Überfahren einer Deck-Zeile (links neben der Liste)
 function dbHoverShow(id, row) {

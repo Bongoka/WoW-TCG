@@ -927,6 +927,25 @@ function runRuleTests() {
         const h = P(s, 1).hero, hp = hpOf(s, h); h.damage = hp - 2; putDamage(s, h, 5);
         assert(h.damage === hp, `Put damage: ${h.damage} statt ${hp}`);
     });
+    test(107, 'Deck-Builder Auto-Fill: bis 60, legal, entfernt nichts, Quests zuletzt, keine groben Schwächen', () => {
+        const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken);
+        for (const h of heroes) {
+            const start = [Object.values(CARDS).find(c => c.type === 'Ability' && (c.allowedClasses || []).includes(h.class) && coachLegal(c, h)).id];
+            const r = autoFillDeck(h.id, start), deck = [...start, ...r.add], cs = deck.map(id => CARDS[id]);
+            const cnt = {}; deck.forEach(id => cnt[id] = (cnt[id] || 0) + 1);
+            assert(deck.length === 60, `${h.name}: ${deck.length} Karten`);
+            assert(cs.every(c => coachLegal(c, h)), `${h.name}: illegale Karte`);
+            assert(Object.keys(cnt).every(id => cnt[id] <= (CARDS[id].unlimited ? 60 : 4)), `${h.name}: mehr als 4 Kopien`);
+            const q = cs.filter(c => c.type === 'Quest').length;
+            assert(q >= 13 && q <= 17, `${h.name}: ${q} Quests`);
+            const bad = coachAnalyze(h.id, deck).rounds.flatMap(x => x.issues).filter(i => i.prio < 10).map(i => i.id);
+            assert(!bad.length, `${h.name}: Schwächen ${bad.join(', ')}`);
+        }
+        // Vorhandenes bleibt, es wird nur ergänzt; 59 → 1 Karte, 60 → nichts
+        const d = GAME_DECKS[0], r59 = autoFillDeck(d.hero, d.cards.slice(0, 59));
+        assert(r59.add.length === 1, `59 Karten: ${r59.add.length} ergänzt`);
+        assert(!autoFillDeck(d.hero, d.cards).add.length, '60 Karten: trotzdem ergänzt');
+    });
     test(99, 'Priorität: Mensch hält am gegnerischen Zugende nur für eine lohnende Quest an', () => {
         for (const [quest, want] of [[360, true], [342, false]]) {
             const s = fresh(); res(s, 2, 3); res(s, 2, 1, quest); s.humans = [2];
