@@ -174,6 +174,7 @@ function animateResources(player, shown) {
 // Friedhof + Held rechts; oben gespiegelt). Jede Ally-Reihe weicht seitlich den Blöcken aus, die in ihre Höhe ragen.
 function layoutRows() {
     const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone'], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone']];
+    let pad = 0;
     for (const [rowId, ids, gySel] of sides) {
         const row = document.getElementById(rowId); if (!row) continue;
         row.style.paddingLeft = row.style.paddingRight = '0px';
@@ -188,8 +189,11 @@ function layoutRows() {
             if (r.left + r.width / 2 < mid) padL = Math.max(padL, Math.round(r.right - rr.left + 12));
             else padR = Math.max(padR, Math.round(rr.right - r.left + 12));
         }
-        row.style.paddingLeft = padL + 'px'; row.style.paddingRight = padR + 'px';
+        pad = Math.max(pad, padL, padR);
     }
+    // Beide Reihen gleich und symmetrisch einrücken: eigene und gegnerische Allies liegen genau gegenüber,
+    // zentriert um dieselbe Mittellinie (auch bei mehreren Allies)
+    for (const [rowId] of sides) { const row = document.getElementById(rowId); if (row) row.style.paddingLeft = row.style.paddingRight = pad + 'px'; }
     // Viele Ressourcen: die Hand rückt nach rechts, solange sie nicht an Friedhof/Held stößt
     const hand = document.getElementById('bot-hand'), tray = document.getElementById('bot-resource-tray');
     if (hand && tray) {
@@ -271,6 +275,7 @@ function render() {
     playFxEvents(prevRects);
     syncAim();
     renderTurnIndicator();
+    placeAttachments();
     checkGameOverScreen();
 }
 
@@ -751,40 +756,93 @@ function decorateInPlay(node, c) {
         const att = findCharacter(G, UI.attacker);
         if (att && attackTargets(G, att).some(d => d.uid === uid) && !validateAction(G, { type: 'ATTACK', attackerUid: att.uid, defenderUid: uid }, 1)) {
             node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';
-            node.onclick = (e) => { e.stopPropagation(); doHumanAttack(att.uid, uid); };
+            node.onclick = (e) => { e.stopPropagation(); doHumanAttack(att.uid, uid, UI.preStrike); };
         }
     }
-    // 3) Eigene Karten: Angriff und Kräfte
+    // 3) Eigene Karten: Angriff und Kräfte per Klick auf die Karte (mehrere Möglichkeiten → Auswahlfenster).
+    //    Ziehen greift an; eine bereite Waffe lässt sich ebenfalls aufs Ziel ziehen: dann greift der Held an und
+    //    schlägt mit genau dieser Waffe zu (Regeln wie immer: erst der Angriff, dann der Schlag, CR 602.1).
     if (mine && !pend) {
-        const bar = document.createElement("div"); bar.className = "card-action-bar";
         // Gelber Rand (wie spielbare Handkarten): Angriff mit Schaden oder bezahlbare Kraft möglich
         const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true })) > 0;
         // Kraft mit Kosten X: Rahmen erst ab 1 bereiten Ressource (X = 0 wäre wirkungslos)
         const worth = pw => pw.cost !== 'X' || getReadyRes(G.p1) >= 1;
-        if (canHit || usablePowers(c).some(worth)) node.classList.add('can-act');
-        if (canMain() && isChar(c) && canAttackNow(G, c, G.p1)) {
-            const b = document.createElement("button"); b.textContent = tr("⚔ Angriff"); b.style.background = "#ea580c";
-            b.onclick = (e) => { e.stopPropagation(); UI.attacker = UI.attacker === uid ? null : uid; render(); };
-            bar.appendChild(b);
+        const swing = weaponSwing(c);
+        if (canHit || swing || usablePowers(c).some(worth)) node.classList.add('can-act');
+        const opts = cardActions(c);
+        if (opts.length) {
+            node.style.cursor = 'pointer';
+            node.onclick = (e) => {
+                e.stopPropagation();
+                if (opts.length === 1) { opts[0].run(); return; }
+                openDecisionModal(c.name, tr('Was möchtest du tun?'), [...opts.map(o => ({ label: o.label, cls: o.cls || '', action: o.run })), { label: tr('Abbrechen'), action: () => {} }]);
+            };
+        }
+        const dragAttack = (canMain() && isChar(c) && canAttackNow(G, c, G.p1)) ? { kind: 'attack', uid } : swing ? { kind: 'attack', uid: G.p1.hero.uid, weapon: uid } : null;
+        if (dragAttack) {
             node.draggable = true;
-            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'attack', uid }; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
+            node.addEventListener('dragstart', (e) => { UI.drag = dragAttack; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { UI.drag = null; clearDragHighlights(); });
         }
-        usablePowers(c).forEach(pw => {
-            const b = document.createElement("button");
-            const cost = pw.cost === 'X' ? 'X' : (pw.cost || 0);
-            b.textContent = `${pw.flip ? '🔄 ' : ''}${pw.label}${cost ? ` (${cost})` : ''}`;
-            b.style.background = pw.flip ? "#7c3aed" : "#2563eb";
-            b.onclick = (e) => { e.stopPropagation(); humanAct({ type: 'ACTIVATE', srcUid: uid, key: pw.key }); };
-            bar.appendChild(b);
-        });
-        if (bar.children.length) node.appendChild(bar);
     }
     if (UI.attacker === uid) node.classList.add('target-selected');
     if (G.battle && (G.battle.att === uid || G.battle.def === uid)) node.classList.add('in-combat');
     // Drop-Ziel für Handkarten (Fähigkeit direkt aufs Ziel), Angriffe und Protector
     node.addEventListener('dragover', (e) => { if (dropAllowedOn(uid)) e.preventDefault(); });
     node.addEventListener('drop', (e) => { if (!dropAllowedOn(uid)) return; e.preventDefault(); e.stopPropagation(); dropOn(uid); });
+}
+
+// Bereite eigene Waffe, mit der der Held jetzt angreifen und zuschlagen könnte
+function weaponSwing(c) {
+    return c.type === 'Weapon' && canMain() && isMine(c.uid) && canAttackNow(G, G.p1.hero, G.p1) && strikeOptions(G, 1).some(w => w.uid === c.uid);
+}
+// Was ein Klick auf eine eigene Karte tun kann: angreifen (Ziel danach anklicken), mit dieser Waffe angreifen, Kräfte
+function cardActions(c) {
+    const out = [];
+    if (canMain() && isChar(c) && canAttackNow(G, c, G.p1))
+        out.push({ label: UI.attacker === c.uid ? tr('✖ Angriff abbrechen') : tr('⚔ Angreifen'), cls: 'success', run: () => { UI.attacker = UI.attacker === c.uid ? null : c.uid; UI.preStrike = null; render(); } });
+    if (weaponSwing(c))
+        out.push({ label: tr`⚔ Mit ${c.name} angreifen`, cls: 'success', run: () => { UI.attacker = G.p1.hero.uid; UI.preStrike = c.uid; render(); } });
+    usablePowers(c).forEach(pw => {
+        const cost = pw.cost === 'X' ? 'X' : (pw.cost || 0);
+        out.push({ label: `${pw.flip ? '🔄 ' : ''}${pw.label}${cost ? ` (${cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: c.uid, key: pw.key }) });
+    });
+    return out;
+}
+// Hauptkarte einer angelegten Karte (Polymorph, Gifte, Segen …), wenn sie im Spiel liegt
+function attachHost(c) {
+    if (!c.attachedTo) return null;
+    const l = locate(G, c.attachedTo);
+    return l && isInPlayZone(l.zone) ? l.c : null;
+}
+// Platz für einen Anhang: unter der oberen rechten Ecke, sonst oben links, darüber oder darunter – der erste Platz,
+// der im Bild liegt und weder Friedhof, Deck, Lebensbalken noch die Zug-Knöpfe überdeckt (Helden stehen am Rand)
+const ATTACH_SPOTS = ['', 'attach-left', 'attach-up', 'attach-down'];
+function attachSpot(node) {
+    const obst = [...document.querySelectorAll('#p1-deck-stack, #p2-deck-stack, .deck-zone, .hp-bar, #btn-end-turn, #btn-undo, #big-end-turn')]
+        .map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
+    for (const cls of ATTACH_SPOTS) {
+        node.classList.remove(...ATTACH_SPOTS.filter(Boolean)); if (cls) node.classList.add(cls);
+        const r = node.getBoundingClientRect();
+        const inView = r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight;
+        if (inView && !obst.some(o => o.right > r.left && o.left < r.right && o.bottom > r.top && o.top < r.bottom)) return;
+    }
+    node.classList.remove(...ATTACH_SPOTS.filter(Boolean));                                  // nirgends frei: Standardplatz
+}
+// Angelegte Karten klein unter die obere rechte Ecke ihrer Hauptkarte legen (mehrere leicht versetzt)
+function placeAttachments() {
+    const per = {};
+    for (const p of [G.p1, G.p2]) for (const c of [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])]) {
+        const h = attachHost(c); if (!h) continue;
+        const host = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(h.uid)}"]`); if (!host) continue;
+        const i = per[h.uid] = (per[h.uid] || 0) + 1;
+        const node = createCardDOM(c, true);
+        node.classList.add('attached-card'); node.style.setProperty('--ai', i - 1);
+        decorateInPlay(node, c);
+        node.addEventListener('click', e => e.stopPropagation());                            // Klick gilt der angelegten Karte, nicht der Hauptkarte
+        host.classList.add('has-attach'); host.appendChild(node);
+        attachSpot(node);
+    }
 }
 
 function renderHeroCard(p, containerId) {
@@ -836,8 +894,6 @@ function isAsleep(ally, pid) {
 // Eigene Reihe: Ausrüstung baut sich von rechts nach links auf; Gegner gespiegelt (von links).
 function renderBattlefield(p, containerId, isOpponent) {
     const row = document.getElementById(containerId); row.innerHTML = "";
-    const wm = document.createElement("span"); wm.className = "row-watermark"; wm.textContent = isOpponent ? "Gegnerische Diener" : "Deine Diener (Dropzone)";
-    row.appendChild(wm);
     const allyZone = document.createElement("div"); allyZone.className = "bf-ally-zone";
     const equipZone = document.createElement("div"); equipZone.className = "bf-equip-zone " + (isOpponent ? "opp" : "own");
     p.allies.forEach(ally => {
@@ -847,17 +903,11 @@ function renderBattlefield(p, containerId, isOpponent) {
         decorateInPlay(node, ally);
         slot.appendChild(node); allyZone.appendChild(slot);
     });
-    const equip = [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])];
+    // Angelegte Karten (Polymorph, Gifte, Segen …) liegen an ihrer Hauptkarte (placeAttachments), nicht in dieser Reihe
+    const equip = [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].filter(c => !attachHost(c));
     equip.forEach(c => {
         const slot = document.createElement("div"); slot.className = "bf-slot" + (c.exhausted ? " ex" : "");
         const node = createCardDOM(c, true);
-        if (c.attachedTo) {
-            const t = findCharacter(G, c.attachedTo);
-            const tag = document.createElement("div"); tag.className = "ongoing-tag";
-            tag.textContent = `→ ${t ? t.name : '?'}`;
-            node.appendChild(tag);
-        }
-        if (p.ongoing && p.ongoing.includes(c)) node.classList.add('ongoing-card');
         decorateInPlay(node, c);
         slot.appendChild(node); equipZone.appendChild(slot);
     });
@@ -1200,7 +1250,7 @@ function dropOn(uid) {
     const d = UI.drag; UI.drag = null; clearDragHighlights();
     if (!d) return;
     if (d.kind === 'hand') humanAct({ type: 'PLAY_CARD', handIdx: d.idx, firstTarget: uid });
-    else if (d.kind === 'attack') doHumanAttack(d.uid, uid);
+    else if (d.kind === 'attack') doHumanAttack(d.uid, uid, d.weapon || null);
     else if (d.kind === 'protect') chooseV(d.uid);
 }
 function markDropTargets() {
@@ -1300,14 +1350,18 @@ function animateAttack(attUid, defUid) {
         setTimeout(() => { triggerShake(dEl); showFloatingText(dRect.left + dRect.width / 2, dRect.top + dRect.height / 2, `💥`, 'hit'); setTimeout(resolve, 250); }, 200);
     });
 }
-async function doHumanAttack(attUid, defUid) {
+// weaponUid: Angriff über eine Waffe (gezogen oder gewählt) – der Held greift an und schlägt mit dieser Waffe zu,
+// sobald das Spiel nach dem Schlag fragt (CR 602.1: erst Angreifer, dann Schlag)
+async function doHumanAttack(attUid, defUid, weaponUid = null) {
     if (!canMain()) return;
     const err = validateAction(G, { type: 'ATTACK', attackerUid: attUid, defenderUid: defUid }, 1);
-    if (err) { addLog(err, "log-hit"); return; }
-    UI.attacker = null; UI.busy = true; render();
+    if (err) { showToast(err); return; }
+    UI.attacker = null; UI.preStrike = null; UI.busy = true; render();
     await animateAttack(attUid, defUid);
     UI.busy = false;
     humanAct({ type: 'ATTACK', attackerUid: attUid, defenderUid: defUid });
+    const d = G.pending;
+    if (weaponUid && d && d.pid === 1 && d.k === 'E:strikeDo' && d.opts.some(o => o.v === weaponUid)) humanAct({ type: 'CHOOSE', v: weaponUid });
 }
 // Protector-Animation ("PROTECTED") – für CPU und Mensch
 function playEventAnimations() {

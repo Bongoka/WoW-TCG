@@ -1492,4 +1492,8 @@ var I18N_EN = {
     '🔄 Mulligan': '🔄 Mulligan',
     '🔄 {0} getauscht': '🔄 {0} swapped',
     '🔀 {0}': '🔀 {0}',
+    'Was möchtest du tun?': 'What do you want to do?',
+    '⚔ Angreifen': '⚔ Attack',
+    '✖ Angriff abbrechen': '✖ Cancel attack',
+    '⚔ Mit {0} angreifen': '⚔ Attack with {0}',
 };

@@ -1039,3 +1039,17 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .hp-bar.critical .hp-num b { animation: none; color: #fca5a5; }
 @keyframes hpLow { 50% { box-shadow: 0 0 6px 1px rgba(239,68,68,.45); } }
 @keyframes hpCrit { 50% { box-shadow: 0 0 9px 2px rgba(239,68,68,.6); } }
+/* Angelegte Karten liegen klein unter der oberen rechten Ecke ihrer Hauptkarte (weitere leicht darunter versetzt) */
+.card-wrapper.has-attach { isolation: isolate; }
+.card-wrapper.attached-card { position: absolute; z-index: -1; width: 56%; --cw: auto; right: -42%; top: calc(-10% + var(--ai, 0) * 24%); transform: rotate(5deg); }
+/* Platz rechts neben einer Karte mit Anhang, damit die Nachbarkarte ihn nicht verdeckt */
+.bf-slot:has(> .card-wrapper.has-attach) { margin-right: calc(var(--field-w, 150px) * .45); }
+.card-wrapper.attached-card:hover { z-index: 5; }
+.row-watermark, .ongoing-tag { display: none; }
+/* Helden: rechts daneben liegt der Lebensbalken – Anhang rechts davon, etwas tiefer (oben ist der Bildschirmrand) */
+.hero-with-hp > .card-wrapper > .card-wrapper.attached-card { right: calc(-56% - 28px); top: calc(4% + var(--ai, 0) * 24%); }
+/* Kein Platz rechts (eigener Held am rechten Rand): Anhang gespiegelt unter der oberen linken Ecke */
+.card-wrapper.attached-card.attach-left, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-left { right: auto; left: -42%; top: calc(-10% + var(--ai, 0) * 24%); transform: rotate(-5deg); }
+/* Weitere Plätze, wenn neben der Karte kein Platz ist (attachSpot): darüber bzw. darunter herausragend */
+.card-wrapper.attached-card.attach-up, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-up { left: auto; right: 6%; top: calc(-50% - var(--ai, 0) * 16%); transform: rotate(4deg); }
+.card-wrapper.attached-card.attach-down, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-down { left: auto; right: 6%; top: auto; bottom: calc(-50% - var(--ai, 0) * 16%); transform: rotate(-4deg); }
