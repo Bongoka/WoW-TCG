@@ -995,6 +995,14 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #db-filter-btn.on { border-color: var(--gold); color: var(--gold-light); }
 #db-filter-badge:not(:empty) { margin-left: 6px; padding: 0 6px; border-radius: 9px; background: var(--gold); color: #1a1208; font-size: 11px; font-weight: bold; }
 .db-toolbar #db-pool-count { white-space: nowrap; }
+.db-toolbar { flex-wrap: wrap; }
+.db-toolbar #db-search { min-width: 160px; }
+.db-toolbar > button { white-space: nowrap; }
+.db-zoom { display: inline-flex; }
+.db-zoom button { padding: 4px 10px; font-size: 16px; font-weight: bold; line-height: 1; }
+.db-zoom button:first-child { border-radius: 4px 0 0 4px; }
+.db-zoom button:last-child { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.db-zoom button:disabled { opacity: .4; cursor: default; }
 .db-more { position: relative; }
 #db-more-btn { font-size: 18px; line-height: 1; padding: 4px 12px; }
 #db-more-menu { display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 600; flex-direction: column; gap: 4px; padding: 6px;
@@ -1009,7 +1017,7 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .db-fp-row { display: flex; gap: 8px; margin-top: 6px; }
 .db-fp-row select { flex: 1; }
 /* Größere Karten im Pool */
-.db-scroll { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.db-scroll { grid-template-columns: repeat(auto-fill, minmax(var(--db-tile, 150px), 1fr)); gap: 14px; }
 /* Deck: fester Kopf, darunter eine gemeinsame Scrollfläche (Held, Statistik, Liste) */
 .db-deck-head { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; background: #1a1512; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
 .db-dh-row { display: flex; gap: 6px; align-items: center; }

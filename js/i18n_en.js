@@ -1027,6 +1027,8 @@ var I18N_EN = {
     'Wie die CPU-vs-CPU-Simulation, aber mit den 20 Turnier-Decks 2006/2007': 'Like the CPU vs CPU simulation, but with the 20 tournament decks of 2006/2007',
     'Name des Decks': 'Deck name',
     'Leeres Deck beginnen': 'Start an empty deck',
+    'Karten kleiner': 'Smaller cards',
+    'Karten größer': 'Larger cards',
     'Kartenliste einfügen': 'Paste card list',
     'Deck als Kartenliste': 'Deck as card list',
     'Speichern': 'Save',

@@ -924,3 +924,18 @@ function loadMaskTest() {
         });
     };
 })();
+// Zoom −/+: Kartengröße im Pool links (Mindestbreite je Kachel), gemerkt in localStorage
+(function () {
+    const STEPS = [100, 125, 150, 180, 220, 270];
+    let i = 2;
+    try { const v = +localStorage.getItem('db-zoom'); if (STEPS.includes(v)) i = STEPS.indexOf(v); } catch (e) {}
+    const out = document.getElementById('db-zoom-out'), inn = document.getElementById('db-zoom-in');
+    const apply = () => {
+        document.getElementById('db-pool-cards').style.setProperty('--db-tile', STEPS[i] + 'px');
+        out.disabled = i === 0; inn.disabled = i === STEPS.length - 1;
+        try { localStorage.setItem('db-zoom', STEPS[i]); } catch (e) {}
+    };
+    out.onclick = () => { if (i > 0) { i--; apply(); } };
+    inn.onclick = () => { if (i < STEPS.length - 1) { i++; apply(); } };
+    apply();
+})();
