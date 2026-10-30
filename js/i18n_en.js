@@ -1469,4 +1469,7 @@ var I18N_EN = {
     'Schadens-Auslöser': 'Damage trigger',
     'Zerstörungs-Auslöser': 'Destruction trigger',
     '{0} / {1} aufgedeckt': '{0} / {1} revealed',
+    '★ {0}': '★ {0}',
+    'Bitte drehe dein Gerät ins Querformat.': 'Please rotate your device to landscape.',
+    'Das Spiel kann nur im Querformat gespielt werden.': 'The game can only be played in landscape mode.',
 };

@@ -56,7 +56,17 @@ function updateImgStyleOptions() {
 // Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.png" (große Vorschau)
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
     9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton' };
+// Bild-Adressen, die schon einmal fehlten (404), nicht erneut anfragen: Extended Art u. a. fehlen bei manchen Karten,
+// sonst probiert jede neu gezeichnete Karte dieselben Dateien wieder durch
+const IMG_BAD = new Set();
+const imgKey404 = u => { try { return decodeURI(new URL(u, location.href).pathname); } catch (e) { return u; } };
+function imgFailed(url) { if (url) IMG_BAD.add(imgKey404(url)); }
+window.addEventListener('error', e => { const t = e.target; if (t && t.tagName === 'IMG' && t.src) imgFailed(t.src); }, true);
 function getImageCandidates(id, mode = 'ea') {
+    const all = imageCandidatesAll(id, mode), ok = all.filter(u => !IMG_BAD.has(imgKey404(u)));
+    return ok.length ? ok : all.slice(-1);
+}
+function imageCandidatesAll(id, mode = 'ea') {
     const cd = CARDS[id];
     if (TOKEN_IMG[id]) {
         const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.png`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);

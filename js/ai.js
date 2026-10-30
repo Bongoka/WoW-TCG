@@ -39,9 +39,8 @@ function evaluateState(s, pid) {
     // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
     const nRes = me.resources.length;
     score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
-    // Ungenutztes Mana ist nichts wert – außer man hält ein Instant für den gegnerischen Zug bereit
-    const ready = getReadyRes(me);
-    if (ready > 0 && me.hand.some(c => c.type !== 'Quest' && c.instant && (c.cost || 0) <= ready && cardMatchesPlayer(c, me))) score += 1.5;
+    // Ungenutztes Mana ist nichts wert – außer man hält es im eigenen Zug für ein Instant im gegnerischen Zug bereit
+    if (s.activePlayer === pid) score += aiHoldValue(s, me);
     // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
     if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });
@@ -52,6 +51,22 @@ function evaluateState(s, pid) {
     (me.ongoing || []).forEach(o => score += 2.5 + (o.cost || 0) * 0.6);
     (opp.ongoing || []).forEach(o => score -= 2.5 + (o.cost || 0) * 0.6);
     return score;
+}
+
+// Mana für den Zug des Gegners zurückhalten: Instants, die gerade dann wirken (unterbrechen, Schaden verhindern,
+// Kampftricks, Angreifer entfernen), lohnen sich nur mit bereitem Mana. Bewertet wird das wertvollste bezahlbare –
+// im Gegnerzug spielt man meist eins. Andere Instants (Karten ziehen …) spielt die KI ohnehin mit übrigem Mana am
+// gegnerischen Zugende (respondOptions). Nur im eigenen Zug: dort entscheidet sich, ob Mana übrig bleibt.
+const AI_REACTIVE = /\bInterrupt\b|\bprevent\b|remove (all )?attackers|\battacking\b|\bdefending\b|in combat|would be dealt|can't attack|\bexhaust target\b/i;
+function aiHoldValue(s, p) {
+    const ready = getReadyRes(p); if (!ready) return 0;
+    let best = 0;
+    for (const c of p.hand) {
+        if (c.type === 'Quest' || !c.instant || !AI_REACTIVE.test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
+        const cost = getPlayCost(s, p, c); if (cost > ready) continue;
+        best = Math.max(best, 3 + cost * 1.2);
+    }
+    return best;
 }
 
 // ---------------------------------------------------------------- Handkarten und Ressourcen

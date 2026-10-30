@@ -974,3 +974,16 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .mp-row > span { min-width: 0; } .mp-row select { width: 100%; min-width: 0; text-overflow: ellipsis; }
 .mp-player .mp-role { flex: 0 0 44px; }
 .mp-player b, .mp-lobby b { flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
+/* Antwort-Dialog: sinnvolle Antworten (Engine) vorn und leuchtend, die übrigen gedämpft */
+#choice-modal .cm-good { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(253,230,138,.55); border-radius: 8px; }
+#choice-modal .cm-good .cm-caption { color: #fde68a; font-weight: bold; }
+#choice-modal .cm-other { opacity: .6; filter: saturate(.7); transition: opacity .15s, filter .15s; }
+#choice-modal .cm-other:hover { opacity: 1; filter: none; }
+/* Hochformat auf Touch-Geräten sperren: Hinweis zum Drehen über allem (das Spiel ist für Querformat gebaut) */
+#rotate-hint { display: none; position: fixed; inset: 0; z-index: 2147483000; background: radial-gradient(circle at 50% 40%, #2a2016, #0a0705 70%);
+    color: #f4ecdc; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; padding: 0 60px; font-family: Georgia, serif; }
+#rotate-hint b { font-size: 64px; color: var(--gold-light); line-height: 1.2; }
+#rotate-hint span { font-size: 40px; color: var(--text-dim); }
+#rotate-hint .rh-icon { font-size: 180px; animation: rhTurn 2.4s ease-in-out infinite; }
+@keyframes rhTurn { 0%, 20% { transform: rotate(0); } 50%, 80% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+@media (orientation: portrait) and (pointer: coarse) { #rotate-hint { display: flex; } }

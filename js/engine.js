@@ -767,7 +767,11 @@ function priorityStep(s) {
     // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
     const opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
     if (!opts.length) { passPriority(s); return true; }
-    if (isHuman(s, pid)) { s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason }; return false; }
+    if (isHuman(s, pid)) {
+        // Sinnvolle Antworten (beste zuerst) merken: die Oberfläche zeigt sie vorn und hebt sie hervor
+        const good = (s.stopAll ? respondOptions(s, pid) : opts).map(o => respondKey(s, pid, o.a));
+        s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason, good: [...new Set(good)] }; return false;
+    }
     if (isReal(s)) s._oppDecided = true;
     doAction(s, opts[0].a, pid);
     return true;
@@ -812,6 +816,13 @@ function respondOptions(s, pid) {
         out.push({ a, gain: vNow - vPass });
     }
     return out.sort((x, y) => y.gain - x.gain);
+}
+// Kennung einer Antwort unabhängig von Zielen/X: Karte (uid), Kraft (Quelle|Schlüssel) oder Quest (uid)
+function respondKey(s, pid, a) {
+    const p = getPlayer(s, pid);
+    if (a.type === 'ACTIVATE') return a.srcUid + '|' + a.key;
+    if (a.type === 'COMPLETE_QUEST') return (p.resources[a.resIdx] || { card: {} }).card.uid;
+    return a.gyUid || (p.hand[a.handIdx] || {}).uid;
 }
 // Je Karte/Kraft/Quest höchstens drei Varianten (Ziele sind schon nach KI-Wert sortiert), insgesamt RESPOND_MAX
 function respondCandidates(s, pid, acts) {

@@ -1419,8 +1419,12 @@ function priorityChoices() {
             const r = G.p1.resources[a.resIdx]; if (!r || seen.has(r.card.uid)) continue; seen.add(r.card.uid);
             out.push({ card: r.card, caption: tr('Quest abschließen'), run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
         }
+        out[out.length - 1].key = respondKey(G, 1, a);
     }
-    return out;
+    // Sinnvolle Antworten (Engine: pending.good, beste zuerst) nach vorn und hervorgehoben, der Rest danach
+    const good = (G.pending && G.pending.good) || [];
+    out.forEach(o => { o.rank = good.indexOf(o.key); o.good = o.rank >= 0; });
+    return out.sort((a, b) => (a.good ? a.rank : 1e9) - (b.good ? b.rank : 1e9));
 }
 function optionCaption(o, card) {
     const name = card.name || '';
@@ -1440,12 +1444,12 @@ function renderChoiceModal(d) {
         const c = cardOfRef(r); if (c) ctx.appendChild(cardNode(c, "cm-ctx-card"));
     });
     const addButton = (label, cls, fn) => { const b = document.createElement("button"); b.textContent = label; if (cls) b.className = cls; b.onclick = fn; btns.appendChild(b); };
-    const addChoice = (card, caption, fn) => { const n = cardNode(card, "cm-card", caption); n.onclick = (e) => { e.stopPropagation(); fn(); }; cards.appendChild(n); };
+    const addChoice = (card, caption, fn, cls) => { const n = cardNode(card, "cm-card", caption); if (cls) n.classList.add(cls); n.onclick = (e) => { e.stopPropagation(); fn(); }; cards.appendChild(n); };
     if (d.kind === 'priority') {
         title.textContent = d.reason === 'combat' ? tr('⚔ Kampf – reagieren?') : tr('Reagieren?');
         prompt.textContent = d.prompt;
         fillContext(chainContext());
-        priorityChoices().forEach(ch => addChoice(ch.card, ch.caption, ch.run));
+        priorityChoices().forEach(ch => addChoice(ch.card, ch.good ? tr`★ ${ch.caption}` : ch.caption, ch.run, ch.good ? 'cm-good' : 'cm-other'));
         addButton(tr('Passen'), 'success', () => humanAct({ type: 'PASS' }));
         return;
     }

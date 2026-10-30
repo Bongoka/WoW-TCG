@@ -259,7 +259,7 @@
                 : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
             let k = 0; const probe = new Image();
             probe.onload = () => { pimg.src = probe.src; };
-            probe.onerror = () => { k++; if (k < list.length) probe.src = list[k]; };
+            probe.onerror = () => { imgFailed(probe.src); k++; if (k < list.length) probe.src = list[k]; };
             probe.src = list[0];
         }
         pv.firstChild.replaceChildren(clone);
