@@ -1500,4 +1500,5 @@ var I18N_EN = {
     'Ergänzt passende Karten bis 60 – nach Manakurve, deinen Karten und Klassen-Staples, Quests zuletzt': 'Adds fitting cards up to 60 – by mana curve, your cards and class staples, quests last',
     'Keine passenden Karten gefunden.': 'No fitting cards found.',
     '{0} Karten ergänzt': '{0} cards added',
+    'Neutrale Fähigkeiten zeigen': 'Show neutral abilities',
 };

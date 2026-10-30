@@ -15,7 +15,14 @@ const dbOrb = c => c.type === 'Ally' ? (c.faction === 'Alliance' ? 'alliance' : 
     : c.type === 'Quest' ? 'quest' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equip' : 'ability';
 const DB_ORB_COLOR = { alliance: '#1c78b4', horde: '#c41e2a', neutral: '#d0b509', ability: '#9b4fd1', equip: '#8f959b', quest: '#c8642a' };
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
-const DBF = { type: 'All', cost: 'all', cls: null };
+const DBF = { type: 'All', cost: 'all', cls: null, neutralAb: true, neutralKey: undefined };
+// "Show neutral abilities": automatisch an ohne Klasse/Held, automatisch aus mit Klasse/Held; ein Klick auf den
+// Schalter gilt, bis sich Klasse bzw. Held wieder ändern
+function dbNeutralSync() {
+    const hero = dbHero(), key = hero ? 'h' + hero.id : DBF.cls || '';
+    if (DBF.neutralKey !== key) { DBF.neutralKey = key; DBF.neutralAb = !key; }
+    const t = document.getElementById('db-neutral-ab'); if (t) t.checked = DBF.neutralAb;
+}
 const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
 const DB_CLASS_DE = { Druid: tr('Druide'), Hunter: tr('Jäger'), Mage: tr('Magier'), Paladin: 'Paladin', Priest: tr('Priester'), Rogue: tr('Schurke'), Shaman: tr('Schamane'), Warlock: tr('Hexenmeister'), Warrior: tr('Krieger') };
 // Karte für eine Klasse spielbar (ohne Held: Fraktion/Talent noch offen)
@@ -98,6 +105,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.g
 document.getElementById("db-name").addEventListener('input', (e) => { currentDeckBuilder.name = e.target.value; });
 document.getElementById("db-search").addEventListener('input', renderDBPool);
 document.getElementById("db-set-filter").addEventListener('change', renderDBPool);
+document.getElementById("db-neutral-ab").addEventListener('change', (e) => { DBF.neutralAb = e.target.checked; renderDBPool(); });
 document.getElementById("db-sort").addEventListener('change', renderDBPool);
 ['db-type-chips', 'db-cost-chips'].forEach(id => document.getElementById(id).addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
@@ -111,8 +119,10 @@ function renderDBPool() {
     const search = document.getElementById("db-search").value.trim().toLowerCase();
     const set = document.getElementById("db-set-filter").value, sort = document.getElementById("db-sort").value;
     const poolBox = document.getElementById("db-pool-cards"); poolBox.innerHTML = "";
+    dbNeutralSync();
     const list = Object.values(CARDS).filter(card => {
         if (card.type === 'Hero' || card.isToken) return false;
+        if (!DBF.neutralAb && card.type === 'Ability' && !(card.allowedClasses || []).length) return false;   // neutrale Fähigkeiten
         if (hero ? !dbLegal(card, hero) : DBF.cls && !dbClassOk(card, DBF.cls)) return false;   // Held > Klasse > alle Karten
         if (DBF.type !== 'All' && dbTypeOf(card).k !== DBF.type) return false;
         if (DBF.cost !== 'all') { const c = card.type === 'Quest' ? -1 : (card.cost || 0); if (DBF.cost === '7' ? c < 7 : c !== +DBF.cost) return false; }
