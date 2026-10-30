@@ -11,6 +11,7 @@ const IMG_STYLE_KEY = 'wow_tcg_img_style';
 const imgStyle = () => { try { return localStorage.getItem(IMG_STYLE_KEY) || 'edited'; } catch (e) { return 'edited'; } };
 const useScans = () => imgStyle() === 'scans';
 const useHQ = () => imgStyle() === 'hq';
+const useSmall = () => imgStyle() === 'small';                                       // überall nur "<set> small" (weniger Daten)
 // Scan-Dateinamen: Akzente weg, " und ? weg, ' → _, : → ' -', " . . ." → "..."; dazu Tippfehler/Abweichungen der Dateien
 const SCAN_NAME_FIX = { 'Nerra Lifeboon': 'Nerra Lifeboom', 'Deacon Johanna': 'Decon Johanna', 'Valthak Spiritdrinker': 'Valthak Spiritdinker',
     'Stronghold Gauntlets': 'Stronghold Guantlets', 'Nathressa Darkstrider': 'Nathressa Darksrider', 'Operation Recombobulation': 'Opertation Recombobulation',
@@ -41,7 +42,7 @@ function updateImgStyleOptions() {
     const sel = document.getElementById("cfg-img-style"); if (!sel) return;
     const miss = f => IMG_DIR_MISSING.has(f);
     const edited = !(miss('azeroth') && miss('azeroth small'));
-    const avail = { edited, scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: edited && !miss('azeroth big') };
+    const avail = { edited, scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: edited && !miss('azeroth big'), small: !miss('azeroth small') };
     for (const o of sel.options) {
         if (!(o.value in avail)) continue;
         o.disabled = !avail[o.value];
@@ -75,7 +76,8 @@ function imageCandidatesAll(id, mode = 'ea') {
     const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
     const [dir, pre] = si, num = cd.set ? cd.num : id;
     const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${pre}-${num}${suf}_ergebnis.webp`), encodeURI(`cards/${folder}/${pre}-${num}${suf}.png`)];
-    const small = suf => ed(dir + ' small', suf), norm = suf => ed(dir, suf), big = suf => ed(dir + ' big', suf);
+    // Einstellung "Nur kleine Bilder": auch Zoom und Booster nehmen die kleinen Bilder
+    const small = suf => ed(dir + ' small', suf), norm = suf => useSmall() ? small(suf) : ed(dir, suf), big = suf => useSmall() ? small(suf) : ed(dir + ' big', suf);
     const zoom = suf => useHQ() ? [...big(suf), ...norm(suf)] : [...norm(suf), ...big(suf)];
     const old = SET_IMG_PREFIX[cd.set] ? [`cards/${SET_IMG_PREFIX[cd.set]}-${num}-EA.png`, `cards/${SET_IMG_PREFIX[cd.set]}-${num}.png`] : [_cfgImgPath.replace("{id}", id)];
     // Modi: 'ea' Hand/Spielfeld (Extended Art bevorzugt), 'full' Zoom/Booster (normales Bild), 'back' Heldenrückseite,
@@ -516,7 +518,7 @@ function bootGame() {
     // Kartenbilder: Normal, Original-Scans oder Normal + High Resolution
     const rerenderImgs = () => { if (G) render(); const db = document.getElementById("deck-builder-modal"); if (db && db.style.display === 'flex') renderDBAll(); };
     const styleSel = document.getElementById("cfg-img-style");
-    styleSel.value = useScans() ? 'scans' : useHQ() ? 'hq' : 'edited';
+    styleSel.value = useScans() ? 'scans' : useHQ() ? 'hq' : useSmall() ? 'small' : 'edited';
     styleSel.onchange = () => { try { localStorage.setItem(IMG_STYLE_KEY, styleSel.value); } catch (e) {} rerenderImgs(); };
     // Untermenü "Einstellungen & Tests"
     const more = document.getElementById("side-more");
