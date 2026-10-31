@@ -1422,28 +1422,18 @@ function playEventAnimations() {
 }
 
 // ---------------------------------------------------------------- Entscheidungsfeld
+// Jede Entscheidung kommt ins mittige Fenster (mit Kartenbildern); links bleibt nur die Anzeige der Kette ohne Entscheidung
 function renderPendingPanel() {
     const panel = document.getElementById("pending-panel"); if (!panel) return;
     const d = myPending();
     const chain = G.chain || [];
-    // Wahl zwischen sichtbaren Karten (Spielfeld, eigene Hand): direkt auf dem Feld, sonst mittiges Fenster
-    const board = boardChoice(d);
-    renderChoiceModal(board ? null : d);
-    if ((d && !board) || (!d && !chain.length)) { panel.style.display = 'none'; return; }
+    renderChoiceModal(d);
+    if (d || !chain.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
-    ch.innerHTML = chain.length ? tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('') : '';
+    ch.innerHTML = tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('');
     opts.innerHTML = '';
-    if (!d) { title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …'); return; }
-    title.textContent = d.protect ? tr('Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
-    prompt.textContent = d.prompt + (d.protect ? tr(' Klicke einen leuchtenden Protector an oder ziehe ihn auf den Angreifer.') : tr(' Klicke eine blau markierte Karte an.'));
-    d.opts.forEach(o => {
-        if (typeof o.v === 'string' && locate(G, o.v)) return;   // Karten wählt man auf dem Feld
-        const b = document.createElement('button'); b.textContent = o.label;
-        if (o.v === '__cancel' || (o.v === '__none' && d.protect)) b.className = 'danger';
-        b.onclick = () => chooseV(o.v);
-        opts.appendChild(b);
-    });
+    title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …');
 }
 // Würde diese Karte im Spiel ein Limit verletzen? Gleiche Prüfung wie die Engine (findLimitViolation) auf einer Kopie
 function limitWarning(card) {
@@ -1469,19 +1459,6 @@ function selfDestroyWarning(events) {
 }
 // Schlagen mit einer Waffe zerstört Bear Form / Cat Form (CR-Text der Form)
 function strikeFormRisk() { return (G.p1.ongoing || []).filter(o => (CARDS[o.id].bearForm || CARDS[o.id].catForm) && !o.attachedTo).map(o => o.name); }
-function boardChoice(d) {
-    if (!d || d.kind !== 'choose' || d.destroy) return false;                             // Zerstören: immer mittig mit Warnung
-    if (d.k === 'E:strikeDo' && d.pid === 1 && strikeFormRisk().length) return false;     // Schlag würde eine Form zerstören: mittig mit Warnung
-    let cards = 0;
-    for (const o of d.opts) {
-        if (o.card !== undefined) return false;
-        const l = typeof o.v === 'string' ? locate(G, o.v) : null;
-        if (!l) continue;
-        if (!isInPlayZone(l.zone) && !(l.zone === 'hand' && l.pid === 1)) return false;
-        cards++;
-    }
-    return cards > 0;
-}
 
 // ---------------------------------------------------------------- Entscheidungsfenster (mittig, mit Kartenbildern)
 // Karte zu einem Verweis: Karteninstanz, uid (im Spiel, Hand, Friedhof, Ressourcen, Kette) oder Karten-ID
