@@ -440,7 +440,7 @@ var I18N_EN = {
     'Infernal: Wirf eine Karte ab, sonst übernimmt der Gegner die Kontrolle': 'Infernal: Discard a card, or the opponent takes control',
     'Inoculation: Welchen eigenen Ally auf die Hand?': 'Inoculation: Which of your allies to return to hand?',
     'Inventor\'s Focal Sword: {0} an wen anhängen?': 'Inventor\'s Focal Sword: Attach {0} to whom?',
-    'Invulnerable Mail: Ressource zerstören (noch {0})': 'Invulnerable Mail: Destroy a resource ({0} left)',
+    '{0}: Ressource zerstören (noch {1})': '{0}: Destroy a resource ({1} left)',
     'Ist das alles?': 'Is that all?',
     'It\'s a Secret to Everybody: Welche Karte oben auf das Deck? ({0})': 'It\'s a Secret to Everybody: Which card goes on top of the deck? ({0})',
     'Ja (2)': 'Yes (2)',

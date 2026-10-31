@@ -368,7 +368,7 @@ FX[2157] = { enter: (s, c, pid) => trig(s, { id: 2157, k: 'go', a: { opp: pid ==
     k: { go: (s, a) => { const p = me(s, a.opp); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: false }); evt(s, 'resEnters', { pid: p.id }); s._hidden = true; L(s, tr`${p.hero.name} legt die oberste Karte verdeckt in die Ressourcenreihe.`); } } };
 FX[2158] = { enter: (s, c, pid) => mayPick(s, pid, tr("Ez'trin: Ziel-Waffe erschöpfen?"), "Ez'trin", targetCands(s, pid, { weapon: true, filter: w => !w.exhausted }), 'E:optExhaust', {}, u => ctrlOf(s, findCharacter(s, u)) === pid ? -5 : 5) };
 FX[2159] = { powers: [{ key: 'faesha', label: tr('Ressource zerstören: Long-Range'), aiSkip: () => true, canUse: (s, pid) => me(s, pid).resources.length > 0 || tr('Keine Ressource'),
-    payExtra: (s, it) => FX[296].k.pick(s, { pid: it.pl, left: 1 }), resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'longRange', turn: s.turn }); } }] };
+    payExtra: (s, it) => FX[296].k.pick(s, { pid: it.pl, left: 1, src: CARDS[2159].name }), resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'longRange', turn: s.turn }); } }] };
 FX[2160] = { powers: [{ key: 'gahrunt', label: tr('3 Allies im Friedhof entfernen: eigener Ally erhält Ferocity'), canUse: (s, pid) => me(s, pid).graveyard.filter(c => isAllyCard(c)).length >= 3 || tr('Braucht 3 Allies im Friedhof'),
     slots: (s, pid) => [{ label: tr('Eigener Ally'), cands: targetCands(s, pid, { ally: true, side: 'friendly' }), harm: false }],
     payExtra: (s, it) => q(s, { op: 'call', k: '2160:pick', a: { pid: it.pl, left: 3 } }),

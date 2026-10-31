@@ -686,7 +686,8 @@ FX[296] = { powers: [{ key: 'mail', label: tr('2 Ressourcen zerstören: Rüstung
     payExtra: (s, it) => q(s, { op: 'call', k: '296:pick', a: { pid: it.pl, left: 2 } }),
     resolve: (s, it) => readyCard(s, findCharacter(s, it.src)) }],
     k: { pick: (s, a) => { if (a.left <= 0) { q(s, { op: 'call', k: 'E:finishPrep', a: {} }); return; } const p = me(s, a.pid);
-            ask(s, { pid: a.pid, prompt: tr`Invulnerable Mail: Ressource zerstören (noch ${a.left})`, src: 'Invulnerable Mail', opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Ressource ${i + 1}${r.exhausted ? tr(tr(tr(tr(' (erschöpft)')))) : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: '296:do', a }); },
+            const src = a.src || 'Invulnerable Mail';   // auch für Twig of the World Tree, Faesha (eigener Name im Fenster)
+            ask(s, { pid: a.pid, prompt: tr`${src}: Ressource zerstören (noch ${a.left})`, src, opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Ressource ${i + 1}${r.exhausted ? tr(' (erschöpft)') : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: '296:do', a }); },
         do: (s, a, v) => { destroyResource(s, v); q(s, { op: 'call', k: '296:pick', a: { ...a, left: a.left - 1 } }); } } };
 FX[298] = { powers: [{ key: 'robe', label: tr('Ziehe 1'), act: true, cost: 2, exhaustHero: true, resolve: (s, it) => drawCards(s, me(s, it.pl), 1) }] };
 FX[299] = { on: { defends: (s, c, d, pid) => { if (d.def === heroOf(s, pid).uid) opposingChars(s, pid).forEach(x => heroDmg(s, pid, x.uid, 1, 'Fire', { ability: false })); } } };
@@ -735,7 +736,7 @@ FX[330] = { powers: [{ key: 'focal', label: tr('Angehängte Fähigkeit umhängen
 FX[332] = { powers: [{ key: 'ogre', label: tr('1 Feuerschaden'), act: true, cost: 2, exhaustHero: true, slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1, 'Fire', { ability: false }); } }] };
 FX[335] = { powers: [{ key: 'teebu', label: tr('+1 ATK diesen Zug'), cost: 2, resolve: (s, it) => { const w = findCharacter(s, it.src); if (w) addTM(w, { k: 'atk', v: 1, turn: s.turn }); } }] };
 FX[338] = { powers: [{ key: 'twig', label: tr('Ressource zerstören: nächster Schlag (3) billiger'), canUse: (s, pid) => me(s, pid).resources.length > 0 || tr('Keine Ressource'),
-    payExtra: (s, it) => FX[296].k.pick(s, { pid: it.pl, left: 1 }),
+    payExtra: (s, it) => FX[296].k.pick(s, { pid: it.pl, left: 1, src: 'Twig of the World Tree' }),
     resolve: (s, it) => { const w = findCharacter(s, it.src); if (w) addTM(w, { k: 'twig', turn: s.turn }); } }] };
 
 // ============================================================================
