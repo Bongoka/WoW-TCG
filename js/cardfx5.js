@@ -73,8 +73,8 @@ FX[3120] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, {
         dmg: (s, c, d) => { if (d.combat && (d.weapons || []).includes(c.uid)) trig(s, { id: 3120, k: 'clear', a: { uid: c.uid } }); } },
     k: { add: (s, a) => { const w = findCharacter(s, a.uid); if (w) { w.counters = w.counters || {}; w.counters.atk1 = (w.counters.atk1 || 0) + 1; } },
         clear: (s, a) => { const w = findCharacter(s, a.uid); if (w && w.counters) w.counters.atk1 = 0; } } };
-FX[3121] = { alt: { label: tr('Ausrüstung von der Hand aus dem Spiel entfernen'), ai: 1.5, can: (s, pid) => me(s, pid).hand.some(isEquip),
-    pay: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr("Eskhandar's Right Claw: Welche Ausrüstung aus dem Spiel entfernen?"), src: "Eskhandar's Right Claw", opts: p.hand.filter(isEquip).map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: '3121:pay', a: {} }); } },
+FX[3121] = { alt: { label: tr('Ausrüstung von der Hand aus dem Spiel entfernen'), ai: 1.5, can: (s, pid, card) => me(s, pid).hand.some(c => isEquip(c) && c.uid !== (card && card.uid)),   // eine andere Ausrüstung, nicht sich selbst
+    pay: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr("Eskhandar's Right Claw: Welche Ausrüstung aus dem Spiel entfernen?"), src: "Eskhandar's Right Claw", opts: p.hand.filter(c => isEquip(c) && c.uid !== it.card.uid).map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: '3121:pay', a: {} }); } },
     k: { pay: (s, a, v) => { const l = locate(s, v); if (l && l.zone === 'hand') { const p = me(s, l.pid); p.hand.splice(p.hand.indexOf(l.c), 1); p.removed.push(l.c); L(s, tr`${l.c.name} wird aus dem Spiel entfernt.`); evt(s, 'handLeft', { pid: p.id, uid: v }); } altDone(s); } } };
 FX[3122] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3122, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => { if (foe(s, a.pid).resources.length <= me(s, a.pid).resources.length || !me(s, a.pid).deck.length) return;

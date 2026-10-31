@@ -971,6 +971,20 @@ function runRuleTests() {
             assert(P(s, 1).hero.damage === 0, `${why}: Angriff trotzdem durchgegangen (${P(s, 1).hero.damage} Schaden)`);
         }
     });
+    test(109, "Eskhandar's Right Claw: Alternativkosten nur mit einer anderen Ausrüstung auf der Hand (nicht sich selbst)", () => {
+        // Allein auf der Hand, keine Ressourcen: nicht spielbar (vorher hielt sie sich selbst für die Bezahlung → Endlosschleife der KI)
+        const s = fresh('alliance_warrior', 'horde_warrior'); const p = P(s, 1); p.resources = []; p.hand = [];
+        const i = hand(s, 1, 3121);
+        assert(!getLegalActions(s, 1).some(a => a.type === 'PLAY_CARD' && a.handIdx === i), 'Ohne andere Ausrüstung trotzdem spielbar');
+        // Mit einer zweiten Ausrüstung: die andere wird entfernt, die Klaue liegt am Helden
+        const other = Object.values(CARDS).find(c => c.type === 'Armor' && !c.isToken).id; hand(s, 1, other);
+        const a = getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === i);
+        assert(a, 'Mit anderer Ausrüstung nicht spielbar');
+        act(s, a, 1); let n = 0;
+        while (s.pending && n++ < 20) { const d = s.pending; applyAction(s, { type: d.kind === 'priority' ? 'PASS' : 'CHOOSE', v: d.kind === 'priority' ? undefined : (d.opts.find(o => o.v === 'alt') || d.opts.find(o => o.v !== '__cancel')).v, actorId: d.pid }, true, d.pid); autoResolve(s); }
+        assert(p.hero.weapons.some(w => w.id === 3121), 'Klaue nicht am Helden');
+        assert(p.removed.some(c => c.id === other) && !p.removed.some(c => c.id === 3121), `Entfernt: ${p.removed.map(c => c.name).join(', ') || 'nichts'}`);
+    });
     test(99, 'Priorität: Mensch hält am gegnerischen Zugende nur für eine lohnende Quest an', () => {
         for (const [quest, want] of [[360, true], [342, false]]) {
             const s = fresh(); res(s, 2, 3); res(s, 2, 1, quest); s.humans = [2];
