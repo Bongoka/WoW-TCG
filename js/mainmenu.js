@@ -158,3 +158,25 @@ function mmTick() {
     c.globalCompositeOperation = 'source-over';
 }
 document.getElementById('btn-main-menu').onclick = () => openMainMenu();
+
+// ---------------------------------------------------------------- Musik: beim Spielstart die ersten 35 s, ein- und ausgeblendet
+// Browser erlauben Ton erst nach einer Bedienung – ist er blockiert, startet die Musik mit dem ersten Klick bzw. Tastendruck.
+const MM_MUSIC = { el: null, started: false, len: 35, vol: .45 };
+function mmMusicStart() {
+    if (MM_MUSIC.started || (typeof sfx !== 'undefined' && sfx.muted)) return;
+    const a = MM_MUSIC.el || (MM_MUSIC.el = Object.assign(new Audio('music/menu.mp3'), { preload: 'auto' }));
+    a.volume = 0;
+    a.play().then(() => {
+        MM_MUSIC.started = true;
+        ['pointerdown', 'keydown'].forEach(t => removeEventListener(t, mmMusicStart, true));
+        const t0 = performance.now();
+        // Timer statt requestAnimationFrame: läuft auch im Hintergrund-Tab weiter, die Musik endet sicher nach 35 s
+        const iv = setInterval(() => {
+            const t = (performance.now() - t0) / 1000;
+            if (a.paused || t >= MM_MUSIC.len || (typeof sfx !== 'undefined' && sfx.muted)) { a.pause(); clearInterval(iv); return; }
+            a.volume = MM_MUSIC.vol * Math.max(0, Math.min(1, t / 2.5, (MM_MUSIC.len - t) / 4));   // 2,5 s ein-, 4 s ausblenden
+        }, 50);
+    }).catch(() => {});
+}
+mmMusicStart();
+['pointerdown', 'keydown'].forEach(t => addEventListener(t, mmMusicStart, true));
