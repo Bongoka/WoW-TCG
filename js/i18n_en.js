@@ -1974,4 +1974,16 @@ var I18N_EN = {
     "Wie viele Spiele pro Deck-Paar? ({0} eigene Decks = {1} Paarungen; Standard: 3)": "How many games per deck pair? ({0} own decks = {1} pairings; default: 3)",
     "CPU vs CPU – eigene Decks ({0})": "CPU vs CPU – own decks ({0})",
     "Alle deine eigenen Decks spielen gegeneinander (ohne Turnier-Decks)": "All your own decks play against each other (without tournament decks)",
+    // Online-Lobby: Sichtbarkeit, VS-Simulation
+    "Simulation: beide Decks spielen im Hintergrund gegeneinander": "Simulation: both decks play each other in the background",
+    "Deck wechseln": "Change deck",
+    "In der Lobby-Liste sichtbar, jeder kann beitreten": "Shown in the lobby list, anyone can join",
+    "Öffentlich": "Public",
+    "Nicht in der Liste – beitreten nur mit dem Code": "Not listed – join only with the code",
+    "Nur mit Code": "Code only",
+    "Es fehlt noch ein Gegner-Deck.": "No opponent deck yet.",
+    "{0} von {1} Spielen": "{0} of {1} games",
+    "simuliert …": "simulating …",
+    "Tippen: simulieren": "Tap: simulate",
+    "läuft – nochmal tippen zum Stoppen": "running – tap again to stop",
 };

@@ -722,7 +722,8 @@ importTourneyDecks();
 // --- DECK OVERVIEW ---
 // Jedes Deck als Deck-Box: vorne das Heldenbild, oben das Klassen-Icon, Farbe nach Fraktion des Helden.
 // Dieselbe Übersicht dient überall als Deck-Auswahl (openDeckOverview({ pick })): Test-Match, Online-Lobby, Deck-Builder „Laden“.
-function deckBoxHTML(deck, mini = false) {
+function deckBoxHTML(deck, size = '') {                                      // size: '' normal, true/'mini' klein, 'big' groß (Online-Lobby)
+    const mini = size === true || size === 'mini';
     const hero = CARDS[deck.hero], cls = deck.class || (hero && hero.class) || '', fac = (deck.faction || (hero && hero.faction) || 'neutral').toLowerCase();
     // Heldenbild (klein, ohne Extended Art), auf das Gesicht gezoomt: Ausschnitt wie beim Coach-Avatar (COACH_FACE)
     const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/-EA[_.]/.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
@@ -734,8 +735,8 @@ function deckBoxHTML(deck, mini = false) {
         const cl = v => (Math.max(0, Math.min(1, v)) * 100).toFixed(1);
         pos = `background-size: ${(z * 100).toFixed(0)}% auto; background-position: ${cl(px)}% ${cl(py)}%`;
     }
-    const n = deck.cards.length;
-    return `<div class="dbox ${esc(fac)}${mini ? ' mini' : ''}"><div class="dbox-top"><img src="${CLASS_ICONS[cls] || ''}" alt=""></div><div class="dbox-side"></div>`
+    const n = (deck.cards || []).length;
+    return `<div class="dbox ${esc(fac)}${mini ? ' mini' : size === 'big' ? ' big' : ''}"><div class="dbox-top"><img src="${CLASS_ICONS[cls] || ''}" alt=""></div><div class="dbox-side"></div>`
         + `<div class="dbox-front" style='background-image:${imgs}; ${pos}'>${mini ? '' : `<span class="dbox-n ${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n}</span>`}</div></div>`;
 }
 const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');

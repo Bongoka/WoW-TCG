@@ -13,7 +13,7 @@ const NET_BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:
 const NET_LIB = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
 const NET_PREFIX = 'wowtcg/v2';
 const NET_STALE_MS = 60000, NET_BEAT_MS = 8000, NET_LOST_MS = 30000;
-const NET_NAME_KEY = 'wow_tcg_mp_name', NET_DECK_KEY = 'wow_tcg_mp_deck', NET_POPUP_KEY = 'wow_tcg_mp_popups';
+const NET_NAME_KEY = 'wow_tcg_mp_name', NET_DECK_KEY = 'wow_tcg_mp_deck', NET_POPUP_KEY = 'wow_tcg_mp_popups', NET_PRIV_KEY = 'wow_tcg_mp_private';
 const NET = {
     client: null, connecting: null, cid: 'p' + Math.random().toString(36).slice(2, 10), since: 0,
     role: null,          // null | 'host' | 'guest'
@@ -114,6 +114,8 @@ function netHost() {
 }
 function netAnnounce() {
     if (NET.role !== 'host') return;
+    // Nur mit Code: keine Ankündigung in der Lobby-Liste (eine frühere wird gelöscht), Beitreten nur über den Code
+    if (netPrivate()) { netPub('/lobby/' + NET.code, '', true); return; }
     const d = netPickDeck(NET.me.deck);
     const status = NET.inGame ? 'playing' : NET.peer ? 'full' : 'open';
     netPub('/lobby/' + NET.code, { v: 2, code: NET.code, name: netName(), deck: d ? d.name : '', hero: d ? d.hero : null, status, created: NET.created, ts: Date.now() }, true);
@@ -137,11 +139,12 @@ function netHostMsg(m) {
 function netSyncRoom() {
     if (NET.role !== 'host') return;
     const d = netPickDeck(NET.me.deck);
-    netPub(netRoom(NET.code, 'h'), { t: 'room', host: { name: netName(), deckName: d ? d.name : '', hero: d ? d.hero : null },
+    netPub(netRoom(NET.code, 'h'), { t: 'room', host: { name: netName(), deckName: d ? d.name : '', hero: d ? d.hero : null, deck: d ? { name: d.name, hero: d.hero, cards: d.cards } : null },
         guest: NET.peer ? { name: NET.peer.name, deckName: NET.peer.deckName, hero: NET.peer.hero, ready: NET.peer.ready } : null });
     netRenderRoom();
 }
 function netPeerGone() {
+    netVsStop();
     NET.peer = null;
     if (NET.inGame) { NET.inGame = false; if (G && !G.gameOver) showToast(tr('Der Gegner hat die Partie verlassen.'), true, 5000); }
     if (NET.role === 'host') { netAnnounce(); netSyncRoom(); }
@@ -149,6 +152,7 @@ function netPeerGone() {
 }
 // Partie starten: Host = Spieler 1, Gast = Spieler 2; wer beginnt, entscheidet der Zufall (CR 101.1)
 function netStart() {
+    netVsStop();
     const hd = netPickDeck(NET.me.deck), gd = NET.peer && NET.peer.deck;
     if (NET.role !== 'host' || !hd || !gd || !NET.peer.ready) return;
     if (typeof tutStop === 'function') tutStop();
@@ -230,6 +234,7 @@ function netSendDeck() {
     netPub(netRoom(NET.code, 'g'), { t: 'deck', deck: d ? { name: d.name, hero: d.hero, cards: d.cards } : null });
 }
 function netGuestStart() {
+    netVsStop();
     if (typeof tutStop === 'function') tutStop();
     UNDO.stack = []; hideGameOver();
     if (typeof pickMatchBackground === 'function') pickMatchBackground();
@@ -345,6 +350,7 @@ function netBeat() {
 }
 // Lobby/Partie verlassen (quiet: ohne Rückmeldung, z. B. vor dem Erstellen einer neuen Lobby)
 function netLeave(quiet) {
+    netVsStop();
     if (!NET.role) return;
     if (NET.role === 'host') { netPub(netRoom(NET.code, 'h'), { t: 'close' }); netPub('/lobby/' + NET.code, '', true); }
     else if (NET.peer) netPub(netRoom(NET.code, 'g'), { t: 'leave' });
@@ -367,7 +373,7 @@ function netModal() {
     m.querySelector('.mp-x').onclick = netHideModal;
     return m;
 }
-function netHideModal() { const m = document.getElementById('mp-modal'); if (m) m.style.display = 'none'; }
+function netHideModal() { netVsStop(); const m = document.getElementById('mp-modal'); if (m) m.style.display = 'none'; }
 function openOnline() {
     netModal().style.display = 'flex';
     if (NET.role && !NET.inGame) netShowRoom(); else netShowMenu();
@@ -417,18 +423,21 @@ function netRenderList() {
         r.appendChild(b); box.appendChild(r);
     });
 }
+// Sichtbarkeit der eigenen Lobby: öffentlich (in der Liste, mit Hinweis-Pop-up) oder nur mit Code (gemerkt)
+function netPrivate() { try { return localStorage.getItem(NET_PRIV_KEY) === '1'; } catch (e) { return false; } }
+function netSetPrivate(on) { try { localStorage.setItem(NET_PRIV_KEY, on ? '1' : '0'); } catch (e) {} netAnnounce(); netRenderRoom(); }
+// Raum: links du (Name, große Deck-Box – Klick wechselt das Deck), rechts der Gegner, dazwischen "VS"
 function netShowRoom() {
     netModal().style.display = 'flex';
     const body = document.getElementById('mp-body'); if (!body) return;
     body.innerHTML = `
-        <div class="mp-code-row">${tr('Lobby-Code')}: <code id="mp-room-code">${esc(NET.code)}</code><button id="mp-copy" title="${tr('Code kopieren')}">${tr('Kopieren')}</button></div>
-        <div id="mp-players"></div>
-        <div class="mp-row"><label>${tr('Dein Deck')}</label><span id="mp-deck-slot"></span></div>
+        <div class="mp-code-row">${tr('Lobby-Code')}: <code id="mp-room-code">${esc(NET.code)}</code><button id="mp-copy" title="${tr('Code kopieren')}">${tr('Kopieren')}</button>
+            <span id="mp-vis"></span></div>
+        <div class="mp-versus"><div class="mp-side" id="mp-me"></div><button id="mp-vs" class="mp-vs" title="${tr('Simulation: beide Decks spielen im Hintergrund gegeneinander')}"></button><div class="mp-side" id="mp-opp"></div></div>
         <div id="mp-chat"></div>
         <div class="mp-chat-in"><input id="mp-say" maxlength="300" placeholder="${tr('Nachricht …')}"><button id="mp-send">${tr('Senden')}</button></div>
         <div class="mp-actions"><button id="mp-leave" class="danger">${tr('Lobby verlassen')}</button><button id="mp-go" class="success"></button></div>`;
     body.querySelector('#mp-copy').onclick = () => { try { navigator.clipboard.writeText(NET.code); showToast(tr('Code kopiert'), false); } catch (e) {} };
-    body.querySelector('#mp-deck-slot').appendChild(netDeckSelect(() => { if (NET.role === 'host') { netAnnounce(); netSyncRoom(); } else { netSendDeck(); } }));
     const say = body.querySelector('#mp-say');
     const send = () => { netSay(say.value); say.value = ''; };
     body.querySelector('#mp-send').onclick = send; say.onkeydown = e => { if (e.key === 'Enter') send(); };
@@ -437,22 +446,68 @@ function netShowRoom() {
         if (NET.role === 'host') netStart();
         else { NET.me.ready = !NET.me.ready; netPub(netRoom(NET.code, 'g'), { t: 'ready', on: NET.me.ready }); netRenderRoom(); }
     };
+    body.querySelector('#mp-vs').onclick = () => { if (NET.vs) netVsStop(); else netVsStart(); };
+    // Jeder andere Knopf im Online-Fenster beendet die Simulation
+    const modal = netModal();
+    if (!modal._vsStop) { modal._vsStop = true; modal.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.id !== 'mp-vs') netVsStop(); }, true); }
     netStatus(); netRenderRoom(); netRenderChat();
 }
+// Gegner-Deck mit Kartenliste (Host kennt es aus der "deck"-Nachricht, der Gast aus "room")
+function netOppDeck() { return NET.role === 'host' ? (NET.peer && NET.peer.deck) : (NET.room && NET.room.host && NET.room.host.deck); }
 function netRenderRoom() {
-    const box = document.getElementById('mp-players'); if (!box) return;
+    const meBox = document.getElementById('mp-me'); if (!meBox) return;
     const hd = netPickDeck(NET.me.deck);
-    const host = NET.role === 'host' ? { name: netName(), deckName: hd ? hd.name : '', hero: hd ? hd.hero : null }
-        : (NET.room && NET.room.host) || { name: '…' };
-    const guest = NET.role === 'host' ? NET.peer : (NET.room && NET.room.guest) || { name: netName(), deckName: hd ? hd.name : '', ready: NET.me.ready };
-    const slot = (p, label, ready) => `<div class="mp-player${p ? '' : ' empty'}"><span class="mp-role">${label}</span>` +
-        (p ? `<b>${esc(p.name)}</b><span>${esc(p.deckName || '')}${p.hero && CARDS[p.hero] ? ' · ' + esc(CARDS[p.hero].name) : ''}</span>${ready ? `<em>${ready}</em>` : ''}` : `<span>${tr('Warte auf einen Gegner …')}</span>`) + `</div>`;
-    box.innerHTML = slot(host, 'Host') + slot(guest, tr('Gast'), guest ? (guest.ready ? tr('✓ bereit') : tr('nicht bereit')) : '');
+    const opp = NET.role === 'host' ? NET.peer : (NET.room && NET.room.host);
+    const oppReady = NET.role === 'host' ? !!(NET.peer && NET.peer.ready) : null;
+    const meReady = NET.role === 'guest' ? NET.me.ready : null;
+    const od = netOppDeck() || (opp && opp.hero ? { hero: opp.hero, name: opp.deckName, cards: [] } : null);
+    const tag = r => r === null ? '' : `<em class="${r ? 'on' : ''}">${r ? tr('✓ bereit') : tr('nicht bereit')}</em>`;
+    meBox.innerHTML = `<b>${esc(netName())}</b><button class="mp-deckbox" title="${tr('Deck wechseln')}">${hd ? deckBoxHTML(hd, 'big') : ''}</button><span>${esc(hd ? hd.name : '')}</span>${tag(meReady)}`;
+    meBox.querySelector('.mp-deckbox').onclick = () => openDeckOverview({ title: tr('Dein Deck'), current: NET.me.deck, pick: d => {
+        NET.me.deck = d.id; try { localStorage.setItem(NET_DECK_KEY, d.id); } catch (e) {}
+        if (NET.role === 'host') { netAnnounce(); netSyncRoom(); } else { netSendDeck(); netRenderRoom(); } } });
+    document.getElementById('mp-opp').innerHTML = opp && opp.name
+        ? `<b>${esc(opp.name)}</b><div class="mp-deckbox">${od ? deckBoxHTML(od, 'big') : '<div class="dbox-special">?</div>'}</div><span>${esc(od ? od.name || '' : '')}</span>${tag(oppReady)}`
+        : `<b class="dim">${tr('Warte auf einen Gegner …')}</b><div class="mp-deckbox"><div class="dbox-special">?</div></div>`;
+    const vis = document.getElementById('mp-vis');
+    if (vis) {
+        vis.innerHTML = NET.role === 'host' ? `<span class="mp-vis-tog"><button data-p="0" class="${netPrivate() ? '' : 'on'}" title="${tr('In der Lobby-Liste sichtbar, jeder kann beitreten')}">${tr('Öffentlich')}</button><button data-p="1" class="${netPrivate() ? 'on' : ''}" title="${tr('Nicht in der Liste – beitreten nur mit dem Code')}">${tr('Nur mit Code')}</button></span>` : '';
+        vis.querySelectorAll('button').forEach(b => b.onclick = () => netSetPrivate(b.dataset.p === '1'));
+    }
+    netRenderVs();
     const go = document.getElementById('mp-go');
     if (go) {
         if (NET.role === 'host') { go.textContent = tr('Spiel starten'); go.disabled = !(NET.peer && NET.peer.ready && NET.peer.deck && hd); }
         else { go.textContent = NET.me.ready ? tr('✓ Bereit') : tr('Bereit'); go.disabled = !NET.peer; go.classList.toggle('on', NET.me.ready); }
     }
+}
+// VS: beide Decks spielen im Hintergrund gegeneinander (CPU gegen CPU, Startspieler abwechselnd), angezeigt wird nur
+// die eigene Winrate. Jeder andere Knopf, ein Deckwechsel oder der Spielstart beenden die Simulation.
+function netVsStart() {
+    const a = netPickDeck(NET.me.deck), b = netOppDeck();
+    if (!a || !b || !b.cards || !b.cards.length) { showToast(tr('Es fehlt noch ein Gegner-Deck.'), false, 2500); return; }
+    const key = a.id + '|' + b.hero + '|' + b.cards.length + '|' + (b.name || '');
+    if (!NET.vsRes || NET.vsRes.key !== key) NET.vsRes = { key, games: 0, wins: 0 };
+    const run = NET.vs = { stop: false };
+    const step = () => {
+        if (run.stop || NET.vs !== run) return;
+        const r = NET.vsRes, meFirst = r.games % 2 === 0;
+        try { const res = meFirst ? simulateOneGame(a, b) : simulateOneGame(b, a); r.games++; if (res.winner === (meFirst ? 1 : 2)) r.wins++; }
+        catch (e) { console.error(e); netVsStop(); return; }
+        netRenderVs();
+        setTimeout(step, 0);
+    };
+    netRenderVs(); setTimeout(step, 0);
+}
+function netVsStop() { if (NET.vs) { NET.vs.stop = true; NET.vs = null; netRenderVs(); } }
+function netRenderVs() {
+    const v = document.getElementById('mp-vs'); if (!v) return;
+    const r = NET.vsRes, a = netPickDeck(NET.me.deck), b = netOppDeck();
+    const key = a && b ? a.id + '|' + b.hero + '|' + (b.cards || []).length + '|' + (b.name || '') : null;
+    const ok = r && r.key === key && r.games > 0;
+    v.classList.toggle('running', !!NET.vs);
+    v.innerHTML = `<span class="mp-vs-t">VS</span>` + (ok ? `<span class="mp-vs-wr">${Math.round(r.wins / r.games * 100)}%</span><small>${tr`${r.wins} von ${r.games} Spielen`}</small>`
+        : `<small>${NET.vs ? tr('simuliert …') : tr('Tippen: simulieren')}</small>`) + (NET.vs ? `<small class="mp-vs-run">${tr('läuft – nochmal tippen zum Stoppen')}</small>` : '');
 }
 function netRenderChat() {
     const box = document.getElementById('mp-chat'); if (!box) return;
