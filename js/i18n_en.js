@@ -1999,4 +1999,7 @@ var I18N_EN = {
     "Meine Decks": "My Decks",
     "Sprache": "Language",
     "Hauptmenü": "Main Menu",
+    "Spiel fortsetzen": "Resume Game",
+    "Zurück in die laufende Partie": "Back to the current match",
+    "Tests": "Tests",
 };

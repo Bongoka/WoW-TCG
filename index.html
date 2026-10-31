@@ -79,9 +79,6 @@
         <span style="font-weight:900;color:var(--gold);font-size:15px;">WoW TCG</span>
         <span style="display:flex;align-items:center;gap:6px;">
             <span id="turn-badge" style="background:#1a1512;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold;border:1px solid var(--border);">Turn 1</span>
-            <!-- Sprache: Englisch (Standard) / Deutsch, gemerkt in localStorage -->
-            <button class="lang-flag" data-lang="en" title="English"><svg viewBox="0 0 60 30" width="22" height="11"><clipPath id="uk-c"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath><path d="M0,0v30h60v-30z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" clip-path="url(#uk-c)" stroke="#C8102E" stroke-width="4"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg></button>
-            <button class="lang-flag" data-lang="de" title="Deutsch"><svg viewBox="0 0 5 3" width="18" height="11"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#DD0000"/><rect y="2" width="5" height="1" fill="#FFCE00"/></svg></button>
         </span>
     </div>
     <div id="cpu-status-box" class="cpu-indicator" style="display:none;"><div class="spinner"></div><span id="cpu-status-text">CPU überlegt...</span></div>
@@ -100,16 +97,13 @@
         </div>
     </div>
     <button id="btn-main-menu" class="success">Hauptmenü</button>
-    <button id="btn-new-game">Neues Spiel (Zufällig)</button>
-    <button id="btn-online" style="border-color:#3b82f6; background:#1e3a5f; color:#bfdbfe;">Online-Spiel</button>
-    <button id="btn-decks" style="border-color:#8a6d2b;">Deck Übersicht</button>
-    <button id="btn-deck-builder" style="border-color:#8a6d2b; background:#4a3f35;">Deck Builder</button>
-    <button id="btn-booster" style="border-color:#10b981; background:#064e3b; color:#6ee7b7;">Booster öffnen</button>
-    <!-- Selten gebraucht: Einstellungen und Tests (aufklappbar, startet eingeklappt) -->
-    <details id="side-more">
-        <summary>Einstellungen &amp; Tests</summary>
-        <div class="side-more-body">
-            <div class="side-more-head">Einstellungen</div>
+    <!-- Einstellungen: liegen unsichtbar bereit und erscheinen im Hauptmenü unter „Optionen“ (mainmenu.js verschiebt sie für die Dauer dorthin) -->
+    <div id="settings-pool" hidden>
+            <!-- Sprache: Englisch (Standard) / Deutsch, gemerkt in localStorage -->
+            <div class="mm-opt-row"><span>Sprache</span>
+            <button class="lang-flag" data-lang="en" title="English"><svg viewBox="0 0 60 30" width="22" height="11"><clipPath id="uk-c"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath><path d="M0,0v30h60v-30z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" clip-path="url(#uk-c)" stroke="#C8102E" stroke-width="4"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></svg></button>
+            <button class="lang-flag" data-lang="de" title="Deutsch"><svg viewBox="0 0 5 3" width="18" height="11"><rect width="5" height="1" fill="#000"/><rect y="1" width="5" height="1" fill="#DD0000"/><rect y="2" width="5" height="1" fill="#FFCE00"/></svg></button>
+            <button id="btn-sound">Sound An</button></div>
             <div style="display:flex;gap:6px;align-items:center;">
                 <label style="font-size:11px;color:var(--text-dim);">Schwierigkeit:</label>
                 <select id="cfg-difficulty" style="flex:1;background:#0a0705;border:1px solid var(--border);color:var(--text-main);padding:3px;border-radius:3px;font-size:11px;">
@@ -128,7 +122,11 @@
                     <option value="edited">Normal</option><option value="scans">Original-Scans</option><option value="hq">Normal + High Resolution</option><option value="small">Nur kleine Bilder (wenig Daten)</option>
                 </select>
             </div>
-            <div class="side-more-head">Tests</div>
+    </div>
+    <!-- Selten gebraucht: Tests (aufklappbar, startet eingeklappt) -->
+    <details id="side-more">
+        <summary>Tests</summary>
+        <div class="side-more-body">
             <div class="tm-box">
                 <label>Dein Deck<button id="tm-deck-p" type="button"></button></label>
                 <label>Gegner-Deck<button id="tm-deck-o" type="button"></button></label>
@@ -154,7 +152,6 @@
         <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">Log:</span>
         <span style="display:flex;gap:4px;">
             <button id="btn-fullscreen" style="padding:2px 8px;font-size:10px;">Vollbild</button>
-            <button id="btn-sound" style="padding:2px 8px;font-size:10px;">Sound An</button>
         </span>
     </div>
     <div id="log-area"></div>
@@ -211,7 +208,6 @@
     <div id="hs-mull-hint">Klicke Karten an, die du tauschen willst</div>
     <div id="hs-mull-cards"></div>
     <button id="hs-mull-keep" class="success">Behalten</button>
-    <button id="hs-mull-learn" class="learn-btn">Lerne die Regeln</button>
 </div>
 
 <div id="sim-modal"><div id="sim-box" class="modal-box">

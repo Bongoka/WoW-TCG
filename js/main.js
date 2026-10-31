@@ -239,8 +239,7 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
         // Mulligan (CR 101.2: einmal)
         openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
             { label: tr("Behalten"), cls: "success", action: startPlay },
-            { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } },
-            { label: tr("Lerne die Regeln"), cls: "learn-btn", action: () => openLearnMenu() }
+            { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
         ]);
     };
     // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
@@ -479,19 +478,15 @@ function bootGame() {
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
     document.getElementById("btn-auto-turn").onclick = autoPlayMyTurn;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
-    document.getElementById("btn-new-game").onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
-    document.getElementById("btn-online").onclick = openOnline;
     const popBtn = document.getElementById("btn-mp-popups");
     const updPop = () => { popBtn.textContent = netPopupsOn() ? tr("Lobby-Hinweise: An") : tr("Lobby-Hinweise: Aus"); };
     popBtn.onclick = () => { try { localStorage.setItem(NET_POPUP_KEY, netPopupsOn() ? "off" : "on"); } catch (e) {} updPop(); netBackground(); };
     updPop();
     setTimeout(netBackground, 3000);                                                      // im Hintergrund verbinden: Hinweise auf neue Lobbys
     document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; document.getElementById("sim-modal").style.display = "none"; };   // laufende Simulation beenden
-    document.getElementById("btn-decks").onclick = openDeckOverview;
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
     document.getElementById("graveyard-close-btn").onclick = () => { document.getElementById("graveyard-modal").style.display = "none"; };
     document.getElementById("graveyard-modal").onclick = (e) => { if (e.target.id === "graveyard-modal") e.target.style.display = "none"; };
-    document.getElementById("btn-deck-builder").onclick = () => openDeckBuilder();
     document.getElementById("btn-mask-test").onclick = loadMaskTest;
 
     // Simulationen: Anzahl über das spieleigene Eingabefenster (statt prompt)

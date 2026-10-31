@@ -16,9 +16,10 @@ function mmBuild() {
             <div class="mm-left">
                 <div class="mm-title"><img class="mm-logo" src="icons/logo.png" alt="World of Warcraft Trading Card Game" draggable="false"><i class="mm-logo-shine"></i></div>
                 <nav class="mm-nav">
-                    <button class="mm-btn mm-continue" data-a="continue"><span>${tr('Weiterspielen')}</span></button>
+                    <button class="mm-btn mm-continue" data-a="continue"><span>${tr('Spiel fortsetzen')}</span><small>${tr('Zurück in die laufende Partie')}</small></button>
                     <button class="mm-btn mm-primary" data-a="quick"><span>${tr('Schnelles Spiel')}</span><small>${tr('Zufälliges Match gegen die CPU')}</small></button>
                     <button class="mm-btn" data-a="online"><span>${tr('Online-Spiel')}</span><small>${tr('1 gegen 1 mit Freunden')}</small></button>
+                    <div class="mm-sep"></div>
                     <button class="mm-btn" data-a="learn"><span>${tr('Regeln lernen')}</span><small>${tr('Videos und Tutorial-Match')}</small></button>
                     <button class="mm-btn" data-a="options"><span>${tr('Optionen')}</span></button>
                 </nav>
@@ -52,7 +53,7 @@ function openMainMenu() {
     if (typeof initMatchBackground === 'function') initMatchBackground();             // Ordnerliste der Matten (über http)
     const el = mmBuild();
     mmFillProps();
-    el.classList.toggle('has-game', !!(G && !G.gameOver && !G.online && G.turn > 1));
+    el.classList.toggle('has-game', !!(G && !G.gameOver));                             // laufende Partie bleibt im Hintergrund erhalten
     el.classList.remove('out'); el.style.display = 'flex';
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open');
@@ -83,26 +84,18 @@ function mmAction(btn, a, e) {
     }[a];
     if (go) setTimeout(go, a === 'booster' ? 0 : 120);
 }
-// Optionen: die Einstellungen aus dem Menü rechts werden für die Dauer hierher verschoben (gleiche Knöpfe, gleiche Wirkung)
+// Optionen: die Einstellungen liegen unsichtbar in #settings-pool (index.html) und werden für die Dauer hierher verschoben
 function mmOpenOptions() {
-    const box = MM.el.querySelector('.mm-opt-body'), body = document.querySelector('#side-more .side-more-body');
-    const heads = body.querySelectorAll('.side-more-head');
-    const moved = []; let n = heads[0] ? heads[0].nextElementSibling : null;
-    while (n && n !== heads[1]) { const next = n.nextElementSibling; moved.push(n); n = next; }
-    MM.moved = { nodes: moved, before: heads[1] || null, parent: body };
-    // Sprache und Sound dazu (stehen sonst im Kopf bzw. Fuß des Menüs rechts)
-    const extra = document.createElement('div'); extra.className = 'mm-opt-row';
-    extra.innerHTML = `<span>${tr('Sprache')}</span>`;
-    document.querySelectorAll('#side-panel .lang-flag').forEach(f => { const c = f.cloneNode(true); c.onclick = () => f.click(); extra.appendChild(c); });
-    const snd = document.getElementById('btn-sound'), sc = document.createElement('button'); sc.textContent = snd.textContent;
-    sc.onclick = () => { snd.click(); sc.textContent = snd.textContent; }; extra.appendChild(sc);
-    box.innerHTML = ''; box.appendChild(extra); moved.forEach(x => box.appendChild(x));
+    const box = MM.el.querySelector('.mm-opt-body'), pool = document.getElementById('settings-pool');
+    const nodes = [...pool.children];
+    MM.moved = { nodes, parent: pool };
+    box.innerHTML = ''; nodes.forEach(x => box.appendChild(x));
     const o = MM.el.querySelector('.mm-options'); o.hidden = false; void o.offsetWidth; o.classList.add('in');
 }
 function mmCloseOptions() {
     if (!MM.el) return;
     const o = MM.el.querySelector('.mm-options'); if (o.hidden) return;
-    if (MM.moved) { MM.moved.nodes.forEach(x => MM.moved.parent.insertBefore(x, MM.moved.before)); MM.moved = null; }
+    if (MM.moved) { MM.moved.nodes.forEach(x => MM.moved.parent.appendChild(x)); MM.moved = null; }
     o.classList.remove('in'); o.hidden = true;
 }
 

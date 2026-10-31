@@ -522,7 +522,6 @@ function boosterFlash(rgb = '255,236,180', ms = 450) {
 }
 
 // ---- Öffnen
-document.getElementById("btn-booster").onclick = () => { bModal().style.display = "flex"; boosterPicker(); };
 // Auswahl: welcher Booster? (je Set ein Pack, Bild zufällig aus den Bildern des Sets)
 function boosterPicker() {
     BOOSTER.busy = false; BOOSTER.cards = []; BOOSTER.focus = null;

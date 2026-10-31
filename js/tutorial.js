@@ -172,5 +172,3 @@ function tutTick() {
 }
 addEventListener('resize', () => { if (TUT.active) tutTick(); });
 
-// Knopf im Hearthstone-Mulligan
-document.getElementById('hs-mull-learn').onclick = () => openLearnMenu();
