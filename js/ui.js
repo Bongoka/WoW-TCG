@@ -527,8 +527,11 @@ function aimSvg() {
 function drawArrow(r, x, y) {
     const svg = aimSvg(); svg.style.display = 'block';
     const sx = r.left + r.width / 2, sy = r.top + r.height / 2;
-    const dist = Math.hypot(x - sx, y - sy);
-    const cx = (sx + x) / 2, cy = Math.min(sy, y) - Math.max(40, dist * 0.35);
+    // Nur leicht gebogen: Kontrollpunkt quer zur Linie (Seite nach oben), höchstens 12 % der Länge / 60 px, immer im Bild
+    const dist = Math.hypot(x - sx, y - sy) || 1;
+    let nx = -(y - sy) / dist, ny = (x - sx) / dist; if (ny > 0) { nx = -nx; ny = -ny; }
+    const bend = Math.min(60, dist * 0.12);
+    const cx = Math.max(8, Math.min(innerWidth - 8, (sx + x) / 2 + nx * bend)), cy = Math.max(8, Math.min(innerHeight - 8, (sy + y) / 2 + ny * bend));
     const d = `M${sx},${sy} Q${cx},${cy} ${x},${y}`;
     svg.querySelector('.aim-line').setAttribute('d', d); svg.querySelector('.aim-glow').setAttribute('d', d);
     const g = svg.querySelector('#aim-grad'); g.setAttribute('x1', sx); g.setAttribute('y1', sy); g.setAttribute('x2', x); g.setAttribute('y2', y);
