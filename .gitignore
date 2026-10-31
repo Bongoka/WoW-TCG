@@ -24,14 +24,6 @@ cards/* big/
 cards/* scans/
 cards/* scans small/
 
-# Hintergründe: online nur eine kleine Auswahl, der Rest bleibt lokal
-backgrounds/*
-!backgrounds/Darkmoon_Faire_Illidan_2009_-_TCG_Playmat.webp
-!backgrounds/Fires_of_Outlands_-_TCG_Playmat.webp
-!backgrounds/Heroes_of_Azeroth_-_TCG_Playmat.webp
-!backgrounds/Leeeeeroy_Jenkins_-_TCG_Playmat.webp
-!backgrounds/Litori_Frostburn_-_TCG_Playmat.webp
-!backgrounds/Through_the_Dark_Portal_-_TCG_Playmat.webp
 
 # Normale Kartenbilder, von denen es eine Extended-Art-Fassung gibt (die EA ist die vollständige Karte): bleiben lokal.
 # Automatisch erzeugt – neu erzeugen nach neuen Sets, siehe CLAUDE.md („Doppelte Kartenbilder“)

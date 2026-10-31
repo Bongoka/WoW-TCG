@@ -1446,3 +1446,21 @@ body:not(.dev) #side-more { display: none !important; }
 /* … und die Hand ist dabei ganz ausgefahren (wie beim Darüberfahren) */
 body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(-50%, 0); }
 #mp-chat .mp-warn { font-style: normal; font-size: 11px; color: #e8c97a; background: rgba(201,168,76,.08); border: 1px solid rgba(201,168,76,.25); border-radius: 4px; padding: 5px 8px; margin-bottom: 6px; }
+/* Hauptmenü auf niedrigen Bildschirmen (Handy quer): alles kompakter, damit Logo, alle Knöpfe und beide Objekte passen */
+@media (max-height: 520px) and (min-width: 561px) {
+    .mm-content { padding: 0 4vw 0 4vw; gap: 3vw; }
+    .mm-left { gap: 10px; }
+    .mm-title { width: clamp(150px, 26vw, 230px); }
+    .mm-nav { gap: 5px; zoom: 1; }
+    .mm-btn { width: min(250px, 38vw); padding: 6px 16px 5px 14px; }
+    .mm-btn span { font-size: 14px; } .mm-btn small { font-size: 9.5px; }
+    .mm-btn.mm-primary { padding: 8px 16px 7px 14px; } .mm-btn.mm-primary span { font-size: 17px; }
+    .mm-sep { height: 8px; }
+    .mm-sep ~ .mm-btn span { font-size: 13px; }
+    .mm-props { zoom: 1; gap: 3vw; padding-bottom: 0; }
+    .mm-deckbox .dbox.big { --w: 84px; --h: 115px; --d: 33px; margin: 20px 17px 6px 0; }
+    .mm-deckbox .dbox.big .dbox-n { font-size: 9px; padding: 2px 6px 1px; }
+    .mm-deckbox .dbox-special { width: 84px; height: 115px; margin: 20px 17px 6px 0; font-size: 36px; }
+    .mm-pile { width: 120px; height: 150px; } .mm-pack { width: 82px; margin-left: -41px; bottom: 4px; }
+    .mm-plate { font-size: 11px; padding: 4px 10px 3px; margin-top: 8px; letter-spacing: 1px; }
+}

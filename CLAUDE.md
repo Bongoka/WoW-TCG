@@ -57,7 +57,7 @@ Wichtige Engine-Konzepte:
 Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuern – sonst laden Browser (vor allem Handys) alte Dateien aus dem Cache und es gibt Fehler wie „Funktion nicht definiert“:
 
 ```bash
-V=$(date +%Y%m%d%H%M); sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]+)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]+)?\"#\1?v=$V\"#g" index.html
+V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]*)?\"#\1?v=$V\"#g" index.html && ! grep -q '?v="' index.html
 ```
 
 Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
