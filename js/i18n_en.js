@@ -1987,4 +1987,5 @@ var I18N_EN = {
     "Tippen: simulieren": "Tap: simulate",
     "läuft – nochmal tippen zum Stoppen": "running – tap again to stop",
     "{0} % Winrate ({1} von {2} Spielen)": "{0} % win rate ({1} of {2} games)",
+    "Fahre über ein Deck, um seine Kartenliste zu sehen.": "Hover over a deck to see its card list.",
 };

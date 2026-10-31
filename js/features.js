@@ -202,8 +202,23 @@ function renderDBDeck(highlightId) {
     fill.className = n < 60 ? 'under' : n === 60 ? 'exact' : 'over';
     const cnt = document.getElementById('db-count'); cnt.textContent = `${n} / 60`; cnt.className = fill.className;
     if (typeof coachUpdateBtn === 'function') coachUpdateBtn(n);
-    // Manakurve (ohne Quests), gestapelt nach Typ
-    const curve = document.getElementById('db-curve'); curve.innerHTML = '';
+    dbRenderStats(cards, document.getElementById('db-curve'), document.getElementById('db-typebar'), document.getElementById('db-typelegend'));
+    // Warnungen: Karten, die der gewählte Held nicht spielen kann
+    const warn = document.getElementById('db-warnings'); warn.querySelectorAll('.db-warn').forEach(x => x.remove());
+    const bad = hero ? [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero)) : [];
+    if (bad.length) { const w = document.createElement('div'); w.className = 'db-warn';
+        w.innerHTML = tr`⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
+        w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
+    // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
+    const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
+    if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>Import</b> eine Kartenliste ein.</div>'); return; }
+    dbRenderRows(box, cards, hero, { edit: true, highlightId });
+    dbAfterRows(box, n, hero);
+}
+// Manakurve (ohne Quests, gestapelt nach Typ) und Typverteilung – auch für die Deck-Vorschau der Übersicht
+function dbRenderStats(cards, curve, tb, tl) {
+    const n = cards.length;
+    curve.innerHTML = '';
     const buckets = Array.from({ length: 8 }, () => ({}));
     cards.forEach(id => { const c = CARDS[id]; if (c.type === 'Quest') return; const b = Math.min(7, c.cost || 0); const k = dbTypeOf(c).k; buckets[b][k] = (buckets[b][k] || 0) + 1; });
     const maxB = Math.max(4, ...buckets.map(b => Object.values(b).reduce((x, y) => x + y, 0)));
@@ -217,22 +232,16 @@ function renderDBDeck(highlightId) {
         curve.appendChild(col);
     });
     // Typverteilung
-    const tb = document.getElementById('db-typebar'), tl = document.getElementById('db-typelegend'); tb.innerHTML = ''; tl.innerHTML = '';
+    tb.innerHTML = ''; tl.innerHTML = '';
     DB_TYPES.forEach(t => {
         const k = cards.filter(id => t.is(CARDS[id])).length;
         if (k) { const seg = document.createElement('div'); seg.style.flex = k; seg.style.background = t.color; seg.title = `${t.label}: ${k}`; tb.appendChild(seg); }
         tl.insertAdjacentHTML('beforeend', `<div><i style="background:${t.color}"></i>${t.label}<b>${k}</b><span>${n ? Math.round(k / n * 100) : 0}%</span></div>`);
     });
     if (!n) tb.innerHTML = tr('<div class="db-empty-bar">leer</div>');
-    // Warnungen: Karten, die der gewählte Held nicht spielen kann
-    const warn = document.getElementById('db-warnings'); warn.querySelectorAll('.db-warn').forEach(x => x.remove());
-    const bad = hero ? [...new Set(cards)].filter(id => !dbLegal(CARDS[id], hero)) : [];
-    if (bad.length) { const w = document.createElement('div'); w.className = 'db-warn';
-        w.innerHTML = tr`⚠ ${bad.length} Karte(n) passen nicht zu ${esc(hero ? hero.name : '?')} <button id="db-fix-btn">entfernen</button>`; warn.appendChild(w);
-        w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
-    // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
-    const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
-    if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>Import</b> eine Kartenliste ein.</div>'); return; }
+}
+// Deckliste nach Typ gruppiert. edit: Zeilen mit − / + und Karten-Vorschau (Deck-Builder); sonst nur Anzahl (Deck-Vorschau der Übersicht)
+function dbRenderRows(box, cards, hero, o = {}) {
     const counts = {}; cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
     DB_TYPES.forEach(t => {
         const ids = Object.keys(counts).map(Number).filter(id => t.is(CARDS[id])).sort((a, b) => (CARDS[a].cost || 0) - (CARDS[b].cost || 0) || CARDS[a].name.localeCompare(CARDS[b].name));
@@ -241,27 +250,32 @@ function renderDBDeck(highlightId) {
         box.insertAdjacentHTML('beforeend', `<div class="db-group" style="--tc:${t.color}">${t.label}<span>${tot}</span></div>`);
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
-            row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === highlightId ? ' pulse' : '');
+            row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === o.highlightId ? ' pulse' : '');
             row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
-                + `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>`;
+                + (o.edit ? `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>` : `<span></span><span class="db-row-n">${counts[id]}</span><span></span>`);
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
             const art = document.createElement('div'); art.className = 'db-row-art';
             art.style.backgroundImage = getImageCandidates(id, 'ea').slice(0, 4).map(u => `url("${u}")`).join(', ');
             row.prepend(art);
             // Kosten auf der Original-Kugel der Karte (Ally je Fraktion, Fähigkeit lila, Ausrüstung grau, Quest-Schild); Streifen links in derselben Farbe
-            const orb = dbOrb(c), cost = row.querySelector('.db-row-cost');
+            const orb = dbOrb(c, hero), cost = row.querySelector('.db-row-cost');
             cost.style.backgroundImage = `url("icons/cost/${orb}.png")`; cost.classList.add('orb-' + orb); if (orb === 'quest') cost.textContent = ''; else if (cost.textContent.length > 2) cost.style.fontSize = '12px';   // „1+X“ passt sonst nicht auf die Kugel
             row.style.setProperty('--tc', DB_ORB_COLOR[orb]);
-            row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
-            const plus = row.querySelector('[data-a="+"]');
-            plus.disabled = counts[id] >= dbMax(c);                                    // 4 Kopien: + grau und ohne Wirkung
-            plus.onclick = (e) => { e.stopPropagation(); dbAdd(id); };
-            row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
+            if (o.edit) {
+                row.querySelector('[data-a="-"]').onclick = (e) => { e.stopPropagation(); dbRemove(id); };
+                const plus = row.querySelector('[data-a="+"]');
+                plus.disabled = counts[id] >= dbMax(c);                                    // 4 Kopien: + grau und ohne Wirkung
+                plus.onclick = (e) => { e.stopPropagation(); dbAdd(id); };
+                row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
+            }
             box.appendChild(row);
         });
     });
-    // Auto-Fill am Ende der Liste: ergänzt fehlende Karten bis 60 (entfernt nie etwas, autoFillDeck in coach.js).
-    // Erst ab 10 verschiedenen Karten – vorher soll der Spieler selbst die Richtung vorgeben
+}
+// Auto-Fill am Ende der Liste: ergänzt fehlende Karten bis 60 (entfernt nie etwas, autoFillDeck in coach.js).
+// Erst ab 10 verschiedenen Karten – vorher soll der Spieler selbst die Richtung vorgeben
+function dbAfterRows(box, n, hero) {
+    const cards = currentDeckBuilder.cards;
     if (n < 60 && new Set(cards).size >= 10 && hero && typeof autoFillDeck === 'function') {
         const b = document.createElement('button'); b.className = 'db-autofill'; b.textContent = tr`Auto-Fill (${60 - n} Karten)`;
         b.title = tr('Ergänzt passende Karten bis 60 – nach Manakurve, deinen Karten und Klassen-Staples, Quests zuletzt');
@@ -725,25 +739,48 @@ importTourneyDecks();
 function deckBoxHTML(deck, size = '') {                                      // size: '' normal, true/'mini' klein, 'big' groß (Online-Lobby)
     const mini = size === true || size === 'mini';
     const hero = CARDS[deck.hero], cls = deck.class || (hero && hero.class) || '', fac = (deck.faction || (hero && hero.faction) || 'neutral').toLowerCase();
-    // Heldenbild (klein, ohne Extended Art), auf das Gesicht gezoomt: Ausschnitt wie beim Coach-Avatar (COACH_FACE)
+    // Heldenbild (klein, ohne Extended Art) im Bildfenster der Front, auf das Gesicht gezoomt (Ausschnitt wie beim Coach-Avatar, COACH_FACE)
     const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/-EA[_.]/.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
     let pos = 'background-size: cover; background-position: center 25%';
     const f = hero && typeof COACH_FACE !== 'undefined' && COACH_FACE[hero.id];
     if (f) {
-        const z = Math.max(2.1, f[2] * 0.72), boxAr = 100 / 74, ar = typeof COACH_CARD_AR !== 'undefined' ? COACH_CARD_AR : 1.4;   // Bildbreite = z × Boxbreite
-        const px = (z * f[0] - .5) / (z - 1), H = z * ar / boxAr, py = (H * (f[1] + .07) - .5) / (H - 1);   // etwas unter dem Gesicht: kein Namensbalken
+        const z = Math.max(1.9, f[2] * 0.65), winAr = 1.07, ar = typeof COACH_CARD_AR !== 'undefined' ? COACH_CARD_AR : 1.4;   // Bildbreite = z × Fensterbreite
+        const px = (z * f[0] - .5) / (z - 1), H = z * ar / winAr, py = (H * (f[1] + .07) - .5) / (H - 1);   // etwas unter dem Gesicht: kein Namensbalken
         const cl = v => (Math.max(0, Math.min(1, v)) * 100).toFixed(1);
         pos = `background-size: ${(z * 100).toFixed(0)}% auto; background-position: ${cl(px)}% ${cl(py)}%`;
     }
-    const n = (deck.cards || []).length;
-    return `<div class="dbox ${esc(fac)}${mini ? ' mini' : size === 'big' ? ' big' : ''}"><div class="dbox-top"><img src="${CLASS_ICONS[cls] || ''}" alt=""></div><div class="dbox-side"></div>`
-        + `<div class="dbox-front" style='background-image:${imgs}; ${pos}'>${mini ? '' : `<span class="dbox-n ${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n}</span>`}</div></div>`;
+    const icon = CLASS_ICONS[cls] || '';
+    // 3D-Box: Front (Klappe mit Klassen-Medaillon, Bildfenster, Kartenzahl, Glanz), rechte Seite, Deckel; darunter der Schatten
+    return `<div class="dbox ${esc(fac)}${mini ? ' mini' : size === 'big' ? ' big' : ''}"><div class="dbox-3d">`
+        + `<div class="dbox-f dbox-front"><div class="dbox-art" style='background-image:${imgs}; ${pos}'></div>`
+        + `<div class="dbox-flap">${mini || !icon ? '' : `<span class="dbox-medal"><img src="${icon}" alt=""></span>`}</div>`
+        + (mini || !hero || !hero.talent ? '' : `<span class="dbox-n">${esc(hero.talent)}</span>`) + `<i class="dbox-gloss"></i></div>`   // Plättchen: Spezialisierung des Helden (z. B. Elemental)
+        + `<div class="dbox-f dbox-side"></div><div class="dbox-f dbox-top">${mini || !icon ? '' : `<img src="${icon}" alt="">`}</div>`
+        + `</div><div class="dbox-shadow"></div></div>`;
 }
 const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');
+// Deckliste rechts in der Übersicht (beim Überfahren eines Decks): wie im Deck-Builder – Manakurve, Verteilung, Liste
+function deckPreview(deck) {
+    const box = document.getElementById('deck-preview'); if (!box) return;
+    if (!deck) { box.innerHTML = `<div class="dp-hint">${tr('Fahre über ein Deck, um seine Kartenliste zu sehen.')}</div>`; return; }
+    if (box.dataset.id === deck.id) return;
+    box.dataset.id = deck.id;
+    const hero = CARDS[deck.hero], n = deck.cards.length;
+    DB_TYPES[0].color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
+    box.innerHTML = `<div class="dp-head">${deckBoxHTML(deck, 'mini')}<div><b>${esc(deck.name)}</b><span>${esc(hero ? hero.name : '')} · <i class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${tr`${n} Karten`}</i></span></div></div>`
+        + `<div class="db-stats"><div class="db-stat-cols"><div class="db-curve-box"><div class="db-stat-title">${tr('Manakurve')}</div><div class="db-curve"></div></div>`
+        + `<div class="db-types-box"><div class="db-stat-title">${tr('Verteilung')}</div><div class="db-typebar"></div><div class="db-typelegend"></div></div></div></div>`
+        + `<div class="db-deck-list" id="dp-cards"></div>`;
+    dbRenderStats(deck.cards, box.querySelector('.db-curve'), box.querySelector('.db-typebar'), box.querySelector('.db-typelegend'));
+    dbRenderRows(box.querySelector('#dp-cards'), deck.cards, hero);
+    box.classList.remove('dp-in'); void box.offsetWidth; box.classList.add('dp-in');
+}
 function openDeckOverview(opts = {}) {
     const modal = document.getElementById("deck-overview-modal"), grid = document.getElementById("deck-overview-grid");
     const pick = typeof opts.pick === 'function' ? opts.pick : null;
     const close = () => { modal.style.display = "none"; modal.classList.remove('picking'); };
+    let busy = false;
+    const choose = (el, go) => { if (busy) return; busy = true; el.classList.add('picked'); if (typeof sfx !== 'undefined') sfx.play('draw'); setTimeout(() => { close(); go(); }, 260); };
     document.getElementById('deck-overview-title').textContent = opts.title || (pick ? tr('Deck wählen') : tr('Deck Übersicht'));
     modal.classList.toggle('picking', !!pick);
     const search = document.getElementById('deck-overview-search'); search.value = '';
@@ -756,10 +793,11 @@ function openDeckOverview(opts = {}) {
         el.innerHTML = deckBoxHTML(deck) + `<div class="deck-tile-name" title="${esc(deck.name)}">${esc(title)}</div>`
             + `<div class="deck-tile-sub">${esc(event || (hero ? hero.name : ''))}</div>`;
         el.dataset.q = `${deck.name} ${hero ? hero.name : ''} ${deck.class || ''}`.toLowerCase();
-        el.onclick = () => { close(); if (pick) pick(deck); else openDeckBuilder(deck); };
+        el.onmouseenter = () => deckPreview(deck);
+        el.onclick = () => choose(el, () => { if (pick) pick(deck); else openDeckBuilder(deck); });
         return el;
     };
-    grid.innerHTML = "";
+    grid.innerHTML = ""; const pv = document.getElementById('deck-preview'); delete pv.dataset.id;
     const head = t => grid.insertAdjacentHTML('beforeend', `<div class="deck-grid-head">${t}</div>`);
     const decks = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards);
     const own = decks.filter(d => !isTourneyDeck(d));
@@ -767,13 +805,13 @@ function openDeckOverview(opts = {}) {
     if (opts.random) {
         const r = document.createElement('div'); r.className = 'deck-tile special' + (opts.current === '' ? ' current' : ''); r.dataset.q = '';
         r.innerHTML = tr('<div class="dbox-special">?</div><div class="deck-tile-name">Zufall</div><div class="deck-tile-sub">eigene & Turnier-Decks</div>');
-        r.onclick = () => { close(); pick(null); };
+        r.onclick = () => choose(r, () => pick(null));
         grid.appendChild(r);
     }
     if (!pick) {
         const nb = document.createElement('div'); nb.className = 'deck-tile special'; nb.dataset.q = '';
         nb.innerHTML = tr('<div class="dbox-special">+</div><div class="deck-tile-name">Neues Deck</div>');
-        nb.onclick = () => { close(); openDeckBuilder(); };
+        nb.onclick = () => choose(nb, () => openDeckBuilder());
         grid.appendChild(nb);
     }
     own.forEach(d => grid.appendChild(tile(d)));
@@ -781,7 +819,12 @@ function openDeckOverview(opts = {}) {
     if (tour.length) { head(tr('Turnier-Decks 2006/2007')); tour.forEach(d => grid.appendChild(tile(d))); }
     // Suche nach Deck-, Helden- oder Klassenname
     search.oninput = () => { const q = search.value.trim().toLowerCase(); grid.querySelectorAll('.deck-tile').forEach(t => t.style.display = !q || !t.dataset.q || t.dataset.q.includes(q) ? '' : 'none'); };
+    // Gestaffeltes Einblenden; die Box unter der Maus neigt sich ihr zu (--tx/--ty), angeklickt ploppt sie kurz auf
+    grid.querySelectorAll('.deck-tile').forEach((t, i) => t.style.setProperty('--i', Math.min(i, 30)));
+    grid.onpointermove = e => { const t = e.target.closest('.deck-tile'); if (!t) return; const r = t.getBoundingClientRect();
+        t.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); t.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); };
     document.getElementById("deck-overview-close-btn").onclick = close;
+    deckPreview(decks.find(d => d.id === opts.current) || null);   // zu Beginn: das gewählte Deck oder ein Hinweis
     modal.style.display = "flex";
 }
 // Kleine Schaltfläche mit Deck-Box und Namen, öffnet die Übersicht zur Auswahl (Test-Match, Online-Lobby)
