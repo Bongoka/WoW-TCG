@@ -298,7 +298,7 @@ FX[1086] = { modes: (s, pid) => [{ label: tr('Gegner'), v: pid === 1 ? 2 : 1, ai
 FX[1087] = { slots: slotChar(tr('1 Nahkampfschaden (Kampfschaden)'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1, 'Melee', { combat: true }); } };
 FX[1088] = { canPlay: stealthReq, resolve: (s, it) => [...alliesOf(s.p1), ...alliesOf(s.p2)].filter(a => a.exhausted).forEach(a => destroy(s, a)) };
 // Finishing Move: X Combos aus dem Friedhof entfernen (zusätzliche Kosten), X ≤ 5
-function removeCombosOnly(s, it) { let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } }
+function removeCombosOnly(s, it) { let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } combosRemoved(s, it); }
 FX[1089] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }),
     slots: (s, pid, c, ctx) => [{ label: tr`Ziele (verteile ${ctx.x || 'X'} Nahkampfschaden)`, cands: targetCands(s, pid, CH), min: 1, max: Math.max(1, ctx.x || 1), harm: true }],
     addCost: (s, it) => { removeCombosOnly(s, it); divideAddCost((s2, it2) => it2.x || 0)(s, it); },

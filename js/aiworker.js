@@ -5,7 +5,7 @@
 // ============================================================================
 self.window = self;
 const AIW_VERSION = self.location.search;                                                      // Versionsnummer der Seite (gegen veraltete Dateien im Cache)
-importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'ai'].map(f => f + '.js' + AIW_VERSION));
+importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'ai'].map(f => f + '.js' + AIW_VERSION));
 self.onmessage = (e) => {
     const { id, state, pid, difficulty, lang } = e.data;
     try {

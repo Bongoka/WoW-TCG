@@ -1110,3 +1110,9 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #bot-hand > * { pointer-events: auto; }
 /* Deck-Builder: Platzhalter am Listenende, löst das Nachladen aus (js/features.js dbPoolMore) */
 .db-pool-more { grid-column: 1 / -1; height: 1px; }
+
+/* Deck-Builder Set-Filter: Hintergrund je Block (Azeroth-Block, Outland-Block, Raids) */
+#db-set-filter option[class^="set-"] { color: #f1f5f9; }
+#db-set-filter option.set-block1 { background: #1e3a5f; }
+#db-set-filter option.set-block2 { background: #2f4a1c; }
+#db-set-filter option.set-raid { background: #5c1f1f; }

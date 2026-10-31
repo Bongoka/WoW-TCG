@@ -814,7 +814,7 @@ function applyOCR(map) {
         if (c.type === 'Ability') {
             const after = (tl.split('—')[1] || '').split(',')[0].trim();
             const words = after.split(' ').filter(Boolean);
-            const schools = ['Arcane','Fire','Frost','Feral','Balance','Restoration','Beast Mastery','Marksmanship','Survival','Holy','Protection','Retribution','Discipline','Shadow','Combat','Assassination','Subtlety','Elemental','Enhancement','Affliction','Demonology','Destruction','Arms','Fury'];
+            const schools = ['Arcane','Fire','Frost','Feral','Balance','Restoration','Beast Mastery','Marksmanship','Survival','Holy','Protection','Retribution','Discipline','Shadow','Combat','Assassination','Subtlety','Elemental','Enhancement','Affliction','Demonology','Destruction','Arms','Fury','Traitor'];
             c.school = schools.find(sc => after.startsWith(sc)) || null;
             const rest = c.school ? after.slice(c.school.length).trim() : after;
             c.subtypes = rest.split(' ').filter(w => w && w !== 'Talent');

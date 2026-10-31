@@ -1032,6 +1032,33 @@ function runRuleTests() {
             if (stop) { const i = P(s, 2).resources.findIndex(r => r.card.id === quest); assert(applyAction(s, { type: 'COMPLETE_QUEST', resIdx: i, actorId: 2 }, true, 2), 'Quest nicht abschließbar'); passAll(s); assert(!P(s, 2).resources[i].faceUp, 'Quest nicht umgedreht'); }
         }
     });
+    test(113, 'Set 7: Plague Demonsoul, Gift of Nature, Bolvar, Curse of Frenzy, Titan\'s Grip, Metalmorph', () => {
+        const vanilla = pred => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && pred(c));
+        // Plague Demonsoul: Schaden am eigenen Dämon geht an den Helden
+        let s = fresh(); const dm = put(s, 1, vanilla(c => c.hp >= 3).id); dm.allyTypes = ['Demon'];   // es gibt keinen Dämon ohne Kartentext
+        addPE(s, 1, { k: 'demonToHero' }); dealDamage(s, { src: P(s, 2).hero.uid, tgt: dm.uid, amt: 2, dt: 'Fire' }); process(s); autoResolve(s);
+        assert(P(s, 1).hero.damage === 2 && !dm.damage, `Demonsoul: Held ${P(s, 1).hero.damage}, Dämon ${dm.damage}`);
+        // Gift of Nature: tödlicher Schaden zerstört erst am Zugende
+        s = fresh(); put(s, 1, 5040); const al = put(s, 1, vanilla(c => c.hp <= 3).id); al.damage = 5;
+        stateBased(s); assert(P(s, 1).allies.includes(al), 'Gift of Nature: Ally starb sofort');
+        FX[5040].k.kill(s, { pid: 1 }); process(s); autoResolve(s); assert(!P(s, 1).allies.includes(al), 'Gift of Nature: Ally überlebt das Zugende');
+        // Bolvar: gegnerische Ziele und Angriffe nur auf ihn
+        s = fresh(); const bol = put(s, 2, 5136); put(s, 2, vanilla(() => true).id); const a1 = put(s, 1, vanilla(c => c.atk > 0).id);
+        assert(targetCands(s, 1, { ally: true }).every(u => u === bol.uid), 'Bolvar: anderes Ziel wählbar');
+        assert(attackTargets(s, a1).every(d => d.uid === bol.uid) && mustAttack(s, 1).includes(a1), 'Bolvar: Angriff nicht erzwungen');
+        // Curse of Frenzy: muss angreifen, nur Allies
+        s = fresh(); const a2 = put(s, 1, vanilla(c => c.atk > 0).id); put(s, 2, vanilla(() => true).id); put(s, 2, 5109, { attachedTo: a2.uid });
+        assert(!attackTargets(s, a2).some(d => d.type === 'Hero') && mustAttack(s, 1).includes(a2), 'Curse of Frenzy: Held angreifbar oder kein Zwang');
+        // Titan's Grip: zwei Zweihand-Nahkampfwaffen
+        s = fresh(); P(s, 1).hero.weapons = [];
+        const two = Object.values(CARDS).filter(c => c.type === 'Weapon' && c.twoHanded && c.slot === 'Melee' && !c.unique && !c.isToken).slice(0, 2);
+        two.forEach(w => put(s, 1, w.id));
+        assert(findLimitViolation(s, P(s, 1)), 'ohne Titan\'s Grip: zwei Zweihänder erlaubt');
+        put(s, 1, 5124); assert(!findLimitViolation(s, P(s, 1)), 'Titan\'s Grip: zwei Zweihänder verboten');
+        // Metalmorph: Ausrüstung ohne Kräfte, kann nicht erschöpfen
+        s = fresh(); const ar = put(s, 1, Object.values(CARDS).find(c => c.type === 'Armor' && !c.unique).id); put(s, 2, 5064, { attachedTo: ar.uid });
+        exhaust(s, ar); assert(!ar.exhausted && !active(s, ar), 'Metalmorph: Rüstung erschöpft oder hat Kräfte');
+    });
     LANG = prevLang;
     return results;
 }
@@ -1158,6 +1185,8 @@ function runCardTests(ids) {
         }]),
         // Set 6: Karten gegen bestimmte Typen (Exorcism, Banish …)
         ['Gegner hat Dämon, Untoten und Elementar', s => { for (const t of ['Demon', 'Undead', 'Elemental']) { const d = Object.values(CARDS).find(c => c.type === 'Ally' && !c.unique && !c.isToken && (c.allyTypes || []).includes(t)); if (d) { const x = makeCardInst(d.id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); } } return true; }],
+        // Set 7: Kosten sinken je Fähigkeit im Friedhof (Enlightenment)
+        ['Viele Fähigkeiten im Friedhof', s => { const ab = Object.values(CARDS).find(c => c.type === 'Ability' && !c.text.includes('Ongoing') && !c.isToken); for (let i = 0; i < 30; i++) s.p1.graveyard.push(makeCardInst(ab.id, false, 1)); return true; }],
     ];
     for (const c of all) {
         const bad = msg => out.push({ id: c.id, name: c.name, problem: msg });
@@ -1186,11 +1215,11 @@ function runCardTests(ids) {
                 if (!vars.length && !fx(c).aiSkip) bad('KI: keine Spielvariante' + scen);
                 for (const a of vars.slice(0, 4)) {
                     const r = tryRun(() => { const t = cloneState(s); t.humans = []; if (!applyAction(t, a, true, 1)) return 'KI-Variante abgelehnt: ' + a.desc; autoResolve(t);
-                        if (t.p1.hand.some(x => x.uid === uid)) return 'KI: Karte blieb auf der Hand (' + a.desc + ')'; return zonesOk(t); });
+                        if (!fx(c).backToHand && t.p1.hand.some(x => x.uid === uid)) return 'KI: Karte blieb auf der Hand (' + a.desc + ')'; return zonesOk(t); });
                     if (r) { bad(r + scen); break; }
                 }
                 const r = tryRun(() => { const t = cloneState(s); const e = humanRun(t, { type: 'PLAY_CARD', handIdx: idx() }); if (e) return 'Mensch: ' + e;
-                    if (t.p1.hand.some(x => x.uid === uid)) return 'Mensch: Karte blieb auf der Hand'; return zonesOk(t); });
+                    if (!fx(c).backToHand && t.p1.hand.some(x => x.uid === uid)) return 'Mensch: Karte blieb auf der Hand'; return zonesOk(t); });
                 if (r) bad(r + scen);
             }
         }
@@ -1274,6 +1303,7 @@ function runCardTextTests() {
                 if ((a.damage || 0) > 0) return `Long-Range: Verteidiger hat ${a.damage} Kampfschaden zugefügt`;
             }
             if (k === 'Stealth' && atkOf(s, a, { attacking: true }) > 0 && canAttackNow(s, a, s.p1)) {
+                put(s, 2, ctVanilla(3).id).exhausted = true;   // Ziel für "When this ally attacks, destroy target exhausted ally" (Aesadonna)
                 const pr = put(s, 2, Object.values(CARDS).find(x => x.type === 'Ally' && x.text === 'Protector').id), h0 = s.p2.hero.damage;
                 if (!atk1(s, a.uid, s.p2.hero.uid)) return 'Stealth: Angriff nicht möglich';
                 if (pr.damage || s.p2.hero.damage === h0) return 'Stealth: Protector konnte schützen';

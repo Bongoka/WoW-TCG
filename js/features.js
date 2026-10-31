@@ -317,7 +317,7 @@ function dbExportText() {
 }
 // Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
 const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
+const DB_SET_CODES = { betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
@@ -422,6 +422,7 @@ const BOOSTER_SETS = [
     { set: 2, name: 'Through the Dark Portal', imgs: ['booster/booster 7.jpg', 'booster/booster 8.jpg'] },
     { set: 3, name: 'Fires of Outland', imgs: ['booster/booster 4.jpg', 'booster/booster 5.jpg'] },
     { set: 6, name: 'March of the Legion', imgs: ['booster/legion1.jpg', 'booster/legion2.jpg'] },   // Bilder folgen; bis dahin Ersatzbild (BOOSTER_FALLBACK)
+    { set: 7, name: 'Servants of the Betrayer', imgs: ['booster/betrayer1.jpg', 'booster/betrayer2.jpg'] },
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)

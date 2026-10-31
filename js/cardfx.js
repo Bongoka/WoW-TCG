@@ -354,7 +354,9 @@ FX[95] = { endStop: true, slots: poisonSlots, resolve: (s, it) => { it.attachTo 
 FX[96] = { slots: (s, pid) => [{ label: 'Ziel-Ausrüstung', cands: targetCands(s, pid, { equipment: true }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }], resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 // Combos im Friedhof: gedruckt "Combo", Tyler Falconbridge ("also a Combo while in a graveyard"), Filthy Tricks ("Cards in your graveyard are Combos")
 const combosInGy = (s, pid) => { const all = me(s, pid).ongoing.some(o => o.id === 2067); return me(s, pid).graveyard.filter(c => all || (c.subtypes || []).includes('Combo') || c.id === 2147); };
-function removeCombos(s, it) { const p = me(s, it.pl); let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } finishPrep(s); }
+function removeCombos(s, it) { const p = me(s, it.pl); let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } combosRemoved(s, it); finishPrep(s); }
+// "When you remove one or more Combos from your graveyard to play a Finishing Move" (Find Weakness, Set 7)
+function combosRemoved(s, it) { if ((it.x || 0) > 0) evt(s, 'combosRemoved', { pid: it.pl, n: it.x }); }
 FX[97] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), slots: slotChar(tr('Ziel'), true),
     addCost: (s, it) => removeCombos(s, it), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2 + (it.x || 0), 'Melee'); } };
 FX[98] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }),

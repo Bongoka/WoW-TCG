@@ -178,8 +178,8 @@ FX[4054] = { aura: { watk: (s, src, sp, w) => w.wsub === 'Wand' && ctrlOf(s, w) 
 // ============================================================================
 FX[4055] = { aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === heroOf(s, sp).uid && (t.damage || 0) >= 25 ? amt : 0 } };
 FX[4056] = { resolve: (s, it) => { addTM(heroOf(s, it.pl), { k: 'protector', turn: s.turn }); drawCards(s, me(s, it.pl), 1); } };
-const isDemonOrUndead = c => !!c && ((c.allyTypes || []).some(t => t === 'Demon' || t === 'Undead') || /\b(Demon|Undead)\b/.test(c.race || ''));
-FX[4057] = { slots: slotAlly(tr('Dämon oder Untoter'), true, { filter: c => isDemonOrUndead(c) }), resolve: (s, it) => { const t = T1(s, it); if (t && isDemonOrUndead(t)) destroy(s, t); } };
+const isDemonOrUndead = (c, s) => !!c && ((s && isDemonS7(s, c)) || (c.allyTypes || []).some(t => t === 'Demon' || t === 'Undead') || /\b(Demon|Undead)\b/.test(c.race || ''));
+FX[4057] = { slots: (s, pid) => slotAlly(tr('Dämon oder Untoter'), true, { filter: c => isDemonOrUndead(c, s) })(s, pid), resolve: (s, it) => { const t = T1(s, it); if (t && isDemonOrUndead(t, s)) destroy(s, t); } };
 // Judgement of Light / Wisdom: "When a friendly hero or ally deals combat damage to attached character, …"
 const judgementOn = (k) => ({ dmg: (s, c, d, pid) => { if (d.combat && d.tgt === c.attachedTo && d.src && d.spid === pid) trig(s, { id: k === 'light' ? 4058 : 4059, k, a: { pid, src: d.src } }); } });
 FX[4058] = { slots: slotChar(tr('Gegnerisches Ziel'), true, { side: 'enemy' }), resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: judgementOn('light'),
@@ -304,8 +304,8 @@ FX[4102] = { aura: { cost: (s, src, sp, pid, card) => pid === sp && card.totem ?
 // ============================================================================
 // FÄHIGKEITEN – Hexenmeister
 // ============================================================================
-const isDemonOrElemental = c => !!c && (c.allyTypes || []).some(t => t === 'Demon' || t === 'Elemental');
-FX[4103] = { slots: slotAlly(tr('Dämon oder Elementar'), true, { filter: c => isDemonOrElemental(c) }), resolve: (s, it) => { const t = T1(s, it); if (t && isDemonOrElemental(t)) removeFromGame(s, t); } };
+const isDemonOrElemental = (c, s) => !!c && ((s && isDemonS7(s, c)) || (c.allyTypes || []).some(t => t === 'Demon' || t === 'Elemental'));   // Apocanon (Set 7): isDemonS7
+FX[4103] = { slots: (s, pid) => slotAlly(tr('Dämon oder Elementar'), true, { filter: c => isDemonOrElemental(c, s) })(s, pid), resolve: (s, it) => { const t = T1(s, it); if (t && isDemonOrElemental(t, s)) removeFromGame(s, t); } };
 // Curse of Contagion: wird der Ally zerstört, darf die Fähigkeit aus dem Friedhof an einen anderen Ally
 FX[4104] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(1, 'Shadow'),
     leave: (s, snap, dest, info) => { if (dest === 'graveyard' && info && info.cause === 'hostLeft') { const host = snap.attachedTo; pushTrig(s, snap.wasCtrl || snap.owner, 4104, [{ op: 'trig', id: 4104, k: 'ask', a: { pid: snap.wasCtrl || snap.owner, uid: snap.uid, owner: snap.owner, host } }]); } },
@@ -320,7 +320,7 @@ FX[4105] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, {
             ask(s, { pid: a.pid, prompt: tr('Drain Mana: (4) bezahlen, sonst wird die Fähigkeit zerstört'), src: 'Drain Mana', opts: [{ label: tr('(4) bezahlen'), v: 1, ai: 1 }, { label: tr('Zerstören'), v: 0, ai: 0 }], k: '4105:pay', a, auto: false }); },
         pay: (s, a, v) => { const c = findCharacter(s, a.uid); if (!c) return; if (!(v && payRes(me(s, a.pid), 4))) destroy(s, c); },
         drain: (s, a) => { q(s, { op: 'call', k: 'E:discard', a: { pid: foe(s, a.pid).id, n: 1, src: 'Drain Mana' } }); q(s, { op: 'call', k: 'E:draw', a: { pid: a.pid, n: 1 } }); } } };
-FX[4106] = { slots: slotAlly(tr('Dämon-Ally'), false, { filter: c => (c.allyTypes || []).includes('Demon') }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
+FX[4106] = { slots: (s, pid) => slotAlly(tr('Dämon-Ally'), false, { filter: c => isDemonS7(s, c) })(s, pid), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { kw: (s, src, sp, c, k) => k === 'indestructible' && c.uid === src.attachedTo } };
 FX[4108] = { resolve: (s, it) => [s.p1, s.p2].forEach(p => [...p.allies].forEach(a => removeFromGame(s, a))) };
 FX[4110] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { it.attachTo = T(it)[0]; },
@@ -638,7 +638,7 @@ CARD_ISSUES[4232] = 'Das Ansehen der obersten eigenen Deckkarte jederzeit ist in
 FX[4246] = { aura: { prevent: (s, src, sp, t, from, o, amt) => amt } };
 FX[4247] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 4247, k: 'go', a: {} }); } }, k: { go: (s) => eachPlayerDestroys(s, 'ally', 'Arazzius the Cruel') } };
 FX[4248] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 4248, k: 'go', a: {} }); } },
-    k: { go: (s) => [s.p1, s.p2].forEach(p => alliesOf(p).filter(a => a.type === 'Ally' && !(a.allyTypes || []).includes('Demon')).forEach(a => destroy(s, a))) } };
+    k: { go: (s) => [s.p1, s.p2].forEach(p => alliesOf(p).filter(a => a.type === 'Ally' && !isDemonS7(s, a)).forEach(a => destroy(s, a))) } };
 FX[4249] = { on: { cardPlayed: (s, c, d, pid) => trig(s, { id: 4249, k: 'zap', a: { uid: c.uid, pid: d.pid } }) },
     k: { zap: (s, a) => { if (findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: heroOf(s, a.pid).uid, amt: 2, dt: 'Fire' }); } } };
 FX[4250] = { enter: (s, c, pid) => trig(s, { id: 4250, k: 'enter', a: { pid, uid: c.uid } }),
@@ -658,7 +658,7 @@ FX[4253] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, {
             if (n1 !== n2) { q(s, { op: 'call', k: 'E:eachPick', a: { kind: 'resource', src: 'Sironas', order: [n1 > n2 ? 1 : 2], picks: [] } }); return; }
             ask(s, { pid: a.pid, prompt: tr('Sironas: Welcher Spieler zerstört eine Ressource?'), src: 'Sironas', opts: [{ label: tr('Du selbst'), v: a.pid, ai: -1 }, { label: tr('Gegner'), v: foe(s, a.pid).id, ai: 1 }], k: '4253:do', a, auto: false }); },
         do: (s, a, v) => q(s, { op: 'call', k: 'E:eachPick', a: { kind: 'resource', src: 'Sironas', order: [v], picks: [] } }) } };
-FX[4254] = { aura: { atk: (s, src, sp, c) => c.uid !== src.uid && (c.allyTypes || []).includes('Demon') ? 2 : 0 } };
+FX[4254] = { aura: { atk: (s, src, sp, c) => c.uid !== src.uid && isDemonS7(s, c) ? 2 : 0 } };
 
 // ============================================================================
 // AUSRÜSTUNG – Rüstung und Gegenstände
@@ -723,7 +723,7 @@ FX[4278] = { enter: (s, c, pid) => trig(s, { id: 4278, k: 'ask', a: { pid } }),
 FX[4279] = { powers: [{ key: 'crystal', label: tr('Held erschöpfen: Ziel-Spieler zieht 1'), exhaustHero: true, modes: playerModes(2, -2), resolve: (s, it) => drawCards(s, me(s, it.mode), 1) }] };
 FX[4280] = { aura: dualWieldAura };
 FX[4281] = { on: { strike: (s, c, d, pid) => { if (d.weapon === c.uid) trig(s, { id: 4281, k: 'ask', a: { pid } }); } },
-    k: { ask: (s, a) => mayPick(s, a.pid, tr('Demonslayer: Dämon-Ally zerstören?'), 'Demonslayer', targetCands(s, a.pid, { ally: true, filter: c => (c.allyTypes || []).includes('Demon') }), '4281:do', a),
+    k: { ask: (s, a) => mayPick(s, a.pid, tr('Demonslayer: Dämon-Ally zerstören?'), 'Demonslayer', targetCands(s, a.pid, { ally: true, filter: c => isDemonS7(s, c) }), '4281:do', a),
         do: (s, a, v) => { const t = v && findCharacter(s, v); if (t) destroy(s, t); } } };
 FX[4282] = { aura: { heal: (s, src, sp, healer, t, amt) => { const h = typeof healer === 'string' ? findCharacter(s, healer) : healer; return h && (h.type === 'Hero' || h.type === 'Ally') && ctrlOf(s, h) === sp ? 1 : 0; } } };
 // Greatsword of Horrid Dreams: Allies, die unter gegnerischer Kontrolle ins Spiel kommen, haben bis zum Beginn des nächsten Zugs
@@ -814,7 +814,7 @@ FX[4316] = { reward: (s, pid) => ask(s, { pid, prompt: tr('Toxic Horrors: Welche
     k: { do: (s, a, v) => { if (v & 1) drawCards(s, me(s, a.pid), 1); if (v & 2) drawCards(s, foe(s, a.pid), 1); } } };
 FX[4317] = { questCond: (s, pid) => pes(s, pid, 'allyDied').length ? null : tr('Diesen Zug muss ein Ally zerstört worden sein, den du kontrolliert hast'), reward: Qd(1) };
 FX[4318] = { questCond: (s, pid) => pes(s, foe(s, pid).id, 'allyDied').length ? null : tr('Diesen Zug muss ein gegnerischer Ally zerstört worden sein'), reward: Qd(1) };
-FX[4319] = { reward: (s, pid) => drawCards(s, me(s, pid), alliesOf(me(s, pid)).some(a => (a.allyTypes || []).includes('Demon')) ? 2 : 1) };
+FX[4319] = { reward: (s, pid) => drawCards(s, me(s, pid), alliesOf(me(s, pid)).some(a => isDemonS7(s, a)) ? 2 : 1) };
 // Nicht exakt umsetzbar
 CARD_ISSUES[4304] = 'Das Übernehmen der Kräfte einer anderen Quest (Abschlussbedingung und Belohnung) ist noch nicht umgesetzt.';
 CARD_ISSUES[4307] = 'Würfel aus 15 cm Höhe auf das Spielfeld werfen lässt sich digital nicht nachbilden.';

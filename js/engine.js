@@ -97,7 +97,10 @@ function polymorphed(s, c) {
     }
     return false;
 }
-function active(s, c) { if (!c) return true; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
+function active(s, c) { if (!c) return true; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
+// Metalmorph (Set 7): "Attached equipment loses and can't have powers and can't exhaust"
+function metalmorphed(s, c) { return (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') && attachedTo(s, c.uid, 5064).length > 0; }
+function cantExhaust(s, c) { return metalmorphed(s, c); }
 function attachedTo(s, uid, id) {
     const out = [];
     for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.attachedTo === uid && (id === undefined || o.id === id)) out.push(o);
@@ -138,7 +141,7 @@ function auraAny(s, hook, ...args) { for (const e of auraSrcs(s)) { const f = FX
 function printedKw(c, k) { return !!c && ((c.kw && c.kw[k]) || (CARDS[c.id] && !!CARDS[c.id][k])); }
 function kwHas(s, c, k) {
     if (!c) return false;
-    if ((k === 'elusive' || k === 'stealth' || k === 'longRange') && auraAny(s, 'kwLose', c, k)) return false;   // Thulthun, Marksman Boriz (Set 6): "lose and can't have …"
+    if ((k === 'elusive' || k === 'stealth' || k === 'longRange' || k === 'untargetable') && auraAny(s, 'kwLose', c, k)) return false;   // Thulthun, Marksman Boriz (Set 6): "lose and can't have …"
     if (isAllyLike(c) && !active(s, c)) return hasTM(s, c, k) && k.startsWith('cant');
     if (c.type !== 'Hero' && printedKw(c, k)) return true;
     if (hasTM(s, c, k)) return true;
@@ -374,6 +377,7 @@ function cantDraw(s, pid) {
 // ---------------------------------------------------------------- Zustands-Helfer
 function exhaust(s, c) {
     if (!c || c.exhausted) return;
+    if (cantExhaust(s, c)) return;
     c.exhausted = true;
     if (c.id === 201 && active(s, c) && ctrlOf(s, c)) trig(s, { k: 'grayson', a: { uid: c.uid } });   // Lord Grayson
     const pid = ctrlOf(s, c); if (pid) evt(s, 'exhausted', { uid: c.uid, pid });           // "When … exhausts" (Set 2/3)
@@ -709,7 +713,9 @@ function isIdle(s) { return !s.gameOver && !s.pending && !s.queue.length && !s.w
 function stateBased(s) {
     let changed = false;
     for (const p of [s.p1, s.p2]) {
-        const dead = p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a));
+        // Gift of Nature (Set 7): "Allies you control can't be destroyed by fatal damage" (zerstört am Zugende, siehe FX[5040])
+        const gon = unattachedOngoing(p, 5040).length > 0;
+        const dead = gon ? [] : p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a));
         for (const a of dead) { L(s, tr`💀 ${a.name}`, "log-hit", p.id); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
@@ -748,14 +754,14 @@ function findLimitViolation(s, p) {
     for (const t in tags) {
         let lim = tags[t].lim;
         // Dual Wield (CR 406.2): zwei Einhand-Nahkampfwaffen statt einer Off-Hand-Ausrüstung
-        if (t === 'Melee' && tags[t].cards.length === 2 && !offH.length && tags[t].cards.every(w => !w.twoHanded) && hasDualWield(s, p.id)) lim = 2;
+        if (t === 'Melee' && tags[t].cards.length === 2 && !offH.length && (titanGrip(s, p.id) || (tags[t].cards.every(w => !w.twoHanded) && hasDualWield(s, p.id)))) lim = 2;   // Titan's Grip (Set 7): Two-Handed Dual Wield
         if (t === 'Ranged' && tags[t].cards.length === 2 && hasRangedDualWield(s, p.id)) lim = 2;            // Ranged Dual Wield (Double Barrel, Set 6)
         lim += auraSum(s, 'tagLimit', p.id, t, tags[t].cards);                             // Goldenmoon: ein zusätzliches Pet
         if (tags[t].cards.length > lim) return { label: `${t} (${tags[t].lim})`, cards: tags[t].cards };
     }
     // Zweihänder + Off-Hand (414.3c)
     const two = p.hero.weapons.filter(w => w.twoHanded), off = p.hero.armors.filter(a => a.limitTags && a.limitTags['Off-Hand']);
-    if (two.length && off.length) return { label: tr('Zweihänder + Off-Hand'), cards: [...two, ...off] };
+    if (two.length && off.length && !titanGrip(s, p.id)) return { label: tr('Zweihänder + Off-Hand'), cards: [...two, ...off] };
     return null;
 }
 
@@ -1169,6 +1175,7 @@ function playSource(s, p, a) {
 // Darf pid diese Karte aus dem Friedhof von ownerPid spielen? (Dramla Lifebender, Readiness, Greed Before Need)
 function canPlayFromGy(s, pid, card, ownerPid) {
     if (card.type === 'Ability' && ownerPid === pid && pes(s, pid, 'abilitiesFromGy').length) return true;
+    if (pes(s, pid, 'gyPlayUid').some(m => m.uid === card.uid)) return true;                // Morn Walks-the-Path / Salts-the-Land (Set 7): "You can play target ability from … graveyard this turn"
     return !!auraAny(s, 'playFromGy', pid, card, ownerPid);
 }
 function startPlay(s, p, a) {
@@ -1324,7 +1331,7 @@ function resolveTop(s) {
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
         p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
-        evt(s, 'resEnters', { pid: p.id });                                                   // Shard of the Flame
+        evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp });                                                   // Shard of the Flame
         return;
     }
     if (it.kind === 'trigger') {
@@ -1576,7 +1583,7 @@ function targetCands(s, pid, spec) {
     }
     if (spec.ability) out = out.filter((c, i, arr) => arr.indexOf(c) === i);
     if (spec.ability && spec.chain) out = (s.chain || []).filter(it => it.kind === 'card' && it.card.type === 'Ability').map(it => it.card);
-    return out.filter(c => {
+    const res = out.filter(c => {
         if (untargetableBy(s, c, pid)) return false;
         if (spec.exhausted && !c.exhausted) return false;
         if (spec.damaged && !(c.damage > 0)) return false;
@@ -1584,7 +1591,10 @@ function targetCands(s, pid, spec) {
         if (spec.undead && c.race !== 'Undead') return false;
         if (spec.filter && !spec.filter(c)) return false;
         return true;
-    }).map(c => c.uid);
+    });
+    // Highlord Bolvar Fordragon (Set 7): "Opposing cards and effects must target this ally if able"
+    const bol = res.filter(c => c.id === 5136 && ctrlOf(s, c) !== pid && active(s, c));
+    return (bol.length ? bol : res).map(c => c.uid);
 }
 function targetLabel(s, uid, pid) {
     const l = locate(s, uid); if (!l) return '?';
@@ -1612,6 +1622,8 @@ function dmgStep(s, o) {
         const to = iv ? getPlayer(s, iv.pid).hero.uid : auraAny(s, 'redirect', tl.c, o);
         if (to && to !== tl.c.uid) { if (iv) iv.used = true; L(s, tr`↪ Schaden an ${tl.c.name} geht an ${nameOf(s, to)}.`); o = { ...o, tgt: to, redirected: true }; tl = locate(s, to); if (!tl) return; }
     }
+    // Set 7: Ersatzeffekte mit Wahl (Plague Fleshbane/Demonsoul, Blessed Life) – fragen pausiert den Schritt, EK.s7dmg setzt fort
+    if (typeof s7DmgReplace === 'function') { const r = s7DmgReplace(s, o, tl); if (r === 'ask') return; if (r) { o = r; tl = locate(s, o.tgt); if (!tl) return; } }
     const t = tl.c; const tp = getPlayer(s, tl.pid);
     const src = o.src ? findCharacter(s, o.src) : null;
     const sl = src ? locate(s, src.uid) : null;
@@ -1622,6 +1634,8 @@ function dmgStep(s, o) {
     if (amt > 0) {
         amt += auraSum(s, 'dmgOut', src, t, o, sp);
         amt += auraSum(s, 'dmgIn', t, src, o, tp.id);
+        // Set 7: "this turn"-Schadensänderungen von Effekten (Michael Goodchilde, Lelora …): Spieler-Effekt dmgMod + DMG_MODS[name]
+        if (typeof DMG_MODS !== 'undefined') for (const m of pes(s, null, 'dmgMod')) { const f = DMG_MODS[m.mod]; if (f) amt = f(s, m, src, t, o, amt, sp, tp.id); }
         if (heroSrc && o.dt === 'Nature') { const m = pes(s, sp, 'stormstrike').find(x => !x.used); if (m) { m.used = true; amt += 2; } } // Stormstrike
         if (heroSrc && o.abilityUid) pes(s, sp, 'abilityPlus').forEach(m => { if (m.uid === o.abilityUid) amt += m.v; });            // Arcane Power
         amt = Math.max(0, amt);
@@ -1638,6 +1652,7 @@ function dmgStep(s, o) {
     // Verdoppeln zuletzt: die Erhöhungen wählt der Verursacher (CR 717.4a) – erst alle +N, dann ×2
     if (heroSrc && amt > 0 && o.dt === 'Fire') for (let i = 0; i < unattachedOngoing(getPlayer(s, sp), 61).length; i++) amt *= 2; // World in Flames
     // 2) Verhinderung
+    const amtPre = amt;                                                                   // für "When damage … is prevented" (Divine Riposte, Set 7)
     let unprev = !!o.unprev;
     if (heroSrc && countCtrl(s, sp, 297) > 0) unprev = true;                              // Lionheart Helm
     if (src && hasTM(s, src, 'unprevOut')) unprev = true;                                 // Dousing the Flames of Protection (Set 6)
@@ -1655,13 +1670,14 @@ function dmgStep(s, o) {
         if (src && attachedTo(s, src.uid, 63).length) all();                              // Blessing of Protection (verursacht von)
         if (attachedTo(s, t.uid, 63).length) all();                                       // Blessing of Protection (an)
         if (hasTM(s, t, 'preventAll')) all();                                             // Bestial Wrath / Snapjaw / Divine Shield
+        if (o.blessed) all();                                                             // Blessed Life (Set 7)
         if (t.type === 'Hero' && o.combat && hasTM(s, t, 'kayleitha') && hasStealth(s, t)) all();
         if (t.type === 'Hero' && hasTM(s, t, 'arktos') && s.battle && s.battle.def === t.uid && (tp.ongoing || []).some(x => CARDS[x.id].bearForm && !x.attachedTo)) all();   // Arktos (Set 6)
         if (heroSrc) amt = Math.max(0, amt - unattachedOngoing(getPlayer(s, sp), 139).length); // Defensive Stance (verursacht)
         if (t.type === 'Hero') amt = Math.max(0, amt - unattachedOngoing(tp, 139).length);    // Defensive Stance (erhalten)
         amt = Math.max(0, amt - unattachedOngoing(tp, 66).length);                            // Devotion Aura
     }
-    dmgShields(s, { o, tgt: t.uid, amt, unprev, sp, tp: tp.id, heroSrc, src: src ? src.uid : null, reflect: 0 });
+    dmgShields(s, { o: { ...o, pre: o.pre === undefined ? amtPre : o.pre }, tgt: t.uid, amt, unprev, sp, tp: tp.id, heroSrc, src: src ? src.uid : null, reflect: 0 });
 }
 // "Prevent the next N"-Schilde. Welcher zuerst verbraucht wird, wählt der Besitzer des Ziels (CR 717.4b) – gefragt
 // wird der Mensch nur, wenn es einen Unterschied macht: verschiedene Schilde (z. B. Holy Shield wirft zurück) und
@@ -1691,7 +1707,7 @@ function dmgShields(s, c) {
     if (c.reflect > 0 && src) dealDamage(s, { src: tp.hero.uid, tgt: src.uid, amt: c.reflect, dt: 'Holy' }); // Holy Shield
     // 3) Rüstung
     if (t && t.type === 'Hero' && !c.unprev && c.amt > 0) {
-        const armors = tp.hero.armors.filter(a => a.type === 'Armor' && !a.exhausted && defOf(s, a) > 0);
+        const armors = tp.hero.armors.filter(a => a.type === 'Armor' && !a.exhausted && !cantExhaust(s, a) && defOf(s, a) > 0);
         if (armors.length) {
             s._batch.push({ op: 'call', k: 'E:armorAsk', a: { st }, v: null });
             return;
@@ -1706,7 +1722,7 @@ function shieldLabel(s, m) {
 }
 EK.armorAsk = (s, a) => {
     const st = a.st; const tp = getPlayer(s, st.tp);
-    const armors = tp.hero.armors.filter(x => x.type === 'Armor' && !x.exhausted && defOf(s, x) > 0);
+    const armors = tp.hero.armors.filter(x => x.type === 'Armor' && !x.exhausted && !cantExhaust(s, x) && defOf(s, x) > 0);
     if (!armors.length || st.amt <= 0) { q(s, { ...st, op: 'dmgApply' }); return; }
     const opts = armors.map(x => ({ label: tr`${x.name} erschöpfen (verhindert ${Math.min(defOf(s, x), st.amt)})`, v: x.uid, ai: Math.min(defOf(s, x), st.amt) * 2 - defOf(s, x) * 0.1 }));
     opts.push({ label: tr`Keine Rüstung – ${st.amt} Schaden nehmen`, v: '__none', ai: 0 });
@@ -1725,6 +1741,7 @@ function dmgApply(s, st) {
     if (!tl || !isInPlayZone(tl.zone) || s.gameOver) { if (st.after) q(s, { op: 'call', k: st.after.k, a: { ...st.after.a, dealt: 0 } }); return; }
     const t = tl.c; const amt = st.amt;
     const wasDamaged = (t.damage || 0) > 0;
+    if (st.pre > amt) evt(s, 'dmgPrevented', { tgt: t.uid, tpid: tl.pid, src: st.src || null, amt: st.pre - amt });   // Divine Riposte (Set 7)
     if (amt > 0) {
         t.damage = (t.damage || 0) + amt;
         t.dmgTurn = s.turn;
@@ -1739,7 +1756,7 @@ function dmgApply(s, st) {
         // Zug-Daten für Set 2/3 (Savin, Venomstrike, Thysta, Victory Rush, Incinerate, Tundra MacGrann …)
         s.dmgTurn = s.turn;
         const spid = src ? ctrlOf(s, src) : st.sp;
-        if (src) { addTM(src, { k: 'dealtDmg', to: t.uid, amt, cmb: !!st.combat, turn: s.turn }); addTM(t, { k: 'hitBy', by: src.uid, cmb: !!st.combat, turn: s.turn }); }
+        if (src) { addTM(src, { k: 'dealtDmg', to: t.uid, amt, cmb: !!st.combat, turn: s.turn }); addTM(t, { k: 'hitBy', by: src.uid, cmb: !!st.combat, wpn: !!st.weapon, turn: s.turn }); }
         if (src && src.type === 'Hero' && st.combat) {
             addPE(s, spid, { k: t.type === 'Hero' ? (spid !== tl.pid ? 'heroCombatHero' : 'heroCombatOwnHero') : 'heroCombatAlly' });
             if (isAllyLike(t) && t.damage >= hpOf(s, t)) addPE(s, spid, { k: 'heroFatalAlly' });
@@ -1982,7 +1999,7 @@ EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexO
 // Abschlusskosten einer Quest (Travel Form: "You pay (1) less to complete your next quest this turn")
 function questCostOf(s, p, card) {
     let c = card.questCost || 0;
-    pes(s, p.id, 'questLess').forEach(m => { if (!m.used) c -= m.v; });
+    pes(s, p.id, 'questLess').forEach(m => { if (!m.used && (!m.quest || m.quest === card.uid)) c -= m.v; });   // Marksman Glous (Set 7): nur für die inspirierte Quest
     const less = auraSum(s, 'questLess', p.id, card);                                    // Aspect of the Cheetah (Set 6): "to a minimum of (1)"
     if (less > 0) c = Math.max(Math.min(c, 1), c - less); else if (less < 0) c -= less;   // Ja'zoona (Set 6): Gegner zahlen (1) mehr
     return Math.max(0, c);
@@ -2064,6 +2081,8 @@ function attackTargets(s, att) {
     // Sarmoth: kann nur diesen Ally angreifen, wenn möglich
     const sar = list.filter(d => d.id === 130 && active(s, d));
     if (sar.length) list = sar;
+    // Curse of Frenzy (Set 7): "can attack only allies if able"
+    if (auraAny(s, 'attackOnlyAllies', att)) { const x = list.filter(d => d.type !== 'Hero'); if (x.length) list = x; }
     return list;
 }
 // Sabotage (CR 601.2b, Glossar "Sabotage"): Ally mit "Sabotage: [thing]" darf auch ein nicht befreundetes [thing] angreifen
@@ -2095,7 +2114,7 @@ function attackTargetError(s, att, def) {
 function mustAttack(s, pid) {
     const p = getPlayer(s, pid);
     const ch = pes(s, null, 'challenge').some(m => m.pid !== pid);
-    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch) && canAttackNow(s, c, p));
+    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch || auraAny(s, 'mustAttack', c)) && canAttackNow(s, c, p) && attackTargets(s, c).length);   // Curse of Frenzy, Bolvar (Set 7)
 }
 function isAttackTargetLegal(att, def) { return !!att && !!def && !attackTargetError(G, att, def); }
 function winterCost(s, att, def) {
@@ -2219,7 +2238,7 @@ EK.protectDo = (s, a, v) => {
 function strikeOptions(s, pid) {
     const p = getPlayer(s, pid);
     if (cantStrike(s, pid)) return [];
-    return p.hero.weapons.filter(w => !w.exhausted && getReadyRes(p) >= strikeCost(s, p, w));
+    return p.hero.weapons.filter(w => !w.exhausted && !cantExhaust(s, w) && getReadyRes(p) >= strikeCost(s, p, w));
 }
 // Schlag mit Waffen: nur der Held, nur genau jetzt (602.1 / 602.3)
 function askStrike(s, side) {
@@ -2272,8 +2291,11 @@ EK.strikeDo = (s, a, v) => {
     }
     b.step = a.side === 'A' ? 'win1' : 'win2';
 };
-function hasDualWield(s, pid) { return !!auraAny(s, 'kw', getPlayer(s, pid).hero, 'dualWield') || hasTM(s, getPlayer(s, pid).hero, 'dualWield'); }
+function titanGrip(s, pid) { return unattachedOngoing(getPlayer(s, pid), 5124).length > 0; }   // Two-Handed Dual Wield (Titan's Grip, Set 7)
+function hasDualWield(s, pid) { return titanGrip(s, pid) || !!auraAny(s, 'kw', getPlayer(s, pid).hero, 'dualWield') || hasTM(s, getPlayer(s, pid).hero, 'dualWield'); }
 function hasRangedDualWield(s, pid) { return !!auraAny(s, 'kw', getPlayer(s, pid).hero, 'rangedDualWield'); }
+// Schadensart eines Allies (Alchemist Norrin'thal, Set 7: "This ally becomes an [Arcane] ally this turn")
+function allyDt(s, c) { const m = tms(s, c, 'dtAs'); return m.length ? m[m.length - 1].dt : (c.atkType || 'Melee'); }
 function combatDamage(s) {
     const b = s.battle;
     // Sabotage (CR 603.1): kein Kampfschaden, stattdessen lösen "when … sabotages"-Kräfte aus
@@ -2287,8 +2309,8 @@ function combatDamage(s) {
     if (att.type === 'Hero' && aw2) aDmg += weaponAtk(s, aw2, { attacking: true, target: def });
     let dDmg = longR ? 0 : atkOf(s, def, { defending: true, weapon: def.type === 'Hero' ? dw : null });
     if (!longR && def.type === 'Hero' && dw2) dDmg += weaponAtk(s, dw2, { defending: true });
-    const aType = att.type === 'Hero' ? (aw ? wdt(aw) : 'Melee') : (att.atkType || 'Melee');
-    const dType = def.type === 'Hero' ? (dw ? wdt(dw) : 'Melee') : (def.atkType || 'Melee');
+    const aType = att.type === 'Hero' ? (aw ? wdt(aw) : 'Melee') : allyDt(s, att);
+    const dType = def.type === 'Hero' ? (dw ? wdt(dw) : 'Melee') : allyDt(s, def);
     
     b.step = 'done';
     const aWs = att.type === 'Hero' ? [aw, aw2].filter(Boolean).map(w => w.uid) : [], dWs = def.type === 'Hero' ? [dw, dw2].filter(Boolean).map(w => w.uid) : [];
@@ -2685,6 +2707,8 @@ const INSPIRE_KINDS = {
     Ability: (p) => (p.ongoing || []).filter(c => c.exhausted).map(c => c.uid),
     Resource: (p) => p.resources.filter(r => r.exhausted).map(r => r.card.uid),
     Quest: (p) => p.resources.filter(r => r.exhausted && r.faceUp && r.card.type === 'Quest').map(r => r.card.uid),
+    Protector: (p) => [p.hero, ...p.allies].filter(c => c.exhausted && (c.protector || (CARDS[c.id] || {}).protector)).map(c => c.uid),   // Vindicator Agran (Set 7)
+    AnyOne: (p) => [...INSPIRE_KINDS.Ability(p), ...INSPIRE_KINDS.Ally(p), ...INSPIRE_KINDS.Equipment(p), ...INSPIRE_KINDS.Hero(p), ...INSPIRE_KINDS.Resource(p)],   // Anchorite Onkoth: "… or …"
 };
 function inspirePowers(s, p) {
     const out = [];
@@ -2711,7 +2735,7 @@ EK.inspire = (s, a) => {
 EK.inspireDo = (s, a, v) => {
     if (v) {
         const l = locate(s, v);
-        if (l && l.zone === 'resource') l.res.exhausted = false;
+        if (l && l.zone === 'resource') { l.res.exhausted = false; if (a.kind === 'Quest' && FX[(findCharacter(s, a.src) || {}).id] && FX[findCharacter(s, a.src).id].inspireQuestLess) addPE(s, a.pid, { k: 'questLess', v: 1, quest: v }); }
         else if (l) readyCard(s, l.c);
         L(s, tr`Inspire: ${inspireName(s, v)} wird bereit.`, '', a.pid);
     }
