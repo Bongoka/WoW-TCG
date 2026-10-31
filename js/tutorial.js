@@ -78,6 +78,7 @@ function tutAllows(a) {
 
 // ---------------------------------------------------------------- Start / Ende
 function startTutorial() {
+    if (typeof mmHide === 'function') mmHide();
     tutStop();
     hideGameOver();
     if (typeof pickMatchBackground === 'function') pickMatchBackground();

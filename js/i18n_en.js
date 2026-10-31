@@ -1988,4 +1988,15 @@ var I18N_EN = {
     "läuft – nochmal tippen zum Stoppen": "running – tap again to stop",
     "{0} % Winrate ({1} von {2} Spielen)": "{0} % win rate ({1} of {2} games)",
     "Fahre über ein Deck, um seine Kartenliste zu sehen.": "Hover over a deck to see its card list.",
+    // Hauptmenü
+    "Weiterspielen": "Continue",
+    "Schnelles Spiel": "Quick Play",
+    "Zufälliges Match gegen die CPU": "Random match against the CPU",
+    "1 gegen 1 mit Freunden": "1 vs 1 with friends",
+    "Regeln lernen": "Learn the Rules",
+    "Videos und Tutorial-Match": "Videos and tutorial match",
+    "Optionen": "Options",
+    "Meine Decks": "My Decks",
+    "Sprache": "Language",
+    "Hauptmenü": "Main Menu",
 };

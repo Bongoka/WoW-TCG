@@ -92,7 +92,9 @@ function imageCandidatesAll(id, mode = 'ea') {
         return [...scans(back), ...(back ? [...small('-Back'), ...norm('-Back')] : []), ...small(''), ...norm(''), ...old];
     }
     if (mode === 'back') return [...small('-Back'), ...norm('-Back'), ...scans(true), ...getImageCandidates(id, 'ea')];
-    if (mode === 'full') return [...zoom(''), ...small(''), ...sc('scans', false), ...sc('scans small', false), ...old];
+    // Extended Art ist die vollständige Karte – die normale Fassung liegt nur für Karten ohne EA online (siehe .gitignore)
+    const noEA = cd.type === 'Hero';                                                       // Helden haben keine Extended Art
+    if (mode === 'full') return [...(noEA ? [] : zoom('-EA')), ...zoom(''), ...(noEA ? [] : small('-EA')), ...small(''), ...sc('scans', false), ...sc('scans small', false), ...old];
     return [...small('-EA'), ...small(''), ...norm('-EA'), ...norm(''), ...big(''), ...scans(false), ...old];
 }
 function getCardColor(card) {
@@ -197,6 +199,7 @@ function pickDeck(key) {
 }
 let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
 function initGame(seedPlayerDeck = null, seedOppDeck = null) {
+    if (typeof mmHide === 'function') mmHide();                                         // ein Spiel startet: Hauptmenü weg
     if (typeof netLeaveGame === 'function') netLeaveGame();                             // neues Spiel beendet eine Online-Partie
     if (typeof tutStop === 'function') tutStop();                                       // neues Spiel beendet ein laufendes Tutorial
     UNDO.stack = [];
@@ -550,7 +553,7 @@ function bootGame() {
     try { const d = localStorage.getItem('wow_tcg_difficulty'); if (d && [...diffSel.options].some(o => o.value === d)) diffSel.value = d; } catch (e) {}
     diffSel.onchange = () => { try { localStorage.setItem('wow_tcg_difficulty', diffSel.value); } catch (e) {} };
     initUiHandlers();
-    initGame();
+    if (typeof openMainMenu === 'function') openMainMenu(); else initGame();   // Start im Hauptmenü (mainmenu.js)
 }
 
 if (document.readyState === 'loading') window.addEventListener("DOMContentLoaded", bootGame);

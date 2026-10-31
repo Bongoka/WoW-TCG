@@ -467,7 +467,8 @@ function coachFaceStyle(id) {
     const clamp = v => Math.max(0, Math.min(100, v * 100)).toFixed(1);
     return `background-size: ${s * 100}% auto; background-position: ${clamp((fx * s - .5) / (s - 1))}% ${clamp((fy * h - .5) / (h - 1))}%;`;
 }
-const coachImgs = hero => getImageCandidates(hero.id, 'full').slice(0, 4).map(u => `url("${u}")`).join(', ');
+const coachImgs = hero => getImageCandidates(hero.id, 'full').filter(u => !/-EA[_.]/.test(u)).slice(0, 4)   // Gesichtsausschnitt (COACH_FACE) passt zur normalen Karte
+   .map(u => `url("${u}")`).join(', ');
 
 // Neues Deck im Builder: alles zurücksetzen (ohne „erwachen“-Animation beim Öffnen)
 function coachReset() { closeDeckCoach(); COACH.heroId = null; COACH.lastN = null; COACH.greeted = false; }

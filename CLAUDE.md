@@ -40,6 +40,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `tests.js` | Regeltests `runRuleTests()` |
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
+| `mainmenu.js` | Hauptmenü beim Start (und „Hauptmenü“ im Menü rechts): Logo `icons/logo.png`, Knöpfe (Weiterspielen, Schnelles Spiel, Online, Regeln lernen, Optionen = Einstellungen aus dem Menü rechts, solange offen dorthin verschoben), Deck-Box „Meine Decks“ → Deck-Übersicht, Booster-Stapel → Booster. Hintergrund: Matten klar mit Überblendung und Maus-Parallax, Glut-Partikel (Canvas). Jeder Spielstart ruft `mmHide()` |
 | `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups; Deck-Übersicht als Deck-Boxen (`openDeckOverview`, mit `{ pick }` überall die Deck-Auswahl: Testmatch, Online-Lobby, Deck-Builder „Laden“) |
 | `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Oberfläche: ab 60 Karten wird die Heldenkarte zum Avatar (`COACH_FACE` = Gesichtsausschnitt je Held), Chat links über den Karten. Texte nur Englisch (ohne `tr`) |
 | `online.js` | Online-Multiplayer 1 gegen 1 (Menü „Online-Spiel“): Lobbys mit Code (Host wählt „Öffentlich“ oder „Nur mit Code“ = nicht in der Liste), Lobbyliste, Raum mit großen Deck-Boxen und „VS“ (Hintergrund-Simulation beider Decks, nur Winrate; jeder andere Knopf stoppt sie), Chat, Bereit/Start, Hinweis-Popups auf neue Lobbys. Läuft ohne eigenen Server über einen öffentlichen MQTT-Broker (`NET_BROKERS`). Der Host rechnet die Partie (`G.online`, `G.humans = [1, 2]`), der Gast schickt nur Aktionen und sieht den Zustand gespiegelt (`netMirror`: Spieler 1 ⇄ 2) – **neue Zustandsfelder mit Spieler-ID** müssen in `NET_PID_KEYS`/`NET_PID_MAPS` stehen |
@@ -60,6 +61,17 @@ V=$(date +%Y%m%d%H%M); sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]+)?\"#
 ```
 
 Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
+
+### Doppelte Kartenbilder (nicht auf GitHub)
+Hat eine Karte eine Extended-Art-Fassung (`…-EA_ergebnis.webp`), ist die EA die vollständige Karte – die normale Fassung bleibt lokal (Abschnitt `EA-Doppel` in `.gitignore`). Das Spiel nimmt überall zuerst die EA (`imageCandidatesAll`), nur Helden (ohne EA) und der Coach-Avatar nutzen die normale Karte. Nach neuen Kartenbildern den Abschnitt neu erzeugen:
+
+```bash
+git ls-files cards | grep -E -- "-EA(_ergebnis\.webp|\.png)$" | grep -v -E "/[^/]* (big|scans|scans small)/" | sed -E 's/-EA(_ergebnis\.webp|\.png)$/\1/' | sort -u > /tmp/c.txt
+git ls-files cards | grep -Fxf - /tmp/c.txt > /tmp/d.txt   # Normale Bilder, die noch in Git sind
+sed -i "/^# <<< EA-Doppel/e sed 's#^#/#' /tmp/d.txt" .gitignore   # neue Pfade vor dem Abschnittsende anhängen
+tr '\n' '\0' < /tmp/d.txt | xargs -0 -r git rm -q --cached --
+```
+Der Befehl hängt nur neue Pfade an; schon eingetragene Bilder sind nicht mehr in Git und tauchen in `git ls-files` nicht mehr auf.
 
 ## Testen
 

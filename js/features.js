@@ -450,8 +450,8 @@ const BOOSTER_SETS = [
     { set: 1, name: 'Heroes of Azeroth', imgs: ['booster/booster1.png', 'booster/booster2.jpg'] },
     { set: 2, name: 'Through the Dark Portal', imgs: ['booster/booster 7.jpg', 'booster/booster 8.jpg'] },
     { set: 3, name: 'Fires of Outland', imgs: ['booster/booster 4.jpg', 'booster/booster 5.jpg'] },
-    { set: 6, name: 'March of the Legion', imgs: ['booster/legion1.jpg', 'booster/legion2.jpg'] },   // Bilder folgen; bis dahin Ersatzbild (BOOSTER_FALLBACK)
-    { set: 7, name: 'Servants of the Betrayer', imgs: ['booster/betrayer1.jpg', 'booster/betrayer2.jpg'] },
+    { set: 6, name: 'March of the Legion', imgs: ['booster/march1.jpg', 'booster/march 2.jpg'] },
+    { set: 7, name: 'Servants of the Betrayer', imgs: ['booster/betrayer 1.jpg', 'booster/betrayer 2.jpg'] },
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)

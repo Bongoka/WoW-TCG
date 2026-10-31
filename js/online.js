@@ -153,6 +153,7 @@ function netPeerGone() {
 // Partie starten: Host = Spieler 1, Gast = Spieler 2; wer beginnt, entscheidet der Zufall (CR 101.1)
 function netStart() {
     netVsStop();
+    if (typeof mmHide === 'function' && NET.role === 'host' && netPickDeck(NET.me.deck) && NET.peer && NET.peer.deck && NET.peer.ready) mmHide();
     const hd = netPickDeck(NET.me.deck), gd = NET.peer && NET.peer.deck;
     if (NET.role !== 'host' || !hd || !gd || !NET.peer.ready) return;
     if (typeof tutStop === 'function') tutStop();
@@ -235,6 +236,7 @@ function netSendDeck() {
 }
 function netGuestStart() {
     netVsStop();
+    if (typeof mmHide === 'function') mmHide();
     if (typeof tutStop === 'function') tutStop();
     UNDO.stack = []; hideGameOver();
     if (typeof pickMatchBackground === 'function') pickMatchBackground();
