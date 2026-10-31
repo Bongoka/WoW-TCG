@@ -1309,16 +1309,16 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 
 /* ===================== HAUPTMENÜ ===================== */
 #main-menu { position: fixed; inset: 0; z-index: 99000; display: none; overflow: hidden; background: #050302; --px: 0; --py: 0; font-family: Georgia, 'Times New Roman', serif; }
-#main-menu.in { animation: mmIn .6s ease both; }
+#main-menu.in { animation: mmIn 1.2s ease both; }
 #main-menu.out { animation: mmOut .45s ease forwards; pointer-events: none; }
 @keyframes mmIn { from { opacity: 0; } }
 @keyframes mmOut { to { opacity: 0; transform: scale(1.04); filter: brightness(1.6) blur(2px); } }
 /* Matten: klar und hell, wechseln mit Überblendung, langsamer Zoom (Ken Burns), Parallax zur Maus */
-.mm-bg { position: absolute; inset: -5%; transform: translate3d(calc(var(--px) * -38px), calc(var(--py) * -24px), 0); will-change: transform; }
-.mm-bg-layer { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 2.2s ease; transform-origin: var(--ox, 50%) var(--oy, 50%); }
+.mm-bg { position: absolute; inset: -5%; transform: translate3d(calc(var(--px) * -16px), calc(var(--py) * -10px), 0); will-change: transform; }
+.mm-bg-layer { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 5s ease-in-out; transform-origin: var(--ox, 50%) var(--oy, 50%); }
 .mm-bg-layer.on { opacity: 1; }
-.mm-bg-layer.kb { animation: mmKenBurns 16s ease-out forwards; }
-@keyframes mmKenBurns { from { transform: scale(1.16); } to { transform: scale(1.02); } }
+.mm-bg-layer.kb { animation: mmKenBurns 60s linear forwards; }
+@keyframes mmKenBurns { from { transform: scale(1.08); } to { transform: scale(1.01); } }
 .mm-sparks { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 /* nur links ein Verlauf hinter Titel und Knöpfen (Lesbarkeit), die Matte selbst bleibt klar */
 .mm-shade { position: absolute; inset: 0; pointer-events: none;
@@ -1332,7 +1332,7 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 .mm-t1, .mm-t3 { color: #e9d49a; letter-spacing: 7px; text-transform: uppercase; font-size: clamp(13px, 1.5vw, 19px); font-weight: bold; text-shadow: 0 2px 4px #000; }
 .mm-t2 { font-size: clamp(54px, 8.4vw, 118px); font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin: 4px 0 8px;
     background: linear-gradient(100deg, #8a5d17 0%, #e6b94e 18%, #fff3c2 26%, #f2c55c 34%, #9a6a1c 58%, #e8bd55 80%, #8a5d17 100%); background-size: 260% 100%;
-    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 1px rgba(60,35,5,.6); animation: mmShimmer 7s ease-in-out infinite; }
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: 1px rgba(60,35,5,.6); animation: mmShimmer 14s ease-in-out infinite; }
 @keyframes mmShimmer { 0%, 55% { background-position: 100% 0; } 85%, 100% { background-position: 0% 0; } }
 /* Knöpfe: Plaketten mit Goldkante, schieben sich beim Überfahren nach rechts */
 .mm-nav { display: flex; flex-direction: column; gap: 10px; }
@@ -1354,23 +1354,23 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 #main-menu.has-game .mm-continue { display: flex; }
 .mm-btn.mm-hit { animation: mmHit .3s ease; }
 @keyframes mmHit { 40% { filter: brightness(1.8); } }
-#main-menu.in .mm-btn { animation: mmBtnIn .6s cubic-bezier(.2,1.25,.4,1) both; }
-#main-menu.in .mm-btn:nth-child(1) { animation-delay: .25s; } #main-menu.in .mm-btn:nth-child(2) { animation-delay: .32s; } #main-menu.in .mm-btn:nth-child(3) { animation-delay: .39s; }
-#main-menu.in .mm-btn:nth-child(4) { animation-delay: .46s; } #main-menu.in .mm-btn:nth-child(5) { animation-delay: .53s; }
+#main-menu.in .mm-btn { animation: mmBtnIn 1s cubic-bezier(.2,1,.3,1) both; }
+#main-menu.in .mm-btn:nth-child(1) { animation-delay: .6s; } #main-menu.in .mm-btn:nth-child(2) { animation-delay: .72s; } #main-menu.in .mm-btn:nth-child(3) { animation-delay: .84s; }
+#main-menu.in .mm-btn:nth-child(4) { animation-delay: .96s; } #main-menu.in .mm-btn:nth-child(5) { animation-delay: 1.08s; }
 @keyframes mmBtnIn { from { opacity: 0; transform: translateX(-60px); } }
 /* Rechts: Deck-Box und Booster-Stapel als Objekte im Raum */
 .mm-props { display: flex; align-items: flex-end; gap: clamp(20px, 4vw, 70px); padding-bottom: 4vh;
-    transform: translate3d(calc(var(--px) * 18px), calc(var(--py) * 12px), 0); }
+    transform: translate3d(calc(var(--px) * 8px), calc(var(--py) * 5px), 0); }
 .mm-prop { --tx: 0; --ty: 0; background: none; border: 0; padding: 0; display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; -webkit-tap-highlight-color: transparent; }
-#main-menu.in .mm-prop { animation: mmPropIn .8s cubic-bezier(.2,1.4,.4,1) both; }
-#main-menu.in .mm-decks { animation-delay: .45s; } #main-menu.in .mm-boosters { animation-delay: .58s; }
+#main-menu.in .mm-prop { animation: mmPropIn 1.4s cubic-bezier(.2,1.1,.3,1) both; }
+#main-menu.in .mm-decks { animation-delay: 1s; } #main-menu.in .mm-boosters { animation-delay: 1.2s; }
 @keyframes mmPropIn { from { opacity: 0; transform: translateY(70px) scale(.7) rotate(-6deg); } }
 .mm-prop::before { content: ''; position: absolute; left: -20%; right: -20%; top: 10%; bottom: 18%; border-radius: 50%; pointer-events: none;
     background: radial-gradient(closest-side, rgba(255,200,90,.35), transparent); opacity: 0; transform: scale(.7); transition: opacity .35s, transform .5s cubic-bezier(.34,1.56,.64,1); }
 .mm-prop:hover::before { opacity: 1; transform: scale(1); }
-.mm-deckbox, .mm-pile { animation: mmFloat 5s ease-in-out infinite; }
-.mm-pile { animation-delay: -2.4s; }
-@keyframes mmFloat { 50% { transform: translateY(-9px); } }
+.mm-deckbox, .mm-pile { animation: mmFloat 10s ease-in-out infinite; }
+.mm-pile { animation-delay: -5s; }
+@keyframes mmFloat { 50% { transform: translateY(-5px); } }
 .mm-deckbox .dbox.big { --w: 150px; --h: 206px; --d: 58px; perspective: 1100px; margin: 36px 30px 10px 0; }
 .mm-deckbox .dbox.big .dbox-n { font-size: 13px; padding: 4px 9px 3px; }
 .mm-deckbox .dbox-special { width: 150px; height: 206px; margin: 36px 30px 10px 0; font-size: 60px; }
@@ -1419,9 +1419,9 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 .mm-logo { width: 100%; height: auto; display: block; filter: drop-shadow(0 8px 18px rgba(0,0,0,.85)); user-select: none; }
 .mm-logo-shine { position: absolute; inset: 0; pointer-events: none; -webkit-mask: url("../icons/logo.png") center / 100% 100% no-repeat; mask: url("../icons/logo.png") center / 100% 100% no-repeat;
     background: linear-gradient(105deg, transparent 38%, rgba(255,250,220,.55) 47%, rgba(255,240,190,.15) 52%, transparent 60%); background-size: 300% 100%; mix-blend-mode: screen;
-    animation: mmLogoShine 6.5s ease-in-out 1.4s infinite; }
-@keyframes mmLogoShine { 0% { background-position: 100% 0; } 35%, 100% { background-position: 0% 0; } }
-#main-menu.in .mm-title { animation: mmLogoIn 1.1s cubic-bezier(.2,1.25,.4,1) .1s both; }
+    animation: mmLogoShine 16s ease-in-out 3s infinite; }
+@keyframes mmLogoShine { 0% { background-position: 100% 0; } 25%, 100% { background-position: 0% 0; } }
+#main-menu.in .mm-title { animation: mmLogoIn 1.8s cubic-bezier(.2,1,.3,1) .2s both; }
 @keyframes mmLogoIn { 0% { opacity: 0; transform: translateY(-40px) scale(1.25); filter: blur(8px); } 60% { opacity: 1; filter: blur(0) brightness(1.4); } }
 .mm-title:hover .mm-logo { filter: drop-shadow(0 8px 18px rgba(0,0,0,.85)) drop-shadow(0 0 14px rgba(120,170,255,.35)); }
 @media (max-width: 760px) { .mm-title { width: min(330px, 86vw); } }

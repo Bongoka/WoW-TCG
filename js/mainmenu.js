@@ -136,19 +136,19 @@ function mmTick() {
     MM.raf = requestAnimationFrame(mmTick);
     if (!MM.el || MM.el.style.display === 'none') return;
     // Parallax: Hintergrund folgt der Maus träge, die Glut davor stärker (Tiefe)
-    MM.tx += (MM.mx - MM.tx) * .05; MM.ty += (MM.my - MM.ty) * .05;
+    MM.tx += (MM.mx - MM.tx) * .015; MM.ty += (MM.my - MM.ty) * .015;
     MM.el.style.setProperty('--px', MM.tx.toFixed(4)); MM.el.style.setProperty('--py', MM.ty.toFixed(4));
     const cv = MM.el.querySelector('.mm-sparks'), dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);
-    if (MM.sparks.filter(s => !s.burst).length < 46 && Math.random() < .5)
-        MM.sparks.push({ x: Math.random() * innerWidth, y: innerHeight + 10, vx: (Math.random() - .5) * .4, vy: -(.4 + Math.random() * 1.1), life: 1, r: .8 + Math.random() * 2, depth: .4 + Math.random() * .9 });
+    if (MM.sparks.filter(s => !s.burst).length < 28 && Math.random() < .12)
+        MM.sparks.push({ x: Math.random() * innerWidth, y: innerHeight + 10, vx: (Math.random() - .5) * .15, vy: -(.15 + Math.random() * .35), life: 1, r: .8 + Math.random() * 2, depth: .4 + Math.random() * .9 });
     c.globalCompositeOperation = 'lighter';
     MM.sparks = MM.sparks.filter(s => {
-        s.x += s.vx + (s.burst ? 0 : Math.sin((s.y + s.r * 40) / 60) * .3); s.y += s.vy;
-        if (s.burst) { s.vy += .12; s.vx *= .96; s.life -= .03; } else s.life -= .0028;
+        s.x += s.vx + (s.burst ? 0 : Math.sin((s.y + s.r * 40) / 90) * .12); s.y += s.vy;
+        if (s.burst) { s.vy += .12; s.vx *= .96; s.life -= .03; } else s.life -= .0011;
         if (s.life <= 0 || s.y < -20) return false;
-        const px = s.burst ? 0 : -MM.tx * 60 * s.depth, py = s.burst ? 0 : -MM.ty * 40 * s.depth;
+        const px = s.burst ? 0 : -MM.tx * 26 * s.depth, py = s.burst ? 0 : -MM.ty * 16 * s.depth;
         const g = c.createRadialGradient(s.x + px, s.y + py, 0, s.x + px, s.y + py, s.r * 4);
         const al = Math.min(1, s.life * 1.4) * (s.burst ? 1 : .8);
         g.addColorStop(0, `rgba(255,220,140,${al})`); g.addColorStop(.35, `rgba(255,140,40,${al * .55})`); g.addColorStop(1, 'rgba(255,90,0,0)');
