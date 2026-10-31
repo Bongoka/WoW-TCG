@@ -555,7 +555,10 @@ function bootGame() {
     try { const d = localStorage.getItem('wow_tcg_difficulty'); if (d && [...diffSel.options].some(o => o.value === d)) diffSel.value = d; } catch (e) {}
     diffSel.onchange = () => { try { localStorage.setItem('wow_tcg_difficulty', diffSel.value); } catch (e) {} };
     initUiHandlers();
-    if (typeof openMainMenu === 'function') openMainMenu(); else initGame();   // Start im Hauptmenü (mainmenu.js)
+    if (typeof openMainMenu === 'function') openMainMenu(true); else initGame();   // Start im Hauptmenü (mainmenu.js), sofort deckend
+    // Abdeckung vom Seitenstart weich ausblenden, sobald das Hauptmenü steht
+    const cover = document.getElementById('boot-cover');
+    if (cover) requestAnimationFrame(() => { cover.classList.add('gone'); setTimeout(() => cover.remove(), 1000); });
 }
 
 if (document.readyState === 'loading') window.addEventListener("DOMContentLoaded", bootGame);

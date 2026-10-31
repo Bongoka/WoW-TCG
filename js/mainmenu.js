@@ -49,12 +49,12 @@ function mmFillProps() {
     const pile = MM.el.querySelector('.mm-pile');
     pile.innerHTML = BOOSTER_SETS.slice(-4).map((b, i, a) => `<img class="mm-pack" style="--k:${i - (a.length - 1) / 2}" src="${encodeURI(b.imgs[b.imgs.length - 1])}" alt="" draggable="false" onerror="this.src='${BOOSTER_FALLBACK}'">`).join('');
 }
-function openMainMenu() {
+function openMainMenu(boot) {
     if (typeof initMatchBackground === 'function') initMatchBackground();             // Ordnerliste der Matten (über http)
     const el = mmBuild();
     mmFillProps();
     el.classList.toggle('has-game', !!(G && !G.gameOver));                             // laufende Partie bleibt im Hintergrund erhalten
-    el.classList.remove('out'); el.style.display = 'flex';
+    el.classList.remove('out'); el.classList.toggle('boot', !!boot); el.style.display = 'flex';   // boot: beim Seitenstart ohne Einblenden (sonst schiene das Spielfeld durch)
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open');
     mmBackground(true);
