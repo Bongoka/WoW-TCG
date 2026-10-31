@@ -505,9 +505,11 @@ function netRenderVs() {
     const r = NET.vsRes, a = netPickDeck(NET.me.deck), b = netOppDeck();
     const key = a && b ? a.id + '|' + b.hero + '|' + (b.cards || []).length + '|' + (b.name || '') : null;
     const ok = r && r.key === key && r.games > 0;
-    v.classList.toggle('running', !!NET.vs);
-    v.innerHTML = `<span class="mp-vs-t">VS</span>` + (ok ? `<span class="mp-vs-wr">${Math.round(r.wins / r.games * 100)}%</span><small>${tr`${r.wins} von ${r.games} Spielen`}</small>`
-        : `<small>${NET.vs ? tr('simuliert …') : tr('Tippen: simulieren')}</small>`) + (NET.vs ? `<small class="mp-vs-run">${tr('läuft – nochmal tippen zum Stoppen')}</small>` : '');
+    // Nur "VS" im Kreis; der Kreis selbst ist ein Kuchendiagramm der eigenen Winrate (Details im Tooltip)
+    v.classList.toggle('running', !!NET.vs); v.classList.toggle('pie', !!ok);
+    v.style.setProperty('--wr', ok ? (r.wins / r.games * 100).toFixed(1) + '%' : '0%');
+    v.title = ok ? tr`${Math.round(r.wins / r.games * 100)} % Winrate (${r.wins} von ${r.games} Spielen)` : tr('Simulation: beide Decks spielen im Hintergrund gegeneinander');
+    v.innerHTML = `<span class="mp-vs-t">VS</span>` + (ok ? `<span class="mp-vs-wr">${Math.round(r.wins / r.games * 100)}%</span>` : '');
 }
 function netRenderChat() {
     const box = document.getElementById('mp-chat'); if (!box) return;

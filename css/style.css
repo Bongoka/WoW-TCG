@@ -1186,11 +1186,20 @@ button.mp-deckbox { cursor: pointer; } button.mp-deckbox:hover .dbox { transform
 .mp-vs-t { font: 900 34px/1 Georgia, serif; letter-spacing: 1px; text-shadow: 0 2px 6px #000; }
 .mp-vs-wr { font-size: 15px; font-weight: bold; color: #f4ecdc; }
 .mp-vs small { font-size: 9px; color: var(--text-dim); line-height: 1.1; max-width: 90px; }
-.mp-vs.running { animation: mpVsPulse 1.2s ease-in-out infinite; }
-.mp-vs .mp-vs-run { color: var(--gold); }
-@keyframes mpVsPulse { 50% { box-shadow: 0 0 30px rgba(201,168,76,.7); } }
 @media (max-width: 520px) {
     .dbox.big { --d: 16px; width: 76px; height: 104px; }
     .mp-deckbox .dbox-special { width: 76px; height: 104px; margin: 16px 16px 0 0; }
     .mp-vs { width: 80px; height: 80px; } .mp-vs-t { font-size: 26px; }
 }
+/* VS als Kuchendiagramm: grüner Anteil = eigene Winrate, roter = Gegner; innen ein Ring mit "VS" */
+.mp-vs.pie { background: conic-gradient(#22c55e 0 var(--wr), #b91c1c var(--wr) 100%); position: relative; }
+.mp-vs.pie::before { content: ''; position: absolute; inset: 14px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #3a2a12, #120c05); box-shadow: 0 0 6px rgba(0,0,0,.8); }
+.mp-vs.pie .mp-vs-t { position: relative; }
+/* VS: Winrate unter "VS" im Kreis; läuft die Simulation, kreist ein goldener Bogen um den Kreis */
+.mp-vs { position: relative; }
+.mp-vs-t, .mp-vs-wr { position: relative; z-index: 1; }
+.mp-vs.pie .mp-vs-t { font-size: 28px; }
+.mp-vs-wr { font-size: 16px; font-weight: bold; color: #f4ecdc; text-shadow: 0 1px 4px #000; }
+.mp-vs.running::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 3px solid transparent; border-top-color: var(--gold-light); border-right-color: rgba(245,215,122,.35);
+    animation: mpVsSpin .9s linear infinite; pointer-events: none; }
+@keyframes mpVsSpin { to { transform: rotate(360deg); } }
