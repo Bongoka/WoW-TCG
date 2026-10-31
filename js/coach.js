@@ -478,6 +478,8 @@ function coachUpdateBtn(n) {
 // Die Heldenkarte wird zum Avatar. grand = gerade 60 erreicht: Balken leuchtet golden, Klang, Karte zoomt aufs Gesicht.
 function coachAwaken(slot, hero, grand) {
     const card = slot.querySelector('.db-hs-card'); if (!card) return;
+    // Gerade 60 erreicht (auch per Auto-Fill): Deckliste schnell nach oben, damit die Helden-Animation sichtbar ist
+    if (grand) { const sc = slot.closest('.db-deck-scroll') || document.querySelector('.db-deck-scroll'); if (sc) coachScrollTop(sc); }
     const ava = document.createElement('div'); ava.className = 'coach-hero-ava'; ava.title = `${hero.name} – your Deck Coach`;
     ava.style.backgroundImage = coachImgs(hero);
     ava.onclick = e => { e.stopPropagation(); if (!coachOpen()) openCoachIntro(); };
@@ -814,4 +816,11 @@ function autoFillDeck(heroId, cardIds, size = 60) {
         put(q.c, Math.min(4 - count(q.c.id), size - deck.length, Math.max(1, qWant - quests)));
     }
     return { add, style, plan };
+}
+// Schnell (≈ 0,3 s) nach oben scrollen – eigene Animation, weil das Neuzeichnen der Deckliste ein sanftes Scrollen des Browsers abbricht
+function coachScrollTop(sc) {
+    const from = sc.scrollTop, t0 = performance.now(), ms = 300;
+    if (from <= 0) return;
+    const step = now => { const k = Math.min(1, (now - t0) / ms); sc.scrollTop = from * (1 - (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
 }
