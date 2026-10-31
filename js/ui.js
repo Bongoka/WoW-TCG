@@ -539,7 +539,7 @@ function drawArrow(r, x, y) {
 function hideArrow() { const svg = document.getElementById('aim-arrow'); if (svg) svg.style.display = 'none'; }
 function updateAim() {
     if (!AIM.srcUid) { hideArrow(); return; }
-    const n = document.querySelector(`#arena [data-uid="${AIM.srcUid}"]`);
+    const n = AIM.srcUid === '__banner' ? document.querySelector('#aim-banner.show .ab-card .card-wrapper') : document.querySelector(`#arena [data-uid="${AIM.srcUid}"]`);
     if (!n) { hideArrow(); return; }
     drawArrow(n.getBoundingClientRect(), AIM.x, AIM.y);
 }
@@ -551,7 +551,7 @@ function syncAim() {
     const d = myPending('choose');
     let src = null;
     if (UI.attacker) src = UI.attacker;
-    else if (d && d.target && G.chainPrep) src = G.chainPrep.kind === 'power' ? G.chainPrep.src : G.p1.hero.uid;
+    else if (d && d.target && G.chainPrep) src = G.chainPrep.kind === 'power' ? G.chainPrep.src : UI.bannerSrc ? '__banner' : G.p1.hero.uid;   // gespielte Karte: Pfeil aus der Mitte
     AIM.srcUid = src;
     // Gegnerischer Angriff, während du entscheidest (Protector wählen / Durchlassen / Reagieren): fester Pfeil Angreifer → Ziel
     AIM.fixed = !src && G.battle && G.battle.apid === 2 && G.pending && G.pending.pid === 1 && !G.gameOver ? [G.battle.att, G.battle.def] : null;
@@ -785,7 +785,8 @@ function decorateInPlay(node, c) {
     if (choices.has(uid)) {
         node.classList.add(pend.protect ? 'protect-pulsing' : 'choice-target');
         node.style.cursor = 'pointer';
-        node.onclick = (e) => { e.stopPropagation(); chooseV(uid); };
+        node.onclick = (e) => { e.stopPropagation(); boardPick(uid); };
+        if (UI.destroyPick === uid) node.classList.add('destroy-picked');
         if (pend.protect) {
             node.draggable = true;
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'protect', uid }; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
@@ -1006,7 +1007,7 @@ function renderPlayerHand(p) {
         if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
             node.classList.add('choice-target'); node.style.cursor = 'pointer';
-            node.onclick = (e) => { e.stopPropagation(); chooseV(card.uid); };
+            node.onclick = (e) => { e.stopPropagation(); boardPick(card.uid); };
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
             if (playable) { node.classList.add("can-act"); slot.classList.add("playable"); }
@@ -1425,18 +1426,73 @@ function playEventAnimations() {
 }
 
 // ---------------------------------------------------------------- Entscheidungsfeld
-// Jede Entscheidung kommt ins mittige Fenster (mit Kartenbildern); links bleibt nur die Anzeige der Kette ohne Entscheidung
+// Wahl zwischen Karten auf dem Feld / der eigenen Hand: direkt dort anklicken (Zielmodus mit Hinweis und Pfeil in der Mitte),
+// alles andere (Optionen, Karten aus Deck/Friedhof, Reagieren) im mittigen Fenster; links nur die Kette ohne Entscheidung
 function renderPendingPanel() {
     const panel = document.getElementById("pending-panel"); if (!panel) return;
     const d = myPending();
     const chain = G.chain || [];
-    renderChoiceModal(d);
+    const board = boardChoice(d);
+    if (!board) UI.destroyPick = null;
+    renderChoiceModal(board ? null : d);
+    renderAimBanner(board ? d : null);
     if (d || !chain.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
     ch.innerHTML = tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('');
     opts.innerHTML = '';
     title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …');
+}
+// Optionen, die Karten auf dem Feld oder der eigenen Hand sind (die wählt man dort)
+const boardOpt = o => { const l = typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };
+function boardChoice(d) {
+    if (!d || d.kind !== 'choose') return false;
+    let cards = 0;
+    for (const o of d.opts) {
+        if (o.card !== undefined) return false;
+        const l = typeof o.v === 'string' ? locate(G, o.v) : null;
+        if (!l) continue;
+        if (!boardOpt(o)) return false;
+        cards++;
+    }
+    return cards > 0;
+}
+// Klick auf eine wählbare Karte: Zerstören erst markieren und bestätigen, sonst sofort wählen
+function boardPick(uid) {
+    const d = myPending('choose');
+    if (d && d.destroy) { UI.destroyPick = uid; render(); return; }
+    chooseV(uid);
+}
+// Zielmodus: gespielte Karte fliegt in die Mitte, darunter "Wähle ein Ziel!", Warnungen und Knöpfe (Abbrechen, Kein Ziel …);
+// der Pfeil geht von ihr (bzw. der Kraft-Quelle auf dem Feld) zum Mauszeiger. Klicks gehen durch auf das Feld.
+function renderAimBanner(d) {
+    let el = document.getElementById('aim-banner');
+    if (!d) { if (el) el.classList.remove('show'); UI.bannerSrc = null; return; }
+    if (!el) {
+        el = document.createElement('div'); el.id = 'aim-banner';
+        el.innerHTML = '<div class="ab-card"></div><b class="ab-title"></b><div class="ab-prompt"></div><div class="ab-warn"></div><div class="ab-btns"></div>';
+        document.body.appendChild(el);
+    }
+    const prep = G.chainPrep, card = prep && prep.kind === 'card' && prep.card ? prep.card : null;
+    const slot = el.querySelector('.ab-card');
+    if (!card) { slot.innerHTML = ''; UI.bannerSrc = null; }
+    else if (UI.bannerSrc !== card.uid) {
+        UI.bannerSrc = card.uid; slot.innerHTML = '';
+        const node = createCardDOM({ ...card, exhausted: false }, false); node.classList.add('no-fx'); node.style.setProperty('--cw', '100%');
+        slot.appendChild(node); slot.classList.remove('fly-in'); void slot.offsetWidth; slot.classList.add('fly-in');
+    }
+    el.querySelector('.ab-title').textContent = d.destroy ? tr('Wähle die Karte, die zerstört wird!') : d.protect ? tr('Protector einsetzen?') : d.target ? tr('Wähle ein Ziel!') : tr('Wähle eine Karte!');
+    el.querySelector('.ab-prompt').textContent = d.prompt || '';
+    const warn = [];
+    if (d.destroy) warn.push(tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'));
+    if (d.k === 'E:strikeDo' && strikeFormRisk().length) warn.push(tr`Achtung: Ein Waffenschlag zerstört ${strikeFormRisk().join(', ')}.`);
+    el.querySelector('.ab-warn').textContent = warn.join(' ');
+    const btns = el.querySelector('.ab-btns'); btns.innerHTML = '';
+    const add = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(b); };
+    const picked = d.destroy && d.opts.find(o => o.v === UI.destroyPick);
+    if (picked) add(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
+    d.opts.filter(o => !boardOpt(o)).forEach(o => add(o.label, o.v === '__cancel' || (o.v === '__none' && d.protect) ? 'danger' : '', () => chooseV(o.v)));
+    el.classList.add('show');
 }
 // Würde diese Karte im Spiel ein Limit verletzen? Gleiche Prüfung wie die Engine (findLimitViolation) auf einer Kopie
 function limitWarning(card) {
