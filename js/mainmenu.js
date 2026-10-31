@@ -126,7 +126,7 @@ function mmBackground(first) {
     };
     if (first || !layers[MM.bgFront].classList.contains('on')) show(files.length);
     clearInterval(MM.bgTimer);
-    MM.bgTimer = setInterval(() => show(files.length || ((typeof MATCH_BG !== 'undefined' ? MATCH_BG.files : []).length)), 11000);
+    MM.bgTimer = setInterval(() => show(files.length || ((typeof MATCH_BG !== 'undefined' ? MATCH_BG.files : []).length)), 60000);   // Matte wechselt einmal pro Minute (so lange dauert auch der langsame Zoom)
 }
 function mmBurst(x, y) {
     for (let i = 0; i < 18; i++) { const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 4;
