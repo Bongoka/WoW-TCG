@@ -100,7 +100,9 @@ function legalCardsFor(heroId) {
 }
 // Zufallsdeck aus allen legalen Karten eines Helden (60 Karten, max. 4 Kopien, Unlimited ohne Grenze)
 function randomLegalDeck(heroId, size = 60) {
-    const pool = legalCardsFor(heroId);
+    // Reputation (CR 100.2d): nur eine Reputation je Deck – zufällig Aldor oder Scryer, die andere fällt weg
+    const rep = Math.random() < 0.5 ? 'Aldor' : 'Scryer';
+    const pool = legalCardsFor(heroId).filter(id => !CARDS[id].reputation || CARDS[id].reputation === rep);
     const cards = [];
     const cnt = {};
     let guard = 0;

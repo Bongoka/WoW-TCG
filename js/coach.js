@@ -624,7 +624,74 @@ async function coachPlay(C, R) {
 // --- Test-Szene: Avatar-Köpfe von Hand ausrichten (Seitenmenü → Tests). Ziehen verschiebt den Kopf langsam, Mausrad zoomt
 // fein, Rechtsklick setzt zurück. „Code exportieren“ liefert die COACH_FACE-Tabelle zum Einfügen. Stand bleibt im Browser.
 const FACE_EDIT_KEY = 'wow_tcg_face_edit';
+// Helden kommender Sets (Servants of the Betrayer = Set 7, Hunt for Illidan = Set 8): nur im Avatar-Köpfe-Editor,
+// damit die Ausschnitte schon vor dem Einbau der Sets ausgerichtet werden können. [id, Name, Set, Nr., Klasse, Fraktion]
+const COACH_PREVIEW_HEROES = [
+    [5001, "Commander Michael Goodchilde", 7, 1, 'Paladin', 'Alliance'],
+    [5002, "Fallingstar", 7, 2, 'Warrior', 'Alliance'],
+    [5003, "Ixamos the Redeemed", 7, 3, 'Shaman', 'Alliance'],
+    [5004, "Marlowe Christophers", 7, 4, 'Warlock', 'Alliance'],
+    [5005, "Mythen of the Wild", 7, 5, 'Druid', 'Alliance'],
+    [5006, "Obora the Wise", 7, 6, 'Mage', 'Alliance'],
+    [5007, "Ressa Shadeshine", 7, 7, 'Rogue', 'Alliance'],
+    [5008, "Sharpshooter Nally", 7, 8, 'Hunter', 'Alliance'],
+    [5009, "Sister Remba", 7, 9, 'Priest', 'Alliance'],
+    [5010, "Crusader Michael Goodchilde", 7, 10, 'Paladin', 'Alliance'],
+    [5011, "Fallenstar", 7, 11, 'Warrior', 'Alliance'],
+    [5012, "Ixamos the Corrupted", 7, 12, 'Shaman', 'Alliance'],
+    [5013, "Marlowe the Felsworn", 7, 13, 'Warlock', 'Alliance'],
+    [5014, "Mythen of the Fang", 7, 14, 'Druid', 'Alliance'],
+    [5015, "Obora the Mad", 7, 15, 'Mage', 'Alliance'],
+    [5016, "Ressa the Leper Queen", 7, 16, 'Rogue', 'Alliance'],
+    [5017, "Seadog Nally", 7, 17, 'Hunter', 'Alliance'],
+    [5018, "Remba, Abbess of Ash", 7, 18, 'Priest', 'Alliance'],
+    [5019, "Jonas White", 7, 19, 'Rogue', 'Horde'],
+    [5020, "Kil'zin of the Darkspear", 7, 20, 'Shaman', 'Horde'],
+    [5021, "Lelora Sunlancer", 7, 21, 'Paladin', 'Horde'],
+    [5022, "Lionar, Unbound", 7, 22, 'Warrior', 'Horde'],
+    [5023, "Morn Walks-the-Path", 7, 23, 'Hunter', 'Horde'],
+    [5024, "Plague Fleshbane", 7, 24, 'Warlock', 'Horde'],
+    [5025, "Runetusk", 7, 25, 'Priest', 'Horde'],
+    [5026, "Vor'na the Disciplined", 7, 26, 'Mage', 'Horde'],
+    [5027, "Warden Stormclaw", 7, 27, 'Druid', 'Horde'],
+    [5028, "Jonas the Red", 7, 28, 'Rogue', 'Horde'],
+    [5029, "Kil'zin of the Bloodscalp", 7, 29, 'Shaman', 'Horde'],
+    [5030, "Lelora the Dawnslayer", 7, 30, 'Paladin', 'Horde'],
+    [5031, "Lionar the Blood Cursed", 7, 31, 'Warrior', 'Horde'],
+    [5032, "Morn Salts-the-Land", 7, 32, 'Hunter', 'Horde'],
+    [5033, "Plague Demonsoul", 7, 33, 'Warlock', 'Horde'],
+    [5034, "Bloodtusk", 7, 34, 'Priest', 'Horde'],
+    [5035, "Vor'na the Wretched", 7, 35, 'Mage', 'Horde'],
+    [5036, "Desecrator Stormclaw", 7, 36, 'Druid', 'Horde'],
+    [6001, "\"Black Ice\" Fizzlefreeze", 8, 1, 'Mage', 'Alliance'],
+    [6002, "Blaine Roberts", 8, 2, 'Warrior', 'Alliance'],
+    [6003, "Durga Gravestone", 8, 3, 'Rogue', 'Alliance'],
+    [6004, "Elumeria Wildershot", 8, 4, 'Hunter', 'Alliance'],
+    [6005, "Eriun Moonglow", 8, 5, 'Druid', 'Alliance'],
+    [6006, "Kamboozle, Bringer of Doom", 8, 6, 'Warlock', 'Alliance'],
+    [6007, "Marta Spires", 8, 7, 'Priest', 'Alliance'],
+    [6008, "Vakeron", 8, 8, 'Paladin', 'Alliance'],
+    [6009, "Zaritha", 8, 9, 'Shaman', 'Alliance'],
+    [6010, "Grindel Hellbringer", 8, 10, 'Warlock', 'Horde'],
+    [6011, "Joren the Martyr", 8, 11, 'Priest', 'Horde'],
+    [6012, "Koth, Caller of the Hunt", 8, 12, 'Hunter', 'Horde'],
+    [6013, "Phosphus the Everburning", 8, 13, 'Mage', 'Horde'],
+    [6014, "Ravenna", 8, 14, 'Rogue', 'Horde'],
+    [6015, "Ringleader Kuma", 8, 15, 'Shaman', 'Horde'],
+    [6016, "Tahanu Brinkrunner", 8, 16, 'Druid', 'Horde'],
+    [6017, "Valterus", 8, 17, 'Paladin', 'Horde'],
+    [6018, "Warmaster Bo'jo", 8, 18, 'Warrior', 'Horde'],
+    [6019, "Kurzon the False", 8, 19, '', 'Alliance'],
+    [6020, "Famish the Binder", 8, 20, '', 'Horde'],
+    [6021, "Imp Lord Pinprik", 8, 21, '', ''],
+    [6022, "Mother Misery", 8, 22, '', ''],
+    [6023, "Obliveron", 8, 23, '', ''],
+    [6024, "Xia, Queen of Suffering", 8, 24, '', ''],
+];
 function openFaceEditor() {
+    // Vorschau-Helden nur für die Dauer des Editors als Karten anlegen (Bilder aus cards/betrayer, cards/illidan)
+    const tmp = COACH_PREVIEW_HEROES.filter(([id]) => !CARDS[id]).map(([id, name, set, num, klass, faction]) => (CARDS[id] = { id, name, type: 'Hero', set, num, class: klass, faction, preview: true }, id));
+    Object.values(CARDS).forEach(c => { if (c.type === 'Hero' && !c.isToken && !COACH_FACE[c.id]) COACH_FACE[c.id] = [.5, .26, 2.5]; });   // Standard-Ausschnitt
     const orig = JSON.parse(JSON.stringify(COACH_FACE));
     try { Object.assign(COACH_FACE, JSON.parse(localStorage.getItem(FACE_EDIT_KEY) || '{}')); } catch (e) {}
     const save = () => { try { localStorage.setItem(FACE_EDIT_KEY, JSON.stringify(COACH_FACE)); } catch (e) {} };
@@ -652,7 +719,7 @@ function openFaceEditor() {
         ava.onwheel = e => { e.preventDefault(); const f = COACH_FACE[h.id]; f[2] = +(f[2] * (e.deltaY < 0 ? 1.02 : 1 / 1.02)).toFixed(3); paint(ava, h.id); save(); };
         ava.oncontextmenu = e => { e.preventDefault(); COACH_FACE[h.id] = [...orig[h.id]]; paint(ava, h.id); save(); };
     });
-    box.querySelector('.fe-close').onclick = () => box.remove();
+    box.querySelector('.fe-close').onclick = () => { box.remove(); tmp.forEach(id => delete CARDS[id]); };
     box.querySelector('.fe-reset').onclick = () => uiConfirm(tr('Alles zurücksetzen'), tr('Alle Änderungen verwerfen?'), tr('Alles zurücksetzen'), () => {
         try { localStorage.removeItem(FACE_EDIT_KEY); } catch (e) {}
         heroes.forEach(h => COACH_FACE[h.id] = [...orig[h.id]]); grid.querySelectorAll('.fe-ava').forEach((a, i) => paint(a, heroes[i].id));
@@ -734,7 +801,8 @@ function autoFillDeck(heroId, cardIds, size = 60) {
     const count = id => deck.filter(x => x === id).length;
     const isQ = id => CARDS[id] && CARDS[id].type === 'Quest';
     const maxCopies = c => c.unlimited ? 4 : c.unique ? 2 : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 2 : 4;
-    const pool = Object.values(CARDS).filter(c => coachLegal(c, hero) && !CARD_ISSUES[c.id] && !c.isToken);
+    const rep0 = (cardIds.map(id => CARDS[id] && CARDS[id].reputation).find(Boolean)) || null;   // Reputation (CR 100.2d): nur die schon gewählte, sonst keine
+    const pool = Object.values(CARDS).filter(c => coachLegal(c, hero) && !CARD_ISSUES[c.id] && !c.isToken && (!c.reputation || c.reputation === rep0));
     const known = deck.map(id => CARDS[id]).filter(Boolean), nonQ0 = known.filter(c => c.type !== 'Quest');
     // Stil und Plan aus dem Vorhandenen (wenige Karten: neutral)
     const avgOf = list => list.length ? list.reduce((a, c) => a + (c.cost || 0), 0) / list.length : 3;

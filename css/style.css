@@ -1108,3 +1108,5 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 /* Hand blockiert nur dort, wo Karten liegen (dahinter liegende Ressourcen bleiben anklickbar) */
 #bot-hand { pointer-events: none; }
 #bot-hand > * { pointer-events: auto; }
+/* Deck-Builder: Platzhalter am Listenende, löst das Nachladen aus (js/features.js dbPoolMore) */
+.db-pool-more { grid-column: 1 / -1; height: 1px; }

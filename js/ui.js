@@ -104,11 +104,13 @@ function renderResourceTray(player, containerId, isHuman) {
                 wrap.title = tr("Klicken: Quest abschließen");
                 wrap.onclick = () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx });
             }
+            if (!isHuman) markSabotageTarget(wrap, r.card.uid);                                   // Sabotage: Quest/Ressource angreifen
             activeRow.appendChild(wrap);
         } else {
             const slot = document.createElement("div"); slot.className = "res-card" + (r.exhausted ? " exhausted" : "");
             const back = document.createElement("img"); back.src = "cards/Card Back.png"; back.alt = ""; back.draggable = false;
             slot.appendChild(back); miniRow.appendChild(slot);
+            if (!isHuman) markSabotageTarget(slot, r.card.uid);
             shown.push([r, slot, back]);
         }
     });
@@ -772,6 +774,13 @@ function playFxEvents(prevRects) {
 }
 
 // ---------------------------------------------------------------- Karten im Spiel
+// Sabotage (Set 6): gewählter Angreifer darf dieses Ding (Fähigkeit, Ausrüstung, Ressource, Quest) angreifen → anklickbar
+function markSabotageTarget(node, uid) {
+    const att = UI.attacker && findCharacter(G, UI.attacker); if (!att || !canMain()) return;
+    if (!sabotageTargets(G, att).some(d => d.uid === uid) || validateAction(G, { type: 'ATTACK', attackerUid: att.uid, defenderUid: uid, sabotage: true }, 1)) return;
+    node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';
+    node.onclick = (e) => { e.stopPropagation(); UI.attacker = null; UI.preStrike = null; humanAct({ type: 'ATTACK', attackerUid: att.uid, defenderUid: uid, sabotage: true }); };
+}
 // Gemeinsame Interaktion für jede Karte im Spiel (Held, Ally, Ausrüstung, laufende Fähigkeit)
 function decorateInPlay(node, c) {
     const uid = c.uid;
@@ -798,6 +807,7 @@ function decorateInPlay(node, c) {
             node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';
             node.onclick = (e) => { e.stopPropagation(); doHumanAttack(att.uid, uid, UI.preStrike); };
         }
+        else markSabotageTarget(node, uid);
     }
     // 3) Eigene Karten: Angriff und Kräfte per Klick auf die Karte (mehrere Möglichkeiten → Auswahlfenster).
     //    Ziehen greift an; eine bereite Waffe lässt sich ebenfalls aufs Ziel ziehen: dann greift der Held an und

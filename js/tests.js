@@ -775,7 +775,8 @@ function runRuleTests() {
     test(96, 'Deck Coach: erst ab 60 Karten, Runden nach Priorität, Kartenvorschläge passen zu den Tipps', () => {
         const missing = COACH_RECS.map(r => r[0]).filter(n => !coachByName(n));
         assert(!missing.length, 'Empfehlung ohne Karte: ' + missing.join(', '));
-        const noFace = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && !COACH_FACE[c.id]).map(c => c.name);
+        // Neue Sets (ab Set 6): Ausschnitt richtet der Nutzer selbst ein (Avatar-Köpfe ausrichten), bis dahin Standard-Ausschnitt
+        const noFace = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && (c.set || 1) <= 5 && !COACH_FACE[c.id]).map(c => c.name);
         assert(!noFace.length, 'Held ohne Avatar-Ausschnitt: ' + noFace.join(', '));
         assert(!coachAnalyze(GAME_DECKS[0].hero, GAME_DECKS[0].cards.slice(0, 59)).ok, 'Analyse mit 59 Karten');
         for (const d of GAME_DECKS) {
@@ -985,6 +986,43 @@ function runRuleTests() {
         assert(p.hero.weapons.some(w => w.id === 3121), 'Klaue nicht am Helden');
         assert(p.removed.some(c => c.id === other) && !p.removed.some(c => c.id === 3121), `Entfernt: ${p.removed.map(c => c.name).join(', ') || 'nichts'}`);
     });
+    // ---------------- Set 6 (March of the Legion): Sabotage, Inspire, Reputation
+    const protectorId = () => Object.values(CARDS).find(c => c.type === 'Ally' && c.text === 'Protector' && !c.unique && (c.set || 1) === 1).id;
+    test(110, 'Sabotage (CR 603.1): Angriff auf eine Ressource ohne Kampfschaden, "when … sabotages" löst aus; Beschützen beendet die Sabotage', () => {
+        const run = (withProtector) => {
+            const s = fresh('alliance_mage', 'horde_warrior'); s.real = false; s.p2.allies = [];
+            const lashan = put(s, 1, 4234); res(s, 2, 3);
+            if (withProtector) put(s, 2, protectorId());
+            const tgt = P(s, 2).resources[0].card.uid;
+            const a = getLegalActions(s, 1).find(x => x.type === 'ATTACK' && x.sabotage && x.defenderUid === tgt);
+            assert(a, 'Keine Sabotage-Aktion auf die Ressource');
+            act(s, a, 1); let n = 0;
+            while (s.pending && n++ < 30) { const d = s.pending; applyAction(s, { type: d.kind === 'priority' ? 'PASS' : 'CHOOSE', v: d.kind === 'priority' ? undefined : aiPick(s, d), actorId: d.pid }, true, d.pid); autoResolve(s); }
+            return { s, lashan };
+        };
+        let { s, lashan } = run(false);
+        assert(P(s, 2).resources.length === 2, `Ressource nicht zerstört (${P(s, 2).resources.length} übrig)`);
+        assert(!(lashan.damage > 0) && !(P(s, 2).hero.damage > 0), 'Bei Sabotage wurde Kampfschaden verteilt');
+        ({ s, lashan } = run(true));
+        assert(P(s, 2).resources.length === 3, 'Trotz Protector wurde sabotiert');
+    });
+    test(111, 'Inspire (CR 501.1b): im Ready-Schritt des Gegners macht Vindicator Kaldel einen eigenen erschöpften Ally bereit', () => {
+        const s = fresh('alliance_mage', 'horde_warrior', 1); s.real = false;
+        const kaldel = put(s, 2, 4222, { exhausted: true }), other = put(s, 2, 262, { exhausted: true }), mine = put(s, 1, 262, { exhausted: true });
+        s.queue.push({ op: 'turn', step: 'ready' }); process(s); autoResolve(s);
+        assert(!mine.exhausted, 'Zugspieler readyt nicht');
+        assert([kaldel, other].filter(c => !c.exhausted).length === 1, `Inspire: ${[kaldel, other].filter(c => !c.exhausted).length} statt 1 Ally bereit`);
+    });
+    test(112, 'Reputation (CR 100.2d): Zufallsdecks, Auto-Fill und Deck-Builder mischen Aldor und Scryer nicht', () => {
+        const hero = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Paladin' && c.faction === 'Alliance').id;
+        for (let i = 0; i < 20; i++) {
+            const d = randomLegalDeck(hero);
+            assert(new Set(d.cards.map(id => CARDS[id].reputation).filter(Boolean)).size <= 1, 'Zufallsdeck mischt Reputationen');
+        }
+        const aldor = Object.values(CARDS).find(c => c.reputation === 'Aldor' && cardMatchesPlayer(c, { className: 'Paladin', faction: 'Alliance', hero: CARDS[hero] }));
+        const f = autoFillDeck(hero, aldor ? [aldor.id] : []);
+        assert(!f.add.some(id => CARDS[id].reputation === 'Scryer'), 'Auto-Fill nimmt Scryer zu Aldor');
+    });
     test(99, 'Priorität: Mensch hält am gegnerischen Zugende nur für eine lohnende Quest an', () => {
         for (const [quest, want] of [[360, true], [342, false]]) {
             const s = fresh(); res(s, 2, 3); res(s, 2, 1, quest); s.humans = [2];
@@ -1106,6 +1144,20 @@ function runCardTests(ids) {
         ['Gegner spielt Fähigkeit', oppCast],
         ['Held hat Stealth', s => { addTM(s.p1.hero, { k: 'stealth', turn: s.turn }); return true; }],
         ['20 Ressourcen', s => { for (let i = 0; i < 10; i++) s.p1.resources.push({ card: makeCardInst(vanilla(1).id, false, 1), faceUp: false, exhausted: false }); return true; }],
+        // Set 6: Gegner spielt einen Ally bzw. eine Ausrüstung (Swallow Soul, Wreck, Nether Fracture …)
+        ...['Ally', 'Weapon'].map(type => [`Gegner spielt ${type}`, s => {
+            oppTurn(s); s.p2.resources.forEach(r => { r.exhausted = false; });
+            for (const c of Object.values(CARDS)) {
+                if (c.type !== type || c.isToken || c.unique || (c.cost || 0) > 3 || !cardMatchesPlayer(c, s.p2)) continue;
+                s.p2.hand.unshift(makeCardInst(c.id, false, 2));
+                const a = getLegalActions(s, 2).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0);
+                if (a && applyAction(s, a, true, 2)) return true;
+                s.p2.hand.shift();
+            }
+            return false;
+        }]),
+        // Set 6: Karten gegen bestimmte Typen (Exorcism, Banish …)
+        ['Gegner hat Dämon, Untoten und Elementar', s => { for (const t of ['Demon', 'Undead', 'Elemental']) { const d = Object.values(CARDS).find(c => c.type === 'Ally' && !c.unique && !c.isToken && (c.allyTypes || []).includes(t)); if (d) { const x = makeCardInst(d.id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); } } return true; }],
     ];
     for (const c of all) {
         const bad = msg => out.push({ id: c.id, name: c.name, problem: msg });

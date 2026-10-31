@@ -136,7 +136,19 @@ function renderDBPool() {
         : sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
         : ((a.type === 'Quest' ? 99 : a.cost || 0) - (b.type === 'Quest' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
     document.getElementById("db-pool-count").textContent = tr`${list.length} Karten`;
-    list.forEach(card => {
+    // Nicht alle Karten auf einmal zeichnen: erst DB_POOL_BATCH, weitere, sobald das Ende der Liste näher als
+    // anderthalb Bildschirmhöhen kommt – das Nachladen passiert vor dem Hinsehen
+    DB_POOL.list = list; DB_POOL.shown = 0; poolBox.scrollTop = 0;
+    const sentinel = document.createElement('div'); sentinel.className = 'db-pool-more';
+    poolBox.onscroll = () => { if (DB_POOL.shown < DB_POOL.list.length && poolBox.scrollTop + poolBox.clientHeight > poolBox.scrollHeight - poolBox.clientHeight * 1.5) dbPoolMore(poolBox, sentinel); };
+    dbPoolMore(poolBox, sentinel);
+}
+const DB_POOL = { list: [], shown: 0 };
+const DB_POOL_BATCH = 60;
+function dbPoolMore(poolBox, sentinel) {
+    const next = DB_POOL.list.slice(DB_POOL.shown, DB_POOL.shown + DB_POOL_BATCH); DB_POOL.shown += next.length;
+    const frag = document.createDocumentFragment();
+    next.forEach(card => {
         const tile = document.createElement('div'); tile.className = 'db-tile'; tile.dataset.id = card.id;
         const node = createCardDOM({ ...card, uid: 'db_' + card.id }, false); node.classList.add('db-card');
         tile.appendChild(node);
@@ -146,8 +158,13 @@ function renderDBPool() {
         tile.appendChild(badge);
         tile.onclick = () => dbAdd(card.id);
         tile.oncontextmenu = (e) => { e.preventDefault(); dbRemove(card.id); };
-        poolBox.appendChild(tile);
+        frag.appendChild(tile);
     });
+    poolBox.insertBefore(frag, sentinel.parentNode === poolBox ? sentinel : null);
+    if (sentinel.parentNode !== poolBox) poolBox.appendChild(sentinel);
+    if (DB_POOL.shown >= DB_POOL.list.length) sentinel.remove();
+    // Liste noch kürzer als der sichtbare Bereich (großes Fenster): gleich weiter füllen
+    else if (poolBox.clientHeight && poolBox.scrollHeight <= poolBox.clientHeight * 2.5) setTimeout(() => dbPoolMore(poolBox, sentinel), 0);
 }
 // Zähler auf einer Kachel aktualisieren, ohne den Pool neu zu zeichnen (Scrollposition bleibt)
 function dbUpdateTile(id) {
@@ -160,6 +177,8 @@ function dbUpdateTile(id) {
 function dbAdd(id) {
     const card = CARDS[id];
     if (dbCount(id) >= dbMax(card)) { dbFlash(tr`Maximal 4 Kopien von „${card.name}“`); return; }
+    const rep = card.reputation && currentDeckBuilder.cards.map(x => CARDS[x] && CARDS[x].reputation).find(r => r && r !== card.reputation);
+    if (rep) { dbFlash(tr`${card.name}: Ein Deck darf keine Karten mit ${rep}-Reputation und ${card.reputation}-Reputation mischen`); return; }   // CR 100.2d
     currentDeckBuilder.cards.push(id); dbUpdateTile(id); renderDBDeck(id);
 }
 function dbRemove(id) {
@@ -298,7 +317,7 @@ function dbExportText() {
 }
 // Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
 const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
+const DB_SET_CODES = { legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
@@ -402,8 +421,10 @@ const BOOSTER_SETS = [
     { set: 1, name: 'Heroes of Azeroth', imgs: ['booster/booster1.png', 'booster/booster2.jpg'] },
     { set: 2, name: 'Through the Dark Portal', imgs: ['booster/booster 7.jpg', 'booster/booster 8.jpg'] },
     { set: 3, name: 'Fires of Outland', imgs: ['booster/booster 4.jpg', 'booster/booster 5.jpg'] },
+    { set: 6, name: 'March of the Legion', imgs: ['booster/legion1.jpg', 'booster/legion2.jpg'] },   // Bilder folgen; bis dahin Ersatzbild (BOOSTER_FALLBACK)
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
+const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)
 const bModal = () => document.getElementById("booster-modal");
 // Kleine Klänge (WebAudio, wie sfx in utils.js)
 function boosterTone(freq, dur = 0.25, type = 'sine', vol = 0.05, delay = 0) {
@@ -485,7 +506,7 @@ function boosterPicker() {
     BOOSTER_SETS.forEach((b, i) => {
         const img = b.imgs[Math.floor(Math.random() * b.imgs.length)];
         const el = document.createElement('div'); el.className = 'bp-pack' + (b.set === BOOSTER.set ? ' last' : ''); el.style.animationDelay = (i * 0.12) + 's';
-        el.innerHTML = `<img src="${encodeURI(img)}" alt="" draggable="false"><div class="bp-name">${esc(b.name)}</div>`;
+        el.innerHTML = `<img src="${encodeURI(img)}" alt="" draggable="false" onerror="this.onerror=null;this.src=BOOSTER_FALLBACK"><div class="bp-name">${esc(b.name)}</div>`;
         el.onmouseenter = () => boosterTone(500 + i * 90, 0.06, 'triangle', 0.02);
         el.onclick = (e) => { e.stopPropagation(); BOOSTER.set = b.set; pk.style.display = 'none'; boosterReset(img); };
         row.appendChild(el);
@@ -499,7 +520,7 @@ function boosterReset(img) {
     const cards = document.getElementById("booster-cards-container");
     pack.className = 'booster-pack-container enter'; pack.style.display = 'flex'; pack.style.removeProperty('--px'); pack.style.removeProperty('--py');
     cards.style.display = "none"; cards.innerHTML = "";
-    document.getElementById("booster-pack-img").src = encodeURI(img);
+    const pimg = document.getElementById("booster-pack-img"); pimg.onerror = () => { pimg.onerror = null; pimg.src = BOOSTER_FALLBACK; }; pimg.src = encodeURI(img);
     document.getElementById('booster-hint').classList.add('show');
     document.getElementById('booster-actions').classList.remove('show');
     bModal().classList.remove('has-focus', 'opened');

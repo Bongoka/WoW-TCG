@@ -31,9 +31,11 @@ function yesNo(s, pid, prompt, src, k, a, aiYes) {
 }
 function gyCands(s, pid, pred) { return me(s, pid).graveyard.filter(pred).map(c => c.uid); }
 function gyCard(s, uid) { const l = locate(s, uid); return l && l.zone === 'graveyard' ? l : null; }
-function fromGyToHand(s, uid) { const l = gyCard(s, uid); if (!l) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); me(s, l.c.owner || l.pid).hand.push(l.c); L(s, tr`↩ ${l.c.name} aus dem Friedhof auf die Hand.`); }
-function fromGyToPlay(s, uid, pid, o = {}) { const l = gyCard(s, uid); if (!l) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); putIntoPlay(s, l.c, pid, o); }
-function gyRemove(s, uid) { const l = gyCard(s, uid); if (!l) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.removed.push(l.c); }
+// Adyen the Lightwarden (Set 6): "Cards can't leave opposing graveyards." – gilt für Friedhöfe von Gegnern eines Adyen-Controllers
+function gyLocked(s, ownerPid) { return [s.p1, s.p2].some(p => p.id !== ownerPid && p.allies.some(a => a.id === 4212 && active(s, a))); }
+function fromGyToHand(s, uid) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); me(s, l.c.owner || l.pid).hand.push(l.c); L(s, tr`↩ ${l.c.name} aus dem Friedhof auf die Hand.`); }
+function fromGyToPlay(s, uid, pid, o = {}) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); putIntoPlay(s, l.c, pid, o); }
+function gyRemove(s, uid) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.removed.push(l.c); }
 function canNotPlayHere(msg) { return msg; }
 function cardPower(id, key) { return (FX[id].powers || []).find(p => p.key === key); }
 function selfDestroyCost(s, it, src) { destroy(s, src, { cause: 'cost' }); }
@@ -96,6 +98,7 @@ const PRED = {
     ally: c => isAllyCard(c),
     weapon: c => c.type === 'Weapon',
     combo: c => (c.subtypes || []).includes('Combo'),
+    equipment: c => ['Weapon', 'Armor', 'Item'].includes(c.type),                          // Gear Upgrade (Set 6)
 };
 EK.searchStep = (s, a) => {
     const p = me(s, a.pid); const pred = PRED[a.predName];
@@ -113,6 +116,7 @@ EK.searchDo = (s, a, id) => {
     p.deck.splice(i, 1);
     L(s, tr`🔎 ${p.hero.name} sucht und zeigt ${CARDS[id].name}.`);
     if (a.dest === 'top') { shuffleInPlace(p); p.deck.push(id); return; }
+    if (a.dest === 'play') { shuffleInPlace(p); putIntoPlay(s, makeCardInst(id, false, p.id), p.id); return; }   // Meeting Stone (Set 6)
     p.hand.push(makeCardInst(id, false, p.id));
     if (a.n > 1) { q(s, { op: 'call', k: 'E:searchStep', a: { ...a, n: a.n - 1 } }); return; }
     shuffleInPlace(p);
@@ -144,7 +148,7 @@ const bearOn = {
 };
 // "At the start of your turn, your hero deals N <type> damage to attached character"
 function dotOnStart(n, dt) {
-    return { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) heroDmg(s, pid, c.attachedTo, n, dt); } };
+    return { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) heroDmg(s, pid, c.attachedTo, n, dt, { abilityId: c.id, abilityUid: c.uid }); } };   // Quelle: die angehängte Fähigkeit (Anders Blankheart, Set 6)
 }
 // Gift-Ziel: "hero or ally that was dealt combat damage by your hero this turn"
 const poisonSlots = (s, pid) => [{ label: tr('Ziel (von deinem Helden im Kampf getroffen)'), cands: targetCands(s, pid, { char: true, filter: c => tms(s, c, 'hitByHero').some(m => m.by === pid) }), harm: true }];
