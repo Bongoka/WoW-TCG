@@ -2905,3 +2905,41 @@ backgrounds/*
 
 # Musik-Original (im Spiel: music/menu.mp3)
 /25. Gloomy.mp3
+
+# Tokens: nur die im Spiel verwendeten (TOKEN_IMG in js/main.js) – neue dort und hier ergänzen
+Tokens/*
+Tokens small/*
+!Tokens/Mechanical Yeti.webp
+!Tokens small/Mechanical Yeti_ergebnis.webp
+!Tokens/Tooga.webp
+!Tokens small/Tooga_ergebnis.webp
+!Tokens/Peasant.webp
+!Tokens small/Peasant_ergebnis.webp
+!Tokens/Dwarf.webp
+!Tokens small/Dwarf_ergebnis.webp
+!Tokens/Mechanical Dragonling.webp
+!Tokens small/Mechanical Dragonling_ergebnis.webp
+!Tokens/Misha.webp
+!Tokens small/Misha_ergebnis.webp
+!Tokens/Earth Elemental.webp
+!Tokens small/Earth Elemental_ergebnis.webp
+!Tokens/Draenei Survivor.webp
+!Tokens small/Draenei Survivor_ergebnis.webp
+!Tokens/Treant.webp
+!Tokens small/Treant_ergebnis.webp
+!Tokens/Fire Elemental.webp
+!Tokens small/Fire Elemental_ergebnis.webp
+!Tokens/Boar.webp
+!Tokens small/Boar_ergebnis.webp
+!Tokens/Ringo.webp
+!Tokens small/Ringo_ergebnis.webp
+!Tokens/Skeleton.webp
+!Tokens small/Skeleton_ergebnis.webp
+!Tokens/Fel Reaver.webp
+!Tokens small/Fel Reaver_ergebnis.webp
+!Tokens/Snake.webp
+!Tokens small/Snake_ergebnis.webp
+!Tokens/Bear.webp
+!Tokens small/Bear_ergebnis.webp
+!Tokens/Naga.webp
+!Tokens small/Naga_ergebnis.webp

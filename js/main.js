@@ -54,9 +54,11 @@ function updateImgStyleOptions() {
         try { localStorage.setItem(IMG_STYLE_KEY, pick); } catch (e) {} sel.value = pick; if (G) render();
     }
 }
-// Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.png" (große Vorschau)
+// Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.webp" (große Vorschau).
+// Auf GitHub liegen nur diese Tokens (Whitelist am Ende von .gitignore) – neue Einträge dort ergänzen.
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
-    9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton' };
+    9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton',
+    9501: 'Fel Reaver', 9601: 'Snake', 9602: 'Bear', 9603: 'Naga' };
 // Bild-Adressen, die schon einmal fehlten (404), nicht erneut anfragen: Extended Art u. a. fehlen bei manchen Karten,
 // sonst probiert jede neu gezeichnete Karte dieselben Dateien wieder durch
 const IMG_BAD = new Set();
@@ -70,7 +72,7 @@ function getImageCandidates(id, mode = 'ea') {
 function imageCandidatesAll(id, mode = 'ea') {
     const cd = CARDS[id];
     if (TOKEN_IMG[id]) {
-        const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.png`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
+        const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.webp`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
         return mode === 'full' || mode === 'eaBig' ? [big, small] : [small, big];
     }
     const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
