@@ -1098,3 +1098,13 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #aim-banner .ab-btns:empty { display: none; }
 #aim-banner .ab-btns button { pointer-events: auto; }
 .card-wrapper.destroy-picked .card-visual { box-shadow: 0 0 0 0.9cqw #ef4444, 0 0 4cqw rgba(239,68,68,.85) !important; }
+/* Allies ab der Mitte: eigene nach links, gegnerische nach rechts (js/ui.js layoutRows setzt die Ränder) */
+#bot-allies .bf-ally-zone { flex-direction: row-reverse; justify-content: flex-start; }
+#bot-allies .bf-ally-zone .bf-slot { justify-content: flex-end; }                   /* bei Platzmangel überlappen die Karten nach links, nie zur Ausrüstung */
+#top-allies .bf-ally-zone { justify-content: flex-start; }
+/* Anhänge an Helden (Cyclone …) liegen genau auf dem Helden; der Held bleibt bedienbar, mit der Maus darüber blendet der Anhang aus */
+.hero-with-hp > .card-wrapper > .card-wrapper.attached-card.on-hero { inset: 0; left: 0; right: auto; top: calc(var(--ai, 0) * 7%); width: 100%; transform: none; z-index: 2; pointer-events: none; transition: opacity .15s; }
+.hero-with-hp > .card-wrapper:hover > .card-wrapper.attached-card.on-hero { opacity: .12; }
+/* Hand blockiert nur dort, wo Karten liegen (dahinter liegende Ressourcen bleiben anklickbar) */
+#bot-hand { pointer-events: none; }
+#bot-hand > * { pointer-events: auto; }

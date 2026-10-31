@@ -182,15 +182,15 @@ function animateResources(player, shown) {
 // Das Brett ist symmetrisch: beide Spielerreihen liegen in den Ecken über dem Spielfeld (unten: Ressourcen links,
 // Friedhof + Held rechts; oben gespiegelt). Jede Ally-Reihe weicht seitlich den Blöcken aus, die in ihre Höhe ragen.
 function layoutRows() {
-    const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone'], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone']];
-    let pad = 0;
-    for (const [rowId, ids, gySel] of sides) {
+    // Allies beginnen in der Mitte: eigene wachsen nach links, gegnerische nach rechts (gegenüber liegt jeweils die Ausrüstung
+    // des Helden, die vom Rand zur Mitte wächst). Seitlich weichen sie Ressourcen, Friedhof und Held aus; bei Platzmangel überlappen sie.
+    const fw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150, half = (fw + 16) / 2;
+    const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone', true], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone', false]];
+    for (const [rowId, ids, gySel, opp] of sides) {
         const row = document.getElementById(rowId); if (!row) continue;
         row.style.paddingLeft = row.style.paddingRight = '0px';
         const rr = row.getBoundingClientRect(), mid = rr.left + rr.width / 2;
-        // Ausrüstung + laufende Fähigkeiten liegen beim Helden (absolut in der Reihe) – Allies weichen auch ihnen aus,
-        // auch den zusätzlichen Reihen der Gegenseite, die über die Mittellinie ragen
-        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel), ...document.querySelectorAll('#top-allies .bf-equip-zone, #bot-allies .bf-equip-zone')].filter(Boolean);
+        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel)].filter(Boolean);
         let padL = 0, padR = 0;
         for (const e of els) {
             const r = e.getBoundingClientRect();
@@ -198,11 +198,9 @@ function layoutRows() {
             if (r.left + r.width / 2 < mid) padL = Math.max(padL, Math.round(r.right - rr.left + 12));
             else padR = Math.max(padR, Math.round(rr.right - r.left + 12));
         }
-        pad = Math.max(pad, padL, padR);
+        if (opp) { row.style.paddingLeft = Math.max(0, Math.round(mid - half - rr.left)) + 'px'; row.style.paddingRight = padR + 'px'; }
+        else { row.style.paddingLeft = padL + 'px'; row.style.paddingRight = Math.max(0, Math.round(rr.right - mid - half)) + 'px'; }
     }
-    // Beide Reihen gleich und symmetrisch einrücken: eigene und gegnerische Allies liegen genau gegenüber,
-    // zentriert um dieselbe Mittellinie (auch bei mehreren Allies)
-    for (const [rowId] of sides) { const row = document.getElementById(rowId); if (row) row.style.paddingLeft = row.style.paddingRight = pad + 'px'; }
     // Viele Ressourcen: die Hand rückt nach rechts, solange sie nicht an Friedhof/Held stößt
     const hand = document.getElementById('bot-hand'), tray = document.getElementById('bot-resource-tray');
     if (hand && tray) {
@@ -883,7 +881,8 @@ function placeAttachments() {
         decorateInPlay(node, c);
         node.addEventListener('click', e => e.stopPropagation());                            // Klick gilt der angelegten Karte, nicht der Hauptkarte
         host.classList.add('has-attach'); host.appendChild(node);
-        attachSpot(node);
+        if (h.type === 'Hero') node.classList.add('on-hero');                                 // an Helden: genau auf dem Helden
+        else attachSpot(node);
     }
 }
 
@@ -966,31 +965,26 @@ function renderBattlefield(p, containerId, isOpponent) {
     }
 }
 
-// Ausrüstung + laufende Fähigkeiten: höchstens wenige Spalten breit (Allies sind wichtiger und brauchen den Platz).
-// Weitere Karten kommen in eine neue Reihe – eigene darüber, gegnerische darunter –, leicht versetzt überlappend.
-// Höchstens EQUIP_COLS Kartenbreiten und EQUIP_MAX_ROWS Reihen; sind es noch mehr, überlappen die Karten einer Reihe.
-const EQUIP_COLS = 3, EQUIP_MAX_ROWS = 3, EQUIP_ROW_STEP = 0.5;                           // Reihenabstand in Kartenhöhen
+// Ausrüstung + laufende Fähigkeiten: eine Reihe beim Helden – eigene vom rechten Rand nach links, gegnerische vom
+// linken Rand nach rechts. Höchstens bis kurz vor die Mitte (dort beginnen die Allies); reicht der Platz nicht, überlappen sie.
 function layoutEquipZone(row, zone, isOpponent) {
     const slots = [...zone.children]; if (!slots.length) return;
     const fw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150;
     const cardH = fw * 1.4, base = fw + 16, wide = fw * 1.4 + 16;
-    const cols = Math.max(EQUIP_COLS, Math.ceil(slots.length / EQUIP_MAX_ROWS));
-    const rows = Math.ceil(slots.length / cols), step = cardH * EQUIP_ROW_STEP, maxRowW = EQUIP_COLS * base;
-    let maxW = 0;
-    for (let r = 0; r < rows; r++) {
-        const inRow = slots.slice(r * cols, (r + 1) * cols);
-        const dx = inRow.length > 1 ? Math.min(base, (maxRowW - base) / (inRow.length - 1)) : base;   // bei Platzmangel überlappen
-        inRow.forEach((s, i) => {
-            const w = s.classList.contains('ex') ? wide : base;
-            s.style.position = 'absolute'; s.style.width = w + 'px';
-            s.style[isOpponent ? 'left' : 'right'] = (i * dx) + 'px';
-            s.style[isOpponent ? 'top' : 'bottom'] = (r * step) + 'px';
-            s.style.zIndex = (rows - r) * 10 + (inRow.length - i);                       // vordere Reihe (beim Helden) liegt oben
-            maxW = Math.max(maxW, i * dx + w);
-        });
-    }
-    zone.style.width = maxW + 'px';
-    zone.style.height = (cardH + (rows - 1) * step) + 'px';
+    const maxW = Math.max(base, row.getBoundingClientRect().width / 2 - base / 2 - 24);    // bis vor die erste Ally-Karte in der Mitte
+    const widths = slots.map(s => s.classList.contains('ex') ? wide : base);
+    const total = widths.reduce((a, b) => a + b, 0);
+    const k = total > maxW && slots.length > 1 ? (maxW - widths[widths.length - 1]) / (total - widths[widths.length - 1]) : 1;   // Überlappung
+    let x = 0, w = 0;
+    slots.forEach((s, i) => {
+        s.style.position = 'absolute'; s.style.width = widths[i] + 'px';
+        s.style[isOpponent ? 'left' : 'right'] = x + 'px';
+        s.style[isOpponent ? 'top' : 'bottom'] = '0px';
+        s.style.zIndex = slots.length - i;                                                    // Karte am Rand liegt oben
+        w = x + widths[i]; x += widths[i] * k;
+    });
+    zone.style.width = w + 'px';
+    zone.style.height = cardH + 'px';
 }
 
 // ---------------------------------------------------------------- Hand
