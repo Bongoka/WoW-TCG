@@ -2002,4 +2002,5 @@ var I18N_EN = {
     "Spiel fortsetzen": "Resume Game",
     "Zurück in die laufende Partie": "Back to the current match",
     "Tests": "Tests",
+    "Hinweis: Der Chat ist nicht verschlüsselt und läuft über einen öffentlichen Server. Teile hier keine Passwörter, persönlichen Daten oder Kontaktdaten und sei respektvoll zu anderen Spielern.": "Note: This chat is not encrypted and runs over a public server. Do not share passwords, personal data or contact details here, and be respectful to other players.",
 };

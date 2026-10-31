@@ -1646,7 +1646,7 @@ function showToast(msg, isErr = true, ms = 2200) {
 }
 // Laufende Partie würde verloren gehen (neues Spiel, Sprachwechsel …): nur dann eine Rückfrage, sonst sofort
 function confirmLeaveGame(go) {
-    if (!G || G.gameOver || G.turn <= 1) { go(); return; }
+    if (!G || G.gameOver) { go(); return; }                                             // jede laufende Partie (auch Zug 1) – im Hauptmenü bietet sie „Spiel fortsetzen“ an
     uiConfirm(tr('Laufende Partie beenden?'), tr('Die aktuelle Partie geht dabei verloren.'), tr('Ja, beenden'), go);
 }
 // Spieleigene Rückfrage statt confirm(): onYes läuft nur bei Bestätigung
@@ -1663,6 +1663,7 @@ function uiAskNumber(title, text, def, min, onOk) {
 }
 function openDecisionModal(title, text, buttons) {
     const m = document.getElementById("decision-modal");
+    m.classList.remove('peek');                                                      // „peek“ (Spielfeld sichtbar) setzt nur, wer es braucht – z. B. der Mulligan
     document.getElementById("decision-title").textContent = title;
     document.getElementById("decision-text").innerHTML = text;
     const actBox = document.getElementById("decision-actions"); actBox.innerHTML = "";

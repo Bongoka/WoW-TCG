@@ -184,6 +184,8 @@ function toggleRulesTextMode() {
     try { localStorage.setItem(RULES_TEXT_KEY, rulesTextMode() === 'expert' ? 'casual' : 'expert'); } catch (e) {}
     updateRulesTextButton();
 }
+// Lokal (localhost oder direkt geöffnete Datei) = Entwicklung: Tests und Debug sichtbar
+const IS_DEV = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
 // Decks für Zufalls-Matches: eigene + Turnier-Decks; nur falls keine da sind, die Start-Decks
 function randomDeckPool() {
     let list = []; try { list = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]'); } catch (e) {}
@@ -241,6 +243,7 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
             { label: tr("Behalten"), cls: "success", action: startPlay },
             { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
         ]);
+        document.getElementById('decision-modal').classList.add('peek');                    // die Starthand bleibt unten sichtbar
     };
     // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
     // wer beginnt, zeigt das Banner nach dem Mulligan
@@ -425,6 +428,8 @@ function updateCpuStatus(active, text = "") {
 
 function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
+    // Tests und Debug-Werkzeuge (Menü rechts „Tests“) nur lokal – auf GitHub Pages sehen Spieler sie nicht
+    document.body.classList.toggle('dev', IS_DEV);
     if (matchMedia('(hover: none)').matches) { const h = document.querySelector('.db-hint'); if (h) h.textContent = tr('Tippen: hinzufügen · „−“ in der Deckliste: entfernen'); }
     // Tastatur: Leertaste/Enter = Zug beenden, Strg+Z = Rückgängig, Esc = Fenster schließen / Abbrechen
     const openModals = () => ['decision-modal', 'deck-builder-modal', 'sim-modal', 'deck-overview-modal', 'graveyard-modal', 'booster-modal', 'db-io-modal', 'choice-modal', 'hs-mulligan', 'gameover']

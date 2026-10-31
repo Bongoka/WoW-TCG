@@ -75,7 +75,7 @@ Der Befehl hängt nur neue Pfade an; schon eingetragene Bilder sind nicht mehr i
 
 ## Testen
 
-Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü.
+Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü. Der Bereich „Tests“ im Menü rechts erscheint nur lokal (`IS_DEV` in main.js: localhost oder file://) – auf GitHub Pages ist er ausgeblendet.
 
 Ohne Browser mit Node: die Skripte in Ladereihenfolge (ohne UI-Dateien) in einen gemeinsamen Kontext laden und `runRuleTests()` aufrufen:
 

@@ -322,6 +322,7 @@ function netMulligan(done) {
         { label: tr("Behalten"), cls: "success", action: fin },
         { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); fin(); } }
     ]);
+    document.getElementById('decision-modal').classList.add('peek');                        // die Starthand bleibt unten sichtbar
 }
 function netTurnBanner() {
     if (!G || G.gameOver || !netBothReady() || NET.mullOpen) return;
@@ -515,7 +516,8 @@ function netRenderVs() {
 }
 function netRenderChat() {
     const box = document.getElementById('mp-chat'); if (!box) return;
-    box.innerHTML = NET.chat.slice(-60).map(l => l.sys ? `<div class="mp-sys">${esc(l.text)}</div>` : `<div class="${l.me ? 'me' : ''}"><b>${esc(l.name)}:</b> ${esc(l.text)}</div>`).join('');
+    // Fester Sicherheitshinweis oben im Chat (Chat läuft unverschlüsselt über einen öffentlichen Server)
+    box.innerHTML = `<div class="mp-sys mp-warn">${esc(tr('Hinweis: Der Chat ist nicht verschlüsselt und läuft über einen öffentlichen Server. Teile hier keine Passwörter, persönlichen Daten oder Kontaktdaten und sei respektvoll zu anderen Spielern.'))}</div>` + NET.chat.slice(-60).map(l => l.sys ? `<div class="mp-sys">${esc(l.text)}</div>` : `<div class="${l.me ? 'me' : ''}"><b>${esc(l.name)}:</b> ${esc(l.text)}</div>`).join('');
     box.scrollTop = box.scrollHeight;
 }
 // Hinweis auf eine neue offene Lobby – mit direktem Beitritt (eine laufende CPU-Partie endet dabei)
