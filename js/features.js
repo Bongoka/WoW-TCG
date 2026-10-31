@@ -760,14 +760,16 @@ function deckBoxHTML(deck, size = '') {                                      // 
 }
 const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');
 // Deckliste rechts in der Übersicht (beim Überfahren eines Decks): wie im Deck-Builder – Manakurve, Verteilung, Liste
-function deckPreview(deck) {
+function deckPreview(deck, tile) {
+    // Die Box, deren Karten rechts zu sehen sind, bleibt hervorgehoben
+    document.querySelectorAll('#deck-overview-grid .deck-tile.shown').forEach(t => t.classList.remove('shown')); if (tile) tile.classList.add('shown');
     const box = document.getElementById('deck-preview'); if (!box) return;
     if (!deck) { box.innerHTML = `<div class="dp-hint">${tr('Fahre über ein Deck, um seine Kartenliste zu sehen.')}</div>`; return; }
     if (box.dataset.id === deck.id) return;
     box.dataset.id = deck.id;
-    const hero = CARDS[deck.hero], n = deck.cards.length;
+    const hero = CARDS[deck.hero];
     DB_TYPES[0].color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
-    box.innerHTML = `<div class="dp-head">${deckBoxHTML(deck, 'mini')}<div><b>${esc(deck.name)}</b><span>${esc(hero ? hero.name : '')} · <i class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${tr`${n} Karten`}</i></span></div></div>`
+    box.innerHTML = ``
         + `<div class="db-stats"><div class="db-stat-cols"><div class="db-curve-box"><div class="db-stat-title">${tr('Manakurve')}</div><div class="db-curve"></div></div>`
         + `<div class="db-types-box"><div class="db-stat-title">${tr('Verteilung')}</div><div class="db-typebar"></div><div class="db-typelegend"></div></div></div></div>`
         + `<div class="db-deck-list" id="dp-cards"></div>`;
@@ -793,7 +795,7 @@ function openDeckOverview(opts = {}) {
         el.innerHTML = deckBoxHTML(deck) + `<div class="deck-tile-name" title="${esc(deck.name)}">${esc(title)}</div>`
             + `<div class="deck-tile-sub">${esc(event || (hero ? hero.name : ''))}</div>`;
         el.dataset.q = `${deck.name} ${hero ? hero.name : ''} ${deck.class || ''}`.toLowerCase();
-        el.onmouseenter = () => deckPreview(deck);
+        el.onmouseenter = () => deckPreview(deck, el);
         el.onclick = () => choose(el, () => { if (pick) pick(deck); else openDeckBuilder(deck); });
         return el;
     };
@@ -824,7 +826,7 @@ function openDeckOverview(opts = {}) {
     grid.onpointermove = e => { const t = e.target.closest('.deck-tile'); if (!t) return; const r = t.getBoundingClientRect();
         t.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); t.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); };
     document.getElementById("deck-overview-close-btn").onclick = close;
-    deckPreview(decks.find(d => d.id === opts.current) || null);   // zu Beginn: das gewählte Deck oder ein Hinweis
+    deckPreview(decks.find(d => d.id === opts.current) || null, grid.querySelector('.deck-tile.current'));   // zu Beginn: das gewählte Deck oder ein Hinweis
     modal.style.display = "flex";
 }
 // Kleine Schaltfläche mit Deck-Box und Namen, öffnet die Übersicht zur Auswahl (Test-Match, Online-Lobby)

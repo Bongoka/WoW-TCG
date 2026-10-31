@@ -1275,12 +1275,6 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 #deck-preview.dp-in { animation: dpIn .28s cubic-bezier(.2,1,.4,1); }
 @keyframes dpIn { from { opacity: .3; transform: translateX(10px); } }
 #deck-preview .dp-hint { height: 100%; display: flex; align-items: center; justify-content: center; padding: 30px; text-align: center; color: var(--text-dim); font-style: italic; }
-.dp-head { display: flex; align-items: center; gap: 12px; padding: 10px 14px 8px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #221a12, #15100b); }
-.dp-head .dbox.mini { --w: 30px; --h: 41px; --d: 12px; margin: 7px 8px 3px 0; }
-.dp-head > div:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.dp-head b { color: var(--gold-light); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dp-head span { font-size: 11px; color: var(--text-dim); } .dp-head i { font-style: normal; font-weight: bold; }
-.dp-head i.exact { color: #4ade80; } .dp-head i.under { color: #facc15; } .dp-head i.over { color: #f87171; }
 #deck-preview .db-stats { border-radius: 0; }
 #dp-cards { padding: 0 10px 12px 4px; }
 #dp-cards .db-row { cursor: default; }
@@ -1298,3 +1292,17 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
     .deck-tile .dbox-special { width: 70px; height: 96px; margin: 17px 14px 6px 0; }
     .deck-tile .dbox-n { font-size: 8px; }
 }
+/* Deck-Übersicht: angezeigtes Deck bleibt hervorgehoben (gehoben, Leuchten, goldener Rahmen); schmale goldene Scrollbars wie im Deck-Builder */
+.deck-tile.shown::before { opacity: 1; transform: scale(1); }
+.deck-tile.shown .dbox-3d { transform: translateY(-9px) rotateX(-12deg) rotateY(-15deg) scale(1.06); }
+.deck-tile.shown .dbox-shadow { transform: scale(.8) translateY(4px); opacity: .55; }
+.deck-tile.shown .dbox-front { box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 0 0 2px var(--gold), 0 0 20px var(--glow); }
+.deck-tile.shown .dbox-special { transform: translateY(-8px) scale(1.06); border-color: var(--gold); }
+.deck-tile.shown .deck-tile-name { color: var(--gold-light); }
+#deck-preview { overflow-x: hidden; }
+#deck-overview-modal ::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+#deck-overview-modal ::-webkit-scrollbar-track, #deck-overview-modal ::-webkit-scrollbar-corner { background: transparent; }
+#deck-overview-modal ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+#deck-overview-modal ::-webkit-scrollbar-thumb { background: rgba(201,168,76,.45); border-radius: 8px; }
+#deck-overview-modal ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,.75); }
+@supports (-moz-appearance: none) { #deck-overview-modal * { scrollbar-width: thin; scrollbar-color: rgba(201,168,76,.5) transparent; } }
