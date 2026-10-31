@@ -66,10 +66,11 @@ function netName() {
 }
 function netCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
 
-// ---------------------------------------------------------------- Decks (vorgefertigte und eigene)
+// ---------------------------------------------------------------- Decks (eigene und Turnier-Decks)
 function netDeckList() {
     let custom = []; try { custom = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]'); } catch (e) {}
-    return [...custom.filter(d => d && d.hero && d.cards && d.cards.length), ...GAME_DECKS];
+    custom = custom.filter(d => d && CARDS[d.hero] && d.cards && d.cards.length);
+    return custom.length ? custom : GAME_DECKS;                                        // Start-Decks nur, falls es gar keine eigenen gibt
 }
 function netPickDeck(id) { return netDeckList().find(d => d.id === id) || null; }
 
@@ -377,14 +378,16 @@ function netStatus(msg) {
     el.textContent = msg || (NET.client && NET.client.connected ? tr('● verbunden') : tr('○ nicht verbunden'));
     el.className = msg ? 'err' : (NET.client && NET.client.connected ? 'ok' : '');
 }
+// Deck-Schaltfläche (Deck-Box + Name): Klick öffnet die Deck-Übersicht zur Auswahl
 function netDeckSelect(onChange) {
-    const sel = document.createElement('select'); sel.className = 'mp-deck';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mp-deck';
     const decks = netDeckList();
     if (!NET.me.deck || !netPickDeck(NET.me.deck)) { let k = null; try { k = localStorage.getItem(NET_DECK_KEY); } catch (e) {} NET.me.deck = netPickDeck(k) ? k : decks[0].id; }
-    decks.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = `${d.name} (${CARDS[d.hero] ? CARDS[d.hero].name : '?'})`; sel.appendChild(o); });
-    sel.value = NET.me.deck;
-    sel.onchange = () => { NET.me.deck = sel.value; try { localStorage.setItem(NET_DECK_KEY, sel.value); } catch (e) {} onChange(); };
-    return sel;
+    const show = () => deckSlotButton(btn, netPickDeck(NET.me.deck));
+    show();
+    btn.onclick = () => openDeckOverview({ title: tr('Dein Deck'), current: NET.me.deck, pick: d => {
+        NET.me.deck = d.id; try { localStorage.setItem(NET_DECK_KEY, d.id); } catch (e) {} show(); onChange(); } });
+    return btn;
 }
 function netShowMenu() {
     const body = document.getElementById('mp-body'); if (!body) return;

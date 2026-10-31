@@ -182,6 +182,12 @@ function toggleRulesTextMode() {
     try { localStorage.setItem(RULES_TEXT_KEY, rulesTextMode() === 'expert' ? 'casual' : 'expert'); } catch (e) {}
     updateRulesTextButton();
 }
+// Decks für Zufalls-Matches: eigene + Turnier-Decks; nur falls keine da sind, die Start-Decks
+function randomDeckPool() {
+    let list = []; try { list = JSON.parse(localStorage.getItem('wow_tcg_custom_decks') || '[]'); } catch (e) {}
+    list = list.filter(d => d && CARDS[d.hero] && d.cards && d.cards.length);
+    return list.length ? list : GAME_DECKS;
+}
 function pickDeck(key) {
     let d = GAME_DECKS.find(x => x.id === key);
     if (!d && key && String(key).startsWith('custom_')) {
@@ -195,10 +201,8 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
     if (typeof tutStop === 'function') tutStop();                                       // neues Spiel beendet ein laufendes Tutorial
     UNDO.stack = [];
     if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
-    const keys = GAME_DECKS.map(d => d.id);
-    // Ohne festes Deck: Auswahl aus dem Testmatch-Menü (Zufall = leer)
-    const tm = typeof testMatchDecks === 'function' ? testMatchDecks() : {};
-    seedPlayerDeck = seedPlayerDeck || tm.p; seedOppDeck = seedOppDeck || tm.o;
+    // Ohne festes Deck: Zufall aus eigenen und Turnier-Decks (Start-Decks nur für Tests)
+    const keys = randomDeckPool().map(d => d.id);
     const pKey = seedPlayerDeck || keys[Math.floor(Math.random() * keys.length)];
     let oKey = seedOppDeck || keys[Math.floor(Math.random() * keys.length)];
     if (oKey === pKey && keys.length > 1 && !seedOppDeck) oKey = keys[(keys.indexOf(pKey) + 1) % keys.length];
@@ -489,8 +493,13 @@ function bootGame() {
 
     // Simulationen: Anzahl über das spieleigene Eingabefenster (statt prompt)
     const simRun = async (fn) => { try { await fn(); } catch (e) { console.error(e); document.getElementById("sim-content").innerHTML = tr`<div style="color:#f87171;">Fehler: ${esc(e.message)}</div>`; } };
-    document.getElementById("btn-simulate").onclick = () =>
-        uiAskNumber(tr('CPU vs CPU Simulation'), tr("Wie viele Spiele pro Deck-Paar? (Standard: 3)"), 3, 1, n => simRun(() => runSimulation(n)));
+    // Alle eigenen Decks (ohne Turnier-Decks) gegeneinander, jede Paarung in beiden Reihenfolgen
+    document.getElementById("btn-simulate").onclick = () => {
+        const decks = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards && d.cards.length && !isTourneyDeck(d));
+        if (decks.length < 2) { showToast(tr('Du brauchst mindestens zwei eigene Decks.'), false, 3000); return; }
+        uiAskNumber(tr('CPU vs CPU Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${decks.length} eigene Decks = ${decks.length * decks.length} Paarungen; Standard: 3)`, 3, 1,
+            n => simRun(() => runSimulation(n, decks, tr`CPU vs CPU – eigene Decks (${decks.length})`)));
+    };
     document.getElementById("btn-simulate-tourney").onclick = () => {
         const n0 = tourneySimDecks().length;
         uiAskNumber(tr('Turnierdeck-Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runTourneySimulation(n)));

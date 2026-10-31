@@ -26,7 +26,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `cards2.js`, `cards3.js` | Set 2 *Through the Dark Portal* (IDs 1001–1319) und Set 3 *Fires of Outland* (IDs 2001–2246), aus der Card Reference erzeugt; Tokens 9101+/9201+ |
 | `cards4.js`, `cards5.js` | Raid-Loot: Set 4 *Onyxia's Lair* (IDs 3001–3033) und Set 5 *Molten Core* (IDs 3101–3130); Token 9401 |
 | `cards6.js` | Set 6 *March of the Legion* (IDs 4001–4319 = 4000 + Kartennummer), aus der Card Reference erzeugt; Tokens 9501+ |
-| `decks.js` | Vorgefertigte Decks `GAME_DECKS` (16 Decks) |
+| `decks.js` | Start-Decks `GAME_DECKS` (16 Decks) – nur noch für Regeltests und Test-Setups, in der Oberfläche nicht mehr sichtbar. Zufalls-Matches nehmen eigene + Turnier-Decks (`randomDeckPool` in main.js) |
 | `state.js` | Spielzustand: `newGameState`, `makeCardInst`, `cloneState` (schnelle Tiefenkopie), Statistik `statPlayed`/`statCompleted` |
 | `engine.js` | Regel-Engine: Warteschlange (`queue`, `q`, `process`), Kette (`chain`), Prioritätsfenster (`win`), Kampf (`battleStep`), Trigger, Quests, legale Aktionen (`getLegalActions`), Mulligan |
 | `cardfx.js` | Verhalten jeder Karte: `FX[id]` (Trigger, Kräfte, Ziele, Quest-Bedingungen/Belohnungen) |
@@ -40,7 +40,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `tests.js` | Regeltests `runRuleTests()` |
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
-| `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups |
+| `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups; Deck-Übersicht als Deck-Boxen (`openDeckOverview`, mit `{ pick }` überall die Deck-Auswahl: Testmatch, Online-Lobby, Deck-Builder „Laden“) |
 | `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Oberfläche: ab 60 Karten wird die Heldenkarte zum Avatar (`COACH_FACE` = Gesichtsausschnitt je Held), Chat links über den Karten. Texte nur Englisch (ohne `tr`) |
 | `online.js` | Online-Multiplayer 1 gegen 1 (Menü „Online-Spiel“): Lobbys mit Code, Lobbyliste, Chat, Bereit/Start, Hinweis-Popups auf neue Lobbys. Läuft ohne eigenen Server über einen öffentlichen MQTT-Broker (`NET_BROKERS`). Der Host rechnet die Partie (`G.online`, `G.humans = [1, 2]`), der Gast schickt nur Aktionen und sieht den Zustand gespiegelt (`netMirror`: Spieler 1 ⇄ 2) – **neue Zustandsfelder mit Spieler-ID** müssen in `NET_PID_KEYS`/`NET_PID_MAPS` stehen |
 
@@ -84,6 +84,6 @@ Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit fes
 
 - Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
 - Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
-- Alle Simulations-Tests (Start-Decks, Turnier-Decks, All-Cards) laufen über dieselbe Funktion `runSimulation(spiele, decks, titel, pairs)` – nur die Paarungen wechseln (`pairs`: feste Paare oder Funktionen, die je Spiel neue Decks liefern). In Runden: jede Paarung einmal pro Runde. Neue Tests nur als neue Paarungen anlegen, keine eigene Schleife.
+- Alle Simulations-Tests (eigene Decks, Turnier-Decks, All-Cards, Testmatch) laufen über dieselbe Funktion `runSimulation(spiele, decks, titel, pairs)` – nur die Paarungen wechseln (`pairs`: feste Paare oder Funktionen, die je Spiel neue Decks liefern). In Runden: jede Paarung einmal pro Runde. Neue Tests nur als neue Paarungen anlegen, keine eigene Schleife.
 - „Abbrechen & auswerten“ / Schließen setzt `SIM_STOP.req`; bei Abbruch oder Fehler wertet `runSimulation` die bis dahin gespielten Spiele aus (mit Anteil in %).
 - Antworten in Prioritätsfenstern (Instants, Kräfte, Quests) wählen Mensch und KI über dieselbe Bewertung `respondOptions` (engine.js): bei einem gegnerischen Link oder im letzten Kampffenster nur, was jetzt mehr bringt als nach der Auflösung; am gegnerischen Zugende alles, was mehr bringt als Passen (übrige Ressourcen). Die KI antwortet so auch in Simulationen. In Kopien (`cloneState` setzt `look`) antwortet niemand – sonst rechnete jede Vorausschau wieder Kopien durch. `stopAll` (Kartentests, Einstellung „Priorität: Jedes Fenster“) lässt den Menschen in jedem Fenster anhalten. Im eigenen Zug hält die KI Mana für reaktive Instants zurück (`aiHoldValue` in ai.js: Unterbrechen, Verhindern, Kampftricks).

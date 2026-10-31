@@ -305,6 +305,21 @@ document.getElementById("db-save-btn").onclick = () => {
     confirmLeaveGame(() => { document.getElementById("deck-builder-modal").style.display = "none"; initGame(d.id, null); });
 };
 document.getElementById("db-new-btn").onclick = () => { if (!currentDeckBuilder.cards.length) { openDeckBuilder(); return; } uiConfirm(tr('Neues Deck'), tr('Aktuelles Deck verwerfen und neu beginnen?'), tr('Verwerfen'), () => openDeckBuilder()); };
+// Laden: Deck-Übersicht zur Auswahl; ungespeicherte Änderungen vorher speichern oder verwerfen
+function dbUnsaved() {
+    const cur = currentDeckBuilder; if (!cur.cards.length && !cur.heroId) return false;
+    const d = loadCustomDecks().find(x => x.id === cur.id);
+    if (!d) return cur.cards.length > 0;
+    return d.hero !== cur.heroId || (cur.name || '').trim() !== d.name || [...d.cards].sort().join() !== [...cur.cards].sort().join();
+}
+document.getElementById("db-load-btn").onclick = () => {
+    const open = () => openDeckOverview({ title: tr('Deck laden'), current: currentDeckBuilder.id, pick: d => openDeckBuilder(d) });
+    if (!dbUnsaved()) { open(); return; }
+    openDecisionModal(tr('Deck laden'), esc(tr('Das aktuelle Deck hat ungespeicherte Änderungen. Vorher speichern?')), [
+        { label: tr('Speichern'), cls: 'success', action: () => { if (dbSave()) open(); } },
+        { label: tr('Verwerfen'), cls: 'danger', action: open },
+        { label: tr('Abbrechen'), action: () => {} }]);
+};
 document.getElementById("db-close-btn").onclick = () => { document.getElementById("deck-builder-modal").style.display = "none"; dbHoverHide(); closeDBHeroPicker(); };
 
 // --- IMPORT / EXPORT als Textliste: "4 Weeble" (Anzahl Leerzeichen Name), optional "Hero: Name" ---
@@ -705,30 +720,75 @@ function importTourneyDecks() {
 importTourneyDecks();
 
 // --- DECK OVERVIEW ---
-function openDeckOverview() {
-    const grid = document.getElementById("deck-overview-grid"); grid.innerHTML = "";
-    const tile = (deck, custom) => {
-        const btn = document.createElement("div");
-        const n = deck.cards.length, hero = CARDS[deck.hero];
-        btn.className = `deck-btn ${(deck.faction || 'alliance').toLowerCase()}${custom ? ' custom' : ''}`;
+// Jedes Deck als Deck-Box: vorne das Heldenbild, oben das Klassen-Icon, Farbe nach Fraktion des Helden.
+// Dieselbe Übersicht dient überall als Deck-Auswahl (openDeckOverview({ pick })): Test-Match, Online-Lobby, Deck-Builder „Laden“.
+function deckBoxHTML(deck, mini = false) {
+    const hero = CARDS[deck.hero], cls = deck.class || (hero && hero.class) || '', fac = (deck.faction || (hero && hero.faction) || 'neutral').toLowerCase();
+    // Heldenbild (klein, ohne Extended Art), auf das Gesicht gezoomt: Ausschnitt wie beim Coach-Avatar (COACH_FACE)
+    const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/-EA[_.]/.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
+    let pos = 'background-size: cover; background-position: center 25%';
+    const f = hero && typeof COACH_FACE !== 'undefined' && COACH_FACE[hero.id];
+    if (f) {
+        const z = Math.max(2.1, f[2] * 0.72), boxAr = 100 / 74, ar = typeof COACH_CARD_AR !== 'undefined' ? COACH_CARD_AR : 1.4;   // Bildbreite = z × Boxbreite
+        const px = (z * f[0] - .5) / (z - 1), H = z * ar / boxAr, py = (H * (f[1] + .07) - .5) / (H - 1);   // etwas unter dem Gesicht: kein Namensbalken
+        const cl = v => (Math.max(0, Math.min(1, v)) * 100).toFixed(1);
+        pos = `background-size: ${(z * 100).toFixed(0)}% auto; background-position: ${cl(px)}% ${cl(py)}%`;
+    }
+    const n = deck.cards.length;
+    return `<div class="dbox ${esc(fac)}${mini ? ' mini' : ''}"><div class="dbox-top"><img src="${CLASS_ICONS[cls] || ''}" alt=""></div><div class="dbox-side"></div>`
+        + `<div class="dbox-front" style='background-image:${imgs}; ${pos}'>${mini ? '' : `<span class="dbox-n ${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n}</span>`}</div></div>`;
+}
+const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');
+function openDeckOverview(opts = {}) {
+    const modal = document.getElementById("deck-overview-modal"), grid = document.getElementById("deck-overview-grid");
+    const pick = typeof opts.pick === 'function' ? opts.pick : null;
+    const close = () => { modal.style.display = "none"; modal.classList.remove('picking'); };
+    document.getElementById('deck-overview-title').textContent = opts.title || (pick ? tr('Deck wählen') : tr('Deck Übersicht'));
+    modal.classList.toggle('picking', !!pick);
+    const search = document.getElementById('deck-overview-search'); search.value = '';
+    const tile = (deck) => {
+        const el = document.createElement("div"), hero = CARDS[deck.hero];
+        el.className = 'deck-tile' + (opts.current && opts.current === deck.id ? ' current' : '');
         // Lange Namen "Platz 1 · Spieler · Turnier": Titel = Platz + Spieler, Turnier klein darunter
-        const parts = custom ? deck.name.split(' · ') : [deck.class];
-        const title = parts.length > 2 ? parts.slice(0, 2).join(' · ') : parts.join(' · '), event = parts.length > 2 ? parts.slice(2).join(' · ') : '';
-        btn.innerHTML = `<div class="deck-icon"><img src="${CLASS_ICONS[deck.class] || ''}" alt="${esc(deck.class)}"></div><div class="deck-name" title="${esc(deck.name)}">${esc(title)}</div>`
-            + (event ? `<div class="deck-event">${esc(event)}</div>` : '')
-            + tr`<div class="deck-sub">${esc(hero ? hero.name : '')} · <span class="${n < 60 ? 'under' : n === 60 ? 'exact' : 'over'}">${n} Karten</span></div>`;
-        // Klick: direkt in den Deck-Builder (Start-Decks als Kopie)
-        btn.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(deck, !custom); };
-        return btn;
+        const parts = deck.name.split(' · ');
+        const title = parts.length > 2 ? parts.slice(0, 2).join(' · ') : deck.name, event = parts.length > 2 ? parts.slice(2).join(' · ') : '';
+        el.innerHTML = deckBoxHTML(deck) + `<div class="deck-tile-name" title="${esc(deck.name)}">${esc(title)}</div>`
+            + `<div class="deck-tile-sub">${esc(event || (hero ? hero.name : ''))}</div>`;
+        el.dataset.q = `${deck.name} ${hero ? hero.name : ''} ${deck.class || ''}`.toLowerCase();
+        el.onclick = () => { close(); if (pick) pick(deck); else openDeckBuilder(deck); };
+        return el;
     };
-    grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Deine Decks</div>'));
-    const nb = document.createElement('div'); nb.className = 'deck-btn new'; nb.innerHTML = tr('<div class="deck-plus">+</div><div class="deck-name">Neues Deck</div>');
-    nb.onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; openDeckBuilder(); };
-    grid.appendChild(nb);
-    loadCustomDecks().forEach(d => grid.appendChild(tile(d, true)));
-    grid.insertAdjacentHTML('beforeend', tr('<div class="deck-grid-head">Start-Decks</div>'));
-    GAME_DECKS.filter(d => !String(d.id).startsWith('t_')).forEach(d => grid.appendChild(tile(d, false)));
-    document.getElementById("deck-overview-modal").style.display = "flex";
+    grid.innerHTML = "";
+    const head = t => grid.insertAdjacentHTML('beforeend', `<div class="deck-grid-head">${t}</div>`);
+    const decks = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards);
+    const own = decks.filter(d => !isTourneyDeck(d));
+    if (own.length || opts.random || !pick) head(tr('Deine Decks'));
+    if (opts.random) {
+        const r = document.createElement('div'); r.className = 'deck-tile special' + (opts.current === '' ? ' current' : ''); r.dataset.q = '';
+        r.innerHTML = tr('<div class="dbox-special">?</div><div class="deck-tile-name">Zufall</div><div class="deck-tile-sub">eigene & Turnier-Decks</div>');
+        r.onclick = () => { close(); pick(null); };
+        grid.appendChild(r);
+    }
+    if (!pick) {
+        const nb = document.createElement('div'); nb.className = 'deck-tile special'; nb.dataset.q = '';
+        nb.innerHTML = tr('<div class="dbox-special">+</div><div class="deck-tile-name">Neues Deck</div>');
+        nb.onclick = () => { close(); openDeckBuilder(); };
+        grid.appendChild(nb);
+    }
+    own.forEach(d => grid.appendChild(tile(d)));
+    const tour = decks.filter(isTourneyDeck);
+    if (tour.length) { head(tr('Turnier-Decks 2006/2007')); tour.forEach(d => grid.appendChild(tile(d))); }
+    // Suche nach Deck-, Helden- oder Klassenname
+    search.oninput = () => { const q = search.value.trim().toLowerCase(); grid.querySelectorAll('.deck-tile').forEach(t => t.style.display = !q || !t.dataset.q || t.dataset.q.includes(q) ? '' : 'none'); };
+    document.getElementById("deck-overview-close-btn").onclick = close;
+    modal.style.display = "flex";
+}
+// Kleine Schaltfläche mit Deck-Box und Namen, öffnet die Übersicht zur Auswahl (Test-Match, Online-Lobby)
+function deckSlotButton(btn, deck, emptyLabel) {
+    btn.classList.add('deck-slot');
+    btn.innerHTML = deck ? deckBoxHTML(deck, true) + `<span class="deck-slot-name">${esc(deck.name)}</span>`
+        : `<span class="dbox-special mini">?</span><span class="deck-slot-name">${esc(emptyLabel || tr('Zufall'))}</span>`;
+    btn.title = deck ? deck.name : (emptyLabel || tr('Zufall'));
 }
 
 // --- SIMULATIONEN ---
@@ -959,26 +1019,22 @@ function loadMaskTest() {
 })();
 
 // --- TESTMATCH: eigenes Deck und Gegner-Deck wählen (Menü „Tests“), gemerkt in localStorage.
-// Gilt für jedes neue Spiel ohne festes Deck; leer = Zufall. "Simulieren": CPU vs CPU nur mit diesen beiden Decks.
+// Gilt nur für „Spielen“ hier (nicht für „Neues Spiel“); leer = Zufall. "Simulieren": CPU vs CPU nur mit diesen beiden Decks.
 const TM_KEY = 'wow_tcg_test_decks';
 function testMatchDecks() {
     let v = {}; try { v = JSON.parse(localStorage.getItem(TM_KEY) || '{}') || {}; } catch (e) {}
-    return { p: pickDeck(v.p) ? v.p : '', o: pickDeck(v.o) ? v.o : '' };
+    const ok = id => pickDeck(id) && String(id).startsWith('custom_');                   // Start-Decks gibt es in der Auswahl nicht mehr
+    return { p: ok(v.p) ? v.p : '', o: ok(v.o) ? v.o : '' };
 }
 (function () {
+    // Zwei Deck-Schaltflächen: Klick öffnet die Deck-Übersicht zur Auswahl (mit „Zufall“)
     const sp = document.getElementById('tm-deck-p'), so = document.getElementById('tm-deck-o');
-    const fill = () => {
-        const cur = testMatchDecks();
-        const opts = [`<option value="">${tr('Zufall')}</option>`]
-            .concat(loadCustomDecks().map(d => `<option value="${esc(d.id)}">★ ${esc(d.name)}</option>`))
-            .concat(GAME_DECKS.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`)).join('');
-        sp.innerHTML = opts; so.innerHTML = opts; sp.value = cur.p; so.value = cur.o;
-    };
-    const save = () => { try { localStorage.setItem(TM_KEY, JSON.stringify({ p: sp.value, o: so.value })); } catch (e) {} };
+    const fill = () => { const cur = testMatchDecks(); deckSlotButton(sp, pickDeck(cur.p)); deckSlotButton(so, pickDeck(cur.o)); };
+    const set = (k, d) => { const cur = testMatchDecks(); cur[k] = d ? d.id : ''; try { localStorage.setItem(TM_KEY, JSON.stringify(cur)); } catch (e) {} fill(); };
     window.addEventListener('load', fill);   // pickDeck steht erst in main.js (lädt danach)
-    // Eigene Decks können sich ändern: vor dem Aufklappen neu füllen
-    [sp, so].forEach(el => { el.addEventListener('mousedown', fill); el.addEventListener('focus', fill); el.addEventListener('change', save); });
-    document.getElementById('tm-play').onclick = () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); });
+    sp.onclick = () => openDeckOverview({ title: tr('Dein Deck'), random: true, current: testMatchDecks().p, pick: d => set('p', d) });
+    so.onclick = () => openDeckOverview({ title: tr('Gegner-Deck'), random: true, current: testMatchDecks().o, pick: d => set('o', d) });
+    document.getElementById('tm-play').onclick = () => confirmLeaveGame(() => { const tm = testMatchDecks(); document.getElementById("log-area").innerHTML = ""; initGame(tm.p || null, tm.o || null); });
     document.getElementById('tm-sim').onclick = () => {
         const tm = testMatchDecks();
         const a = pickDeck(tm.p), b = pickDeck(tm.o);
