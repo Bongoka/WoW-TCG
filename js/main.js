@@ -247,11 +247,19 @@ function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
     if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
     // Karte würde ein Limit verletzen (Unique, zweite Waffe, Totem, Form …): vorher nachfragen (CR 414.3)
-    if (action.type === 'PLAY_CARD' && !action.limitOk) {
-        const card = action.gyUid ? G.p1.graveyard.find(c => c.uid === action.gyUid) : G.p1.hand[action.handIdx];
+    // Ebenso, wenn sich eine eigene Karte dadurch selbst zerstört (Moonkin Form bei Innervate, Flight Form beim Angriff …)
+    if ((action.type === 'PLAY_CARD' || action.type === 'ATTACK') && !action.limitOk) {
+        const card = action.type === 'ATTACK' ? null : action.gyUid ? G.p1.graveyard.find(c => c.uid === action.gyUid) : G.p1.hand[action.handIdx];
         const v = card && limitWarning(card);
-        if (v) {
-            uiConfirm(tr`${card.name} spielen?`, tr`Achtung: ${v.label} – danach musst du eine dieser Karten zerstören: ${v.names}.`, tr('Trotzdem spielen'), () => humanAct({ ...action, limitOk: true }));
+        const lost = action.type === 'ATTACK'
+            ? (action.attackerUid === G.p1.hero.uid ? selfDestroyWarning([['attacks', { att: action.attackerUid, def: action.defenderUid, apid: 1, first: true }]]) : [])
+            : card ? selfDestroyWarning([['cardPlayed', { pid: 1, card }], ...(action.gyUid ? [] : [['handLeft', { pid: 1, uid: card.uid }]])]) : [];
+        if (v || lost.length) {
+            const lines = [];
+            if (v) lines.push(tr`Achtung: ${v.label} – danach musst du eine dieser Karten zerstören: ${v.names}.`);
+            if (lost.length) lines.push(tr`Achtung: Dadurch wird ${lost.join(', ')} zerstört.`);
+            const title = card ? tr`${card.name} spielen?` : tr('Angreifen?'), yes = card ? tr('Trotzdem spielen') : tr('Trotzdem angreifen');
+            uiConfirm(title, lines.join(' '), yes, () => humanAct({ ...action, limitOk: true }));
             return false;
         }
     }

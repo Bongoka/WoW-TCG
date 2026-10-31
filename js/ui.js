@@ -1458,8 +1458,20 @@ function limitWarning(card) {
     if (!v || !v.cards.some(x => x.uid === 'limit_probe')) return null;
     return { label: v.label, names: v.cards.map(x => x.name).join(', ') };
 }
+// Würde eine eigene Karte sich dadurch selbst zerstören (Formen, Mind Control, Shadowform, Tree of Life …)?
+// Die Ereignisse laufen in einer Kopie durch die Karteneffekte; gesammelt werden ausgelöste "destroy this"-Trigger.
+function selfDestroyWarning(events) {
+    const c = cloneState(G); c.real = false; c._batch = []; c.queue = []; c.waitTrig = [];
+    const mine = new Set((c.p1.ongoing || []).map(o => o.uid));
+    for (const [name, data] of events) { try { evt(c, name, data); } catch (e) {} }
+    const lost = [...c._batch, ...c.queue, ...c.waitTrig.flatMap(w => w.steps || [])].filter(x => x.op === 'trig' && x.k === 'destroyOngoing' && x.a && mine.has(x.a.uid));
+    return [...new Set(lost.map(x => (c.p1.ongoing.find(o => o.uid === x.a.uid) || {}).name))].filter(Boolean);
+}
+// Schlagen mit einer Waffe zerstört Bear Form / Cat Form (CR-Text der Form)
+function strikeFormRisk() { return (G.p1.ongoing || []).filter(o => (CARDS[o.id].bearForm || CARDS[o.id].catForm) && !o.attachedTo).map(o => o.name); }
 function boardChoice(d) {
     if (!d || d.kind !== 'choose' || d.destroy) return false;                             // Zerstören: immer mittig mit Warnung
+    if (d.k === 'E:strikeDo' && d.pid === 1 && strikeFormRisk().length) return false;     // Schlag würde eine Form zerstören: mittig mit Warnung
     let cards = 0;
     for (const o of d.opts) {
         if (o.card !== undefined) return false;
@@ -1563,6 +1575,9 @@ function renderChoiceModal(d) {
     title.textContent = d.protect ? tr('Angriff! Protector einsetzen?') : (d.src ? tr(d.src) : tr('Entscheidung'));
     prompt.textContent = d.prompt;
     fillContext(decisionContext(d));
+    if (d.k === 'E:strikeDo' && strikeFormRisk().length) {
+        const w = document.createElement("div"); w.className = "cm-warn"; w.textContent = tr`Achtung: Ein Waffenschlag zerstört ${strikeFormRisk().join(', ')}.`; prompt.appendChild(w);
+    }
     // Karte zerstören (Unique, zweite Waffe, Totem …): rote Warnung, erst auswählen, dann bestätigen
     if (d.destroy) {
         const w = document.createElement("div"); w.className = "cm-warn"; w.textContent = tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'); prompt.appendChild(w);
