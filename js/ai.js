@@ -10,7 +10,7 @@ function evaluateState(s, pid) {
     if (myHp <= 0) return -100000;
     if (oppHp <= 0) return 100000;
     let score = 0;
-    score += myHp * 1.0 - oppHp * 1.6;
+    score += myHp * AI_HP_W.me - oppHp * AI_HP_W.opp;
     if (myHp <= 6) score -= (7 - myHp) * 14; else if (myHp <= 12) score -= (13 - myHp) * 3;
     if (oppHp <= 6) score += (7 - oppHp) * 16; else if (oppHp <= 12) score += (13 - oppHp) * 3;
     const allyVal = (a, mine) => {
@@ -48,15 +48,24 @@ function evaluateState(s, pid) {
     // Ein bereiter Held ist etwas wert (Kräfte mit Erschöpfen, Angriff später im Zug) – ein Angriff ohne Schaden lohnt sich so nicht
     if (!me.hero.exhausted) score += 1.5;
     me.hero.weapons.forEach(w => { score += 3 + weaponAtk(s, w, {}) * 1.5; if (!w.exhausted) score += 2; });
-    me.hero.armors.forEach(a => { score += 2 + defOf(s, a) * 1.2; if (!a.exhausted) score += 0.5; });
+    // Rüstungen und Gegenstände mit eigener Wirkung (Schaden verstärken, Karten ziehen, Kräfte …) sind mehr wert als ihr DEF –
+    // sonst spielt die KI z. B. Chromatic Cloak (0 DEF, +1 Fähigkeitsschaden) nie aus
+    me.hero.armors.forEach(a => { score += 2 + defOf(s, a) * 1.2 + aiFxWorth(a, 0.9); if (!a.exhausted) score += 0.5; });
     opp.hero.weapons.forEach(w => { score -= 3.5 + weaponAtk(s, w, {}) * 1.8; });
-    opp.hero.armors.forEach(a => { score -= 2 + defOf(s, a) * 1.2; });
-    // Laufende Fähigkeiten zählen für ihren Controller
-    (me.ongoing || []).forEach(o => score += 2.5 + (o.cost || 0) * 0.6);
-    (opp.ongoing || []).forEach(o => score -= 2.5 + (o.cost || 0) * 0.6);
+    opp.hero.armors.forEach(a => { score -= 2 + defOf(s, a) * 1.2 + aiFxWorth(a, 0.9); });
+    // Laufende Fähigkeiten zählen für ihren Controller (mit eigener Wirkung etwas mehr)
+    (me.ongoing || []).forEach(o => score += 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
+    (opp.ongoing || []).forEach(o => score -= 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     return score;
 }
 
+// Zusatzwert einer Karte im Spiel, die eine eigene Wirkung hat (Dauereffekt, Auslöser, Kraft): je Kostenpunkt (bis 6)
+function aiFxWorth(c, perCost) {
+    // Kartentext = eigene Wirkung (auch die direkt in engine.js umgesetzten, z. B. Chromatic Cloak)
+    return ((CARDS[c.id] || {}).text || '').trim() ? Math.min(c.cost || 0, 6) * perCost : 0;
+}
+// Leben linear (je Punkt); bei wenig Leben kommen oben die starken Zuschläge dazu
+const AI_HP_W = { me: 1.0, opp: 1.6 };
 const AI_FLIP_VALUE = 4;
 const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).some(pw => pw.flip));
 // Mana für den Zug des Gegners zurückhalten: Instants, die gerade dann wirken (unterbrechen, Schaden verhindern,
