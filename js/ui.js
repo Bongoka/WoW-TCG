@@ -131,6 +131,9 @@ function renderResourceTray(player, containerId, isHuman) {
         box.ondragleave = () => box.classList.remove('dropzone-active');
         box.ondrop = (e) => {
             e.preventDefault(); box.classList.remove('dropzone-active');
+            // Die vergrößerte Ablage liegt teils über Karten: ein gültiges Ziel unter dem Zeiger hat Vorrang
+            const under = document.elementsFromPoint(e.clientX, e.clientY).map(x => x.closest && x.closest('[data-uid].target-drop-valid')).find(Boolean);
+            if (under) { dropOn(under.dataset.uid); return; }
             const d = UI.drag; UI.drag = null;
             if (d && d.kind === 'hand') humanAct({ type: 'PLACE_RESOURCE', handIdx: d.idx, faceUp: d.card.type === 'Quest' });
         };
@@ -1302,10 +1305,10 @@ function dropOn(uid) {
 function markDropTargets() {
     const d = UI.drag; if (!d) return;
     if (d.kind === 'hand') {
-        if (!handPlayable(d.card)) return;
-        if (d.card.type === 'Quest') { if (!G.placedResource) document.getElementById("bot-resource-tray").classList.add("dropzone-active"); return; }
+        // Ressource legen geht mit jeder Karte – auch mit einer, die man gerade nicht bezahlen kann
+        if (!G.placedResource && canMain()) { document.getElementById("bot-resource-tray").classList.add("dropzone-active"); document.body.classList.add("res-drag"); }
+        if (!handPlayable(d.card) || d.card.type === 'Quest') return;
         document.getElementById("bot-allies").classList.add("dropzone-active");
-        if (!G.placedResource && canMain()) document.getElementById("bot-resource-tray").classList.add("dropzone-active");
     }
     document.querySelectorAll("#arena [data-uid]").forEach(el => { if (dropAllowedOn(el.dataset.uid)) el.classList.add("target-drop-valid"); });
 }
@@ -1380,6 +1383,7 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
 })();
 function clearDragHighlights() {
     stopDragAim();
+    document.body.classList.remove("res-drag");
     document.querySelectorAll(".dropzone-active").forEach(el => el.classList.remove("dropzone-active"));
     document.querySelectorAll(".target-drop-valid").forEach(el => el.classList.remove("target-drop-valid"));
 }

@@ -79,7 +79,7 @@ function openDBHeroPicker(byClass) {
     const pk = document.getElementById('db-hero-picker'), grid = document.getElementById('db-hp-grid'); grid.innerHTML = '';
     const cls = byClass ? DBF.cls : null;
     const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && (!cls || c.class === cls))
-        .sort((a, b) => a.class.localeCompare(b.class) || (a.set || 1) - (b.set || 1) || a.name.localeCompare(b.name));
+        .sort((a, b) => (a.class || '').localeCompare(b.class || '') || (a.set || 1) - (b.set || 1) || a.name.localeCompare(b.name));
     document.getElementById('db-hp-title').textContent = tr`Held wählen · ${heroes.length} Helden${cls ? ' · ' + (DB_CLASS_DE[cls] || cls) : ''}`;
     const tools = document.getElementById('db-hp-tools'); tools.innerHTML = '';
     if (DBF.cls) { const b = document.createElement('button'); b.textContent = cls ? tr('Alle Klassen zeigen') : tr`Nur ${DB_CLASS_DE[DBF.cls]}`; b.onclick = () => openDBHeroPicker(!cls); tools.appendChild(b); }
@@ -452,6 +452,7 @@ const BOOSTER_SETS = [
     { set: 3, name: 'Fires of Outland', imgs: ['booster/booster 4.jpg', 'booster/booster 5.jpg'] },
     { set: 6, name: 'March of the Legion', imgs: ['booster/march1.jpg', 'booster/march 2.jpg'] },
     { set: 7, name: 'Servants of the Betrayer', imgs: ['booster/betrayer 1.jpg', 'booster/betrayer 2.jpg'] },
+    { set: 8, name: 'The Hunt for Illidan', imgs: ['booster/illidan 1.jpg', 'booster/illidan 2.jpg'] },
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)

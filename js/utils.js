@@ -1,6 +1,11 @@
+// JS-Fehler sichtbar melden, ohne die Bedienung zu blockieren: Banner lässt Klicks durch, schließbar, blendet nach 12 s aus
 window.onerror = function(msg, url, line) {
     const b = document.getElementById("error-banner");
-    if (b) { b.style.display = "block"; b.textContent = `JS-Fehler (Z.${line}): ${msg}`; }
+    if (b) {
+        b.style.display = "block"; b.textContent = `JS-Fehler (Z.${line}): ${msg}`;
+        const x = document.createElement("button"); x.textContent = "✕"; x.title = "OK"; x.onclick = () => { b.style.display = "none"; }; b.appendChild(x);
+        clearTimeout(b._hide); b._hide = setTimeout(() => { b.style.display = "none"; }, 12000);
+    }
     console.error("Game Error:", msg, "at:", line);
 };
 

@@ -1,5 +1,5 @@
 // ============================================================================
-// KARTENDATEN – The Hunt for Illidan (Set 8, Karten-IDs 6001â6252)
+// KARTENDATEN – The Hunt for Illidan (Set 8, Karten-IDs 6001–6252)
 // Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
 // Das Verhalten jeder Karte steht in js/cardfx8.js (FX[id]).
 // ============================================================================

@@ -1628,7 +1628,7 @@ var I18N_EN = {
     'Neue Allies müssen eine Runde warten, bevor sie angreifen. Mehr geht in diesem Zug nicht – beende deinen Zug.': 'New allies have to wait a turn before they can attack. There\'s nothing more to do this turn – end your turn.',
     'Neuer Zug: Deine Karten sind wieder bereit, und du hast eine Karte gezogen. Keine Quest auf der Hand? Jede Karte kann eine Ressource sein – sie wird verdeckt abgelegt. Ziehe Valanos auf deine Ressourcen.': 'New turn: your cards are ready again and you drew a card. No quest in hand? Any card can be a resource – it\'s placed face down. Drag Valanos onto your resources.',
     'Jetzt hast du 2 Mana. Fähigkeiten wirken sofort und kommen danach in den Friedhof. Ziehe Fire Blast auf den gegnerischen Helden.': 'Now you have 2 mana. Abilities take effect immediately and then go to the graveyard. Drag Fire Blast onto the opposing hero.',
-    'Cerwyn ist jetzt bereit. Ziehe ihn auf den gegnerischen Helden, um anzugreifen – die Zahl unten links ist sein Schaden.': 'Cerwyn is ready now. Drag him onto the opposing hero to attack – the number at the bottom left is his damage.',
+    'Cerwyn ist jetzt bereit. Ziehe ihn auf den gegnerischen Helden, um anzugreifen – die Zahl unten links ist sein Angriffswert (ATK).': 'Cerwyn is ready now. Drag him onto the opposing hero to attack – the number at the bottom left is his attack value (ATK).',
     'Dein Held': 'Your Hero',
     'Held des Gegners': 'Enemy Hero',
     'Ausgelöste Effekte': 'Triggered effects',
@@ -1737,6 +1737,7 @@ var I18N_EN = {
     'Neutrale Fähigkeiten zeigen': 'Show neutral abilities',
     // Set illidan (Hunt for Illidan)
     'Kartenwirkung noch nicht umgesetzt.': 'Card effect not implemented yet.',
+    'Zurück zum Hauptmenü': 'Back to main menu',
     'Sextuple Wield: mit bis zu sechs Nahkampfwaffen im selben Kampf zuschlagen ist noch nicht umgesetzt.': 'Sextuple Wield: striking with up to six Melee weapons in the same combat is not implemented yet.',
     'Spieler mit Untargetable (Ziel-Spieler-Effekte) sind noch nicht umgesetzt.': 'Players with Untargetable (target player effects) are not implemented yet.',
     'Ziehen von unten nach Wahl ist noch nicht umgesetzt.': 'Optionally drawing from the bottom is not implemented yet.',

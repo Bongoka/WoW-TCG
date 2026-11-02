@@ -24,11 +24,11 @@ function openLearnMenu() {
                 <span class="learn-thumb"><img src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="" loading="eager" referrerpolicy="no-referrer" onerror="this.remove()"><span class="learn-play"></span></span>
                 <b>${esc(v.title)}</b><small>YouTube · ${v.len}</small></a>`).join('')}</div>
         <button id="learn-tut" class="success">${esc(tr('Tutorial-Match starten (ca. 2 Min.)'))}</button>
-        <button id="learn-close">${esc(tr('Zurück – neues Spiel'))}</button>
+        <button id="learn-close">${esc(tr('Zurück zum Hauptmenü'))}</button>
     </div>`;
     m.style.display = 'flex';
     document.getElementById('learn-tut').onclick = () => { m.style.display = 'none'; startTutorial(); };
-    document.getElementById('learn-close').onclick = () => { m.style.display = 'none'; initGame(); };
+    document.getElementById('learn-close').onclick = () => { m.style.display = 'none'; openMainMenu(); };
 }
 
 // ---------------------------------------------------------------- Tutorial-Schritte
@@ -59,7 +59,7 @@ const TUT_STEPS = [
       allow: a => a.type === 'PLAY_CARD' && G.p1.hand[a.handIdx] && G.p1.hand[a.handIdx].id === TUT_CARDS.ability && (!a.firstTarget || a.firstTarget === G.p2.hero.uid),
       choose: a => a.v === G.p2.hero.uid || typeof a.v !== 'string',
       done: () => tutLeft() === 1 && !G.chain.length && isIdle(G) },
-    { text: () => tr('Cerwyn ist jetzt bereit. Ziehe ihn auf den gegnerischen Helden, um anzugreifen – die Zahl unten links ist sein Schaden.'),
+    { text: () => tr('Cerwyn ist jetzt bereit. Ziehe ihn auf den gegnerischen Helden, um anzugreifen – die Zahl unten links ist sein Angriffswert (ATK).'),
       spots: () => [tutCard(TUT.u.ally), tutOppHero()], arrow: () => [tutCard(TUT.u.ally), tutOppHero()], hand: true,
       allow: a => a.type === 'ATTACK' && a.attackerUid === TUT.u.ally && a.defenderUid === G.p2.hero.uid,
       done: () => G.gameOver },
