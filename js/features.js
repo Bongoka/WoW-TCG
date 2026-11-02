@@ -30,7 +30,7 @@ const dbClassOk = (c, cls) => !c.allowedClasses || !c.allowedClasses.length || c
 function loadCustomDecks() { try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch (e) { return []; } }
 function saveCustomDecks(list) { try { localStorage.setItem(DB_KEY, JSON.stringify(list)); return true; } catch (e) { alert(tr('Speichern fehlgeschlagen: ') + e.message); return false; } }
 const dbHero = () => CARDS[currentDeckBuilder.heroId];
-const dbLegal = (card, hero = dbHero()) => !!hero && cardMatchesPlayer(card, hero) && (!card.talentReq || card.talentReq === hero.talent);
+const dbLegal = (card, hero = dbHero()) => !!hero && cardMatchesPlayer(card, hero) && talentReqOk(card, hero);
 const dbMax = card => card.unlimited ? Infinity : 4;
 const dbCount = id => currentDeckBuilder.cards.filter(x => x === id).length;
 
@@ -346,7 +346,7 @@ function dbExportText() {
 }
 // Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
 const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
+const DB_SET_CODES = { illidan: 8, 'hunt for illidan': 8, 'the hunt for illidan': 8, thfi: 8, betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held

@@ -97,7 +97,7 @@ function polymorphed(s, c) {
     }
     return false;
 }
-function active(s, c) { if (!c) return true; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
+function active(s, c) { if (!c) return true; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
 // Metalmorph (Set 7): "Attached equipment loses and can't have powers and can't exhaust"
 function metalmorphed(s, c) { return (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') && attachedTo(s, c.uid, 5064).length > 0; }
 function cantExhaust(s, c) { return metalmorphed(s, c); }
@@ -124,7 +124,7 @@ function auraSrcs(s) {
     if (!AURA_IDS) AURA_IDS = new Set(Object.keys(FX).filter(id => FX[id] && FX[id].aura).map(Number));
     const out = [];
     for (const p of [s.p1, s.p2]) {
-        if (AURA_IDS.has(p.hero.id) && !p.hero.flipped) out.push({ c: p.hero, pid: p.id });
+        if (AURA_IDS.has(p.hero.id) && (!p.hero.flipped || FX[p.hero.id].backAura)) out.push({ c: p.hero, pid: p.id });
         for (const c of p.allies) if (AURA_IDS.has(c.id) && active(s, c)) out.push({ c, pid: p.id });
         for (const c of p.hero.weapons) if (AURA_IDS.has(c.id)) out.push({ c, pid: p.id });
         for (const c of p.hero.armors) if (AURA_IDS.has(c.id)) out.push({ c, pid: p.id });
@@ -154,7 +154,9 @@ function pushTrig(s, pid, srcId, steps, srcUid = null) {
 
 // Temporäre Modifikatoren "this turn" / "this combat"
 function addTM(c, m) { c.tm = c.tm || []; c.tm.push(m); }
-function tms(s, c, k) { return (c && c.tm || []).filter(m => m.k === k && (m.turn === undefined || m.turn === s.turn) && (m.combat === undefined || (s.battle && s.battle.id === m.combat))); }
+// cond: Bedingung aus TM_COND (z. B. "while attacking", "while you control a Pet") – gilt nur, solange sie erfüllt ist
+const TM_COND = { attacking: (s, c) => !!s.battle && s.battle.att === c.uid };
+function tms(s, c, k) { return (c && c.tm || []).filter(m => m.k === k && (m.turn === undefined || m.turn === s.turn) && (m.combat === undefined || (s.battle && s.battle.id === m.combat)) && (!m.cond || (TM_COND[m.cond] && TM_COND[m.cond](s, c, m)))); }
 function hasTM(s, c, k) { return tms(s, c, k).length > 0; }
 function addPE(s, pid, m) { s.pe = s.pe || []; s.pe.push({ pid, turn: s.turn, ...m }); }   // Spieler-Effekte "this turn"
 function pes(s, pid, k) { return (s.pe || []).filter(m => m.k === k && (pid === null || m.pid === pid) && (m.turn === s.turn || m.until === 'game' || (m.untilTurn && s.turn <= m.untilTurn))); }
@@ -366,6 +368,7 @@ function cantStrike(s, pid) {
     if (pes(s, pid, 'fangLock').length) return true;
     const o = getOpponent(s, pid);
     if (s.activePlayer === o.id && alliesOf(o).some(a => a.id === 186 && active(s, a))) return true; // Grint Sundershot
+    if (alliesOf(o).some(a => a.id === 6141 && active(s, a))) return true;                // Talian Bladebender (Set illidan): "Opponents can't strike with weapons."
     return false;
 }
 function cantDraw(s, pid) {
@@ -426,6 +429,7 @@ function heal(s, healerUid, tgtUid, amt) {
 // "Put" damage (nicht "deal"): nie mehr als tödlicher Schaden (CR 405.3)
 function putDamage(s, c, n) { if (c && n > 0) { const d = c.damage || 0; c.damage = Math.min(d + n, Math.max(d, hpOf(s, c))); } }
 function drawCard(s, p, isSim) { return drawCards(s, p, 1); }
+const DRAW_REPLACE = [];   // (s, p) => true: dieses Ziehen wird ersetzt (die Funktion erledigt Log und Zähler)
 function drawCards(s, p, n) {
     let got = 0;
     if (p.allies.some(a => a.id === 4245 && active(s, a))) n *= 2;                           // Voren'thal the Seer (Set 6): "If you would draw a card, draw two instead."
@@ -434,6 +438,7 @@ function drawCards(s, p, n) {
         if (cantDraw(s, p.id)) { L(s, tr`${p.hero.name} kann in diesem Zug keine Karten ziehen.`, '', p.id); return got; }
         const skip = pes(s, p.id, 'skipDraw').find(m => !m.used);                          // Touch of Ice (Set 6): "skips drawing that card"
         if (skip) { skip.used = true; L(s, tr`${p.hero.name} überspringt das Ziehen einer Karte.`, '', p.id); continue; }
+        if (DRAW_REPLACE.some(f => f(s, p))) continue;                                        // Ersatz: "skips drawing that card instead" (Brain Lock, Set illidan)
         // Freezing Band (Set 6): "Each opponent can't draw more than one card per turn."
         if ((p.drawn || {}).turn === s.turn && p.drawn.n >= 1 && getOpponent(s, p.id).hero.armors.some(x => x.id === 4271)) return got;
         if ((p.ongoing || []).some(o => o.id === 124) && p.fk) {                         // Forbidden Knowledge
@@ -715,7 +720,7 @@ function stateBased(s) {
     for (const p of [s.p1, s.p2]) {
         // Gift of Nature (Set 7): "Allies you control can't be destroyed by fatal damage" (zerstört am Zugende, siehe FX[5040])
         const gon = unattachedOngoing(p, 5040).length > 0;
-        const dead = gon ? [] : p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a));
+        const dead = gon ? [] : p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a) && !(FX[a.id] && FX[a.id].noFatal && active(s, a)));   // Zorus (Set illidan)
         for (const a of dead) { L(s, tr`💀 ${a.name}`, "log-hit", p.id); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
@@ -963,6 +968,8 @@ function strikeCost(s, p, w) {
 // ---------------------------------------------------------------- Karten spielen
 function cardMatchesPlayer(card, player) {
     if (!card || !player) return false;
+    const hero0 = player.hero || player;
+    if (typeof HERO_DECK_RULES !== 'undefined' && hero0 && HERO_DECK_RULES[hero0.id]) return HERO_DECK_RULES[hero0.id](card, hero0);   // Dämonen-Helden (Set illidan): eigene Deckbau-Regel
     const fac = player.faction || (player.hero && player.hero.faction);
     const klass = player.className || player.class || (player.hero && player.hero.class);
     if (card.allowedFactions && card.allowedFactions.length && !card.allowedFactions.includes(fac)) return false;
@@ -970,15 +977,19 @@ function cardMatchesPlayer(card, player) {
     if (!heroReqOk(player.hero || player, card)) return false;                            // "<Race>/<Faction> Hero Required" (Deckbau)
     return true;
 }
-function talentOk(p, card) { return !card.talentReq || p.hero.talent === card.talentReq; }
+function talentOk(p, card) { return talentReqOk(card, p.hero); }
+// "<Talent> Hero Required"; Obliveron (Set illidan) darf "any Traitor cards" spielen
+function talentReqOk(card, hero) { return !card.talentReq || card.talentReq === hero.talent || (card.talentReq === 'Traitor' && !!hero.traitorCards); }
 // "<Race> Hero Required" / "<Faction> Hero Required" (Set 2/3)
 function heroReqOk(hero, card) {
     if (!card || !hero) return true;
     if (card.raceReq && hero.race !== card.raceReq) return false;
     if (card.factionReq && hero.faction !== card.factionReq) return false;
+    if (card.loyalReq && hero.talent === 'Traitor') return false;                       // "Loyal Hero Required" (Set illidan): kein Traitor-Held
     return true;
 }
 function isInstantFor(s, p, card) {
+    if (alliesOf(getOpponent(s, p.id)).some(a => a.id === 6200 && active(s, a)) && p.hand.includes(card)) return false;   // Edward the Odd (Set illidan): Karten in gegnerischen Händen verlieren "instant"
     if (card.instant) return true;
     if (countCtrl(s, p.id, 324) > 0 && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(card.type)) return true; // Hand of Edward
     if (card.type === 'Weapon' && pes(s, p.id, 'weaponsInstant').length) return true;    // Victoria Jaton
@@ -1071,6 +1082,7 @@ function validateAction(s, a, pid) {
             if (s.placedResource || (s.resPlaced || 0) >= resAllowance(s)) return tr('Du hast in diesem Zug schon eine Ressource gelegt');
             const c = p.hand[a.handIdx]; if (!c) return tr('Karte nicht auf der Hand');
             if (a.faceUp && c.type !== 'Quest') return tr('Nur Quests werden offen gelegt');
+            if (a.faceUp && questFaceUpBlocked(s, pid)) return tr('Gegner verbietet offene Quests');          // Kam'pah (Set illidan)
             return null;
         }
         case 'COMPLETE_QUEST': {
@@ -1331,7 +1343,7 @@ function resolveTop(s) {
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
         p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
-        evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp });                                                   // Shard of the Flame
+        evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp, uid: it.res.uid, id: it.res.id });                                                   // Shard of the Flame
         return;
     }
     if (it.kind === 'trigger') {
@@ -1402,6 +1414,7 @@ EK.placeAbility = (s, a) => {
     const it = a.it; const p = getPlayer(s, it.pl); const c = it.card;
     if (it.dest === 'removed') { leaveChain(s, it, 'removed'); return; }
     if (it.dest === 'deckOf') { const tp = getPlayer(s, it.deckOf); tp.deck.push(c.id); L(s, tr`${c.name} kommt oben auf das Deck von ${tp.hero.name}.`, '', it.pl); return; }   // Paper Airplane (Set 6)
+    if (it.dest === 'resource') { resetInst(c); p.resources.push({ card: c, faceUp: false, exhausted: false }); L(s, tr`${c.name} kommt verdeckt und bereit in die Ressourcenreihe.`, '', it.pl); return; }   // Vigor (Set illidan)
     if (it.dest === 'play') {
         c.exhausted = false; c.damage = 0; c.joinedTurn = s.turn;
         if (c.totem) {
@@ -1570,6 +1583,9 @@ const FX_GRANT = {
 
 // ---------------------------------------------------------------- Ziele
 // spec: {side:'any'|'friendly'|'enemy', hero, ally, char, exhausted, damaged, pet, undead, ability, equipment, armor, weapon, gy, ...}
+// "count as being exhausted" (Shadowstep, Set illidan): weitere Bedingungen in EXH_ALSO
+const EXH_ALSO = [];
+function isExhausted(s, c) { return !!c && (!!c.exhausted || EXH_ALSO.some(f => f(s, c))); }
 function targetCands(s, pid, spec) {
     const me = getPlayer(s, pid), op = getOpponent(s, pid);
     const sides = spec.side === 'friendly' ? [me] : spec.side === 'enemy' ? [op] : [me, op];
@@ -1585,7 +1601,7 @@ function targetCands(s, pid, spec) {
     if (spec.ability && spec.chain) out = (s.chain || []).filter(it => it.kind === 'card' && it.card.type === 'Ability').map(it => it.card);
     const res = out.filter(c => {
         if (untargetableBy(s, c, pid)) return false;
-        if (spec.exhausted && !c.exhausted) return false;
+        if (spec.exhausted && !isExhausted(s, c)) return false;
         if (spec.damaged && !(c.damage > 0)) return false;
         if (spec.pet && !c.isPet) return false;
         if (spec.undead && c.race !== 'Undead') return false;
@@ -1607,7 +1623,9 @@ function targetLabel(s, uid, pid) {
 
 // ---------------------------------------------------------------- Schaden
 // dealDamage: Schritt einreihen. o = {src, tgt, amt, dt, combat, ability, weapon, unprev, after:{k,a}}
+const DMG_PRE = [];   // (s, o) => void: Schaden vor dem Einreihen umschreiben (Dirty Work, Set illidan: "non-combat damage … combat damage instead")
 function dealDamage(s, o) {
+    for (const f of DMG_PRE) f(s, o);
     // Schaden "mit einer Fähigkeit": die gerade auflösende Fähigkeit merken (Moonkin Form, Arcane Power, Anathema …)
     const rc = o.ability && s.resolvingCard ? s.resolvingCard : null;
     q(s, { op: 'dmg', abilityId: rc ? rc.id : undefined, abilityUid: rc ? rc.uid : undefined, ...o });
@@ -1656,7 +1674,7 @@ function dmgStep(s, o) {
     let unprev = !!o.unprev;
     if (heroSrc && countCtrl(s, sp, 297) > 0) unprev = true;                              // Lionheart Helm
     if (src && hasTM(s, src, 'unprevOut')) unprev = true;                                 // Dousing the Flames of Protection (Set 6)
-    if (o.weapon && o.combat) { const w = findCharacter(s, o.weapon); if (w && w.id === 312) unprev = true; } // Annihilator
+    if (o.weapon && o.combat) { const w = findCharacter(s, o.weapon); if (w && (w.id === 312 || w.id === 6226)) unprev = true; } // Annihilator, Hammer of the Naaru (Set illidan)
     if (!unprev && auraAny(s, 'unprev', src, t, o)) unprev = true;                         // Surprise Attacks, Kelvor Valorshine … (Set 2/3)
     if (!unprev && amt > 0) {
         const all = () => { amt = 0; };
@@ -1698,7 +1716,7 @@ function dmgShields(s, c) {
                     opts: usable.map(x => ({ label: shieldLabel(s, x), v: x.sid, ai: x.reflect ? 1 : 0 })), k: 'E:shieldPick', a: { c }, keep: true });
                 return;
             }
-            const pv = Math.min(m.v, c.amt); m.v -= pv; c.amt -= pv;
+            const pv = m.whole ? c.amt : Math.min(m.v, c.amt); m.v = m.whole ? 0 : m.v - pv; c.amt -= pv;   // whole: "the next time … would be dealt damage, prevent it" (Joren, Set illidan)
             if (m.reflect && pv > 0) c.reflect += pv;
         }
         t.tm = (t.tm || []).filter(m => !(m.k === 'shield' && m.v <= 0));
@@ -2013,6 +2031,8 @@ function checkQuestCondition(s, p, r) {
     if (getReadyRes(p) < cost) return tr`Braucht (${cost})`;
     return null;
 }
+// Kam'pah (Set illidan): "Opponents can't place quests face up."
+function questFaceUpBlocked(s, pid) { return alliesOf(getOpponent(s, pid)).some(a => a.id === 6159 && active(s, a)); }
 function blockedQuests(s, pid) { return !!auraAny(s, 'noQuest', pid); }   // Greefer: "Opponents can't complete quests."
 function startQuest(s, p, resIdx) {
     const r = p.resources[resIdx]; const f = FX[r.card.id] || {};
@@ -2066,6 +2086,8 @@ function attackTargets(s, att) {
     let list = partyOf(o).filter(d => !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked'));
     // Gamon: "Any hero or ally can attack this ally. (Including characters you control.)"
     getPlayer(s, pid).allies.forEach(d => { if (d.id === 1209 && active(s, d) && d !== att && !hasElusive(s, d)) list.push(d); });
+    // Dashel Stonefist (Set illidan): "This ally can attack friendly heroes and allies (including other characters you control)."
+    if (FX[att.id] && FX[att.id].attackFriendly && active(s, att)) partyOf(getPlayer(s, pid)).forEach(d => { if (d !== att && !list.includes(d) && !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked')) list.push(d); });
     // Set 2/3: einzelne Angriffssperren (Wing Clip, Mind Soothe, Grace of Air ohne Bezahlung ist erlaubt → atkTax)
     list = list.filter(d => !(tms(s, att, 'cantAttackUid').some(m => m.uid === d.uid)) && !auraAny(s, 'atkBlock', att, d));
     // Mocking Blow: kann nur den Helden des Wirkers angreifen
@@ -2087,12 +2109,17 @@ function attackTargets(s, att) {
 }
 // Sabotage (CR 601.2b, Glossar "Sabotage"): Ally mit "Sabotage: [thing]" darf auch ein nicht befreundetes [thing] angreifen
 // Verdeckte Ressourcen bleiben verdeckt
-function sabotageLabel(s, c) { const l = locate(s, c.uid); return l && l.zone === 'resource' && !l.res.faceUp ? tr('verdeckte Ressource') : c.name; }
+function sabotageLabel(s, c) { if (c.type === 'Hero' && s.battle && s.battle.sabotage && sabotageKind(s, findCharacter(s, s.battle.att) || {}) === 'Player') return tr`Spieler ${c.name}`; const l = locate(s, c.uid); return l && l.zone === 'resource' && !l.res.faceUp ? tr('verdeckte Ressource') : c.name; }
 // (Set 6: Ability, Attachment, Resource, Quest, Weapon, Armor, Equipment). Ergebnis: Karten (Ressourcen: deren Karte).
+// Sabotage-Art eines Charakters: aufgedruckt (FX.sabotage) oder verliehen (SABOTAGE_GRANT, Seer's Signet)
+const SABOTAGE_GRANT = [];
+function sabotageKind(s, att) { const f = FX[att.id]; if (f && f.sabotage && active(s, att)) return f.sabotage; for (const g of SABOTAGE_GRANT) { const k = g(s, att); if (k) return k; } return null; }
 function sabotageTargets(s, att) {
-    const f = FX[att.id]; if (!f || !f.sabotage || !active(s, att)) return [];
+    const kind = sabotageKind(s, att); if (!kind) return [];
     const o = getOpponent(s, ctrlOf(s, att)); const h = o.hero;
-    switch (f.sabotage) {
+    switch (kind) {
+        case 'Player': return [h];                                                         // Set illidan: der Spieler (vertreten durch seinen Helden)
+        case 'AbilityOrEquipment': return [...(o.ongoing || []), ...h.weapons, ...h.armors];   // Seer's Signet
         case 'Ability': return [...(o.ongoing || [])];
         case 'Attachment': return (o.ongoing || []).filter(c => c.attachedTo);
         case 'Resource': return o.resources.map(r => r.card);
@@ -2196,11 +2223,13 @@ function battleStep(s, step) {
 function protectorsFor(s) {
     const b = s.battle; const att = findCharacter(s, b.att), def = findCharacter(s, b.def);
     const dp = getPlayer(s, b.dpid);
-    if (hasStealth(s, att)) return [];                                                     // 602.2a Stealth
+    const stealthAtt = hasStealth(s, att);                                                 // 602.2a Stealth (Thief Catcher Norun, Set illidan: "can also protect against attackers with Stealth")
     if (alliesOf(getPlayer(s, b.apid)).some(a => a.id === 187 && active(s, a))) return [];// Hannah the Unstoppable
     if (auraAny(s, 'noProtect', att)) return [];                                           // Set 2/3
+    if (pes(s, b.apid, 'noProtectOpp').length) return [];                                 // Retainer Kai (Set illidan): "opposing heroes and allies can't protect this turn"
     return partyOf(dp).filter(c => {
         if (c.exhausted) return false;
+        if (stealthAtt && !(FX[c.id] && FX[c.id].protectStealth && active(s, c))) return false;
         if (c.uid === def.uid && !(c.id === 2148 && active(s, c) && hasProtector(s, c))) return false; // Ubel Sternbrow: "can protect himself"
         if (hasTM(s, c, 'cantProtect') || kwHas(s, c, 'cantProtect')) return false;
         if (!active(s, c)) return false;
@@ -2385,7 +2414,7 @@ function turnStep(s, step) {
             if (isAllyLike(c) && earthbind) continue;
             if (c.id === 126 && active(s, c)) { helwens.push(c.uid); continue; }          // Helwen: darf nicht readien
             if (auraAny(s, 'noReady', c)) continue;                                       // Set 2/3: Hamstring, Ivus, Borlis Brode …
-            c.exhausted = false;
+            c.exhausted = false; evt(s, 'readied', { uid: c.uid });                         // "When this … readies" gilt auch im Ready-Step
         }
         p.resources.forEach(r => r.exhausted = false);
         helwens.forEach(u => q(s, { op: 'call', k: 'E:helwenReady', a: { uid: u } }));
@@ -2515,7 +2544,7 @@ function targetCombos(s, pid, slots, distinct) {
         if (cands.length < mn) return null;
         // Nach KI-Wert sortieren und begrenzen
         cands.sort((a, b) => (sl.ai ? sl.ai(b, s) : aiTargetValue(s, pid, b, sl.harm)) - (sl.ai ? sl.ai(a, s) : aiTargetValue(s, pid, a, sl.harm)));
-        const top = cands.slice(0, mx > 1 ? 4 : 6);
+        const top = cands.slice(0, mx > 1 ? Math.max(4, mn) : 6);                       // Pflichtanzahl (X Ziele, The More, the Scarier) immer erreichbar
         const choices = [];
         if (mx <= 0) choices.push([]);                                                     // "Destroy X target armor" mit X = 0
         else if (mx === 1) { top.forEach(u => choices.push([u])); if (mn === 0) choices.push([]); }
@@ -2526,6 +2555,7 @@ function targetCombos(s, pid, slots, distinct) {
             choices.push(top.slice(0, Math.max(mn, 1)));
             if (top.length > n) choices.push([...top.slice(1, n + 1)]);
         }
+        for (let i = choices.length - 1; i >= 0; i--) if (choices[i].length < mn) choices.splice(i, 1);
         const next = [];
         for (const cmb of combos) for (const ch of choices) {
             if (distinct && ch.some(u => cmb.flat().includes(u))) continue;
@@ -2573,7 +2603,7 @@ function getLegalActions(s, pid) {
     if (!s.placedResource) {
         const seen = new Set();
         p.hand.forEach((c, i) => {
-            const vs = c.type === 'Quest' ? [true, false] : [false];
+            const vs = c.type === 'Quest' && !questFaceUpBlocked(s, pid) ? [true, false] : [false];
             vs.forEach(fu => { const k = c.id + '|' + fu; if (seen.has(k)) return; seen.add(k); acts.push({ type: 'PLACE_RESOURCE', handIdx: i, faceUp: fu, actorId: pid, desc: c.type === 'Quest' ? `Quest ${c.name} ${fu ? tr('offen') : tr('verdeckt')}` : tr`Ressource: ${c.name}` }); });
         });
     }
@@ -2710,9 +2740,23 @@ const INSPIRE_KINDS = {
     Protector: (p) => [p.hero, ...p.allies].filter(c => c.exhausted && (c.protector || (CARDS[c.id] || {}).protector)).map(c => c.uid),   // Vindicator Agran (Set 7)
     AnyOne: (p) => [...INSPIRE_KINDS.Ability(p), ...INSPIRE_KINDS.Ally(p), ...INSPIRE_KINDS.Equipment(p), ...INSPIRE_KINDS.Hero(p), ...INSPIRE_KINDS.Resource(p)],   // Anchorite Onkoth: "… or …"
 };
+// Set illidan: Inspire auf Karten eines Namens ("name:<Name>", Anchorite Kilandra) und "Inspire: All …" (alle auf einmal)
+const INSPIRE_EXTRA = [];
+const INSPIRE_ALL = {
+    AllProtector: (s, p) => [p.hero, ...p.allies].filter(c => c.exhausted && hasProtector(s, c)).map(c => c.uid),
+    AllActivate: (s, p) => [p.hero, ...p.allies].filter(c => c.exhausted && hasActivatePower(s, c)).map(c => c.uid),
+};
+function inspireCands(s, p, k) {
+    if (INSPIRE_KINDS[k]) return INSPIRE_KINDS[k](p);
+    if (INSPIRE_ALL[k]) return INSPIRE_ALL[k](s, p);
+    if (k.startsWith('name:')) return [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...p.ongoing].filter(c => c.exhausted && c.name === k.slice(5)).map(c => c.uid);
+    return [];
+}
+function hasActivatePower(s, c) { return getPowers(s, c).some(pw => pw.act); }
 function inspirePowers(s, p) {
     const out = [];
-    for (const c of [p.hero, ...p.allies]) { const f = FX[c.id]; if (f && f.inspire && active(s, c)) [].concat(f.inspire).forEach(k => out.push({ k, src: c.uid })); }
+    for (const c of [p.hero, ...p.allies]) { const f = FX[c.id]; if (f && f.inspire && active(s, c)) [].concat(typeof f.inspire === 'function' ? f.inspire(s, c) : f.inspire).filter(Boolean).forEach(k => out.push({ k, src: c.uid })); }
+    for (const g of INSPIRE_EXTRA) out.push(...(g(s, p) || []));                       // verliehene Inspire-Kräfte (Lightwarden's Band, Set illidan)
     return out;
 }
 EK.inspire = (s, a) => {
@@ -2721,8 +2765,9 @@ EK.inspire = (s, a) => {
     if (!todo.length) return;
     const pw = todo.shift();
     const next = () => { if (todo.length) q(s, { op: 'call', k: 'E:inspire', a: { pid: a.pid, done: a.done, todo } }); };
-    const cands = INSPIRE_KINDS[pw.k](p).filter(u => !a.done.includes(u) && !auraAny(s, 'noReady', findCharacter(s, u) || {}));
+    const cands = inspireCands(s, p, pw.k).filter(u => !a.done.includes(u) && !auraAny(s, 'noReady', findCharacter(s, u) || {}));
     if (!cands.length) { next(); return; }
+    if (INSPIRE_ALL[pw.k]) { cands.forEach(u => { readyCard(s, findCharacter(s, u)); evt(s, 'inspired', { uid: u, src: pw.src, pid: a.pid }); }); L(s, tr`Inspire: ${nameOf(s, pw.src)} macht ${cands.length} Karte(n) bereit.`, '', a.pid); a.done = [...a.done, ...cands]; next(); return; }   // "Inspire: All …" (Set illidan)
     const same = todo.filter(x => x.k === pw.k).length + 1;
     if (cands.length <= same || !isHuman(s, a.pid)) {
         const pick = isHuman(s, a.pid) ? cands[0] : cands.sort((x, y) => ((findCharacter(s, y) || {}).cost || 0) - ((findCharacter(s, x) || {}).cost || 0))[0];
@@ -2737,6 +2782,7 @@ EK.inspireDo = (s, a, v) => {
         const l = locate(s, v);
         if (l && l.zone === 'resource') { l.res.exhausted = false; if (a.kind === 'Quest' && FX[(findCharacter(s, a.src) || {}).id] && FX[findCharacter(s, a.src).id].inspireQuestLess) addPE(s, a.pid, { k: 'questLess', v: 1, quest: v }); }
         else if (l) readyCard(s, l.c);
+        evt(s, 'inspired', { uid: v, src: a.src, pid: a.pid });                         // Instructor Giralo, Vindicator Javlo (Set illidan)
         L(s, tr`Inspire: ${inspireName(s, v)} wird bereit.`, '', a.pid);
     }
     if (a.todo && a.todo.length) q(s, { op: 'call', k: 'E:inspire', a: { pid: a.pid, done: [...a.done, v].filter(Boolean), todo: a.todo } });

@@ -96,7 +96,7 @@ function analyzeCardStats(cardStats, minEach = 8) {
 function legalCardsFor(heroId) {
     const hero = CARDS[heroId];
     const p = { hero, faction: hero.faction, className: hero.class };
-    return Object.values(CARDS).filter(c => c.type !== 'Hero' && !c.isToken && cardMatchesPlayer(c, p) && (!c.talentReq || c.talentReq === hero.talent)).map(c => c.id);
+    return Object.values(CARDS).filter(c => c.type !== 'Hero' && !c.isToken && cardMatchesPlayer(c, p) && talentReqOk(c, hero)).map(c => c.id);
 }
 // Zufallsdeck aus allen legalen Karten eines Helden (60 Karten, max. 4 Kopien, Unlimited ohne Grenze)
 function randomLegalDeck(heroId, size = 60) {

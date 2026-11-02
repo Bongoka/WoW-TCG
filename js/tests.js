@@ -929,9 +929,11 @@ function runRuleTests() {
         assert(h.damage === hp, `Put damage: ${h.damage} statt ${hp}`);
     });
     test(107, 'Deck-Builder Auto-Fill: bis 60, legal, entfernt nichts, Quests zuletzt, keine groben Schwächen', () => {
-        const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken);
+        const heroes = Object.values(CARDS).filter(c => c.type === 'Hero' && !c.isToken && !CARD_ISSUES[c.id]);
         for (const h of heroes) {
-            const start = [Object.values(CARDS).find(c => c.type === 'Ability' && (c.allowedClasses || []).includes(h.class) && coachLegal(c, h)).id];
+            const first = Object.values(CARDS).find(c => c.type === 'Ability' && (c.allowedClasses || []).includes(h.class) && coachLegal(c, h))
+                || Object.values(CARDS).find(c => c.type !== 'Quest' && coachLegal(c, h));   // Helden ohne Klasse (Set illidan)
+            const start = [first.id];
             const r = autoFillDeck(h.id, start), deck = [...start, ...r.add], cs = deck.map(id => CARDS[id]);
             const cnt = {}; deck.forEach(id => cnt[id] = (cnt[id] || 0) + 1);
             assert(deck.length === 60, `${h.name}: ${deck.length} Karten`);
@@ -1074,7 +1076,7 @@ function runRuleTests() {
 const ctHeroes = () => Object.values(CARDS).filter(c => c.type === 'Hero');
 const ctVanilla = cost => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.cost === cost);
 const ctPlain = type => Object.values(CARDS).find(c => c.type === type && !c.text && !c.isToken && !c.unique);
-const ctHeroFor = c => ctHeroes().find(h => (c.type === 'Hero' ? h.id === c.id : cardMatchesPlayer(c, { hero: h, faction: h.faction, className: h.class }) && (!c.talentReq || c.talentReq === h.talent)));
+const ctHeroFor = c => ctHeroes().find(h => (c.type === 'Hero' ? h.id === c.id : cardMatchesPlayer(c, { hero: h, faction: h.faction, className: h.class }) && talentReqOk(c, h)));
 function runCardTests(ids) {
     const out = [];
     const all = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id] && (!ids || ids.includes(c.id)));   // bekannte Abweichungen: bewusst nicht getestet
@@ -1185,6 +1187,15 @@ function runCardTests(ids) {
         }]),
         // Set 6: Karten gegen bestimmte Typen (Exorcism, Banish …)
         ['Gegner hat Dämon, Untoten und Elementar', s => { for (const t of ['Demon', 'Undead', 'Elemental']) { const d = Object.values(CARDS).find(c => c.type === 'Ally' && !c.unique && !c.isToken && (c.allyTypes || []).includes(t)); if (d) { const x = makeCardInst(d.id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); } } return true; }],
+        // Set illidan: offene gegnerische Quest und erschöpfte Ausrüstung (Knock Out, Disassemble)
+        ['Gegner hat offene Quest und erschöpfte Ausrüstung', s => { const qc = Object.values(CARDS).find(c => c.type === 'Quest' && !c.isToken && !(FX[c.id] || {}).questCond);
+            s.p2.resources.push({ card: makeCardInst(qc.id, false, 2), faceUp: true, exhausted: false });
+            const w = Object.values(CARDS).find(c => c.type === 'Weapon' && !c.isToken && !c.unique); const wi = makeCardInst(w.id, false, 2); wi.exhausted = true; s.p2.hero.weapons.push(wi); return true; }],
+        // Set illidan: Belohnung einer gegnerischen Quest auf der Kette (Astral Grief)
+        ['Gegner schließt eine Quest ab', s => { oppTurn(s); s.p2.resources.forEach(r => { r.exhausted = false; });
+            const qc = Object.values(CARDS).find(c => c.type === 'Quest' && !c.isToken && !FX[c.id].questCond && !FX[c.id].questExtra && !FX[c.id].questNoPay && (c.questCost || 0) <= 2);
+            s.p2.resources.push({ card: makeCardInst(qc.id, false, 2), faceUp: true, exhausted: false });
+            const a = getLegalActions(s, 2).find(x => x.type === 'COMPLETE_QUEST'); return !!a && applyAction(s, a, true, 2); }],
         // Set 7: Kosten sinken je Fähigkeit im Friedhof (Enlightenment)
         ['Viele Fähigkeiten im Friedhof', s => { const ab = Object.values(CARDS).find(c => c.type === 'Ability' && !c.text.includes('Ongoing') && !c.isToken); for (let i = 0; i < 30; i++) s.p1.graveyard.push(makeCardInst(ab.id, false, 1)); return true; }],
     ];
@@ -1351,7 +1362,7 @@ function runCardTextTests() {
         const cost = n ? +n : 3;
         const t = noun === 'ally' ? put(s, 2, ctVanilla(Math.min(6, Math.max(1, cost))).id, { exhausted: adj === 'exhausted ', damage: adj === 'damaged ' ? 1 : 0 })
             : noun === 'ability' ? put(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem).id)
-            : put(s, 2, ctPlain(noun === 'armor' ? 'Armor' : 'Weapon').id);
+            : put(s, 2, ctPlain(noun === 'armor' ? 'Armor' : 'Weapon').id, { exhausted: adj === 'exhausted ' });   // Disassemble (Set illidan): erschöpfte Ausrüstung
         // Gegenprobe: falsches Ziel (nicht erschöpft / unverletzt / Kosten außerhalb) ist nicht wählbar
         if (adj || n) { const w = put(s, 2, ctVanilla(n ? (ml === 'more' ? +n - 1 : +n + 1) : 3).id); s.p1.hand.unshift(makeCardInst(c.id, false, 1));
             const bad = getLegalActions(s, 1).some(a => a.type === 'PLAY_CARD' && a.handIdx === 0 && tgt(w.uid)(a)); s.p1.hand.shift(); if (bad) return 'unpassendes Ziel wählbar: ' + w.name; }

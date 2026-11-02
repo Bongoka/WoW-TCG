@@ -33,6 +33,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `cardfx2.js`, `cardfx3.js` | Verhalten von Set 2 / Set 3; Dauereffekte über `FX[id].aura` (siehe `auraSrcs` in engine.js), alternative Kosten über `FX[id].alt` |
 | `cardfx4.js`, `cardfx5.js` | Verhalten des Raid-Loots (Onyxia / Molten Core); Kräfte von der Hand über `fromHand: true` |
 | `cards7.js`, `cardfx7.js` | Set 7 *Servants of the Betrayer* (IDs 5001–5264 = 5000 + Kartennummer): Daten und Verhalten |
+| `cards8.js`, `cardfx8.js` | Set *Hunt for Illidan* (IDs 6001–6252 = 6000 + Kartennummer, Tokens 9701+): Daten und Verhalten; Dämonen-Helden mit eigener Deckbau-Regel (`HERO_DECK_RULES`), nicht umsetzbare Karten in `CARD_ISSUES` |
 | `cardfx6.js` | Verhalten von March of the Legion |
 | `tourneydecks.js` | Turnier-Decklisten 2006/2007 als Text, werden einmalig über den Importer in „Deine Decks“ übernommen |
 | `ai.js` | CPU: `evaluateState`, `searchBestAction` (echtes Spiel), `fastAiAction` (Simulation) |
@@ -84,7 +85,7 @@ const fs = require('fs'), vm = require('vm');
 const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','ai','simcore','coach','tests'])
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','ai','simcore','coach','tests'])
   vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));

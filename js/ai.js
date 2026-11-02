@@ -80,7 +80,7 @@ function aiHoldValue(s, p) {
 function handCardValue(s, p, c) {
     if (!c) return 0;
     if (c.type === 'Quest') return 2.5;
-    if (!cardMatchesPlayer(c, p) || (c.talentReq && c.talentReq !== p.hero.talent)) return 0.5;
+    if (!cardMatchesPlayer(c, p) || !talentReqOk(c, p.hero)) return 0.5;
     const R = p.resources.length, cost = c.xCost ? 4 : (c.cost || 0);
     let v = 2.6 + Math.min(cost, 8) * 0.18;
     if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4);        // noch lange nicht spielbar
@@ -105,7 +105,7 @@ function wantResource(s, p) {
 // früh sind sehr teure Karten (7–8 bei 2–3 Ressourcen) nutzlos, spät (ab 5 Ressourcen) billige Karten.
 function resourceKeepValue(s, p, c) {
     if (!c) return 0;
-    if (!cardMatchesPlayer(c, p) || (c.talentReq && c.talentReq !== p.hero.talent)) return -10;   // unspielbar: zuerst weg
+    if (!cardMatchesPlayer(c, p) || !talentReqOk(c, p.hero)) return -10;   // unspielbar: zuerst weg
     const R = p.resources.length + 1, cost = c.xCost ? 4 : (c.cost || 0);
     let v = 5 + cost * 0.3 + (c.type === 'Ally' ? 0.8 : 0);
     if (cost > R + 2) v -= (cost - R - 2) * 1.5;                         // zu teuer für die nächsten Züge

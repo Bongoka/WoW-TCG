@@ -8,7 +8,7 @@ const COACH_MIN = 60;
 
 // Text ohne Erinnerungstexte in Klammern (z. B. „(Has Protector. Destroy this card when you strike with a weapon …)“)
 const coachTxt = c => (c.text || '').replace(/\([^)]*\)/g, ' ');
-const coachLegal = (card, hero) => !!card && !!hero && card.type !== 'Hero' && !card.isToken && cardMatchesPlayer(card, hero) && (!card.talentReq || card.talentReq === hero.talent);
+const coachLegal = (card, hero) => !!card && !!hero && card.type !== 'Hero' && !card.isToken && cardMatchesPlayer(card, hero) && talentReqOk(card, hero);
 const coachByName = name => Object.values(CARDS).find(c => c.name === name && !c.isToken);
 const coachNames = list => [...new Set(list.map(c => c.name))];
 const coachList = (list, max = 3) => { const n = coachNames(list); return n.slice(0, max).join(', ') + (n.length > max ? ' …' : ''); };
