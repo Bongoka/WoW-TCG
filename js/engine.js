@@ -1548,7 +1548,7 @@ EK.prepItemPower = (s) => {
         if (pw.act) exhaust(s, src);
         if (pw.exhaustHero) exhaust(s, p.hero);
         if (pw.once === 'turn') { src.usedTurn = src.usedTurn || {}; src.usedTurn[pw.key] = s.turn; }
-        if (pw.flip) { src.flipped = true; L(s, tr`🔄 ${src.name} wird umgedreht.`); }
+        if (pw.flip) { src.flipped = true; L(s, tr`🔄 ${src.name} wird umgedreht.`); fxEvent(s, { t: 'flip', uid: src.uid, back: true }); }
         if (pw.payExtra) { pw.payExtra(s, it, src); return; }   // weitere Kosten (z.B. Ally zerstören) – ruft danach E:finishPrep
         if (pw.selfCost) pw.selfCost(s, it, src);
     }

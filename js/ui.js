@@ -747,6 +747,26 @@ function deathAnim(e, r, delay) {
     ], { duration: 1300, delay, easing: 'ease-in-out', fill: 'both' }).finished.then(() => ghost.remove());
     burstParticles(r, ['#57534e', '#a8a29e', '#292524'], 16, delay + 450, true);
 }
+// Held wird umgedreht (Flip): fliegt groß in die Mitte, dreht sich dort von der alten auf die neue Seite, bleibt kurz
+// stehen und fliegt zurück – so sieht man, welcher Held gerade seine Kraft benutzt hat
+function heroFlipAnim(node, r, e) {
+    const c = findCharacter(G, e.uid); if (!c) return;
+    const face = back => { const d = createCardDOM(c, true, null, { imageMode: back ? 'back' : 'ea' }); d.style.cssText += ';position:absolute;inset:0;width:100%;height:100%;margin:0;backface-visibility:hidden;'; return d; };
+    const box = document.createElement('div');
+    box.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:99000;pointer-events:none;perspective:1200px;`;
+    const card = document.createElement('div'); card.style.cssText = 'position:absolute;inset:0;transform-style:preserve-3d;';
+    const from = face(!e.back), to = face(e.back); to.style.transform = 'rotateY(180deg)';
+    card.append(from, to); box.appendChild(card); document.body.appendChild(box);
+    node.style.visibility = 'hidden'; UI.flipHide = e.uid;
+    const sc = Math.min(2.6, (innerHeight * 0.5) / r.height);
+    const dx = innerWidth / 2 - (r.left + r.width / 2), dy = innerHeight / 2 - (r.top + r.height / 2);
+    const mid = `translate(${dx}px, ${dy}px) scale(${sc})`;
+    box.animate([{ transform: 'none' }, { transform: mid, offset: 0.22 }, { transform: mid, offset: 0.78 }, { transform: 'none' }],
+        { duration: 2400, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' });
+    card.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: 0.26 }, { transform: 'rotateY(180deg)', offset: 0.48 }, { transform: 'rotateY(180deg)' }],
+        { duration: 2400, easing: 'ease-in-out', fill: 'both' }).finished.then(() => { box.remove(); UI.flipHide = null; document.querySelectorAll(`#arena [data-uid="${e.uid}"]`).forEach(n => { n.style.visibility = ''; }); });
+    if (typeof sfx !== 'undefined') sfx.play('play');
+}
 function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
     G.fxq = [];
@@ -772,6 +792,8 @@ function playFxEvents(prevRects) {
             floatNumber(r, `+${e.amt}`, '#4ade80', HEAL_STYLE.icon, delay);
         } else if (e.t === 'leave' && (e.dest === 'graveyard' || e.dest === 'removed' || e.dest === 'token') && !node) {
             deathAnim(e, r, delay + 350);
+        } else if (e.t === 'flip' && node) {
+            heroFlipAnim(node, r, e);
         }
     }
 }
@@ -904,6 +926,7 @@ function renderHeroCard(p, containerId) {
     box.classList.add('hero-with-hp');
     const h = createCardDOM(p.hero, true, null, { imageMode: p.hero.flipped ? 'back' : 'ea' });
     decorateInPlay(h, p.hero);
+    if (UI.flipHide === p.hero.uid) h.style.visibility = 'hidden';                     // fliegt gerade als Flip-Animation
     box.appendChild(h);
     box.appendChild(heroHpBar(p));
 }

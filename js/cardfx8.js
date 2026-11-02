@@ -427,7 +427,7 @@ FX[6148] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { i
 FX[6149] = { on: { dmg: (s, c, d) => { const t = findCharacter(s, d.tgt); if (d.combat && d.src === c.uid && t && t.type === 'Hero' && d.amt > 0) trig(s, { id: 6149, k: 'kill', a: { pid: d.tpid } }); } },
     k: { kill: (s, a) => { const h = heroOf(s, a.pid); if (!isIndestructible(s, h)) lose(s, a.pid, 'Chief Apothecary Hildagard'); } } };
 FX[6150] = enterMay(6150, tr('Dawn Ravensdale: Verdeckten Helden aufdecken?'), (s, pid) => targetCands(s, pid, { hero: true, filter: c => !!c.flipped }), '6150:do');
-FX[6150].k.do = (s, a, v) => { const h = v && findCharacter(s, v); if (h) { h.flipped = false; L(s, tr`${h.name} wird wieder aufgedeckt.`); } };
+FX[6150].k.do = (s, a, v) => { const h = v && findCharacter(s, v); if (h) { h.flipped = false; fxEvent(s, { t: 'flip', uid: h.uid, back: false }); L(s, tr`${h.name} wird wieder aufgedeckt.`); } };
 FX[6151] = { aura: { kw: (s, src, sp, c, k) => k === 'spellshield' && c.type === 'Weapon' && ctrlOf(s, c) === sp } };
 FX[6152] = { on: { allyEnters: (s, c, d, pid) => { const x = findCharacter(s, d.uid); if (d.pid === pid && x && isAllyLike(x) && x.atkType === 'Ranged') trig(s, { id: 6152, k: 'ask', a: { pid, uid: x.uid } }); } },
     k: { ask: (s, a) => { if (findCharacter(s, a.uid)) mayPick(s, a.pid, tr`${nameOf(s, a.uid)}: 1 Fernkampfschaden an Ziel?`, 'Elder Huntsman Swiftshot', targetCands(s, a.pid, { char: true }), '6152:do', a); },
