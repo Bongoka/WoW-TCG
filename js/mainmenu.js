@@ -154,7 +154,7 @@ document.getElementById('btn-main-menu').onclick = () => openMainMenu();
 
 // ---------------------------------------------------------------- Musik: beim Spielstart die ersten 35 s, ein- und ausgeblendet
 // Browser erlauben Ton erst nach einer Bedienung – ist er blockiert, startet die Musik mit dem ersten Klick bzw. Tastendruck.
-const MM_MUSIC = { el: null, started: false, len: 35, vol: .45 };
+const MM_MUSIC = { el: null, started: false, len: 35, vol: .45, fadeIn: .6 };
 function mmMusicStart() {
     if (MM_MUSIC.started || (typeof sfx !== 'undefined' && sfx.muted)) return;
     const a = MM_MUSIC.el || (MM_MUSIC.el = Object.assign(new Audio('music/menu.mp3'), { preload: 'auto' }));
@@ -167,7 +167,7 @@ function mmMusicStart() {
         const iv = setInterval(() => {
             const t = (performance.now() - t0) / 1000;
             if (a.paused || t >= MM_MUSIC.len || (typeof sfx !== 'undefined' && sfx.muted)) { a.pause(); clearInterval(iv); return; }
-            a.volume = MM_MUSIC.vol * Math.max(0, Math.min(1, t / 2.5, (MM_MUSIC.len - t) / 4));   // 2,5 s ein-, 4 s ausblenden
+            a.volume = MM_MUSIC.vol * Math.max(0, Math.min(1, t / MM_MUSIC.fadeIn, (MM_MUSIC.len - t) / 4));   // kurz ein-, 4 s ausblenden
         }, 50);
     }).catch(() => {});
 }
