@@ -302,7 +302,7 @@ function dbHoverHide() { document.getElementById('db-hover').style.display = 'no
 function dbSave() {
     const hero = dbHero();
     if (!hero) { dbFlash(tr('Wähle zuerst rechts oben einen Helden.')); document.getElementById('db-hero-slot').animate([{ boxShadow: '0 0 0 0 #facc15' }, { boxShadow: '0 0 0 3px #facc15' }, { boxShadow: '0 0 0 0 #facc15' }], { duration: 900 }); return null; }
-    const name = (currentDeckBuilder.name || '').trim() || `${hero.class} – ${hero.name}`;
+    const name = (currentDeckBuilder.name || '').trim() || `${hero.class || hero.faction} – ${hero.name}`;
     const list = loadCustomDecks();
     const deck = { id: currentDeckBuilder.id || 'custom_' + Date.now(), hero: hero.id, faction: hero.faction, class: hero.class, name, cards: [...currentDeckBuilder.cards] };
     const i = list.findIndex(d => d.id === deck.id);
@@ -425,8 +425,10 @@ function dbIoReport(items) { document.getElementById('db-io-report').innerHTML =
 document.getElementById('db-io-ok').onclick = () => {
     const r = dbParseList(document.getElementById('db-io-text').value, currentDeckBuilder.heroId);
     if (!r.cards.length) { dbIoReport([{ bad: true, msg: tr('Keine Karten erkannt.') }, ...r.report]); return; }
+    // Import = neues Deck: ohne neue Id überschrieb "Speichern" das zuvor geöffnete Deck
+    currentDeckBuilder.id = null;
     currentDeckBuilder.heroId = r.heroId; currentDeckBuilder.cards = r.cards;
-    if (r.name) { currentDeckBuilder.name = r.name; document.getElementById('db-name').value = r.name; }
+    currentDeckBuilder.name = r.name || ''; document.getElementById('db-name').value = currentDeckBuilder.name;
     if (CARDS[r.heroId]) DBF.cls = CARDS[r.heroId].class;
     document.getElementById('db-io-modal').style.display = 'none';
     renderDBAll();
