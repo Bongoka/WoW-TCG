@@ -1,4 +1,4 @@
-// Turnier-Decklisten 2006–2007 (Platz 1 und 2), Quelle: wow.tcgbrowser.com (Darkmoon Faire / World Championship)
+// Turnier-Decklisten 2006–2009 (DMF Platz 1 und 2, World Championships Top 8), Quelle: wow.tcgbrowser.com und Nutzer
 // Format wie der Import im Deck Builder (dbParseList); werden beim ersten Start in "Deine Decks" importiert.
 const TOURNEY_DECKS = [
 `#1 Michael Dalton, World Championship San Diego, USA 2007
@@ -439,4 +439,176 @@ const TOURNEY_DECKS = [
 3 The Missing Diplomat
 4 Timeslicer
 3 Warp Splinter's Thorn`,
+`#1 Dusty Hostutler, World Championship Austin, USA 2009
+Hero: Emek the Equalizer
+2 A Taste of Divinity
+2 Call to Arms: Arathi Basin
+3 Creeping Shadow
+4 Dark Archon Farrum
+4 Dethvir the Malignant
+3 Disperse Magic
+2 Dryad's Wrist Bindings
+4 Nathaniel Voran
+4 Power Word: Courage
+1 Proving Grounds
+4 Rise and Be Recognized
+4 Searing Light
+4 Shadow Word: Anguish
+4 Sivandra Darklust
+2 Skumm Bag'go
+3 Splinter Mind
+4 The Last Barov
+3 Undercity
+3 United Front`,
+`#2 William Postlethwait, World Championship Austin, USA 2009
+Hero: Spellweaver Jihan
+4 Blizzard
+3 Heartburn
+2 Mana Ruby
+4 The Taste of Arcana
+3 Elder Achillia
+4 Mikael the Blunt
+2 Battle Mage's Baton
+4 A Question of Gluttony
+3 Darkness Calling
+3 Spell Suppression
+2 Spell Ricochet
+3 Arcanite Dragonling
+4 Brittilize
+4 Everlasting Cold
+3 Adam Eternum
+3 Dryad's Wrist Bindings
+2 Call to Arms: Arathi Basin
+3 Rise and Be Recognized
+4 Call to Arms: Eye of the Storm`,
+`#3 Phillip Martin, World Championship Austin, USA 2009
+Hero: Pidge Filthfinder
+4 Victimize
+4 Mikael the Blunt
+2 Pappy Ironbane
+4 Cuffs of Devastation
+3 Talisman of the Alliance
+4 A Question of Gluttony
+3 Drain Will
+4 Magnus Longbarrel
+3 Weldon Barov
+3 Woodsie Leafsong
+2 Outland Sucks!
+2 Dominate
+2 Hesriana
+4 Adam Eternum
+4 Dimzer the Prestidigitator
+4 Gromble the Apt
+4 Rise and Be Recognized
+4 Call to Arms: Eye of the Storm`,
+`#4 Luke Chen, World Championship Austin, USA 2009
+Hero: Velindra Sepulchre
+4 Blizzard
+2 Heartburn
+3 Mana Ruby
+3 The Taste of Arcana
+4 A Question of Gluttony
+3 Spell Suppression
+1 Spell Ricochet
+4 Johnny Rotten
+3 The Last Barov
+4 Brittilize
+4 Everlasting Cold
+4 Dark Archon Farrum
+4 Dethvir the Malignant
+3 Nathaniel Voran
+4 Sivandra Darklust
+3 Wub's Cursed Hexblade
+3 Call to Arms: Arathi Basin
+4 Call to Arms: Eye of the Storm`,
+`#5 Matt Markoff, World Championship Austin, USA 2009
+Hero: Loraala the Frigid
+4 Blizzard
+4 Heartburn
+4 Mana Ruby
+4 The Taste of Arcana
+4 Elder Achillia
+4 Mikael the Blunt
+4 A Question of Gluttony
+4 Spell Suppression
+3 Gladiator Loraala
+4 Outland Sucks!
+4 Brittilize
+4 Everlasting Cold
+3 Nether Fissure
+4 Adam Eternum
+2 Call to Arms: Arathi Basin
+4 Call to Arms: Eye of the Storm`,
+`#6 Remi Lacorre, World Championship Austin, USA 2009
+Hero: Velindra Sepulchre
+3 Mana Ruby
+4 The Taste of Arcana
+2 Nea Sunmark
+3 Battle Mage's Baton
+4 A Question of Gluttony
+3 Goblin Rocket Launcher
+4 Darkness Calling
+4 Conjured Cinnamon Roll
+4 Mystic Denial
+4 Spell Suppression
+2 Gladiator's Regalia
+4 Outland Sucks!
+3 Auchindoun Spirit Towers
+4 Ice Barbs
+4 Roaring Blaze
+4 Dethvir the Malignant
+4 Sivandra Darklust`,
+`#7 Tim Batow, World Championship Austin, USA 2009
+Hero: Velindra Sepulchre
+4 Mana Ruby
+4 Meltdown
+1 Cuffs of Devastation
+4 A Question of Gluttony
+3 Mystic Denial
+4 Spell Suppression
+2 Doomsayer Din'ju
+4 Johnny Rotten
+1 Blue Suede Shoes
+3 Gladiator's Regalia
+3 Arcanite Dragonling
+4 Brittilize
+4 Everlasting Cold
+4 Zalan Ragewind
+1 Wand of Prismatic Focus
+2 Wub's Cursed Hexblade
+4 Call to Arms: Arathi Basin
+4 Rise and Be Recognized
+4 Undercity`,
+`#8 Anssi Alkio, World Championship Austin, USA 2009
+Hero: Loraala the Frigid
+4 Blizzard
+3 Heartburn
+4 Mana Ruby
+4 The Taste of Arcana
+3 Elder Achillia
+4 Mikael the Blunt
+2 Ossus the Ancient
+4 A Question of Gluttony
+2 A Rare Bean
+4 Brittilize
+4 Everlasting Cold
+4 Adam Eternum
+3 "Bladehands" Spigotgulp
+4 Gromble the Apt
+2 Wub's Cursed Hexblade
+3 Call to Arms: Arathi Basin
+2 Concerted Efforts
+4 Call to Arms: Eye of the Storm`,
 ];
+
+// World Championships als Ordner in der Deck-Übersicht (features.js): Decks gehören über ihre Kopfzeile
+// ("…, World Championship <Stadt>, <Land> <Jahr>") zum Ordner. country: Kürzel für die Flagge (WORLDS_FLAGS).
+const WORLDS = [
+    { year: 2007, city: 'San Diego', country: 'USA' },
+    { year: 2009, city: 'Austin', country: 'USA' },
+];
+// Helden der Listen, deren Set im Spiel noch fehlt: Fraktion und Klasse für die (gesperrte) Deck-Box
+const TOURNEY_HEROES = {
+    'Emek the Equalizer': ['Horde', 'Priest'], 'Spellweaver Jihan': ['Alliance', 'Mage'], 'Pidge Filthfinder': ['Alliance', 'Warlock'],
+    'Velindra Sepulchre': ['Horde', 'Mage'], 'Loraala the Frigid': ['Alliance', 'Mage'],
+};

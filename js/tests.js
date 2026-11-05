@@ -1061,6 +1061,22 @@ function runRuleTests() {
         s = fresh(); const ar = put(s, 1, Object.values(CARDS).find(c => c.type === 'Armor' && !c.unique).id); put(s, 2, 5064, { attachedTo: ar.uid });
         exhaust(s, ar); assert(!ar.exhausted && !active(s, ar), 'Metalmorph: Rüstung erschöpft oder hat Kräfte');
     });
+    test(114, 'Angriffsvorschlag (CR 601.1/601.3): der Mensch bekommt immer ein Fenster, wenn er den Angriff verhindern kann', () => {
+        // Großer Angreifer überlebt Frostbolt: "später im Kampf" schien der Bewertung besser – trotzdem muss der Mensch gefragt werden
+        const van = c => Object.values(CARDS).find(x => x.type === 'Ally' && !x.isToken && !x.text && x.cost === c && x.faction !== 'Alliance');
+        const big = Object.values(CARDS).find(x => x.type === 'Ally' && !x.isToken && !x.text && x.hp >= 5 && x.atk >= 4 && x.faction === 'Horde');
+        const f = Array(40).fill(van(2).id), s = newGameState(4003, f, 15, f);
+        Object.assign(s, { real: false, humans: [1], turn: 6, activePlayer: 2, phase: 'main', placedResource: true, lastTurnOf: { 1: 5, 2: 6 } });
+        for (const p of [s.p1, s.p2]) for (let i = 0; i < 5; i++) p.resources.push({ card: makeCardInst(f[0], false, p.id), faceUp: false, exhausted: false });
+        const mine = makeCardInst(van(3).id, false, 1), att = makeCardInst(big.id, false, 2); mine.joinedTurn = att.joinedTurn = 1;
+        s.p1.allies.push(mine); s.p2.allies.push(att); s.p1.hand = [makeCardInst(56, false, 1)];
+        applyAction(s, getLegalActions(s, 2).find(x => x.type === 'ATTACK' && x.attackerUid === att.uid && x.defenderUid === mine.uid), true, 2); process(s);
+        assert(s.pending && s.pending.pid === 1 && s.chain.some(i => i.kind === 'proposal'), 'kein Fenster beim Angriffsvorschlag');
+        const fb = getPriorityActions(s, 1).find(x => (x.targets || []).flat().includes(att.uid)); assert(fb, 'Frostbolt auf den Angreifer nicht wählbar');
+        applyAction(s, fb, true, 1); process(s);
+        for (let i = 0; i < 10 && s.pending; i++) { applyAction(s, { type: 'PASS' }, true, s.pending.pid); process(s); }
+        assert(!(mine.damage > 0) && s.p1.allies.includes(mine) && !att.exhausted, 'Angriff trotz "can\'t attack" ausgeführt');
+    });
     LANG = prevLang;
     return results;
 }

@@ -704,6 +704,28 @@ document.getElementById("booster-close-btn").onclick = (e) => { e.stopPropagatio
 // --- TURNIER-DECKS: einmalig über den Importer in "Deine Decks" übernehmen (danach frei bearbeit-/löschbar) ---
 // Gemerkt wird die Nummer jeder übernommenen Liste – neue Listen kommen dazu, gelöschte Decks bleiben gelöscht.
 const TOURNEY_KEY = 'wow_tcg_tourney_imported';
+// Kartennamen einer Liste, die es (noch) nicht als Karte gibt – Held inklusive
+let TOURNEY_NAMES = null;
+function tourneyMissing(text) {
+    if (!TOURNEY_NAMES) { TOURNEY_NAMES = new Set(); Object.values(CARDS).forEach(c => { if (!c.isToken) TOURNEY_NAMES.add(dbNorm(c.name)); }); }
+    const out = [];
+    text.split('\n').forEach(l => {
+        l = l.trim(); if (!l || l.startsWith('#') || l.startsWith('//')) return;
+        const h = l.match(/^(?:hero|held)\s*:?\s*(.+)$/i), m = l.match(/^(\d+)\s*[x×*]?\s*(.+)$/i), name = (h ? h[1] : m ? m[2] : l).trim();
+        if (!TOURNEY_NAMES.has(dbNorm(name))) out.push(name);
+    });
+    return out;
+}
+// Kopfzeile "#1 Spieler, Turnier": Platz, Spieler, Turnier, Held und der Ordner in der Deck-Übersicht
+// (World Championship → Eintrag aus WORLDS, Darkmoon Faire → 'dmf')
+function tourneyMeta(i) {
+    const text = TOURNEY_DECKS[i] || '', head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+    const hl = text.match(/^(?:hero|held)\s*:?\s*(.+)$/im);
+    const w = head && head[3].match(/World Championship\s+(.+?),\s*(.+?)\s+(\d{4})/);
+    const worlds = w && typeof WORLDS !== 'undefined' ? WORLDS.find(e => e.year === +w[3]) : null;
+    return { text, place: head ? +head[1] : 99, player: head ? head[2].trim() : '', event: head ? head[3].trim() : '', hero: hl ? hl[1].trim() : '',
+        folder: worlds ? 'worlds' + worlds.year : head && /^DMF/.test(head[3]) ? 'dmf' : 'other', worlds };
+}
 function importTourneyDecks() {
     if (typeof TOURNEY_DECKS === 'undefined') return;
     let done = [];
@@ -725,8 +747,9 @@ function importTourneyDecks() {
             if (d && rev < REV && hero && d.hero === hero.id && r.cards.length > d.cards.length && d.cards.every(c => r.cards.includes(c))) d.cards = r.cards;
             return;
         }
-        done.push(i + 1);
+        // Listen, deren Held es im Spiel noch nicht gibt (Worlds 2009), werden übernommen, sobald er da ist
         if (!hero || !r.cards.length) return;
+        done.push(i + 1);
         const name = head ? tr`Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
         if (list.some(d => d.name === name)) return;
         list.push({ id, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards });
@@ -761,6 +784,12 @@ function deckBoxHTML(deck, size = '') {                                      // 
         + `</div><div class="dbox-shadow"></div></div>`;
 }
 const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');
+// Kleine Landesflagge (SVG) für die Worlds-Ordner; unbekannte Länder ohne Flagge
+const WORLDS_FLAGS = {
+    USA: '<rect width="19" height="10" fill="#b22234"/><path d="M0 1.154h19M0 2.692h19M0 4.231h19M0 5.769h19M0 7.308h19M0 8.846h19" stroke="#fff" stroke-width=".77"/>'
+        + '<rect width="7.6" height="5.385" fill="#3c3b6e"/><g fill="#fff">' + [0, 1, 2, 3].map(r => [0, 1, 2, 3, 4].map(c => `<circle cx="${.8 + c * 1.5 + (r % 2) * .75}" cy="${.75 + r * 1.3}" r=".32"/>`).join('')).join('') + '</g>',
+};
+const worldsFlag = c => WORLDS_FLAGS[c] ? `<svg class="wflag" viewBox="0 0 19 10" aria-hidden="true">${WORLDS_FLAGS[c]}</svg>` : '';
 // Deckliste rechts in der Übersicht (beim Überfahren eines Decks): wie im Deck-Builder – Manakurve, Verteilung, Liste
 function deckPreview(deck, tile) {
     // Die Box, deren Karten rechts zu sehen sind, bleibt hervorgehoben
@@ -769,6 +798,17 @@ function deckPreview(deck, tile) {
     if (!deck) { box.innerHTML = `<div class="dp-hint">${tr('Fahre über ein Deck, um seine Kartenliste zu sehen.')}</div>`; return; }
     if (box.dataset.id === deck.id) return;
     box.dataset.id = deck.id;
+    if (deck.locked) {
+        // Gesperrte Turnierliste: Kartenliste als Text, fehlende Karten gedämpft
+        const miss = new Set(deck.miss);
+        const rows = deck.text.split('\n').slice(1).map(l => l.trim()).filter(l => l && !l.startsWith('//')).map(l => {
+            const h = l.match(/^(?:hero|held)\s*:?\s*(.+)$/i), m = l.match(/^(\d+)\s+(.+)$/), name = h ? h[1].trim() : m ? m[2].trim() : l;
+            return `<div class="dp-raw${miss.has(name) ? ' miss' : ''}${h ? ' hero' : ''}"><b>${h ? tr('Held') : m ? m[1] + '×' : ''}</b><span>${esc(name)}</span></div>`;
+        });
+        box.innerHTML = `<div class="dp-locked">🔒 ${tr('Noch nicht spielbar: Die Karten dieses Decks (Sets nach Hunt for Illidan) gibt es im Spiel noch nicht.')}</div><div class="db-deck-list">${rows.join('')}</div>`;
+        box.classList.remove('dp-in'); void box.offsetWidth; box.classList.add('dp-in');
+        return;
+    }
     const hero = CARDS[deck.hero];
     DB_TYPES[0].color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
     box.innerHTML = ``
@@ -795,36 +835,93 @@ function openDeckOverview(opts = {}) {
         const parts = deck.name.split(' · ');
         const title = parts.length > 2 ? parts.slice(0, 2).join(' · ') : deck.name, event = parts.length > 2 ? parts.slice(2).join(' · ') : '';
         el.innerHTML = deckBoxHTML(deck) + `<div class="deck-tile-name" title="${esc(deck.name)}">${esc(title)}</div>`
-            + `<div class="deck-tile-sub">${esc(event || (hero ? hero.name : ''))}</div>`;
+            + `<div class="deck-tile-sub">${esc((folder ? '' : event) || (hero ? hero.name : ''))}</div>`;   // im Ordner: Held statt Turnier
         el.dataset.q = `${deck.name} ${hero ? hero.name : ''} ${deck.class || ''}`.toLowerCase();
         el.onmouseenter = () => deckPreview(deck, el);
         el.onclick = () => choose(el, () => { if (pick) pick(deck); else openDeckBuilder(deck); });
         return el;
     };
-    grid.innerHTML = ""; const pv = document.getElementById('deck-preview'); delete pv.dataset.id;
+    const pv = document.getElementById('deck-preview'); delete pv.dataset.id;
     const head = t => grid.insertAdjacentHTML('beforeend', `<div class="deck-grid-head">${t}</div>`);
     const decks = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards);
     const own = decks.filter(d => !isTourneyDeck(d));
-    if (own.length || opts.random || !pick) head(tr('Deine Decks'));
-    if (opts.random) {
-        const r = document.createElement('div'); r.className = 'deck-tile special' + (opts.current === '' ? ' current' : ''); r.dataset.q = '';
-        r.innerHTML = tr('<div class="dbox-special">?</div><div class="deck-tile-name">Zufall</div><div class="deck-tile-sub">eigene & Turnier-Decks</div>');
-        r.onclick = () => choose(r, () => pick(null));
-        grid.appendChild(r);
-    }
-    if (!pick) {
-        const nb = document.createElement('div'); nb.className = 'deck-tile special'; nb.dataset.q = '';
-        nb.innerHTML = tr('<div class="dbox-special">+</div><div class="deck-tile-name">Neues Deck</div>');
-        nb.onclick = () => choose(nb, () => openDeckBuilder());
-        grid.appendChild(nb);
-    }
-    own.forEach(d => grid.appendChild(tile(d)));
-    const tour = decks.filter(isTourneyDeck);
-    if (tour.length) { head(tr('Turnier-Decks 2006/2007')); tour.forEach(d => grid.appendChild(tile(d))); }
-    // Suche nach Deck-, Helden- oder Klassenname
+    // Turnier-Decks in Ordnern (je World Championship einer, Darkmoon Faire zusammen): übernommene Decks aus "Deine Decks",
+    // dazu gesperrt die Listen, deren Karten es im Spiel noch nicht gibt
+    const folders = {};
+    const addTo = (m, deck) => (folders[m.folder] = folders[m.folder] || { key: m.folder, worlds: m.worlds, decks: [] }).decks.push({ deck, m });
+    decks.filter(isTourneyDeck).forEach(d => { const i = +String(d.id).replace('custom_tourney_', '') - 1; addTo(tourneyMeta(i), d); });
+    if (typeof TOURNEY_DECKS !== 'undefined') TOURNEY_DECKS.forEach((text, i) => {
+        const m = tourneyMeta(i), miss = tourneyMissing(text);
+        if (!m.hero || !miss.includes(m.hero) || decks.some(d => d.id === `custom_tourney_${i + 1}`)) return;   // nur Listen ohne Helden im Spiel
+        const hi = (typeof TOURNEY_HEROES !== 'undefined' && TOURNEY_HEROES[m.hero]) || [];
+        addTo(m, { id: `locked_tourney_${i + 1}`, locked: true, miss, text, hero: null, heroName: m.hero, faction: hi[0], class: hi[1], name: tr`Platz ${m.place} · ${m.player} · ${m.event}` });
+    });
+    const rank = f => f.worlds ? -f.worlds.year : f.key === 'dmf' ? 0 : 1;                  // Worlds (neueste zuerst), dann Darkmoon Faire
+    const order = Object.values(folders).sort((a, b) => rank(a) - rank(b));
+    order.forEach(f => f.decks.sort((a, b) => a.m.place - b.m.place));
+    const cur = opts.current && order.find(f => f.decks.some(x => x.deck.id === opts.current));
+    let folder = cur ? cur.key : null;
+    const lockedTile = (deck) => {
+        const el = document.createElement('div'); el.className = 'deck-tile locked';
+        el.innerHTML = deckBoxHTML(deck) + `<span class="deck-lock" title="${esc(tr('Noch nicht spielbar'))}">🔒</span>`
+            + `<div class="deck-tile-name" title="${esc(deck.name)}">${esc(deck.name.split(' · ').slice(0, 2).join(' · '))}</div><div class="deck-tile-sub">${esc(deck.heroName)}</div>`;
+        el.dataset.q = `${deck.name} ${deck.heroName} ${deck.class || ''}`.toLowerCase();
+        el.onmouseenter = () => deckPreview(deck, el);
+        el.onclick = () => { deckPreview(deck, el); showToast(tr('Dieses Deck braucht Karten, die es im Spiel noch nicht gibt.'), false, 2600); };
+        return el;
+    };
+    // Ordner-Kachel: Mappe mit Worlds-Emblem und Jahr, darunter Stadt und Flagge
+    const folderTile = (f) => {
+        const el = document.createElement('div'); el.className = 'deck-tile folder' + (f.worlds ? ' worlds' : '');
+        const w = f.worlds, n = f.decks.length;
+        const face = w ? `<img class="wfold-logo" src="icons/worlds_logo.png" alt=""><span class="wfold-year">${w.year}</span>`
+            : `<span class="wfold-text">${f.key === 'dmf' ? 'Darkmoon<br>Faire' : esc(tr('Turnier'))}</span>`;
+        el.innerHTML = `<div class="wfold"><div class="wfold-back"></div><div class="wfold-papers"><i></i><i></i><i></i></div><div class="wfold-front">${face}</div></div>`
+            + (w ? `<div class="deck-tile-name">${worldsFlag(w.country)}${esc(w.city)}, ${esc(w.country)}</div><div class="deck-tile-sub">World Championship · ${tr`${n} Decks`}</div>`
+                 : `<div class="deck-tile-name">${f.key === 'dmf' ? 'Darkmoon Faire' : esc(tr('Weitere Turnier-Decks'))}</div><div class="deck-tile-sub">${tr`${n} Decks`}</div>`);
+        el.dataset.q = f.decks.map(x => `${x.deck.name} ${x.deck.heroName || (CARDS[x.deck.hero] || {}).name || ''} ${x.deck.class || ''}`).join(' ').toLowerCase()
+            + (w ? ` worlds world championship ${w.year} ${w.city} ${w.country}` : ' darkmoon faire dmf').toLowerCase();
+        el.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('draw'); folder = f.key; render(); };
+        return el;
+    };
+    const render = () => {
+        grid.innerHTML = ''; grid.classList.toggle('in-folder', !!folder);
+        const f = folder && folders[folder];
+        if (f) {
+            // Ordner offen: Kopf mit Zurück, Worlds-Schriftzug, Jahr und Ort – darunter die Decks nach Platz
+            const w = f.worlds, hd = document.createElement('div'); hd.className = 'deck-folder-head' + (w ? ' worlds' : '');
+            hd.innerHTML = `<button class="deck-folder-back">‹ ${esc(tr('Zurück'))}</button>`
+                + (w ? `<img class="dfh-text" src="icons/worlds_text.png" alt="World Championship"><div class="dfh-info"><span class="dfh-year">${w.year}</span><span class="dfh-place">${worldsFlag(w.country)}${esc(w.city)}, ${esc(w.country)}</span><span class="dfh-sub">Top 8</span></div>`
+                     : `<div class="dfh-info"><span class="dfh-year dfh-name">${f.key === 'dmf' ? 'Darkmoon Faire' : esc(tr('Weitere Turnier-Decks'))}</span><span class="dfh-sub">2006 – 2007</span></div>`);
+            hd.querySelector('button').onclick = () => { folder = null; render(); };
+            grid.appendChild(hd);
+            f.decks.forEach(x => grid.appendChild(x.deck.locked ? lockedTile(x.deck) : tile(x.deck)));
+        } else {
+            if (own.length || opts.random || !pick) head(tr('Deine Decks'));
+            if (opts.random) {
+                const r = document.createElement('div'); r.className = 'deck-tile special' + (opts.current === '' ? ' current' : ''); r.dataset.q = '';
+                r.innerHTML = tr('<div class="dbox-special">?</div><div class="deck-tile-name">Zufall</div><div class="deck-tile-sub">eigene & Turnier-Decks</div>');
+                r.onclick = () => choose(r, () => pick(null));
+                grid.appendChild(r);
+            }
+            if (!pick) {
+                const nb = document.createElement('div'); nb.className = 'deck-tile special'; nb.dataset.q = '';
+                nb.innerHTML = tr('<div class="dbox-special">+</div><div class="deck-tile-name">Neues Deck</div>');
+                nb.onclick = () => choose(nb, () => openDeckBuilder());
+                grid.appendChild(nb);
+            }
+            own.forEach(d => grid.appendChild(tile(d)));
+            if (order.length) { head(tr('Turnier-Decks')); order.forEach(f => grid.appendChild(folderTile(f))); }
+        }
+        // Gestaffeltes Einblenden
+        grid.querySelectorAll('.deck-tile').forEach((t, i) => t.style.setProperty('--i', Math.min(i, 30)));
+        grid.scrollTop = 0;
+        if (search.value) search.oninput();
+    };
+    // Suche nach Deck-, Helden- oder Klassenname (Ordner: wenn eines ihrer Decks passt)
     search.oninput = () => { const q = search.value.trim().toLowerCase(); grid.querySelectorAll('.deck-tile').forEach(t => t.style.display = !q || !t.dataset.q || t.dataset.q.includes(q) ? '' : 'none'); };
-    // Gestaffeltes Einblenden; die Box unter der Maus neigt sich ihr zu (--tx/--ty), angeklickt ploppt sie kurz auf
-    grid.querySelectorAll('.deck-tile').forEach((t, i) => t.style.setProperty('--i', Math.min(i, 30)));
+    render();
+    // Die Box unter der Maus neigt sich ihr zu (--tx/--ty), angeklickt ploppt sie kurz auf
     grid.onpointermove = e => { const t = e.target.closest('.deck-tile'); if (!t) return; const r = t.getBoundingClientRect();
         t.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); t.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); };
     document.getElementById("deck-overview-close-btn").onclick = close;

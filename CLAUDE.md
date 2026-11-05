@@ -35,7 +35,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `cards7.js`, `cardfx7.js` | Set 7 *Servants of the Betrayer* (IDs 5001–5264 = 5000 + Kartennummer): Daten und Verhalten |
 | `cards8.js`, `cardfx8.js` | Set *Hunt for Illidan* (IDs 6001–6252 = 6000 + Kartennummer, Tokens 9701+): Daten und Verhalten; Dämonen-Helden mit eigener Deckbau-Regel (`HERO_DECK_RULES`), nicht umsetzbare Karten in `CARD_ISSUES` |
 | `cardfx6.js` | Verhalten von March of the Legion |
-| `tourneydecks.js` | Turnier-Decklisten 2006/2007 als Text, werden einmalig über den Importer in „Deine Decks“ übernommen |
+| `tourneydecks.js` | Turnier-Decklisten (DMF 2006/2007, World Championships Top 8) als Text, werden einmalig über den Importer in „Deine Decks“ übernommen – Listen, deren Held es im Spiel noch nicht gibt, erst sobald er da ist. `WORLDS` = Ordner je World Championship (Jahr, Stadt, Land; Bilder `icons/worlds_logo.png`, `icons/worlds_text.png`), `TOURNEY_HEROES` = Fraktion/Klasse fehlender Helden |
 | `ai.js` | CPU: `evaluateState`, `searchBestAction` (echtes Spiel), `fastAiAction` (Simulation) |
 | `simcore.js` | DOM-freie Simulation `simulateOneGame`, Karten-Statistik, Zufallsdecks, Late-Game-Testaufbau |
 | `tests.js` | Regeltests `runRuleTests()` |

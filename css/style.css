@@ -1307,6 +1307,59 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 #deck-overview-modal ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,.75); }
 @supports (-moz-appearance: none) { #deck-overview-modal * { scrollbar-width: thin; scrollbar-color: rgba(201,168,76,.5) transparent; } }
 
+/* Deck-Übersicht: Turnier-Ordner (je World Championship eine Mappe mit Emblem und Jahr; offen: Kopf mit Schriftzug, Jahr, Ort) */
+.deck-tile.folder { --glow: rgba(255,165,50,.45); }
+.wfold { position: relative; width: 124px; height: 150px; margin-bottom: 2px; perspective: 520px; }
+.wfold-back { position: absolute; left: 4px; right: 4px; top: 40px; bottom: 0; border-radius: 3px 8px 6px 6px; background: linear-gradient(#3b2715, #1c1209); border: 1px solid #6b4f22; box-shadow: 0 8px 16px rgba(0,0,0,.65); }
+.wfold-back::before { content: ''; position: absolute; top: -12px; left: -1px; width: 46%; height: 12px; border-radius: 6px 12px 0 0; background: #3b2715; border: 1px solid #6b4f22; border-bottom: 0; }
+.wfold-papers i { position: absolute; left: 14px; right: 14px; top: 46px; height: 70px; border-radius: 2px; background: linear-gradient(#f1e5c6, #cbb684); box-shadow: 0 1px 3px rgba(0,0,0,.5); transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+.wfold-papers i:nth-child(1) { transform: rotate(-5deg); background: linear-gradient(#e6d6ae, #b9a271); }
+.wfold-papers i:nth-child(2) { transform: rotate(3deg) translateY(2px); }
+.wfold-papers i:nth-child(3) { transform: rotate(-1deg) translateY(4px); background: linear-gradient(#f6ecd4, #d5c294); }
+.wfold-front { position: absolute; left: 4px; right: 4px; bottom: 0; height: 96px; transform-origin: 50% 100%; border-radius: 4px 4px 6px 6px;
+    background: radial-gradient(120% 90% at 50% 0%, #5a3a1c, #2a190c 62%, #1a1008); border: 1px solid #8a6a2c;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,220,140,.3), 0 -2px 8px rgba(0,0,0,.45); transition: transform .45s cubic-bezier(.34,1.56,.64,1), box-shadow .3s; }
+.wfold-front::after { content: ''; position: absolute; inset: 4px; border: 1px solid rgba(201,168,76,.35); border-radius: 3px; pointer-events: none; }
+.wfold-logo { position: absolute; left: 50%; top: -50px; width: 120px; transform: translateX(-50%); filter: drop-shadow(0 4px 6px rgba(0,0,0,.8)); transition: transform .45s cubic-bezier(.34,1.56,.64,1); pointer-events: none; }
+.wfold-year { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font: 900 25px/1 Georgia, 'Times New Roman', serif; letter-spacing: 1px;
+    background: linear-gradient(#fff3b0, #f2b632 45%, #c2561b); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 1px #000) drop-shadow(0 0 1px #000); }
+.wfold-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; font: 900 17px/1.15 Georgia, serif; color: var(--gold); text-shadow: 0 2px 2px #000; }
+.deck-tile.folder:hover .wfold-front, .deck-tile.folder:focus-visible .wfold-front { transform: rotateX(-24deg); box-shadow: inset 0 0 0 2px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,220,140,.3), 0 0 18px var(--glow); }
+.deck-tile.folder:hover .wfold-logo { transform: translateX(-50%) translateY(-4px) scale(1.05); }
+.deck-tile.folder:hover .wfold-papers i:nth-child(1) { transform: rotate(-9deg) translate(-4px, -14px); }
+.deck-tile.folder:hover .wfold-papers i:nth-child(2) { transform: rotate(6deg) translate(4px, -18px); }
+.deck-tile.folder:hover .wfold-papers i:nth-child(3) { transform: rotate(-1deg) translateY(-10px); }
+.deck-tile.folder:active .wfold { transform: scale(.96); }
+.wflag { width: 17px; height: 9px; vertical-align: -1px; margin-right: 5px; border-radius: 1px; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
+.deck-folder-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 2px 4px 12px; border-bottom: 1px solid var(--border); animation: deckTileIn .45s cubic-bezier(.2,1.25,.4,1) both; }
+.deck-folder-back { flex: none; }
+.dfh-text { height: 92px; width: auto; min-width: 0; flex: 0 1 auto; max-width: 52%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.8)); }
+.dfh-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dfh-year { font: 900 36px/1 Georgia, serif; background: linear-gradient(#fff3b0, #f2b632 45%, #c2561b); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 1px #000); }
+.dfh-year.dfh-name { font-size: 26px; }
+.dfh-place { font-size: 15px; font-weight: bold; color: var(--text-main); white-space: nowrap; }
+.dfh-place .wflag { width: 21px; height: 11px; margin-right: 7px; }
+.dfh-sub { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; }
+.deck-tile.locked .dbox { filter: grayscale(.85) brightness(.65); }
+.deck-tile.locked .deck-tile-name { color: var(--text-dim); }
+.deck-lock { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); font-size: 22px; filter: drop-shadow(0 2px 3px #000); pointer-events: none; }
+.dp-locked { margin-bottom: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(201,168,76,.08); font-size: 12px; line-height: 1.4; color: var(--text-dim); }
+.dp-raw { display: flex; gap: 8px; padding: 3px 6px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,.05); color: var(--text-main); }
+.dp-raw b { flex: none; width: 34px; text-align: right; color: var(--gold); }
+.dp-raw.hero span { color: var(--gold-light); font-weight: bold; }
+@media (max-width: 600px) {
+    .wfold { width: 98px; height: 118px; }
+    .wfold-back { top: 32px; } .wfold-papers i { top: 38px; height: 54px; left: 11px; right: 11px; }
+    .wfold-front { height: 76px; }
+    .wfold-logo { width: 96px; top: -40px; }
+    .wfold-year { font-size: 20px; bottom: 5px; }
+    .deck-lock { top: 56px; font-size: 18px; }
+    .deck-folder-head { gap: 10px; flex-wrap: wrap; }
+    .dfh-text { height: 48px; max-width: 60%; }
+    .dfh-year { font-size: 26px; }
+}
+@media (max-height: 500px) { .dfh-text { height: 54px; } .dfh-year { font-size: 26px; } .deck-folder-head { padding-bottom: 8px; } }
+
 /* ===================== HAUPTMENÜ ===================== */
 #main-menu { position: fixed; inset: 0; z-index: 99000; display: none; overflow: hidden; background: #050302; --px: 0; --py: 0; font-family: Georgia, 'Times New Roman', serif; }
 #main-menu.in { animation: mmIn 1.2s ease both; }

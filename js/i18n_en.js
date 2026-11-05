@@ -2202,4 +2202,12 @@ var I18N_EN = {
     "Zurück in die laufende Partie": "Back to the current match",
     "Tests": "Tests",
     "Hinweis: Der Chat ist nicht verschlüsselt und läuft über einen öffentlichen Server. Teile hier keine Passwörter, persönlichen Daten oder Kontaktdaten und sei respektvoll zu anderen Spielern.": "Note: This chat is not encrypted and runs over a public server. Do not share passwords, personal data or contact details here, and be respectful to other players.",
+    "Turnier-Decks": "Tournament decks",
+    "Turnier": "Tournament",
+    "Weitere Turnier-Decks": "More tournament decks",
+    "{0} Decks": "{0} decks",
+    "Noch nicht spielbar": "Not playable yet",
+    "Dieses Deck braucht Karten, die es im Spiel noch nicht gibt.": "This deck needs cards that are not in the game yet.",
+    "Noch nicht spielbar: Die Karten dieses Decks (Sets nach Hunt for Illidan) gibt es im Spiel noch nicht.": "Not playable yet: the cards of this deck (sets after Hunt for Illidan) are not in the game yet.",
+    "Zurück": "Back",
 };

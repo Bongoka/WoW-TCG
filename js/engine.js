@@ -851,10 +851,20 @@ function respondOptions(s, pid) {
         if (vNow === null) continue;
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
         if (vNow <= vPass + (human && moment === 'react' ? -2 : 0.5)) continue;
-        if (moment === 'react') { const vLater = respondValue(s, pid, a, true); if (vLater !== null && vNow <= vLater + 0.5) continue; }
+        // Gegnerischer Angriffsvorschlag (CR 601.1/601.3): der Mensch entscheidet selbst, ob er jetzt (Angriff verhindern)
+        // oder erst im Kampf antwortet – das spätere Fenster kann wegfallen (der Gegner tötet den Verteidiger vorher)
+        const proposal = human && moment === 'react' && top && top.kind === 'proposal' && stopsProposal(s, pid, a, top);
+        if (moment === 'react' && !proposal) { const vLater = respondValue(s, pid, a, true); if (vLater !== null && vNow <= vLater + 0.5) continue; }
         out.push({ a, gain: vNow - vPass });
     }
     return out.sort((x, y) => y.gain - x.gain);
+}
+// Verhindert die Antwort den vorgeschlagenen Angriff (Angreifer tot, "can't attack" – CR 601.3)? In einer Kopie geprüft
+function stopsProposal(s, pid, a, top) {
+    const c = cloneState(s);
+    try { doAction(c, a, pid); process(c); autoResolve(c); } catch (e) { return false; }
+    const att = findCharacter(c, top.att);
+    return !att || !isInPlayZone((locate(c, top.att) || {}).zone) || att.attackedTurn !== c.turn;
 }
 // Kennung einer Antwort unabhängig von Zielen/X: Karte (uid), Kraft (Quelle|Schlüssel) oder Quest (uid)
 function respondKey(s, pid, a) {
