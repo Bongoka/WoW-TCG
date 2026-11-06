@@ -552,7 +552,6 @@ FX[4210] = { aura: { protectFor: (s, src, sp, c, def) => def.uid === src.uid && 
 FX[4211] = { aura: { unprev: (s, src, sp, from, t, o) => !!from && from.type === 'Ally' && from.atkType === 'Holy' && ctrlOf(s, from) === sp } };
 
 // Imp Mistress Noali: verdeckte Ressourcen müssten zugleich 1/1-Allies im Spiel sein (angreifen, verteidigen, Ziele) – das kann die Engine nicht abbilden
-CARD_ISSUES[4189] = 'Verdeckte Ressourcen werden nicht zu Imp-Demon-Allies – Ressourcen können in diesem Spiel nicht zugleich Allies sein.';
 
 // ============================================================================
 // ALLIES – Aldor (Inspire) und Scryer (Sabotage); Reputation steht in den Kartendaten (CR 100.2d)
@@ -629,8 +628,8 @@ FX[4244] = { sabotage: 'Equipment', on: { sabotages: (s, c, d, pid) => { if (d.a
     k: { bounce: (s, a) => { const t = findCharacter(s, a.uid); if (t && isInPlayZone((locate(s, a.uid) || {}).zone)) leavePlay(s, t, 'hand', { destroyed: false }); } } };
 FX[4245] = {};   // Voren'thal the Seer: drawCards (engine.js)
 // Arcanist Raith / Arcanist Tian: nur offene Informationen (oberste Karte zeigen bzw. ansehen) – die Anzeige dafür fehlt noch
-CARD_ISSUES[4231] = 'Die oberste Karte der gegnerischen Decks wird noch nicht offen angezeigt.';
-CARD_ISSUES[4232] = 'Das Ansehen der obersten eigenen Deckkarte jederzeit ist in der Oberfläche noch nicht möglich.';
+// Arcanist Raith: "Opponents play with the top card of their decks revealed." / Arcanist Tian: "You may look at the top card of your deck at any time." (ui.js: topVisible)
+FX[4231] = FX[4231] || {}; FX[4232] = FX[4232] || {};
 
 // ============================================================================
 // ALLIES – neutral
@@ -816,5 +815,33 @@ FX[4317] = { questCond: (s, pid) => pes(s, pid, 'allyDied').length ? null : tr('
 FX[4318] = { questCond: (s, pid) => pes(s, foe(s, pid).id, 'allyDied').length ? null : tr('Diesen Zug muss ein gegnerischer Ally zerstört worden sein'), reward: Qd(1) };
 FX[4319] = { reward: (s, pid) => drawCards(s, me(s, pid), alliesOf(me(s, pid)).some(a => isDemonS7(s, a)) ? 2 : 1) };
 // Nicht exakt umsetzbar
-CARD_ISSUES[4304] = 'Das Übernehmen der Kräfte einer anderen Quest (Abschlussbedingung und Belohnung) ist noch nicht umgesetzt.';
+// Gurok the Usurper: "[Activate] >>> Choose a quest you control. This quest has that quest's powers this turn." (Abschlussbedingung, Kosten, Belohnung der gewählten Quest)
+const gurokOf = (s, r) => { const g = r && r.card && r.card.gurok6; return g && g.turn === s.turn ? g.id : null; };
+FX[4304] = { resPowers: true,
+    powers: [actPow('gurok', tr('Kräfte einer eigenen Quest übernehmen'), { canUse: (s, pid, src) => me(s, pid).resources.some(r => r.faceUp && r.card.type === 'Quest' && r.card.uid !== src.uid) || tr('Keine andere offene Quest'),
+        resolve: (s, it) => { const l = me(s, it.pl).resources.filter(r => r.faceUp && r.card.type === 'Quest' && r.card.uid !== it.src); ask(s, { pid: it.pl, prompt: tr('Gurok the Usurper: Welche Quest?'), src: 'Gurok the Usurper', opts: l.map(r => ({ label: r.card.name, v: r.card.id, card: r.card.id, ai: 2 - (r.card.questCost || 0) / 3 })), k: '4304:set', a: { uid: it.src } }); } })],
+    k: { set: (s, a, id) => { const l = locate(s, a.uid); if (l && l.c) l.c.gurok6 = { id, turn: s.turn }; } },
+    questCond: (s, pid, r) => { const g = gurokOf(s, r); if (!g) return tr('Gurok hat in diesem Zug keine Quest-Kräfte'); const f = FX[g] || {}; return f.questCond ? f.questCond(s, pid, r) : null; },
+    questSelfLess: (s, pid) => { const r = me(s, pid).resources.find(x => x.card.id === 4304 && gurokOf(s, x)); return r ? -(CARDS[gurokOf(s, r)].questCost || 0) : 0; },
+    questExtra: (s, pid, r) => { const g = gurokOf(s, r), f = g && FX[g]; if (f && f.questExtra) return f.questExtra(s, pid, r); q(s, { op: 'call', k: 'E:questPay', a: {} }); },
+    reward: (s, pid, r) => { const g = gurokOf(s, r), f = g && FX[g]; if (f && f.reward) f.reward(s, pid, r); } };
 CARD_ISSUES[4307] = 'Würfel aus 15 cm Höhe auf das Spielfeld werfen lässt sich digital nicht nachbilden.';
+
+// Imp Mistress Noali: "Face-down resources you control are also Imp Demon allies with 1 [Fire] / 1 [Health]."
+// Die Ressource bleibt in der Ressourcenreihe und steht zugleich als Imp in der Party (verdeckt: erscheint als namenloser Imp); Erschöpfen wird gespiegelt.
+Object.assign(CARDS, { 4999: { id: 4999, name: 'Imp', type: 'Ally', cost: 0, atk: 1, hp: 1, atkType: 'Fire', faction: 'Neutral', race: 'Imp Demon', allyTypes: ['Imp', 'Demon'], text: '', isFaceDownImp: true, isToken: true } });
+const NOALI_FIELDS = ['id', 'name', 'type', 'cost', 'atk', 'hp', 'atkType', 'faction', 'race', 'allyTypes', 'allyClass', 'text', 'typeLine', 'b', 'unique', 'protector', 'limitTags', 'subtypes', 'allowedClasses', 'allowedFactions'];
+function noaliRestore(s, p, c, leaving) { const o = c.noaliOrig6; if (!o) return; for (const k of NOALI_FIELDS) c[k] = o[k]; delete c.noaliOrig6; delete c.allyRes6; delete c.resEx6;
+    if (leaving) { const i = p.resources.findIndex(r => r.card === c); if (i >= 0) p.resources.splice(i, 1); } }
+STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) {
+    const on = p.allies.some(a => a.id === 4189 && active(s, a));
+    for (const r of p.resources) { const c = r.card;
+        if (on && !r.faceUp && !c.allyRes6) { const d = CARDS[4999]; c.noaliOrig6 = Object.fromEntries(NOALI_FIELDS.map(k => [k, c[k]])); for (const k of NOALI_FIELDS) c[k] = k === 'b' ? { atk: 1, hp: 1, def: 0, strike: 0 } : d[k];
+            c.allyRes6 = true; c.joinedTurn = s.turn; c.damage = 0; c.exhausted = !!r.exhausted; c.resEx6 = !!r.exhausted; p.allies.push(c); }
+        else if (c.allyRes6) {
+            if (!on || r.faceUp) { const i = p.allies.indexOf(c); if (i >= 0) p.allies.splice(i, 1); c.damage = 0; noaliRestore(s, p, c, false); continue; }
+            if (c.exhausted !== c.resEx6) r.exhausted = c.exhausted; else if (r.exhausted !== c.resEx6) c.exhausted = r.exhausted;   // Erschöpfen spiegeln
+            c.resEx6 = r.exhausted = c.exhausted; } }
+    for (const c of [...p.allies]) if (c.allyRes6 && !p.resources.some(r => r.card === c)) { p.allies.splice(p.allies.indexOf(c), 1); noaliRestore(s, p, c, false); } }
+    return false; });
+FX[4189] = { ...(FX[4189] || {}), engineImpl: true };

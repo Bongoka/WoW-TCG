@@ -100,9 +100,12 @@ function legalCardsFor(heroId) {
 }
 // Zufallsdeck aus allen legalen Karten eines Helden (60 Karten, max. 4 Kopien, Unlimited ohne Grenze)
 function randomLegalDeck(heroId, size = 60) {
-    // Reputation (CR 100.2d): nur eine Reputation je Deck – zufällig Aldor oder Scryer, die andere fällt weg
-    const rep = Math.random() < 0.5 ? 'Aldor' : 'Scryer';
-    const pool = legalCardsFor(heroId).filter(id => !CARDS[id].reputation || CARDS[id].reputation === rep);
+    // Reputation (CR 100.2d): nur eine Reputation je Deck – zufällig eine der möglichen, die anderen fallen weg;
+    // Helden mit "either [Alliance] or [Horde] cards" (Set icecrown): zufällig eine Fraktion
+    const legal = legalCardsFor(heroId), reps = [...new Set(legal.map(id => CARDS[id].reputation).filter(Boolean))];
+    const rep = reps.length ? reps[Math.floor(Math.random() * reps.length)] : null;
+    const fac = CARDS[heroId].factionEither ? (Math.random() < 0.5 ? 'Alliance' : 'Horde') : null;
+    const pool = legal.filter(id => (!CARDS[id].reputation || CARDS[id].reputation === rep) && (!fac || !(CARDS[id].allowedFactions || []).length || CARDS[id].allowedFactions.includes(fac)));
     const cards = [];
     const cnt = {};
     let guard = 0;

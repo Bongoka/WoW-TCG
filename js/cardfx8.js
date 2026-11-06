@@ -23,7 +23,9 @@ EK.pickN = (s, a) => {
 EK.pickNAdd = (s, a, v) => q(s, { op: 'call', k: 'E:pickN', a: { ...a, list: [...a.list, v] } });
 const isDemon8 = (s, c) => typeof isDemonS7 === 'function' ? isDemonS7(s, c) : ((c.allyTypes || []).includes('Demon') || /\bDemon\b/.test(c.race || ''));
 // Resistenzen (Set illidan): "<Art> Resistance (Prevent all <art> damage that this ally would be dealt.)"
-const resist = dt => ({ aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === src.uid && o.dt === dt ? amt : 0 } });
+// Winter's Icy Embrace (Set icecrown): "Opposing heroes and allies lose and can't have Resistances."
+function resistLost(s, t) { if (!t || !isChar(t)) return false; const pid = ctrlOf(s, t); return !!pid && getOpponent(s, pid).hero.armors.some(a => a.id === 13178); }
+const resist = dt => ({ aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === src.uid && o.dt === dt && !resistLost(s, t) ? amt : 0 } });
 
 // ---------------------------------------------------------------- Deckbau der Dämonen-Helden
 // "You can include only neutral quests, … You can't include cards with reputation or text restrictions (like Fire Hero Required)."
@@ -94,7 +96,6 @@ FX[6020] = { backAura: true, powers: [flipPow(tr('Drei [Horde]-Allies zerstören
 FX[6021] = { backAura: true, aura: { kw: (s, src, sp, c, k) => k === 'elusive' && c.uid === src.uid } };   // Imp Lord Pinprik: Elusive auf beiden Seiten
 FX[6023] = { backAura: true, aura: { tagLimit: (s, src, sp, pid, t, cards) => pid === sp && t === 'Pet' ? cards.length : 0 } };   // Obliveron: beliebig viele Pets
 FX[6024] = { powers: [flipPow(tr('Kontrolle über Ziel-Ally'), 0, { myTurn: true, slots: slotAlly(tr('Ziel-Ally'), true, { side: 'enemy' }), resolve: (s, it) => { const t = T1(s, it); if (t) changeControl(s, t, it.pl); } })] };
-CARD_ISSUES[6022] = 'Sextuple Wield: mit bis zu sechs Nahkampfwaffen im selben Kampf zuschlagen ist noch nicht umgesetzt.';
 
 // ============================================================================
 // FÄHIGKEITEN (25–116)
@@ -222,7 +223,6 @@ FX[6064] = { modes: () => [{ label: tr('Nächste 3 Schaden an Ziel-Ally verhinde
     slots: (s, pid, card, ctx) => ctx.mode === 1 ? [{ label: tr('Ziel-Ally'), cands: targetCands(s, pid, { ally: true }), harm: false }] : [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: false }],
     resolve: (s, it) => { const t = T(it)[0]; if (it.mode === 1) { it.dest = 'graveyard'; const c = t && findCharacter(s, t); if (c) addTM(c, { k: 'shield', v: 3, turn: s.turn }); } else if (t) it.attachTo = t; else it.dest = 'graveyard'; },
     aura: { atk: (s, src, sp, c) => c.uid === src.attachedTo && s.battle && s.battle.att === c.uid ? 1 : 0 } };
-CARD_ISSUES[6055] = 'Spieler mit Untargetable (Ziel-Spieler-Effekte) sind noch nicht umgesetzt.';
 FX[6065] = { resolve: (s, it) => partyOf(me(s, it.pl)).forEach(c => heal(s, heroOf(s, it.pl).uid, c.uid, 10)) };
 FX[6066] = { powers: [{ key: 'divspirit', label: tr('Ziehe 1 oder mache bis zu drei Ressourcen bereit'), act: true,
     modes: () => [{ label: tr('Ziehe eine Karte'), v: 1, ai: 3 }, { label: tr('Bis zu drei Ressourcen bereit'), v: 2, ai: 2 }],
@@ -530,10 +530,10 @@ FX[6195] = { aura: { kw: (s, src, sp, c, k) => k === 'untargetable' && c.uid !==
     noPlay: (s, src, sp, pid, card) => card.talentReq === 'Traitor' ? tr('Akama: Traitor-Karten können nicht gespielt werden') : null } };
 FX[6203] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 6203, k: 'go', a: {} }); } },
     k: { go: (s) => { [s.p1, s.p2].forEach(p => alliesOf(p).filter(x => isDemon8(s, x)).forEach(x => destroy(s, x))); [s.p1, s.p2].forEach(p => { if (isDemon8(s, p.hero) && !isIndestructible(s, p.hero)) lose(s, p.id, "Xi'ri"); }); } } };
-CARD_ISSUES[6185] = 'Ziehen von unten nach Wahl ist noch nicht umgesetzt.';
-CARD_ISSUES[6186] = 'Sabotage: Deck (Decks tauschen, mit Besitzer) ist noch nicht umgesetzt.';
-CARD_ISSUES[6187] = 'Ersatzkosten durch Erschöpfen (Fähigkeit oder Schlag) sind noch nicht umgesetzt.';
-CARD_ISSUES[6190] = 'Sabotage: Schlüsselwörter (verlieren überall) ist noch nicht umgesetzt.';
+// Arcanist Renaan: "If you would draw a card, you may draw it from the bottom of your deck instead."
+DRAW_REPLACE.push((s, p) => { if (p.renaanAsk8 || !p.allies.some(a => a.id === 6185 && active(s, a)) || p.deck.length < 2) return false; q(s, { op: 'call', k: 'E:renaan8', a: { pid: p.id } }); return true; });
+EK.renaan8 = (s, a) => ask(s, { pid: a.pid, prompt: tr('Arcanist Renaan: von oben oder von unten ziehen?'), src: 'Arcanist Renaan', opts: [{ label: tr('Von oben'), v: 0, ai: 1 }, { label: tr('Von unten'), v: 1, ai: 0.9 }], k: 'E:renaan8Do', a });
+EK.renaan8Do = (s, a, v) => { const p = me(s, a.pid); if (!v) { p.renaanAsk8 = true; drawCards(s, p, 1); p.renaanAsk8 = false; return; } if (!p.deck.length) return; const id = p.deck.shift(); const c = makeCardInst(id, false, p.id); p.hand.push(c); L(s, tr`${p.hero.name} zieht von unten.`, '', p.id); evt(s, 'drew', { pid: p.id, uid: c.uid }); };
 CARD_ISSUES[6194] = 'Sabotage: Spiel (Sieg in der nächsten Partie) gibt es in diesem Spiel nicht.';
 // Vindicator Vasha: "Cards in play with reputation other than Aldor lose and can't have powers." (engine.js active())
 function repLocked(s) { return [s.p1, s.p2].some(p => p.allies.some(a => a.id === 6183)); }
@@ -554,7 +554,6 @@ FX[6206] = { on: { armorPrevented: (s, c, d, pid) => { if (d.uid === c.uid && d.
 FX[6207] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid && CARDS[d.id] && CARDS[d.id].type === 'Quest') trig(s, { id: 6207, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => { const h = heroOf(s, a.pid); const slot = h.class === 'Hunter' ? 'Ranged' : h.class === 'Shaman' ? 'Melee' : null; if (!slot) return; readyCard(s, h); h.weapons.filter(w => w.slot === slot).forEach(w => readyCard(s, w)); } } };
 FX[6208] = { aura: { kw: (s, src, sp, c, k) => k === 'untargetable' && c.uid !== src.uid && isEquip(c) && ctrlOf(s, c) === sp && eqCount(me(s, sp)) >= 5 } };
-CARD_ISSUES[6209] = 'Karten aus dem Bereich "aus dem Spiel entfernt" spielen ist noch nicht umgesetzt.';
 FX[6210] = { on: { strike: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 6210, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Greaves of Desolation: Eigenen Ally vollständig heilen'), 'Greaves of Desolation', targetCands(s, a.pid, { ally: true, side: 'friendly' }), '6210:do', a, u => findCharacter(s, u).damage || 0),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c && c.damage > 0) heal(s, heroOf(s, a.pid).uid, c.uid, c.damage); } } };
@@ -586,7 +585,6 @@ FX[6225] = { on: { strike: (s, c, d, pid) => { if (d.weapon !== c.uid) return; c
 FX[6226] = { on: { attacks: (s, c, d, pid) => { if (d.att === heroOf(s, pid).uid) trig(s, { id: 6226, k: 'go', a: { pid } }); } }, k: { go: (s, a) => opposingChars(s, a.pid).forEach(c => exhaust(s, c)) } };
 FX[6227] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.type === 'Hero' && ctrlOf(s, from) === sp && t && isDemon8(s, t) ? (o.amt || 0) : 0 } };
 FX[6228] = { entered: (s, c) => { if (oppWentFirst(s, ctrlOf(s, c))) c.counters = { ...(c.counters || {}), atk1: ((c.counters || {}).atk1 || 0) + 3 }; } };
-CARD_ISSUES[6229] = 'Textänderung "Beginn des Zuges → Ende des Zuges" ist noch nicht umgesetzt.';
 FX[6230] = { powers: [{ key: 'tirisfal', label: tr('Fähigkeit im Friedhof entfernen: nächster Schlag (1) billiger'),
     canUse: (s, pid) => me(s, pid).graveyard.some(c => c.type === 'Ability') || tr('Keine Fähigkeit im Friedhof'),
     payExtra: (s, it) => mustPick(s, it.pl, tr('Tirisfal Wand: Welche Fähigkeit aus dem Friedhof entfernen?'), 'Tirisfal Wand of Ascendancy', gyCands(s, it.pl, c => c.type === 'Ability'), '6230:pay', {}, () => 0),
@@ -639,6 +637,39 @@ FX[6249] = { questCond: (s) => s.abilDestroyed === s.turn ? null : tr('In diesem
 FX[6250] = { questCond: (s, pid) => alliesOf(me(s, pid)).length ? null : tr('Du brauchst einen Ally'), reward: Qd(1) };
 FX[6251] = { reward: Qd(1) };
 FX[6252] = { questCond: (s, pid) => [heroOf(s, pid), ...alliesOf(me(s, pid))].some(c => isDemon8(s, c)) ? null : tr('Du brauchst einen Dämon'), reward: Qd(1) };
+
+
+// ---------------------------------------------------------------- früher ⚠, jetzt umgesetzt
+// Mother Misery: Sextuple Wield (engine.js sextupleWield: sechs Hände Nahkampfwaffen, beliebig viele Schläge pro Kampf)
+// Staff of the Ashtongue Deathsworn: "Text that refers to the start of a turn refers to the end of that turn instead." (engine.js ashtongueOn)
+// Blessing of Salvation: "When this ability enters play, choose a friendly player. That player has Untargetable." (im Spiel zu zweit: du selbst)
+FX[6055] = { entered: (s, c, pid) => { c.salv8 = pid; L(s, tr`Blessing of Salvation: ${me(s, pid).hero.name} hat Untargetable.`, '', pid); } };
+function playerUntargetable(s, pid) { return [s.p1, s.p2].some(p => (p.ongoing || []).some(o => o.id === 6055 && o.salv8 === pid && active(s, o))); }
+// Arcanist Thelis: "When this ally sabotages a deck, switch that deck with yours."
+FX[6186] = { sabotage: 'Deck', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 6186, k: 'go', a: { pid } }); } },
+    k: { go: (s, a) => { const p = me(s, a.pid), o = foe(s, a.pid); const pd = p.deck, po = p.deckOwner || p.id; p.deck = o.deck; p.deckOwner = o.deckOwner || o.id; o.deck = pd; o.deckOwner = po;
+        L(s, tr('Arcanist Thelis: Die Decks werden getauscht.'), '', a.pid); } } };
+// Battlemage Vyara: "You may exhaust this ally rather than pay the cost of an ability with cost 7 or less, or a weapon's [Strike] of 7 or less."
+const vyaraOf = (s, pid) => me(s, pid).allies.find(a => a.id === 6187 && !a.exhausted && !cantExhaust(s, a) && active(s, a));
+GLOBAL_ALT.push({ label: tr('Battlemage Vyara erschöpfen statt bezahlen'), ai: 3, can: (s, pid, card) => card.type === 'Ability' && (card.cost || 0) <= 7 && !!vyaraOf(s, pid),
+    pay: (s, it) => { const v = vyaraOf(s, it.pl); if (v) exhaust(s, v); altDone(s); } });
+STRIKE_ALT.push((s, pid, w) => strikeCost(s, me(s, pid), w) <= 7 ? vyaraOf(s, pid) || null : null);
+// Retainer Alashon: "When this ally sabotages keywords, opposing cards everywhere lose and can't have keyword powers while he remains under your control."
+FX[6190] = { sabotage: 'Keywords', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) { c.alashon8 = pid; L(s, tr('Retainer Alashon: Gegnerische Karten verlieren ihre Schlüsselwörter.'), '', pid); } } } };
+const alashonVs = (s, ownerPid) => [s.p1, s.p2].some(p => p.id !== ownerPid && p.allies.some(a => a.id === 6190 && a.alashon8 === p.id));
+KW_LOST.push((s, c) => { const o = c.owner || ctrlOf(s, c); return !!o && alashonVs(s, o); });
+NO_ASSAULT_MEND.push((s, c) => kwLostAll(s, c));
+// Gloves of the High Magus: "[Activate], Remove the top card of your deck from the game >>> If it's an ability, ally, or equipment, you may play it this turn if able. If it's a quest, you may place it this turn if able."
+FX[6209] = { powers: [actPow('magus', tr('Oberste Deckkarte entfernen: in diesem Zug spielen bzw. als Quest legen'), { canUse: (s, pid) => me(s, pid).deck.length > 0 || tr('Dein Deck ist leer'),
+    payExtra: (s, it) => { const p = me(s, it.pl); const c = makeCardInst(p.deck.pop(), false, p.deckOwner || p.id); p.removed.push(c); it.extra.g8 = c.uid; L(s, tr`${c.name} wird aus dem Spiel entfernt.`, '', it.pl); finishPrep(s); },
+    resolve: (s, it) => { const p = me(s, it.pl); const c = (p.removed || []).find(x => x.uid === it.extra.g8); if (!c) return;
+        if (c.type === 'Quest') { if (s.activePlayer === it.pl && !s.placedResource) yesNo(s, it.pl, tr`Gloves of the High Magus: ${c.name} als Quest legen?`, 'Gloves of the High Magus', '6209:q', { pid: it.pl, uid: c.uid }, true); return; }
+        addPE(s, it.pl, { k: 'rfgPlayUid', uid: c.uid }); } })],
+    k: { q: (s, a, v) => { const p = me(s, a.pid); const i = (p.removed || []).findIndex(x => x.uid === a.uid); if (!v || i < 0 || s.placedResource) return; const c = p.removed.splice(i, 1)[0];
+        p.resources.push({ card: c, faceUp: true, exhausted: false }); s.resPlaced = (s.resPlaced || 0) + 1; s.placedResource = s.resPlaced >= resAllowance(s); L(s, tr`${c.name} wird als Quest gelegt.`, '', a.pid); evt(s, 'resEnters', { pid: a.pid, faceUp: true, uid: c.uid, id: c.id }); } } };
+
+// Engine-Umsetzungen ohne eigenen FX-Eintrag
+for (const id of [6022, 6185, 6187, 6229]) FX[id] = { ...(FX[id] || {}), engineImpl: true };
 
 // ---------------------------------------------------------------- Sicherheitsnetz
 // Karten, deren Text mehr als Schlüsselwörter verlangt, aber hier (noch) keinen Eintrag haben, werden markiert.

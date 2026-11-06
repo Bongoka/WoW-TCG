@@ -37,6 +37,9 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `cards9.js`, `cardfx9.js` | Set *Drums of War* (drums, IDs 7001–7268, Tokens 9801+): u. a. **Locations** (Kartentyp, nur als Ressource; offen: Kräfte, Auslöser, Dauereffekte, höchstens eine offen – CR 306, 410.6g), Diplomacy, Shadowmeld, Berserking, War Stomp. Gemeinsame Hilfen für die folgenden Sets (`fxMix`, `KW9`, `warStomp`, `diplomacy`, `onEnter`, `actPow` …) |
 | `cards10.js`, `cardfx10.js` | Set *Blood of Gladiators* (gladiator, IDs 8001–8208, Tokens 9901+): Arena-Karten, Inspiring Presence, Arcane Torrent, Thrown, Kosten beim offenen Legen (`faceUpCost`), Allies beider Fraktionen (`facIs`) |
 | `cards11.js`, `cardfx11.js` | Set *Fields of Honor* (honor, IDs 10001–10208, Tokens 10501+): Will of the Forsaken, Escape Artist, Find Treasure, honor counters / Battlegrounds, Werte festsetzen (`STAT_SET`) |
+| `cards12.js`, `cardfx12.js` | Set *Scourgewar* (scourgewar, IDs 11001–11270, Tokens 11501+): **Death Knights** (zehnte Klasse), **Master Heroes** (Kartentyp `Master Hero`, CR 301.4: `becomeHero`, `restoreStartHero`), Death Rattle (Wächter über die Friedhöfe, `deathRattle`), Mend (`mendList`), Assault (`assaultOf`), Mounts (CR 302.3). Gemeinsame Hilfen für wrathgate/icecrown |
+| `cards13.js`, `cardfx13.js` | Set *Wrathgate* (wrathgate, IDs 12001–12219, Tokens 12501+): Argent Crusade, „Lesson of …“ (`lessonAlt`), Flip mit „discard a <Klasse>“, Eitrigg (`UNIQUE_ALL`) |
+| `cards14.js`, `cardfx14.js` | Set *Icecrown* (icecrown, IDs 13001–13218, Tokens 13501+): Scourge (`scourgeReq`), Helden mit Deckbau-Regel auf der Rückseite (`HERO_DECK_RULES`, „either [Alliance] or [Horde]“: `factionEither`), Kräfte aus dem Friedhof (`fromGy`). Am Ende: Spieler mit Untargetable (Modi „Gegner“/„Du selbst“ filtern) |
 | `cardfx6.js` | Verhalten von March of the Legion |
 | `tourneydecks.js` | Turnier-Decklisten (DMF 2006/2007, World Championships Top 8) als Text, werden einmalig über den Importer in „Deine Decks“ übernommen – Listen, deren Held es im Spiel noch nicht gibt, erst sobald er da ist. `WORLDS` = Ordner je World Championship (Jahr, Stadt, Land; Bilder `icons/worlds_logo.png`, `icons/worlds_text.png`), `TOURNEY_HEROES` = Fraktion/Klasse fehlender Helden |
 | `ai.js` | CPU: `evaluateState`, `searchBestAction` (echtes Spiel), `fastAiAction` (Simulation) |
@@ -88,7 +91,7 @@ const fs = require('fs'), vm = require('vm');
 const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','ai','simcore','coach','tests'])
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','ai','simcore','coach','tests'])
   vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));

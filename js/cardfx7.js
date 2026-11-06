@@ -228,12 +228,17 @@ FX[5110] = { powers: [{ key: 'demknow', label: tr('Dämon zerstören: Ziehe 2'),
     payExtra: (s, it) => mustPick(s, it.pl, tr('Demonic Knowledge: Welchen Dämon zerstören?'), 'Demonic Knowledge', alliesOf(me(s, it.pl)).filter(a => isDemonS7(s, a)).map(a => a.uid), '5110:pay', {}, u => -cardValue(s, findCharacter(s, u))),
     resolve: (s, it) => drawCards(s, me(s, it.pl), 2) }], k: { pay: (s, a, v) => { const c = findCharacter(s, v); if (c) destroy(s, c); finishPrep(s); } } };
 // Nicht (vollständig) umgesetzt
-CARD_ISSUES[5062] = 'Ressourcen mit eigener Kraft "[Activate] >>> Draw a card" sind noch nicht umgesetzt.';
+// Invocation: "(2), Destroy this ability >>> This turn, resources you control have '[Activate] >>> Draw a card.'" (engine.js RES_GRANTS)
+FX[5062] = { powers: [{ key: 'invoc', label: tr('Zerstören: Ressourcen erhalten "[Activate] >>> Ziehe eine Karte"'), cost: 2, selfCost: selfDestroyCost, resolve: (s, it) => addPE(s, it.pl, { k: 'invoc5062' }) }] };
+FX_GRANT.invoc5062 = { label: tr('Ressource erschöpfen: Ziehe eine Karte (Invocation)'), act: true, resolve: (s, it) => drawCards(s, getPlayer(s, it.pl), 1) };
+RES_GRANTS.push((s, card, l) => l && pes(s, l.pid, 'invoc5062').length ? ['invoc5062'] : []);
 // "any number of …": Karten nacheinander wählen, "Fertig" beendet; danach k(a, Liste)
+// KI bei "beliebig viele": eigene Handkarten (aufdecken) und gegnerische Karten (Schaden/Zerstören) lohnen, eigene Karten im Spiel nicht
+function pickManyAi(s, pid, u) { const l = locate(s, u); if (!l) return -1; if (l.zone === 'hand') return 1; if (l.zone === 'graveyard' || l.zone === 'removed') return 0.5; return aiTargetValue(s, pid, u, true); }
 function pickMany(s, pid, prompt, src, cands, k, a, aiFn) { q(s, { op: 'call', k: 'E:pickMany', a: { pid, prompt, src, cands, k, a, list: [], ai: !!aiFn } }); }
 EK.pickMany = (s, a) => { const left = a.cands.filter(u => !a.list.includes(u) && findCharacter(s, u));
     if (!left.length) { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; }
-    ask(s, { pid: a.pid, prompt: a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false }); };
+    ask(s, { pid: a.pid, prompt: a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: a.ai ? pickManyAi(s, a.pid, u) : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false }); };
 EK.pickManyAdd = (s, a, v) => { if (v === '__done') { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; } q(s, { op: 'call', k: 'E:pickMany', a: { ...a, list: [...a.list, v] } }); };
 
 // ============================================================================
@@ -363,7 +368,14 @@ const enterCombatWithDamaged = (s, c, other) => { const o = findCharacter(s, oth
 FX[5175] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid && enterCombatWithDamaged(s, c, d.def)) trig(s, { id: 5175, k: 'go', a: { uid: c.uid, o: d.def } }); },
         defends: (s, c, d, pid) => { if (d.def === c.uid && enterCombatWithDamaged(s, c, d.att)) trig(s, { id: 5175, k: 'go', a: { uid: c.uid, o: d.att } }); } },
     k: { go: (s, a) => { const o = findCharacter(s, a.o); if (o) destroy(s, o); readyCard(s, findCharacter(s, a.uid)); } } };
-CARD_ISSUES[5128] = 'Oberste Deckkarte offen und Zielverbot nach Kartentyp sind noch nicht umgesetzt.';
+// Personal Weather Maker: "Play with the top card of your deck revealed. Opponents can't target cards in play you control that share a type with the top card of your deck."
+const kindType7 = c => !c ? null : isEquip(c) ? 'Equipment' : c.isTotem ? 'Ability' : c.type;
+FX[5128] = { aura: { kw: (s, src, sp, c, k) => { if (k !== 'spellshield' || src.attachedTo || ctrlOf(s, c) !== sp) return false; const p = me(s, sp); if (!p.deck.length) return false; return kindType7(CARDS[p.deck[p.deck.length - 1]]) === kindType7(c); } } };
+// Oberste Deckkarte sichtbar? (Raith, Tian, Personal Weather Maker) – viewer: Spieler, der schaut
+function topVisible(s, p, viewer) { const o = p.id === 1 ? s.p2 : s.p1;
+    if (o.allies.some(a => a.id === 4231 && active(s, a))) return true;
+    if ((p.ongoing || []).some(c => c.id === 5128 && !c.attachedTo && active(s, c))) return true;
+    return viewer === p.id && p.allies.some(a => a.id === 4232 && active(s, a)); }
 
 // ============================================================================
 // ALLIES 176–216, AUSRÜSTUNG 217–244, QUESTS 245–264
@@ -517,11 +529,6 @@ FX[5263] = { questCond: (s, pid) => (pes(s, pid, 'heroDmgTotal').reduce((n, m) =
 onEvt('dmg', (s, d) => { const a = d.src && findCharacter(s, d.src); if (a && a.type === 'Hero' && d.amt > 0) addPE(s, d.spid, { k: 'heroDmgTotal', v: d.amt }); });
 FX[5264] = { reward: (s, pid) => addPE(s, pid, { k: 'equipInstant' }) };
 CARD_ISSUES[5197] = 'Side Decks gibt es in diesem Spiel nicht.';
-CARD_ISSUES[5198] = 'Sabotage einer Quest mit Abschluss durch den Angreifer ist noch nicht umgesetzt.';
-CARD_ISSUES[5201] = 'Sabotage eines Friedhofs ist noch nicht umgesetzt.';
-CARD_ISSUES[5204] = 'Sabotage einer Hand ist noch nicht umgesetzt.';
-CARD_ISSUES[5205] = 'Sabotage eines Spielers ist noch nicht umgesetzt.';
-CARD_ISSUES[5207] = 'Sabotage eines Decks ist noch nicht umgesetzt.';
 CARD_ISSUES[5209] = 'Einen Onyxia-Raid zu starten ist in diesem Spiel nicht möglich.';
 
 // ============================================================================
@@ -733,3 +740,38 @@ FX[5259] = { questNoPay: true,
         go: (s, a) => { for (const u of a.list) { const l = gyCard(s, u); if (!l) continue; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(l.c.id); o.deck = shuffleDeck(o.deck); }
             if (a.list.length) L(s, tr`Preparing for War: ${a.list.length} Karten in die Decks gemischt.`, '', a.pid); } } };
 
+
+// ---------------------------------------------------------------- Sabotage: Quest, Graveyard, Hand, Player, Deck (früher ⚠)
+// Ziele wie bei "Sabotage: Player": der gegnerische Held vertritt Friedhof, Hand und Deck (engine.js sabotageTargets/sabotageLabel)
+// Arcanist Dayvana: "When this ally sabotages a quest, you may complete it this turn."
+FX[5198] = { sabotage: 'Quest', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5198, k: 'go', a: { pid, q: d.tgt } }); } },
+    k: { go: (s, a) => { const l = locate(s, a.q); if (!l || !l.res || !l.res.faceUp || l.c.type !== 'Quest') return; const f = FX[l.c.id] || {}; const p = me(s, a.pid);
+            if (f.questCond && f.questCond(s, a.pid, l.res)) return; const cost = f.questNoPay ? 0 : questCostOf(s, p, l.c); if (getReadyRes(p) < cost) return;
+            yesNo(s, a.pid, tr`Arcanist Dayvana: ${l.c.name} für (${cost}) abschließen?`, 'Arcanist Dayvana', '5198:do', { ...a, cost }, true); },
+        do: (s, a, v) => { const l = locate(s, a.q); if (!v || !l || !l.res || !l.res.faceUp) return; const p = me(s, a.pid); if (!payRes(p, a.cost)) return; l.res.faceUp = false; evt(s, 'resTurnedDown', { pid: l.pid, uid: a.q });
+            L(s, tr`📜 ${l.c.name} erfüllt (Arcanist Dayvana)`, 'log-heal', a.pid); evt(s, 'questDone', { pid: a.pid, uid: a.q, id: l.c.id });
+            s.chain.push({ kind: 'reward', id: newUid('rw_'), pl: a.pid, src: a.q, srcId: l.c.id, srcName: l.c.name, label: tr('Belohnung') }); } } };
+// Magistrix Larynna: "When this ally sabotages a graveyard, she deals 1 fire damage to target hero or ally for each card in it."
+FX[5201] = { sabotage: 'Graveyard', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5201, k: 'go', a: { pid, uid: c.uid, n: foe(s, pid).graveyard.length } }); } },
+    k: { go: (s, a) => { if (a.n > 0) mustPick(s, a.pid, tr`Magistrix Larynna: ${a.n} Feuerschaden`, 'Magistrix Larynna', targetCands(s, a.pid, { char: true }), '5201:do', a); },
+        do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: a.n, dt: 'Fire' }); } } };
+// Retainer Eteron: "When this ally sabotages an opponent's hand, look at it and choose up to two cards. That opponent puts those cards into his resource row face down and exhausted."
+FX[5204] = { sabotage: 'Hand', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5204, k: 'go', a: { pid, opp: oppPid(s, pid) } }); } },
+    k: { go: (s, a) => { const o = me(s, a.opp); showHand(s, a.pid, a.opp, 'Retainer Eteron'); if (!o.hand.length) return; q(s, { op: 'trig', id: 5204, k: 'pick', a: { ...a, left: 2, list: [] } }); },
+        pick: (s, a) => { const o = me(s, a.opp); const l = o.hand.filter(c => !a.list.includes(c.uid)); if (a.left <= 0 || !l.length) { q(s, { op: 'trig', id: 5204, k: 'put', a }); return; }
+            ask(s, { pid: a.pid, prompt: tr`Retainer Eteron: Karte wählen (noch ${a.left})`, src: 'Retainer Eteron', opts: [...l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: c.cost || 0 })), { label: tr('Fertig'), v: 0, ai: -1 }], k: '5204:add', a, auto: false }); },
+        add: (s, a, v) => { if (!v) { q(s, { op: 'trig', id: 5204, k: 'put', a }); return; } q(s, { op: 'trig', id: 5204, k: 'pick', a: { ...a, left: a.left - 1, list: [...a.list, v] } }); },
+        put: (s, a) => { const o = me(s, a.opp); a.list.forEach(u => { const i = o.hand.findIndex(c => c.uid === u); if (i < 0) return; const c = o.hand.splice(i, 1)[0]; evt(s, 'handLeft', { pid: o.id, uid: u }); resetInst(c); o.resources.push({ card: c, faceUp: false, exhausted: true }); }); if (a.list.length) L(s, tr`${o.hero.name} legt ${a.list.length} Karte(n) verdeckt und erschöpft in die Ressourcenreihe.`, '', a.pid); } } };
+// Retainer Ryn: "When this ally sabotages a player, that player chooses an ability, ally, equipment, or resource he controls and puts it on top of its owner's deck."
+FX[5205] = { sabotage: 'Player', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5205, k: 'go', a: { opp: oppPid(s, pid) } }); } },
+    k: { go: (s, a) => { const o = me(s, a.opp); const l = [...nonHeroCards(s, o).filter(c => ctrlOf(s, c) === o.id).map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), ...o.resources.map(r => ({ label: r.faceUp ? r.card.name : tr('verdeckte Ressource'), v: r.card.uid, ai: -1 }))];
+            if (l.length) ask(s, { pid: a.opp, prompt: tr('Retainer Ryn: eigene Karte oben auf das Deck ihres Besitzers'), src: 'Retainer Ryn', opts: l, k: '5205:do', a }); },
+        do: (s, a, v) => { const o = me(s, a.opp); const i = o.resources.findIndex(r => r.card.uid === v);
+            if (i >= 0) { const r = o.resources.splice(i, 1)[0]; me(s, r.card.owner || o.id).deck.push(r.card.id); L(s, tr`${r.faceUp ? r.card.name : tr('Eine Ressource')} kommt oben auf das Deck.`, '', o.id); return; }
+            const c = findCharacter(s, v); if (c) leavePlay(s, c, 'deckTop', { destroyed: false }); } } };
+// Spymaster Thalodien: "When this ally sabotages a deck, reveal cards from the top until you reveal a non-quest. Remove that card from the game and put the rest on the bottom. You may play that card without paying its cost this turn. (If it has X in its cost, X is 0.)"
+FX[5207] = { sabotage: 'Deck', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5207, k: 'go', a: { pid, opp: oppPid(s, pid) } }); } },
+    k: { go: (s, a) => { const o = me(s, a.opp); const rev = []; let hit = null; while (o.deck.length) { const id = o.deck.pop(); if (CARDS[id].type === 'Quest') { rev.push(id); continue; } hit = id; break; }
+        L(s, tr`👁 Spymaster Thalodien deckt auf: ${[...rev, hit].filter(Boolean).map(id => CARDS[id].name).join(', ') || '–'}`, '', a.pid); putBottom(s, o.id, rev);
+        if (!hit) return; const c = makeCardInst(hit, false, o.id); o.removed.push(c); addPE(s, a.pid, { k: 'rfgPlayUid', uid: c.uid }); addPE(s, a.pid, { k: 'freePlayUid', uid: c.uid }); } } };
+COST_MODS.push((s, pid, card) => card.uid && pes(s, pid, 'freePlayUid').some(m => m.uid === card.uid) ? -(card.cost || 0) : 0);

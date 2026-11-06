@@ -1152,6 +1152,82 @@ function runRuleTests() {
         const m = put(s2, 1, 10108), big = put(s2, 2, 262);                                // Marundal: ATK und [Health] = Kosten
         assert(atkOf(s2, big, {}) === (big.cost || 0) && hpOf(s2, big) === (big.cost || 0), `Marundal: ${atkOf(s2, big, {})}/${hpOf(s2, big)} statt ${big.cost}/${big.cost}`);
     });
+    // ---------------- Set scourgewar: Master Heroes, Death Rattle, Mend, Assault, Mounts, Death Knights
+    test(120, "Master Hero (CR 301.4): Kel'Thuzad ersetzt den Helden mit Schaden, Ausrüstung und uid; der alte Held ist entfernt", () => {
+        const s = fresh(); res(s, 1, 10); const h0 = P(s, 1).hero; h0.damage = 5; const w = put(s, 1, Object.values(CARDS).find(c => c.type === 'Weapon' && !c.text && !c.isToken && (c.allowedClasses || []).includes('Hunter')).id);
+        const foeAlly = put(s, 2, 262);
+        const ki = hand(s, 1, 11021); act(s, getLegalActions(s, 1).find(a => a.type === 'PLAY_CARD' && a.handIdx === ki), 1);
+        const h = P(s, 1).hero;
+        assert(h.id === 11021 && h.uid === 'hero_1' && h.damage === 5, `Held danach: ${h.name} (${h.uid}) mit ${h.damage} Schaden`);
+        assert(h.weapons.includes(w) && P(s, 1).removed.some(c => c.id === h0.id), 'Waffe nicht übernommen oder alter Held nicht entfernt');
+        assert(atkOf(s, h, {}) >= 3, `Kel'Thuzad ATK ${atkOf(s, h, {})} statt 3`);
+        assert(ctrlOf(s, foeAlly) === 1, "Kel'Thuzad: gegnerischer Ally nicht übernommen");
+    });
+    test(121, 'Death Rattle: löst aus, wenn die Karte von irgendwo in den Friedhof kommt (auch abgeworfen)', () => {
+        const s = fresh(); const a = put(s, 1, 262);
+        const i = hand(s, 1, 11098); EK.discardDo(s, {}, P(s, 1).hand[i].uid); process(s); autoResolve(s);
+        assert((a.tm || []).some(m => m.k === 'resist10' && m.dt === 'Shadow'), "Jek'kresh: Death Rattle hat nicht ausgelöst");
+        const n = (a.tm || []).length; stateBased(s); process(s); autoResolve(s);
+        assert((a.tm || []).length === n, 'Death Rattle hat ein zweites Mal ausgelöst');
+    });
+    test(122, 'Mend und Assault (CR Glossar), Mounts greifen nicht an und werden nicht angegriffen (CR 302.3)', () => {
+        const s = fresh(); const hz = put(s, 1, 11181); const a = P(s, 1).hero; a.damage = 5;
+        evt(s, 'startOfTurn', { pid: 1 }); process(s); autoResolve(s);
+        assert(a.damage === 3, `Mend 2: Schaden ${a.damage} statt 3`);
+        const g = put(s, 1, 11135);
+        assert(atkOf(s, g, {}) === 3, `Assault 3 im eigenen Zug: ATK ${atkOf(s, g, {})}`);
+        s.activePlayer = 2; assert(atkOf(s, g, {}) === 0, `Assault im gegnerischen Zug: ATK ${atkOf(s, g, {})}`); s.activePlayer = 1;
+        const m = put(s, 1, 11025), x = put(s, 2, 262);
+        assert(!canAttackNow(s, m, P(s, 1)), 'Mount darf angreifen');
+        assert(!attackTargets(s, x).some(d => d.uid === m.uid), 'Mount kann angegriffen werden');
+    });
+    test(123, 'Death Knights: Klasse, "If you control another Death Knight: Flip", Unholy Presence', () => {
+        assert(CARDS[11003].class === 'Death Knight' && CARDS[11003].talent === 'Unholy', 'Erondra: Klasse/Talent falsch');
+        const s = freshH(11003, 13); const pow = getPowers(s, P(s, 1).hero).find(p => p.flip);
+        assert(!!canUsePower(s, 1, P(s, 1).hero, pow), 'Flip ohne weiteren Death Knight erlaubt');
+        put(s, 1, 11129);
+        assert(!canUsePower(s, 1, P(s, 1).hero, pow), `Flip mit Death Knight nicht erlaubt: ${canUsePower(s, 1, P(s, 1).hero, pow)}`);
+        put(s, 1, 11030); const wc = Object.values(CARDS).find(c => c.type === 'Weapon' && (c.allowedClasses || []).includes('Death Knight') && (c.cost || 0) >= 2);
+        assert(getPlayCost(s, P(s, 1), makeCardInst(wc.id, false, 1)) === wc.cost - 1, 'Unholy Presence: Waffe nicht (1) billiger');
+    });
+    // ---------------- früher ⚠: Bezahlen mit Karten, Ready-Grenze, Kopie, doppelter Text, halber Schaden
+    test(125, 'Früher ⚠: Resourcefulness (Karten wie Ressourcen), Upstanding Spaulders, Masquerade Gown, Staff of Twin Worlds, Foam Sword Rack', () => {
+        const s = fresh(); P(s, 1).resources = []; const a = put(s, 1, 262); put(s, 1, 7030);
+        assert(getReadyRes(P(s, 1)) === 2 && payRes(P(s, 1), 2) && P(s, 1).hero.exhausted && a.exhausted, 'Resourcefulness: Held und Ally zahlen nicht wie Ressourcen');
+        const s2 = fresh(); res(s2, 1, 5); P(s2, 1).resources.forEach(r => { r.exhausted = true; }); put(s2, 2, 12179);
+        s2.queue.push({ op: 'turn', step: 'ready' }); process(s2);
+        const rdy = P(s2, 1).resources.filter(r => !r.exhausted).length;
+        assert(rdy <= 3, `Upstanding Spaulders: ${rdy} Ressourcen bereit gemacht`);
+        const s3 = fresh(); const x = put(s3, 1, 262), y = put(s3, 1, 11135);
+        copyAlly9(s3, x, y);
+        assert(x.id === 11135 && x.name === CARDS[11135].name && atkOf(s3, x, {}) === 3, 'Masquerade Gown: keine Kopie');
+        s3.turn++; stateBased(s3);
+        assert(x.id === 262, 'Masquerade Gown: Kopie endet nicht');
+        const s4 = fresh(); const g = put(s4, 1, 262); put(s4, 1, 11045);
+        const base = atkOf(s4, g, {}); put(s4, 2, 7234);
+        assert(atkOf(s4, g, {}) === base + 1, `Staff of Twin Worlds: Assault nicht doppelt (${base} → ${atkOf(s4, g, {})})`);
+        const s5 = fresh(); res(s5, 1, 2); put(s5, 1, 8092); const h2 = P(s5, 2).hero; const d0 = h2.damage || 0;
+        const pw = getPowers(s5, P(s5, 1).hero).find(p => p.grant === 'foam10');
+        assert(!!pw, 'Foam Sword Rack: Held hat die Kraft nicht');
+        dealDamage(s5, { src: P(s5, 1).hero.uid, tgt: h2.uid, amt: 0.5, dt: 'Melee' }); process(s5); autoResolve(s5);
+        assert(Math.abs((h2.damage || 0) - d0 - 0.5) < 1e-9, `Foam Sword Rack: Schaden ${h2.damage}`);
+    });
+    // ---------------- Set wrathgate
+    test(124, 'Wrathgate: "Lesson of …" (Klassen-Ally erschöpfen statt bezahlen), Eitrigg (alles Unique), Frost Fever (kein Assault/Mend)', () => {
+        const s = freshH(12010, 13); const r = put(s, 1, Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && isClassCardData(c, 'Rogue') && !FX[c.id].on && !FX[c.id].aura && !FX[c.id].powers).sort((a, b) => (a.text || '').length - (b.text || '').length)[0].id);
+        const i = hand(s, 1, 12067); const t = put(s, 1, 262);
+        assert(!!(FX[12067].alt && FX[12067].alt.can(s, 1, P(s, 1).hand[i])), 'Lesson of the Shadow: Ersatzkosten nicht möglich');
+        act(s, getLegalActions(s, 1).find(a => a.type === 'PLAY_CARD' && a.handIdx === i), 1);
+        assert(r.exhausted && P(s, 1).resources.every(x => !x.exhausted), 'Lesson of the Shadow: Rogue nicht erschöpft oder Ressourcen bezahlt');
+        const s2 = fresh(); const a1 = put(s2, 1, 262), a2 = put(s2, 1, 262);
+        assert(!findLimitViolation(s2, P(s2, 1)), 'zwei gleiche Allies ohne Eitrigg verboten');
+        put(s2, 2, 12162);
+        assert(!!findLimitViolation(s2, P(s2, 1)), 'Eitrigg: zwei gleiche Allies bleiben erlaubt');
+        const s3 = fresh(); const g = put(s3, 1, 11135);
+        assert(atkOf(s3, g, {}) === 3, 'Assault 3 fehlt');
+        put(s3, 2, 12025, { attachedTo: P(s3, 1).hero.uid });
+        assert(atkOf(s3, g, {}) === 0, `Frost Fever: Assault wirkt noch (ATK ${atkOf(s3, g, {})})`);
+    });
     LANG = prevLang;
     return results;
 }
@@ -1178,7 +1254,7 @@ function runCardTests(ids) {
         for (const p of [s.p1, s.p2]) for (const z of [p.hand, p.allies, p.graveyard, p.ongoing, p.removed, p.hero.weapons, p.hero.armors, p.resources.map(r => r.card)])
             for (const c of z) {
                 if (!c || !CARDS[c.id]) return 'ungültige Karte in einer Zone';
-                if (uids.has(c.uid)) return `${c.name} liegt doppelt (${c.uid})`;
+                if (uids.has(c.uid) && !c.allyItem9 && !c.allyRes6) return `${c.name} liegt doppelt (${c.uid})`;   // Arcanite Dragonling, Imp Mistress Noali: gewollt in zwei Zonen
                 uids.add(c.uid);
                 if (!Number.isFinite(c.damage || 0)) return `${c.name}: Schaden ${c.damage}`;
             }
@@ -1262,6 +1338,21 @@ function runCardTests(ids) {
         ['Gegner-Ally greift Held an, eigener Protector fängt ab', s => { oppTurn(s); const pr = makeCardInst(protector.id, false, 1); pr.joinedTurn = 1; s.p1.allies.push(pr); return atk(s, 2, fresh2(s).uid, s.p1.hero.uid); }],
         ['Eigener Ally greift an, Protector fängt ab', s => { const pr = makeCardInst(protector.id, false, 2); pr.joinedTurn = 1; s.p2.allies.push(pr); return atk(s, 1, s.p1.allies[0].uid, s.p2.hero.uid); }],
         ['Gegner spielt Fähigkeit', oppCast],
+        // Set scourgewar: gegnerische Instant-Fähigkeit auf der Kette (Disarm Trap: "Interrupt target instant")
+        // Set wrathgate: billige gegnerische Fähigkeit auf der Kette (Kick Thinking: "cost less than or equal to the number of Mages and Rogues you control")
+        ['Gegner spielt Fähigkeit mit Kosten 0–1', s => { oppTurn(s); for (const ab of Object.values(CARDS)) { if (ab.type !== 'Ability' || ab.ongoing || ab.isToken || (ab.cost || 0) > 1 || !cardMatchesPlayer(ab, s.p2)) continue;
+            s.p2.hand.unshift(makeCardInst(ab.id, false, 2)); const a = getLegalActions(s, 2).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0);
+            if (a && applyAction(s, a, true, 2)) return true; s.p2.hand.shift(); } return false; }],
+        // Set wrathgate: Allies jeder Schadensart im eigenen Friedhof (Sacred Circle: "[Holy] ally from your graveyard")
+        // Sets icecrown: eigene Allies jeder Klasse und ein gegnerischer Ghoul (Boundless Concentration, Necessary Sacrifice …), Fernkampfwaffe (Penetrating Shots), Protector im Friedhof (Restitution)
+        ['Eigene Allies jeder Klasse, gegnerischer Ghoul', s => { for (const k of ['Death Knight', 'Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior']) { const a = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && !c.isPet && (c.allyClass === k || (c.allyTypes || []).includes(k)) && (c.cost || 0) >= 2 && !(FX[c.id] && (FX[c.id].aura || FX[c.id].on))); if (a) { const x = makeCardInst(a.id, false, 1); x.joinedTurn = 1; s.p1.allies.push(x); } }
+            const g = makeCardInst(11501, false, 2); g.joinedTurn = 1; s.p2.allies.push(g); return true; }],
+        ['Eigene Fernkampfwaffe', s => { const w = Object.values(CARDS).filter(c => c.type === 'Weapon' && c.slot === 'Ranged' && !c.isToken && !c.unique && !FX[c.id].on && !FX[c.id].aura).sort((a, b) => (a.text || '').length - (b.text || '').length)[0]; if (!w) return false; s.p1.hero.weapons = s.p1.hero.weapons.filter(x => x.slot !== 'Ranged'); s.p1.hero.weapons.push(makeCardInst(w.id, false, 1)); return true; }],
+        ['Protector im Friedhof', s => { const a = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && c.protector && (c.cost || 0) <= 3); if (a) s.p1.graveyard.push(makeCardInst(a.id, false, 1)); return !!a; }],
+        ['Allies jeder Schadensart im Friedhof', s => { for (const dt of ['Arcane', 'Fire', 'Frost', 'Holy', 'Melee', 'Nature', 'Ranged', 'Shadow']) { const a = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && c.atkType === dt && (c.cost || 0) <= 3); if (a) s.p1.graveyard.push(makeCardInst(a.id, false, 1)); } return true; }],
+        ['Gegner spielt Instant', s => { oppTurn(s); for (const ab of Object.values(CARDS)) { if (ab.type !== 'Ability' || !ab.instant || ab.ongoing || ab.isToken || (ab.cost || 0) > 3 || !cardMatchesPlayer(ab, s.p2)) continue;
+            s.p2.hand.unshift(makeCardInst(ab.id, false, 2)); const a = getLegalActions(s, 2).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0 && JSON.stringify(x.targets) === JSON.stringify([[s.p1.hero.uid]]));
+            if (a && applyAction(s, a, true, 2)) return true; s.p2.hand.shift(); } return false; }],
         // Set drums: eigene Bear Form und gegnerische Fähigkeit auf der Kette (Feral Charge)
         ['Bear Form, Gegner spielt Fähigkeit', s => { const bf = Object.values(CARDS).find(c => c.bearForm && c.type === 'Ability' && !c.isToken); const x = makeCardInst(bf.id, false, 1); x.joinedTurn = 1; s.p1.ongoing.push(x); return oppCast(s); }],
         ['Held hat Stealth', s => { addTM(s.p1.hero, { k: 'stealth', turn: s.turn }); return true; }],

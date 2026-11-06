@@ -75,7 +75,7 @@ FX[10010] = { powers: [flipPow(tr('Gewählte Resistenz in diesem Zug'), 3, { mod
     resolve: (s, it) => addTM(heroOf(s, it.pl), { k: 'resist10', dt: it.mode, turn: s.turn }) })] };
 // Resistenz "this turn" als TM (Silvermoon City, Addisyn the Untouchable): allgemein über DMG-Verhinderung
 FX[10010].backAura = true;
-FX[10010].aura = { prevent: (s, src, sp, t, from, o, amt) => (t.tm || []).some(m => m.k === 'resist10' && m.turn === s.turn && m.dt === o.dt) && t.uid === src.uid ? amt : 0 };
+FX[10010].aura = { prevent: (s, src, sp, t, from, o, amt) => (t.tm || []).some(m => m.k === 'resist10' && m.turn === s.turn && m.dt === o.dt) && t.uid === src.uid && !resistLost(s, t) ? amt : 0 };
 FX[10011] = { powers: [flipPow(tr('Ziel-Ally erhält Ferocity'), 3, { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'ferocity', turn: s.turn }); } })] };
 FX[10012] = { powers: [flipPow(tr('Heile 2 an jedem eigenen Charakter'), 2, { resolve: (s, it) => partyOf(me(s, it.pl)).forEach(c => heroHeal(s, it.pl, c.uid, 2)) })] };
 FX[10013] = { powers: [flipPow(tr('Du und Ziel-Gegner werft je eine Karte ab'), 0, { myTurn: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }],
@@ -233,7 +233,6 @@ FX[10072] = { canPlay: (s, pid) => alliesOf(me(s, pid)).length > 0 || tr('Kein e
     addCost: (s, it) => mustPick(s, it.pl, tr('Dominate: eigenen Ally zerstören'), 'Dominate', alliesOf(me(s, it.pl)).map(c => c.uid), '10072:pay', {}, u => atkOf(s, findCharacter(s, u))),
     resolve: (s, it) => { const n = it.extra.atk11 || 0; if (n > 0) opposingChars(s, it.pl).forEach(c => heroDmg(s, it.pl, c.uid, n, 'Shadow')); },
     k: { pay: (s, a, v) => { const c = v && findCharacter(s, v); if (c) { if (s.chainPrep) s.chainPrep.extra.atk11 = atkOf(s, c); destroy(s, c, { cause: 'cost' }); } finishPrep(s); } } };
-CARD_ISSUES[10073] = 'Die gedruckten Kräfte einer entfernten Karte übernehmen ist noch nicht umgesetzt.';
 FX[10074] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; } };
 DESTROY_PRE.push((s, c) => { if (!isAllyLike(c)) return; for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.attachedTo === c.uid && active(s, o)) {
     if (o.id === 10074) pushTrig(s, p.id, 10074, [{ op: 'trig', id: 10074, k: 'back', a: { owner: c.owner || ctrlOf(s, c), uid: c.uid } }]);
@@ -289,7 +288,6 @@ FX[10098] = { powers: [{ key: 'durgle', label: tr('Fähigkeit aus dem Friedhof e
     resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) heal(s, c.uid, c.uid, 2); } }], k: { pay: (s, a, v) => { if (v) gyRemove(s, v); finishPrep(s); } } };
 FX[10099] = { aura: { attackOnlyAll: (s, src, sp, att) => src.exhausted && ctrlOf(s, att) !== sp ? src.uid : null } };
 FX[10100] = fxMix(findTreasure(10100));
-CARD_ISSUES[10100] = 'Find Treasure wirkt; den Helden wie eine Ressource zum Bezahlen erschöpfen ist noch nicht umgesetzt.';
 FX[10101] = findTreasure(10101);
 FX[10102] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 10102, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => { const o = foe(s, a.pid); const l = [...nonHeroCards(s, o), ...o.resources.filter(r => r.faceUp).map(r => r.card)].filter(c => facIs(c, 'Horde') || (c.allowedFactions || []).includes('Horde')); if (!l.length) return;
@@ -340,8 +338,13 @@ FX[10123] = fxMix(forsaken, onEnter(10123, 'back'), { k: { back: (s, a) => [a.pi
 FX[10124] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 10124, k: 'buff', a: { uid: c.uid } }); } }, k: { buff: (s, a) => { const c = findCharacter(s, a.uid); if (c) addTM(c, { k: 'atk', v: 2, turn: s.turn }); } } };
 FX[10125] = fxMix(forsaken, { canProtectSelf: true, aura: { protectFor: (s, src, sp, c, def) => def.uid === src.uid && c.type === 'Hero' && ctrlOf(s, c) === sp } });
 FX[10126] = fxMix(forsaken, { aura: { atk: (s, src, sp, c) => { if (c.uid !== src.uid || !s.battle || s.battle.att !== c.uid) return 0; const d = findCharacter(s, s.battle.def); return d && isExhausted(s, d) ? 3 : 0; } } });
-FX[10127] = fxMix(forsaken, { aura: { redirect: (s, src, sp, t, o) => t.uid !== src.uid && isChar(t) && ctrlOf(s, t) === sp && src.dethvir11 === s.turn ? src.uid : null } });
-CARD_ISSUES[10127] = 'Will of the Forsaken wirkt; die freiwillige Schadensumleitung ("you may") fragt noch nicht nach.';
+// Dethvir the Malignant: "If another hero or ally you control would be dealt damage, you may have it be dealt to this ally instead."
+FX[10127] = fxMix(forsaken, {});
+DMG_PRE.push((s, o) => { if (o.dethvir11 || !(o.amt > 0)) return; const t = o.tgt && findCharacter(s, o.tgt); if (!t || !isChar(t)) return; const pid = ctrlOf(s, t); if (!pid) return;
+    const d = me(s, pid).allies.find(a => a.id === 10127 && a.uid !== t.uid && active(s, a)); if (!d) return; const full = { ...o, dethvir11: true }; o.amt = 0; q(s, { op: 'call', k: 'E:dethvir11', a: { pid, o: full, d: d.uid } }); });
+EK.dethvir11 = (s, a) => { const d = findCharacter(s, a.d), t = findCharacter(s, a.o.tgt); if (!d || !t) { dealDamage(s, a.o); return; }
+    yesNo(s, a.pid, tr`Dethvir the Malignant: ${a.o.amt} Schaden an ${t.name} stattdessen Dethvir zufügen?`, 'Dethvir the Malignant', 'E:dethvir11Do', a, t.type === 'Hero' && (d.damage || 0) + a.o.amt < hpOf(s, d)); };
+EK.dethvir11Do = (s, a, v) => dealDamage(s, v && findCharacter(s, a.d) ? { ...a.o, tgt: a.d } : a.o);
 FX[10128] = { selfCost: (s, pid) => -honorTotal(s, pid),
     powers: [{ key: 'drekthar', label: tr('Honor counter entfernen: Wolf-Token mit Ferocity'), cost: 1, canUse: (s, pid) => honorCards(s, pid).length > 0 || tr('Kein honor counter'),
         payExtra: (s, it) => mustPick(s, it.pl, tr('Honor counter entfernen von …'), "Drek'Thar", honorCards(s, it.pl).map(c => c.uid), 'E:honorRm11', {}, () => 1), resolve: (s, it) => makeToken(s, 10505, it.pl) }] };
@@ -430,7 +433,8 @@ FX[10164] = { powers: [actPow('windtalker', tr('Oberste zwei aufdecken: verschie
         const ty = id => isEquip(CARDS[id]) ? 'Equipment' : CARDS[id].type; if (ids.length === 2 && ty(ids[0]) !== ty(ids[1])) { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Nature', { ability: false }); } } })] };
 FX[10165] = fxMix(onEnter(10165, 'go'), { k: { go: (s) => [s.p1, s.p2].forEach(p => { p.resources.filter(r => !r.faceUp).forEach(r => { p.resources.splice(p.resources.indexOf(r), 1); resetInst(r.card); me(s, r.card.owner || p.id).hand.push(r.card); }); L(s, tr`Bangle of Endless Blessings: verdeckte Ressourcen von ${p.hero.name} gehen auf die Hand.`); }) },
     aura: { noFaceDownRes: () => true } });
-CARD_ISSUES[10166] = 'Eigene Allies können keine eigene Ausrüstung angreifen – noch nicht umgesetzt.';
+FX[10166] = { on: { defends: (s, c, d, pid) => { if (d.def === c.uid) trig(s, { id: 10166, k: 'pop', a: { pid, uid: c.uid } }); } },
+    k: { pop: (s, a) => { const c = findCharacter(s, a.uid); if (c && destroy(s, c)) drawCards(s, me(s, a.pid), 2); } } };   // Piñata: angreifbar durch eigene Allies (engine.js attackTargets)
 const insignia = (id, burst) => ({ on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id, k: 'add', a: { uid: c.uid } }); } },
     k: { add: (s, a) => { const c = findCharacter(s, a.uid); if (!c) return; addCounter(s, c, 'honor', 1); insigniaCheck(s, c); }, burst } });
 FX[10167] = insignia(10167, (s, a) => mustPick(s, a.pid, tr('Stormpike Insignia: 5 Frostschaden'), 'Stormpike Insignia', targetCands(s, a.pid, { char: true }), '10167:hit', a));
@@ -444,7 +448,6 @@ FX[10171] = fxMix(onEnter(10171, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid
 onEvt('died', (s, d) => { (s.died11 = s.died11 || {})[d.snap.wasCtrl] = s.turn; });
 onEvt('destroyed', (s, d) => { (s.died11 = s.died11 || {})[d.snap.wasCtrl] = s.turn; });
 FX[10172] = { aura: { strike: (s, src, sp, pid, w) => pid === sp && w.uid === src.uid && (s.died11 || {})[oppPid(s, sp)] === s.turn ? -3 : 0 } };
-CARD_ISSUES[10173] = 'Die oberste Deckkarte als Ressource legen ist noch nicht umgesetzt.';
 FX[10174] = { aura: { kw: (s, src, sp, c, k) => k === 'dualWield' && c.uid === heroOf(s, sp).uid },
     powers: [{ key: 'heartless', label: tr('1 Schaden auf eigenen Ally: nächster Schlag (1) weniger'), canUse: (s, pid) => alliesOf(me(s, pid)).length > 0 || tr('Kein eigener Ally'),
         payExtra: (s, it) => mustPick(s, it.pl, tr('Heartless: 1 Schaden auf einen eigenen Ally'), 'Heartless', alliesOf(me(s, it.pl)).map(c => c.uid), '7189:pay', {}, u => { const c = findCharacter(s, u); return hpOf(s, c) - (c.damage || 0); }),
@@ -459,7 +462,8 @@ FX[10179] = { strikeLR: true, on: { startOfTurn: (s, c, d, pid) => { if (d.pid =
     k: { ask: (s, a) => { const w = findCharacter(s, a.uid); if (!w) return; if (getReadyRes(me(s, a.pid)) < 1) { exhaust(s, w); return; } yesNo(s, a.pid, tr('Steelhawk Crossbow: (1) bezahlen, sonst wird sie erschöpft?'), 'Steelhawk Crossbow', '10179:do', a, true); },
         do: (s, a, v) => { const w = findCharacter(s, a.uid); if (!w) return; if (v && payRes(me(s, a.pid), 1)) return; exhaust(s, w); } } };
 FX[10180] = { aura: { kw: (s, src, sp, c, k) => k === 'dualWield' && c.uid === heroOf(s, sp).uid } };
-CARD_ISSUES[10180] = 'Dual Wield wirkt; Zuschlagen, während ein eigener Ally angreift oder verteidigt, ist noch nicht umgesetzt.';
+// "You can strike with this weapon while an ally you control is attacking or defending." (engine.js askStrike: ALLY_STRIKE)
+ALLY_STRIKE.push((s, ally, pid) => me(s, pid).hero.weapons.filter(w => w.id === 10180 && active(s, w)).map(w => w.uid));
 FX[10181] = fxMix(onEnter(10181, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid, tr('Wand of Prismatic Focus: Ziel-Ally'), 'Wand of Prismatic Focus', targetCands(s, a.pid, { ally: true }), '10181:do', a),
     do: (s, a, v) => { if (v) ['Arcane', 'Fire', 'Frost', 'Nature', 'Shadow'].forEach(dt => heroDmg(s, a.pid, v, 1, dt)); } } });
 FX[10182] = { powers: [{ key: 'hexblade', label: tr('Zerstören: Ziel-Ally zerstören'), cost: 2, selfCost: selfDestroyCost, slots: slotAlly(tr('Ziel-Ally'), true),
@@ -529,3 +533,8 @@ FX[10208] = { powers: [actPow('undercity', tr('Ally in einem Friedhof entfernen:
     k: { rm: (s, a, v) => { if (!v || !gyCard(s, a.uid)) return; gyRemove(s, a.uid); if (gyCard(s, a.uid)) return; const l = partyOf(me(s, a.pid)).filter(raceIs('Undead')); if (!l.length) return;
             ask(s, { pid: a.pid, prompt: tr('Undercity: Welcher Untote heilt 2?'), src: 'Undercity', opts: l.map(c => ({ label: c.name, v: c.uid, ai: c.damage || 0 })), k: '10208:heal', a }); },
         heal: (s, a, v) => { if (v) heal(s, v, v, 2); } } };
+// Hesriana: "When this ally enters play, you may remove target opposing ally from the game, and this ally has that card's printed powers while it remains removed from the game."
+// (engine.js: hesrianaOk – Kräfte, Auslöser und Dauereffekte der entfernten Karte)
+FX[10073] = fxMix(onEnter(10073, 'go'), { k: { go: (s, a) => mayPick(s, a.pid, tr('Hesriana: gegnerischen Ally aus dem Spiel entfernen?'), 'Hesriana', targetCands(s, a.pid, { ally: true, side: 'enemy' }), '10073:rm', a),
+    rm: (s, a, v) => { const t = v && findCharacter(s, v), h = findCharacter(s, a.uid); if (!t || removeFromGame(s, t) === false || findCharacter(s, v)) return; if (h) { h.hes11 = { id: t.id, uid: t.uid }; L(s, tr`Hesriana erhält die Kräfte von ${t.name}.`, '', a.pid); } } } });
+FX[10173] = { ...(FX[10173] || {}), engineImpl: true };

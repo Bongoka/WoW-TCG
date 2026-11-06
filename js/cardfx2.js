@@ -15,12 +15,16 @@ const TRAP = { label: tr('Verteidigenden Helden erschöpfen (Trap)'), ai: 3,
     pay: (s, it) => { exhaust(s, heroOf(s, it.pl)); altDone(s); } };
 // "you may … target …" – optionale Wahl mit "Nein"
 function mayPick(s, pid, prompt, src, cands, k, a, aiFn) {
+    if (cands.length && lollyTarget(s, prompt)) { yesNo(s, pid, prompt, src, 'E:lollyMay', { k, a: a || {}, cands }, true); return; }
     if (!cands.length) return;
     const opts = cands.map(u => ({ label: targetLabel(s, u, pid), v: u, ai: aiFn ? aiFn(u) : aiTargetValue(s, pid, u, true) }));
     opts.push({ label: tr('Nein'), v: 0, ai: 0 });
     ask(s, { pid, prompt, src, opts, k, a: a || {}, auto: false });
 }
+// Lolly the Unsuspecting (Set drums): "All targets are chosen at random." – auch Ziele ausgelöster Effekte (keine Kosten-/Auswahlfragen "Welche …")
+const lollyTarget = (s, prompt) => typeof lollyOn === 'function' && lollyOn(s) && !/^(Welche|Welchen|Welches|Wie|Which|How)/.test(String(prompt).replace(/^[^:]*: /, ''));
 function mustPick(s, pid, prompt, src, cands, k, a, aiFn) {
+    if (cands.length && lollyTarget(s, prompt)) { q(s, { op: 'call', k, a: a || {}, v: cands[Math.floor(Math.random() * cands.length)] }); return; }
     if (!cands.length) return;
     ask(s, { pid, prompt, src, opts: cands.map(u => ({ label: targetLabel(s, u, pid), v: u, ai: aiFn ? aiFn(u) : aiTargetValue(s, pid, u, true) })), k, a: a || {} });
 }
@@ -811,3 +815,4 @@ FX[1318] = { questCond: (s, pid) => [...me(s, pid).hero.weapons, ...me(s, pid).h
     questExtra: (s, pid) => { const eq = [...me(s, pid).hero.weapons, ...me(s, pid).hero.armors].filter(e => !e.exhausted); ask(s, { pid, prompt: tr('Samophlange: Welche Ausrüstung erschöpfen?'), src: 'Samophlange', opts: eq.map(e => ({ label: e.name, v: e.uid, ai: -(e.cost || 0) })), k: '1318:pay', a: {} }); },
     reward: Qd(1), k: { pay: (s, a, v) => { exhaust(s, findCharacter(s, v)); q(s, { op: 'call', k: 'E:questPay', a: {} }); } } };
 FX[1319] = { reward: (s, pid) => revealTop(s, pid, 4, 'The Scourge Cauldrons', { type: 'Quest', byQuest: true }) };
+EK.lollyMay = (s, a, v) => { if (!v) { q(s, { op: 'call', k: a.k, a: a.a, v: 0 }); return; } const l = a.cands.filter(u => findCharacter(s, u) || locate(s, u)); if (!l.length) return; q(s, { op: 'call', k: a.k, a: a.a, v: l[Math.floor(Math.random() * l.length)] }); };

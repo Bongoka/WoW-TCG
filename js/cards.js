@@ -4,7 +4,7 @@
 // Das Verhalten jeder Karte steht in js/cardfx.js (FX[id]).
 // ============================================================================
 const CARDS = {};
-const CL = { Dr:'Druid', Hu:'Hunter', Ma:'Mage', Pa:'Paladin', Pr:'Priest', Ro:'Rogue', Sh:'Shaman', Wa:'Warrior', Lo:'Warlock' };
+const CL = { Dr:'Druid', Hu:'Hunter', Ma:'Mage', Pa:'Paladin', Pr:'Priest', Ro:'Rogue', Sh:'Shaman', Wa:'Warrior', Lo:'Warlock', Dk:'Death Knight' };
 const cls = s => s.split(',').map(x => CL[x.trim()] || x.trim());
 
 function H(id, name, hp, klass, faction, talent, text) {
@@ -809,7 +809,7 @@ function applyOCR(map) {
         c.typeLine = tl; c.text = tx.replace(/ <p> /g, ' ');
         if (/Your hero has Cat Form/.test(tx)) c.catForm = true;
         if (/Your hero has Bear Form/.test(tx)) c.bearForm = true;
-        if (c.type === 'Hero') { const m = tl.match(/\(([^)]+)\)/); if (m) c.talent = m[1]; const r = tl.match(/Hero—(.+?) \w+ \(/); if (r) c.race = r[1]; continue; }
+        if (c.type === 'Hero') { const m = tl.match(/\(([^)]+)\)/); if (m) c.talent = m[1]; const r = tl.match(/Hero—(.+?) (?:Death Knight|\w+) \(/); if (r) c.race = r[1]; continue; }
         if (c.type === 'Location') { c.limitTags = {}; continue; }                     // "Objective (5)" ist die Kapazität, kein Limit
         c.instant = /^Instant/.test(tl);
         c.talentCard = /\bTalent\b/.test(tl);
@@ -819,7 +819,7 @@ function applyOCR(map) {
         if (c.type === 'Ability') {
             const after = (tl.split('—')[1] || '').split(',')[0].trim();
             const words = after.split(' ').filter(Boolean);
-            const schools = ['Arcane','Fire','Frost','Feral','Balance','Restoration','Beast Mastery','Marksmanship','Survival','Holy','Protection','Retribution','Discipline','Shadow','Combat','Assassination','Subtlety','Elemental','Enhancement','Affliction','Demonology','Destruction','Arms','Fury','Traitor'];
+            const schools = ['Arcane','Fire','Frost','Feral','Balance','Restoration','Beast Mastery','Marksmanship','Survival','Holy','Protection','Retribution','Discipline','Shadow','Combat','Assassination','Subtlety','Elemental','Enhancement','Affliction','Demonology','Destruction','Arms','Fury','Traitor','Blood','Unholy'];
             c.school = schools.find(sc => after.startsWith(sc)) || null;
             const rest = c.school ? after.slice(c.school.length).trim() : after;
             c.subtypes = rest.split(' ').filter(w => w && w !== 'Talent');

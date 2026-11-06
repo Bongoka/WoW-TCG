@@ -116,7 +116,10 @@ FX[8026] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = 
 FX[8027] = {};
 FX[8028] = { slots: (s, pid) => [{ label: tr('Ziel-Ally (+2 ATK)'), cands: targetCands(s, pid, { ally: true }), harm: false }, { label: tr('Zweiter Ziel-Ally (-2 ATK)'), cands: targetCands(s, pid, { ally: true }), harm: true }], distinct: true,
     resolve: (s, it) => { const a = T1(s, it, 0), b = T1(s, it, 1); if (a) addTM(a, { k: 'atk', v: 2, turn: s.turn }); if (b) addTM(b, { k: 'atk', v: -2, turn: s.turn }); } };
-CARD_ISSUES[8029] = 'Eine Nahkampfwaffe in eine Fernkampfwaffe umwandeln ist noch nicht umgesetzt.';
+// Improvised Weaponry: angehängte Nahkampfwaffe wird zu einer Fernkampfwaffe (Felder solange umgeschrieben, Long-Range beim Zuschlagen: engine.js strikeDo ranged8029)
+STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) for (const w of p.hero.weapons) { const on = attachedTo(s, w.uid, 8029).length > 0;
+    if (on && !w.impOrig8029) { w.impOrig8029 = { slot: w.slot, twoHanded: !!w.twoHanded, limitTags: w.limitTags, dmgType: w.dmgType || null }; w.slot = 'Ranged'; w.twoHanded = false; w.limitTags = { Ranged: 1 }; w.dmgType = 'Ranged'; w.ranged8029 = true; }
+    else if (!on && w.impOrig8029) { const o = w.impOrig8029; w.slot = o.slot; w.twoHanded = o.twoHanded; w.limitTags = o.limitTags; if (o.dmgType) w.dmgType = o.dmgType; else delete w.dmgType; delete w.impOrig8029; delete w.ranged8029; } } return false; });
 FX[8030] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T1(s, it); if (t) heroDmg(s, it.pl, t.uid, t.joinedTurn === s.turn ? 6 : 2, 'Ranged'); } };
 FX[8031] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1 + rangedAtk(s, it.pl), 'Ranged', { after: { k: '8031:lock', a: { uid: t } } }); },
     k: { lock: (s, a) => { const c = findCharacter(s, a.uid); if (c && c.type === 'Hero' && a.dealt > 0) addPE(s, ctrlOf(s, c), { k: 'noCards' }); } } };
@@ -226,7 +229,14 @@ FX[8072] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, {
     k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; opposingChars(s, a.pid).forEach(t => { const n = me(s, a.pid).ongoing.filter(o => o.attachedTo === t.uid).length; if (n) dealDamage(s, { src: a.uid, tgt: t.uid, amt: n, dt: 'Shadow' }); }); } } };
 FX[8073] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1, 'Shadow', { after: { k: '8073:pay', a: { pid: it.pl } } }); },
     k: { pay: (s, a) => { const n = a.dealt || 0; if (!n) return; putDamage(s, heroOf(s, a.pid), n); drawCards(s, me(s, a.pid), n); } } };
-CARD_ISSUES[8074] = 'Allies aus der eigenen Sammlung (außerhalb des Spiels) gibt es hier nicht.';
+// Ritual of Summoning: "Put an ally from your collection into play." – Sammlung = alle Karten des Spiels (wie Flash of Brilliance, Set wrathgate)
+FX[8074] = { powers: [{ key: 'ritual', label: tr('Held und zwei Allies erschöpfen: Ally aus deiner Sammlung ins Spiel'), myTurn: true,
+    canUse: (s, pid) => (!heroOf(s, pid).exhausted || tr('Held ist erschöpft')) === true && (alliesOf(me(s, pid)).filter(a => !a.exhausted && !cantExhaust(s, a)).length >= 2 || tr('Du brauchst zwei bereite Allies')),
+    payExtra: (s, it) => { exhaust(s, heroOf(s, it.pl)); pickN(s, it.pl, tr('Ritual of Summoning: zwei eigene Allies erschöpfen'), 'Ritual of Summoning', alliesOf(me(s, it.pl)).filter(a => !a.exhausted && !cantExhaust(s, a)).map(a => a.uid), 2, '8074:pay', {}); },
+    resolve: (s, it) => { const p = me(s, it.pl); const l = Object.values(CARDS).filter(c => isAllyCard(c) && !c.isToken && !CARD_ISSUES[c.id] && cardMatchesPlayer(c, p)).sort((a, b) => (b.cost || 0) - (a.cost || 0));
+        ask(s, { pid: it.pl, prompt: tr('Ritual of Summoning: Welcher Ally aus deiner Sammlung?'), src: 'Ritual of Summoning', opts: l.map(c => ({ label: `${c.name} (${c.cost || 0})`, v: c.id, card: c.id, ai: c.cost || 0 })), k: '8074:put', a: { pid: it.pl } }); } }],
+    k: { pay: (s, a, list) => { if ((list || []).length < 2) return abortPrep(s, tr('Zu wenige Allies')); list.forEach(u => { const c = findCharacter(s, u); if (c) exhaust(s, c); }); finishPrep(s); },
+        put: (s, a, id) => { if (id) putIntoPlay(s, makeCardInst(id, false, a.pid), a.pid); } } };
 FX[8075] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1, 'Melee', { after: { k: '8075:ask', a: { pid: it.pl } } }); },
     k: { ask: (s, a) => { if (!(a.dealt > 0)) return; mayPick(s, a.pid, tr('The Benefits of Practice: +1-ATK-Zähler auf eine eigene Waffe?'), 'The Benefits of Practice', me(s, a.pid).hero.weapons.map(w => w.uid), '8075:do', a, () => 2); },
         do: (s, a, v) => { if (v) addCounter(s, findCharacter(s, v), 'atk1', a.dealt); } } };
@@ -265,7 +275,6 @@ FX[8091] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.a
     k: { go: (s, a) => [a.first, a.first === 1 ? 2 : 1].forEach(pid => q(s, { op: 'call', k: '8091:ask', a: { pid, uid: a.uid } })),
         ask: (s, a) => { const c = findCharacter(s, a.uid); if (c) yesNo(s, a.pid, tr`AWESOME!: ${c.name} ein Kompliment machen und eine Karte ziehen?`, 'Center of Attention', '8091:do', a, true); },
         do: (s, a, v) => { if (!v) return; const c = findCharacter(s, a.uid); L(s, tr`👏 ${me(s, a.pid).hero.name}: „${c ? c.name : ''} ist großartig!“`, '', a.pid); drawCards(s, me(s, a.pid), 1); } } };
-CARD_ISSUES[8092] = 'Halber Schaden (½) ist in dieser Umsetzung nicht möglich.';
 
 // ============================================================================
 // ALLIES (93–155)
@@ -394,7 +403,9 @@ FX[8152] = { on: { died: (s, c, d, pid) => { if (d.snap.uid === c.uid) trig(s, {
         do: (s, a, v) => { if (v && gyCard(s, a.uid) && payRes(me(s, a.pid), 3)) fromGyToPlay(s, a.uid, a.owner); } } };
 FX[8152].on = { died: (s, c, d, pid) => {} };
 onEvt('died', (s, d) => { if (d.snap.id === 8152 && d.dest === 'graveyard') pushTrig(s, d.snap.wasCtrl, 8152, [{ op: 'trig', id: 8152, k: 'ask', a: { pid: d.snap.wasCtrl, uid: d.snap.uid, owner: d.snap.owner } }]); });
-CARD_ISSUES[8153] = 'Loot-Karten werden in dieser Umsetzung nicht von anderen Karten unterschieden.';
+// Sandbox Tiger: "+1 / +1 for each Loot card you control" – Loot-Karten (Loot-Sets) gibt es in diesem Spiel nicht, daher +0 (isLoot)
+const isLoot = c => !!c && !!(CARDS[c.id] && CARDS[c.id].loot);
+FX[8153] = { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? controlledCards(s, sp).filter(isLoot).length : 0, hp: (s, src, sp, c) => c.uid === src.uid ? controlledCards(s, sp).filter(isLoot).length : 0 } };
 FX[8154] = fxMix(onEnter(8154, 'search'), { k: { search: (s, a) => { const p = me(s, a.pid); const seen = new Set(), opts = [];
         p.deck.forEach(id => { const c = CARDS[id]; if (!isEquip(c) || seen.has(id)) return; seen.add(id); opts.push({ label: c.name + (c.arena ? ' (Arena)' : ''), v: id, card: id, ai: (c.arena ? 5 : 0) + (c.cost || 0) * 0.1 }); });
         if (!opts.length) { p.deck = shuffleDeck(p.deck); return; } ask(s, { pid: a.pid, prompt: tr('Short John Mithril: Ausrüstung suchen'), src: 'Short John Mithril', opts, k: '8154:do', a }); },
@@ -519,3 +530,9 @@ FX[8208] = { enterRes: (s, c, pid) => ask(s, { pid, prompt: tr('Silvermoon City:
         resolve: (s, it) => { const t = T1(s, it), src = findCharacter(s, it.src); if (t && src && src.resist9) addTM(t, { k: 'resist10', dt: src.resist9, turn: s.turn }); } })] };
 // "has the chosen Resistance this turn" (Silvermoon City): Resistenz als Spieler-Wirkung
 FX[8208].aura = { prevent: (s, src, sp, t, from, o, amt) => (t.tm || []).some(m => m.k === 'resist10' && m.turn === s.turn && m.dt === o.dt) ? amt : 0 };
+FX[8029] = { slots: (s, pid) => [{ label: tr('Ziel-Nahkampfwaffe'), cands: targetCands(s, pid, { equipment: true, filter: c => c.type === 'Weapon' && c.slot === 'Melee' }), harm: false }], resolve: (s, it) => { it.attachTo = T(it)[0]; } };
+// Foam Sword Rack: "Each hero has '(1) >>> This hero deals ½ melee damage to target hero.'" – halbe Schadenspunkte werden genau gezählt
+FX_GRANT.foam10 = { key: 'foam10', label: tr('(1): ½ Nahkampfschaden an Ziel-Held (Foam Sword Rack)'), cost: 1, slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }],
+    resolve: (s, it) => { const t = T(it)[0]; if (t) dealDamage(s, { src: heroOf(s, it.pl).uid, tgt: t, amt: 0.5, dt: 'Melee' }); } };
+HERO_GRANTS.push((s, h) => [s.p1, s.p2].some(p => (p.ongoing || []).some(o => o.id === 8092 && !o.attachedTo && active(s, o))) ? ['foam10'] : []);
+FX[8092] = { engineImpl: true };

@@ -1117,6 +1117,7 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #db-set-filter option.set-block1 { background: #1e3a5f; }
 #db-set-filter option.set-block2 { background: #2f4a1c; }
 #db-set-filter option.set-block3 { background: #4a2f1c; }
+#db-set-filter option.set-block4 { background: #1c3a4a; }
 #db-set-filter option.set-raid { background: #5c1f1f; }
 
 /* Deck-Übersicht: jedes Deck als Deck-Box (vorne Heldenbild, oben Klassen-Icon, Farbe nach Fraktion) */

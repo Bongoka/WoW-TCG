@@ -7,8 +7,8 @@ function evaluateState(s, pid) {
     if (s.gameOver) return s.winner === pid ? 100000 : (s.winner ? -100000 : 0);
     const me = getPlayer(s, pid), opp = getOpponent(s, pid);
     const myHp = hpOf(s, me.hero) - me.hero.damage, oppHp = hpOf(s, opp.hero) - opp.hero.damage;
-    if (myHp <= 0) return -100000;
-    if (oppHp <= 0) return 100000;
+    if (myHp <= 0 && !isIndestructible(s, me.hero)) return -100000;   // Spirit of Redemption (Set wrathgate): 0 Leben, aber nicht zerstörbar
+    if (oppHp <= 0 && !isIndestructible(s, opp.hero)) return 100000;
     let score = 0;
     score += myHp * AI_HP_W.me - oppHp * AI_HP_W.opp;
     if (myHp <= 6) score -= (7 - myHp) * 14; else if (myHp <= 12) score -= (13 - myHp) * 3;

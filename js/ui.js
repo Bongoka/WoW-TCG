@@ -254,8 +254,9 @@ function render() {
         undoBtn.innerHTML = ok ? `${esc(tr('↶ Rückgängig'))}<small>${esc(UNDO.stack[UNDO.stack.length - 1].desc)}</small>` : esc(tr('↶ Rückgängig'));
     }
     // Fortune Telling: umgedrehtes Deck – oberste Karte ist offen
-    const deckTxt = p => p.deck.length + (p.deckFaceUp && p.deck.length ? tr` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
+    const deckTxt = p => p.deck.length + ((p.deckFaceUp || (typeof topVisible === 'function' && topVisible(G, p, 1))) && p.deck.length ? tr` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
     document.getElementById("p1-deck-count").textContent = deckTxt(G.p1);
+    { const st = document.getElementById('p1-deck-stack'); if (st && !st.dataset.maul) { st.dataset.maul = '1'; st.addEventListener('click', () => { if (G && typeof gladMaulOk === 'function' && gladMaulOk(G, 1) && !G.placedResource) humanAct({ type: 'PLACE_RESOURCE', handIdx: -1, fromDeckTop: true, faceUp: false }); }); } }   // Gladiator's Maul: Klick auf das Deck
     document.getElementById("p1-grave-count").textContent = G.p1.graveyard.length;
     document.getElementById("p1-res-count").textContent = `${getReadyRes(G.p1)}/${G.p1.resources.length}`;
     document.getElementById("p2-deck-count").textContent = deckTxt(G.p2);
@@ -1244,7 +1245,7 @@ const BANTER_ALWAYS = new Set(['greet', 'win', 'lose', 'low']);
 const _banter = { last: 0, saidLow: false };
 function heroRace(p) {
     const t = (typeof OCR !== 'undefined' && OCR[p.hero.id]) ? OCR[p.hero.id][0] : '';
-    const m = t.match(/Hero—(.+?) (Druid|Hunter|Mage|Paladin|Priest|Rogue|Shaman|Warlock|Warrior)\b/);
+    const m = t.match(/Hero—(.+?) (Death Knight|Druid|Hunter|Mage|Paladin|Priest|Rogue|Shaman|Warlock|Warrior)\b/);
     return m && BANTER[m[1]] ? m[1] : 'Human';
 }
 // Sagt eine passende Zeile, wenn die letzte nicht zu kurz her ist (wichtige Anlässe immer)

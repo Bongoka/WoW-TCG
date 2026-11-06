@@ -24,8 +24,8 @@ function dbNeutralSync() {
     if (DBF.neutralKey !== key) { DBF.neutralKey = key; DBF.neutralAb = !key; }
     const t = document.getElementById('db-neutral-ab'); if (t) t.checked = DBF.neutralAb;
 }
-const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
-const DB_CLASS_DE = { Druid: tr('Druide'), Hunter: tr('Jäger'), Mage: tr('Magier'), Paladin: 'Paladin', Priest: tr('Priester'), Rogue: tr('Schurke'), Shaman: tr('Schamane'), Warlock: tr('Hexenmeister'), Warrior: tr('Krieger') };
+const DB_CLASSES = ['Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior', 'Death Knight'];
+const DB_CLASS_DE = { Druid: tr('Druide'), Hunter: tr('Jäger'), Mage: tr('Magier'), Paladin: 'Paladin', Priest: tr('Priester'), Rogue: tr('Schurke'), Shaman: tr('Schamane'), Warlock: tr('Hexenmeister'), Warrior: tr('Krieger'), 'Death Knight': tr('Todesritter') };
 // Karte für eine Klasse spielbar (ohne Held: Fraktion/Talent noch offen)
 const dbClassOk = (c, cls) => !c.allowedClasses || !c.allowedClasses.length || c.allowedClasses.includes(cls);
 function loadCustomDecks() { try { return JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch (e) { return []; } }
@@ -180,6 +180,8 @@ function dbAdd(id) {
     if (dbCount(id) >= dbMax(card)) { dbFlash(tr`Maximal 4 Kopien von „${card.name}“`); return; }
     const rep = card.reputation && currentDeckBuilder.cards.map(x => CARDS[x] && CARDS[x].reputation).find(r => r && r !== card.reputation);
     if (rep) { dbFlash(tr`${card.name}: Ein Deck darf keine Karten mit ${rep}-Reputation und ${card.reputation}-Reputation mischen`); return; }   // CR 100.2d
+    { const h = dbHero(), f = card.allowedFactions && card.allowedFactions.length === 1 ? card.allowedFactions[0] : null;   // "either [Alliance] or [Horde] cards" (Set icecrown)
+      if (h && h.factionEither && f && currentDeckBuilder.cards.some(x => CARDS[x] && (CARDS[x].allowedFactions || []).length === 1 && CARDS[x].allowedFactions[0] !== f)) { dbFlash(tr`${card.name}: ${h.name} erlaubt entweder Allianz- oder Horde-Karten, nicht beides`); return; } }
     currentDeckBuilder.cards.push(id); dbUpdateTile(id); renderDBDeck(id);
 }
 function dbRemove(id) {
@@ -347,7 +349,7 @@ function dbExportText() {
 }
 // Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
 const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { honor: 11, 'fields of honor': 11, foh: 11, gladiator: 10, gladiators: 10, 'blood of gladiators': 10, bog: 10, drums: 9, 'drums of war': 9, dow: 9, illidan: 8, 'hunt for illidan': 8, 'the hunt for illidan': 8, thfi: 8, betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
+const DB_SET_CODES = { icecrown: 14, ic: 14, wrathgate: 13, wg: 13, scourgewar: 12, sw: 12, honor: 11, 'fields of honor': 11, foh: 11, gladiator: 10, gladiators: 10, 'blood of gladiators': 10, bog: 10, drums: 9, 'drums of war': 9, dow: 9, illidan: 8, 'hunt for illidan': 8, 'the hunt for illidan': 8, thfi: 8, betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
@@ -459,6 +461,9 @@ const BOOSTER_SETS = [
     { set: 9, name: 'Drums of War', imgs: ['booster/drums 1.png', 'booster/drums 2.jpg'] },
     { set: 10, name: 'Blood of Gladiators', imgs: ['booster/gladiators 1.jpg', 'booster/gladiators 2.jpg'] },
     { set: 11, name: 'Fields of Honor', imgs: ['booster/honor 1.jpeg', 'booster/honor 2.jpg'] },
+    { set: 12, name: 'Scourgewar', imgs: ['booster/scourgewar 1.jpg', 'booster/scourgewar 2.jpg'] },
+    { set: 13, name: 'Wrathgate', imgs: ['booster/wrathgate 1.jpg', 'booster/wrathgate 2.jpg'] },
+    { set: 14, name: 'Icecrown', imgs: ['booster/icecrown 1.jpg', 'booster/icecrown 2.jpg'] },
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)

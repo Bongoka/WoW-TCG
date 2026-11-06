@@ -133,7 +133,7 @@ const COACH_PLANS = [
     { k: 'control', label: 'Control', when: S => S.avg >= 3.4 || S.removal.length + S.heal.length >= 16, desc: 'Answer everything, then win the long game.' },
     { k: 'midrange', label: 'Midrange', when: () => true, desc: 'A solid mix of early plays and strong mid-game cards.' },
 ];
-const COACH_CLASS = { Druid: 'Druid', Hunter: 'Hunter', Mage: 'Mage', Paladin: 'Paladin', Priest: 'Priest', Rogue: 'Rogue', Shaman: 'Shaman', Warlock: 'Warlock', Warrior: 'Warrior' };
+const COACH_CLASS = { Druid: 'Druid', Hunter: 'Hunter', Mage: 'Mage', Paladin: 'Paladin', Priest: 'Priest', Rogue: 'Rogue', Shaman: 'Shaman', Warlock: 'Warlock', Warrior: 'Warrior', 'Death Knight': 'Death Knight' };
 
 // Stärken: [Bedingung, Text] – Reihenfolge = Priorität (die ersten erscheinen zuerst)
 const COACH_STRENGTHS = [
@@ -813,7 +813,14 @@ function autoFillDeck(heroId, cardIds, size = 60) {
     const isQ = id => CARDS[id] && CARDS[id].type === 'Quest';
     const maxCopies = c => c.unlimited ? 4 : c.unique ? 2 : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 2 : 4;
     const rep0 = (cardIds.map(id => CARDS[id] && CARDS[id].reputation).find(Boolean)) || null;   // Reputation (CR 100.2d): nur die schon gewählte, sonst keine
-    const pool = Object.values(CARDS).filter(c => coachLegal(c, hero) && !CARD_ISSUES[c.id] && !c.isToken && (!c.reputation || c.reputation === rep0));
+    // "either [Alliance] or [Horde] cards" (Set icecrown): die schon gewählte Fraktion, sonst die des Helden-Volks
+    const fac0 = hero.factionEither ? ((cardIds.map(id => CARDS[id] && (CARDS[id].allowedFactions || []).length === 1 && CARDS[id].allowedFactions[0]).find(Boolean)) || (['Human', 'Dwarf', 'Gnome', 'Night Elf', 'Draenei', 'Worgen'].includes(hero.race) ? 'Alliance' : 'Horde')) : null;
+    const pool0 = Object.values(CARDS).filter(c => coachLegal(c, hero) && !CARD_ISSUES[c.id] && !c.isToken && (!c.reputation || c.reputation === rep0) && (!fac0 || !(c.allowedFactions || []).length || c.allowedFactions.includes(fac0)));
+    // Helden ohne legale Waffen (Obliveron): keine Karten, die eine Waffe brauchen
+    const needW0 = /weapons? you control|with a weapon|Dagger you control|weapon you control/, noW0 = !pool0.some(c => c.type === 'Weapon');
+    // Allies, die "few allies" wollen (Emelia Darkhand …), passen nicht in ein ally-lastiges Auto-Fill (Schwäche swarm-alone)
+    const alone0 = /only ally you control|controls more allies than (in )?you/;
+    const pool = (noW0 ? pool0.filter(c => !needW0.test(coachTxt(c))) : pool0).filter(c => c.type !== 'Ally' || !alone0.test(coachTxt(c)) || cardIds.includes(c.id));
     const known = deck.map(id => CARDS[id]).filter(Boolean), nonQ0 = known.filter(c => c.type !== 'Quest');
     // Stil und Plan aus dem Vorhandenen (wenige Karten: neutral)
     const avgOf = list => list.length ? list.reduce((a, c) => a + (c.cost || 0), 0) / list.length : 3;

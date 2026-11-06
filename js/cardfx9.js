@@ -53,7 +53,7 @@ const raceIs = r => c => (c.allyTypes || []).includes(r) || c.race === r || (c.r
 const chooseResist = id => ({ enter: (s, c, pid) => ask(s, { pid, prompt: tr`${CARDS[id].name}: Welche Resistenz?`, src: CARDS[id].name,
         opts: ['Arcane', 'Fire', 'Frost', 'Nature', 'Shadow'].map(dt => ({ label: dtName(dt), v: dt, ai: foeDtWeight(s, pid, dt) })), k: `${id}:res`, a: { uid: c.uid } }),
     k: { res: (s, a, v) => { const c = findCharacter(s, a.uid); if (c) c.resist9 = v; } },
-    aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === src.uid && src.resist9 && o.dt === src.resist9 ? amt : 0 } });
+    aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === src.uid && src.resist9 && o.dt === src.resist9 && !resistLost(s, t) ? amt : 0 } });
 // KI: welche Schadensart der Gegner am meisten hat
 function foeDtWeight(s, pid, dt) { const o = foe(s, pid); return [o.hero, ...o.allies].filter(c => c.atkType === dt).length + o.hand.filter(c => new RegExp(dt.toLowerCase() + ' damage').test(c.text || '')).length * 0.5; }
 // Ausgelöste Wirkung beim Betreten des Spiels als eigener Kettenlink
@@ -69,7 +69,7 @@ onEvt('cardPlayed', (s, d) => { if (d.card.type === 'Ability' && d.card.school !
 // Gelegte Ressourcen (Moonflare, Vengeful Gladiator's Bonecracker …): "When a resource enters play under your control"
 const onResEnter = (id, k) => ({ on: { resEnters: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id, k, a: { pid, uid: c.uid } }); } } });
 // Ressource offen/verdeckt umdrehen
-function turnResDown(s, uid) { const l = locate(s, uid); if (!l || l.zone !== 'resource' || !l.res.faceUp) return; l.res.faceUp = false; L(s, tr`${l.c.name} wird verdeckt umgedreht.`, '', l.pid); }
+function turnResDown(s, uid) { const l = locate(s, uid); if (!l || l.zone !== 'resource' || !l.res.faceUp) return; l.res.faceUp = false; evt(s, 'resTurnedDown', { pid: l.pid, uid }); L(s, tr`${l.c.name} wird verdeckt umgedreht.`, '', l.pid); }
 const allResCands = s => [...s.p1.resources, ...s.p2.resources].map(r => r.card.uid);
 const faceUpResCands = s => [...s.p1.resources, ...s.p2.resources].filter(r => r.faceUp).map(r => r.card.uid);
 // Abilities, Allies und Equipment im Spiel (ohne Helden)
@@ -184,7 +184,6 @@ FX[7028] = fxMix({ alt: TRAP }, onEnter(7028, 'hit'), { k: { hit: (s, a) => { if
     do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: 1, dt: 'Nature' }); } } });
 FX[7029] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { dmgIn: (s, src, sp, t, from, o) => t.uid === src.attachedTo && o.dt === 'Ranged' ? 1 : 0 } };
-CARD_ISSUES[7030] = 'Helden und Allies wie Ressourcen zum Bezahlen erschöpfen ist noch nicht umgesetzt.';
 FX[7031] = { resolve: (s, it) => addPE(s, it.pl, { k: 'snipe9' }) };
 onEvt('entersPlay', (s, d) => { const c = findCharacter(s, d.uid); if (!c || !(isAllyLike(c) || isEquip(c) || c.type === 'Ability')) return;
     for (const m of pes(s, null, 'snipe9')) { if (m.used) continue; m.used = true; pushTrig(s, m.pid, 7031, [{ op: 'call', k: 'E:destroyUid', a: { uid: c.uid } }]); } });
@@ -264,7 +263,7 @@ FX[7052] = { resolve: (s, it) => { const mine = inPlayCount9(s, me(s, it.pl)); c
 FX[7053] = { modes: playerModes(-3, 3), resolve: (s, it) => { const n = alliesOf(me(s, it.pl)).filter(a => a.atkType === 'Shadow').length; if (n > 0) q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n, src: 'Exasperate' } }); } };
 FX[7054] = { powers: [{ key: 'misery', label: tr('Ziel-Spieler legt die obersten X Karten in den Friedhof'), cost: 'X', act: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -3 }],
     resolve: (s, it) => millN(s, it.mode, it.x || 0) }] };
-function millN(s, pid, n) { const p = me(s, pid); let k = 0; for (let i = 0; i < n && p.deck.length; i++) { p.graveyard.push(makeCardInst(p.deck.pop(), false, pid)); k++; } if (k) L(s, tr`${p.hero.name} legt ${k} Karte(n) vom Deck in den Friedhof.`, '', pid); }
+function millN(s, pid, n) { const p = me(s, pid); let k = 0; for (let i = 0; i < n && p.deck.length; i++) { p.graveyard.push(makeCardInst(p.deck.pop(), false, p.deckOwner || pid)); k++; } if (k) L(s, tr`${p.hero.name} legt ${k} Karte(n) vom Deck in den Friedhof.`, '', pid); }
 FX[7055] = { xRange: () => ({ min: 0, max: 20 }), modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }],
     resolve: (s, it) => { const o = me(s, oppPid(s, it.pl)); showHand(s, it.pl, o.id, 'Precognition'); const l = o.hand.filter(c => c.type === 'Ally' && (c.cost || 0) <= (it.x || 0)); if (!l.length) return;
         ask(s, { pid: o.id, prompt: tr`Precognition: Welcher Ally (Kosten ≤ ${it.x || 0}) geht ins Spiel des Gegners?`, src: 'Precognition', opts: l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -(c.cost || 0) })), k: '7055:do', a: { pid: it.pl, from: o.id } }); },
@@ -613,20 +612,17 @@ FX[7208] = fxMix(onEnter(7208, 'look'), { k: { look: (s, a) => { const p = me(s,
         ask(s, { pid: a.pid, prompt: tr`Girdle of the Blasted Reaches: ${CARDS[top].name} unter das Deck legen?`, src: 'Girdle of the Blasted Reaches', opts: [{ label: tr('Oben lassen'), v: 0, card: top, ai: CARDS[top].cost || 1 }, { label: tr('Unter das Deck'), v: 1, card: top, ai: 2 }], k: '7208:do', a, hidden: true }); },
     do: (s, a, v) => { const p = me(s, a.pid); if (v && p.deck.length) { p.deck.unshift(p.deck.pop()); L(s, tr`${p.hero.name} legt die oberste Karte unter das Deck.`, '', a.pid); } } } });
 FX[7209] = { engine: true, powers: [actPow('regalia', tr('2 Feuerschaden'), { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Fire', { ability: false }); } })] };
-CARD_ISSUES[7210] = 'Ein Ally wird eine Kopie eines anderen Allies: noch nicht umgesetzt.';
 FX[7211] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && o.weapon && (o.amt || 0) > 0 ? weaponDmgBase(s, o) : 0 },
     powers: [actPow('battlegear', tr('Ziel erschöpfen und 1 Nahkampfschaden'), { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; exhaust(s, t); heroDmg(s, it.pl, t.uid, 1, 'Melee', { ability: false }); } })] };
 // "deals double that much": verdoppelt den Betrag vor den übrigen Erhöhungen (dmgOut addiert den einfachen Betrag)
 const weaponDmgBase = (s, o) => o.amt || 0;
 FX[7212] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl !== pid && isAllyCard(CARDS[d.snap.id])) trig(s, { id: 7212, k: 'add', a: { uid: c.uid } }); } }, k: { add: (s, a) => addCounter(s, findCharacter(s, a.uid), 'def', 1) } };
-CARD_ISSUES[7213] = 'Kräfte gegnerischer Karten nutzen ist noch nicht umgesetzt.';
 FX[7214] = { on: { dmg: (s, c, d, pid) => { const a = findCharacter(s, d.src), t = findCharacter(s, d.tgt); if (d.amt > 0 && a && t && a.uid !== t.uid && isAllyLike(a) && isAllyLike(t)) trig(s, { id: 7214, k: 'go', a: { x: a.uid, y: t.uid } }); } },
     k: { go: (s, a) => [a.x, a.y].forEach(u => { const c = findCharacter(s, u); if (c) destroy(s, c); }) } };
 FX[7215] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && (d.card.subtypes || []).includes('Finishing Move') || (d.pid === pid && /Finishing Move/.test(d.card.text || '') && d.card.type === 'Ability')) trig(s, { id: 7215, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Vengeful Gladiator\'s Vestments: Ziel-Karte unterbrechen?'), "Vengeful Gladiator's Vestments", chainCards(s, () => true), '7215:do', a, u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== a.pid ? 5 : -10; }),
         do: (s, a, v) => { if (v) interruptUid(s, v); } },
     powers: [actPow('vestments', tr('Oberste Deckkarte verdeckt und bereit in die Ressourcenreihe'), { resolve: (s, it) => { const p = me(s, it.pl); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id); p.resources.push({ card: c, faceUp: false, exhausted: false }); evt(s, 'resEnters', { pid: p.id, faceUp: false, uid: c.uid, id: c.id }); L(s, tr`${p.hero.name} legt die oberste Deckkarte bereit in die Ressourcenreihe.`, '', p.id); } })] };
-CARD_ISSUES[7216] = 'Ein Gegenstand, der zugleich ein Ally ist, wird noch nicht unterstützt.';
 FX[7217] = { engine: true };   // Rune of Metamorphosis: EK.destroyOngoing (engine.js)
 CARD_ISSUES[7218] = 'Wirkt erst im nächsten Spiel einer Serie – Spielserien gibt es hier nicht.';
 const medallion = (id, foeFac) => ({ powers: [{ key: 'medal', label: tr('Unter das Deck: Fähigkeit unterbrechen, die deinen Helden anvisiert'), cost: 1,
@@ -670,7 +666,6 @@ FX[7233] = fxMix(onEnter(7233, 'oath'), { k: { oath: (s, a) => ask(s, { pid: a.p
         opts: [{ label: tr('"Ich spiele keine Karten."'), v: 'play', ai: 0 }, { label: tr('"Ich ziehe keine Karten."'), v: 'draw', ai: 1 }], k: '7233:do', a }),
     do: (s, a, v) => { const c = findCharacter(s, a.uid); if (c) { c.oath9 = v; L(s, tr`The Oathkeeper: ${v === 'play' ? tr('keine Karten spielen') : tr('keine Karten ziehen')}.`, '', a.pid); } } },
     aura: { noPlay: (s, src, sp, pid) => pid === sp && src.oath9 === 'play' ? tr('The Oathkeeper: Du hast geschworen, keine Karten zu spielen') : false, noDraw: (s, src, sp, pid) => pid === sp && src.oath9 === 'draw' } });
-CARD_ISSUES[7234] = 'Den gedruckten Text anderer Karten verdoppeln ist noch nicht umgesetzt.';
 FX[7235] = fxMix(onResEnter(7235, 'add'), { k: { add: (s, a) => addCounter(s, findCharacter(s, a.uid), 'atk1', 1) } });
 FX[7236] = fxMix(onEnter(7236, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid, tr('Wand of Biting Cold: Ziel kann nicht angreifen'), 'Wand of Biting Cold', targetCands(s, a.pid, { char: true }), '7236:do', a),
     do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'cantAttack', turn: s.turn }); } } });
@@ -780,4 +775,22 @@ FX[7267] = fxMix(onOppAllyDies(7267), { powers: [{ key: 'epl', label: tr('4 Zäh
 FX[7268] = fxMix(onOppAllyDies(7268), { powers: [{ key: 'twinspire', label: tr('2 Zähler entfernen: Ally (Kosten ≤ 2) aus deinem Friedhof ins Spiel'), cost: 2, act: true, myTurn: true, canUse: capOk(2), selfCost: removeCaptures(2),
     slots: (s, pid) => [{ label: tr('Ally in deinem Friedhof (Kosten ≤ 2)'), cands: gyCands(s, pid, c => isAllyCard(c) && (c.cost || 0) <= 2), harm: false }],
     resolve: (s, it) => { const u = T(it)[0]; if (u) fromGyToPlay(s, u, it.pl); } }] });
-CARD_ISSUES[7134] = 'Ziele von Karten und Kräften werden zufällig gewählt; Ziele ausgelöster Effekte wählt der Spieler noch selbst.';
+
+// ---------------------------------------------------------------- früher ⚠, jetzt umgesetzt
+// Nyn'jah's Tabi Boots, The Staff of Twin Worlds: engine.js (tabiOwner, twinOn); Lolly the Unsuspecting: auch Ziele ausgelöster Effekte (cardfx2 mustPick/mayPick)
+FX[7213] = { engineImpl: true }; FX[7234] = { engineImpl: true };
+// Masquerade Gown: "[Activate] >>> Target ally you control becomes a copy of a second target ally you control this turn."
+// Kopie: Name, Werte, Typen, Text und Kräfte (FX) der zweiten Karte; Schaden, Zähler, Anhänge und uid bleiben. Am Zugende zurück.
+const COPY_FIELDS9 = ['id', 'name', 'cost', 'atk', 'hp', 'atkType', 'faction', 'race', 'allyClass', 'allyTypes', 'text', 'typeLine', 'unique', 'protector', 'elusive', 'ferocity', 'stealth', 'untargetable', 'longRange', 'assault', 'mend', 'allowedFactions', 'factions', 'isPet', 'b'];
+FX[7210] = { powers: [actPow('gown', tr('Eigener Ally wird Kopie eines zweiten eigenen Allies'), { slots: (s, pid) => [{ label: tr('Eigener Ally (wird Kopie)'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: c => !c.isTotem }), harm: false }, { label: tr('Zweiter eigener Ally (Vorlage)'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: c => !c.isTotem }), harm: false }],
+    resolve: (s, it) => { const a = T1(s, it, 0), b = T1(s, it, 1); if (!a || !b || a === b) return; copyAlly9(s, a, b); } })] };
+function copyAlly9(s, a, b) { if (!a.copy9) a.copy9 = { orig: Object.fromEntries(COPY_FIELDS9.map(k => [k, a[k]])), turn: s.turn }; else a.copy9.turn = s.turn;
+    const d = CARDS[b.id]; for (const k of COPY_FIELDS9) { if (k === 'b') a.b = { atk: d.atk || 0, hp: d.hp || 0, def: d.def || 0, strike: d.strike || 0 }; else a[k] = k === 'id' ? b.id : d[k] !== undefined ? d[k] : b[k]; }
+    L(s, tr`Masquerade Gown: ${a.copy9.orig.name} wird zu einer Kopie von ${b.name}.`, '', ctrlOf(s, a)); }
+STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) for (const c of p.allies) if (c.copy9 && c.copy9.turn !== s.turn) { const o = c.copy9.orig; delete c.copy9; for (const k of COPY_FIELDS9) c[k] = o[k]; } return false; });
+// Arcanite Dragonling: "(1) >>> This item is also an ally with 2 [Melee] / 2 [Health] and Protector this turn." – zugleich in Party und Ausrüstung (engine.js allyItem9)
+FX[7216] = { powers: [{ key: 'dragon', label: tr('In diesem Zug auch ein Ally 2/2 mit Protector'), cost: 1, canUse: (s, pid, src) => !src.allyItem9 || tr('Ist schon ein Ally'),
+    resolve: (s, it) => { const c = findCharacter(s, it.src); if (!c || c.allyItem9) return; const p = me(s, ctrlOf(s, c));
+        c.allyItem9 = s.turn; c.dragonOrig9 = { b: c.b, atkType: c.atkType, kw: c.kw }; c.b = { ...(c.b || {}), atk: 2, hp: 2 }; c.atk = 2; c.hp = 2; c.atkType = 'Melee'; c.kw = { ...(c.kw || {}), protector: true }; c.joinedTurn = s.turn; c.damage = 0;
+        p.allies.push(c); L(s, tr`${c.name} ist in diesem Zug auch ein Ally.`, '', p.id); evt(s, 'allyEnters', { uid: c.uid, pid: p.id }); } }] };
+STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) for (const c of [...p.allies]) if (c.allyItem9 && c.allyItem9 !== s.turn) { p.allies.splice(p.allies.indexOf(c), 1); const o = c.dragonOrig9 || {}; c.b = o.b; c.atkType = o.atkType; c.kw = o.kw; c.damage = 0; delete c.allyItem9; delete c.dragonOrig9; } return false; });
