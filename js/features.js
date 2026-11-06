@@ -828,6 +828,22 @@ function deckPreview(deck, tile) {
     dbRenderRows(box.querySelector('#dp-cards'), deck.cards, hero);
     box.classList.remove('dp-in'); void box.offsetWidth; box.classList.add('dp-in');
 }
+// Siegertreppe der World Championship: Pokal für Platz 1, Medaille für Platz 2 und 3 (Gold, Silber, Bronze)
+const PODIUM_METAL = { 1: ['#fff4c2', '#f2c94c', '#9a6b14'], 2: ['#ffffff', '#c9ced6', '#6f7782'], 3: ['#ffd9b3', '#cd8a4f', '#6e3d17'] };
+function podiumAward(pl) {
+    const [a, b, c] = PODIUM_METAL[pl], g = `wpg${pl}`;
+    const grad = `<defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset=".45" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient></defs>`;
+    if (pl === 1) return `<svg class="wpod-cup" viewBox="0 0 64 64" aria-hidden="true">${grad}`
+        + `<path d="M19 13H10c0 10 5 15 11 16M45 13h9c0 10-5 15-11 16" fill="none" stroke="url(#${g})" stroke-width="4" stroke-linecap="round"/>`
+        + `<path d="M17 6h30v12c0 11-7 19-15 19S17 29 17 18z" fill="url(#${g})" stroke="${c}" stroke-width="1"/>`
+        + `<path d="M22 9h5v9c0 6 2 10 5 13-6-1-10-6-10-13z" fill="#fff" opacity=".35"/>`
+        + `<rect x="29" y="36" width="6" height="8" fill="url(#${g})"/><path d="M22 44h20l3 7H19z" fill="url(#${g})" stroke="${c}" stroke-width="1"/>`
+        + `<rect x="15" y="51" width="34" height="6" rx="1.5" fill="${c}"/><text x="32" y="25" text-anchor="middle" font-family="Georgia,serif" font-size="13" font-weight="bold" fill="${c}">1</text></svg>`;
+    return `<svg class="wpod-medal" viewBox="0 0 64 64" aria-hidden="true">${grad}`
+        + `<path d="M20 2h10l6 22h-10zM44 2H34l-6 22h10z" fill="${pl === 2 ? '#2f5fa8' : '#a83232'}" stroke="#0007" stroke-width="1"/>`
+        + `<circle cx="32" cy="40" r="17" fill="url(#${g})" stroke="${c}" stroke-width="2"/><circle cx="32" cy="40" r="12" fill="none" stroke="${c}" stroke-width="1" opacity=".6"/>`
+        + `<text x="32" y="46" text-anchor="middle" font-family="Georgia,serif" font-size="17" font-weight="bold" fill="${c}">${pl}</text></svg>`;
+}
 function openDeckOverview(opts = {}) {
     const modal = document.getElementById("deck-overview-modal"), grid = document.getElementById("deck-overview-grid");
     const pick = typeof opts.pick === 'function' ? opts.pick : null;
@@ -904,7 +920,24 @@ function openDeckOverview(opts = {}) {
                      : `<div class="dfh-info"><span class="dfh-year dfh-name">${f.key === 'dmf' ? 'Darkmoon Faire' : esc(tr('Weitere Turnier-Decks'))}</span><span class="dfh-sub">2006 – 2007</span></div>`);
             hd.querySelector('button').onclick = () => { folder = null; render(); };
             grid.appendChild(hd);
-            f.decks.forEach(x => grid.appendChild(x.deck.locked ? lockedTile(x.deck) : tile(x.deck)));
+            // World Championship: Platz 1–3 groß auf einer Siegertreppe (2 · 1 · 3) mit Pokal und Medaillen, darunter die übrigen Plätze
+            const top = w ? f.decks.filter(x => x.m.place <= 3) : [];
+            if (top.length) {
+                const pod = document.createElement('div'); pod.className = 'wpodium';
+                [2, 1, 3].forEach(pl => {
+                    const x = top.find(y => y.m.place === pl); if (!x) return;
+                    const col = document.createElement('div'); col.className = 'wpod p' + pl;
+                    const t = x.deck.locked ? lockedTile(x.deck) : tile(x.deck); t.classList.add('pod-tile');
+                    const nm = t.querySelector('.deck-tile-name'); if (nm && x.m.player) nm.textContent = x.m.player;
+                    col.innerHTML = `<div class="wpod-award">${podiumAward(pl)}</div>`;
+                    col.appendChild(t);
+                    col.insertAdjacentHTML('beforeend', `<div class="wpod-step"><span class="wpod-n">${pl}</span>${pl === 1 ? `<span class="wpod-l">${esc(tr('Weltmeister'))}</span>` : ''}</div>`);
+                    pod.appendChild(col);
+                });
+                grid.appendChild(pod);
+                if (f.decks.length > top.length) head(tr('Weitere Plätze'));
+            }
+            f.decks.filter(x => !top.includes(x)).forEach(x => grid.appendChild(x.deck.locked ? lockedTile(x.deck) : tile(x.deck)));
         } else {
             if (own.length || opts.random || !pick) head(tr('Deine Decks'));
             if (opts.random) {

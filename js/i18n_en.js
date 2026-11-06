@@ -3573,4 +3573,6 @@ var I18N_EN = {
     'Zerstören: 3/3 Netherdrake-Token': 'Destroy: 3/3 Netherdrake token',
     'Ziel-Ally: Long-Range und Fire Resistance': 'Target ally: Long-Range and Fire Resistance',
     '"Each face-down resource you control is also an armor with 1 [DEF]": Verdeckte Ressourcen als Rüstung (verhindern, Ziel von Rüstungs-Effekten, zählen als Ausrüstung) bildet die Engine nicht ab.': '"Each face-down resource you control is also an armor with 1 [DEF]": the engine does not model face-down resources as armor (preventing damage, being targeted by armor effects, counting as equipment).',
+    'Weltmeister': 'World Champion',
+    'Weitere Plätze': 'Other places',
 };
