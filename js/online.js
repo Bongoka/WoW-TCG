@@ -277,7 +277,7 @@ function netGuestAct(action) {
 }
 // Spieler-IDs tauschen: Spieler 1 ⇄ 2 in allen Feldern, die eine Spieler-ID tragen
 const NET_PID_KEYS = new Set(['pid', 'prio', 'actorId', 'srcPl', 'pl', 'owner', 'by', 'opp', 'first', 'wantedBy', 'onTurnOf', 'chooser', 'apid', 'dpid', 'activePlayer', 'winner', 'firstPid']);
-const NET_PID_MAPS = new Set(['lastTurnOf', 'skip', 'netReady', 'enslave']);
+const NET_PID_MAPS = new Set(['lastTurnOf', 'firstTurnOf', 'halion15', 'widow15', 'urn15', 'skip', 'netReady', 'enslave']);
 function netMirror(st) {
     const sw = v => v === 1 ? 2 : v === 2 ? 1 : v;
     const walk = (v, key) => {

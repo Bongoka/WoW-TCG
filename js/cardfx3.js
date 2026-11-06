@@ -461,7 +461,8 @@ FX[2206] = { enter: (s, c, pid) => mayPick(s, pid, tr('Sun-Gilded Shouldercaps: 
 FX[2207] = { aura: { strike: (s, src, sp, pid, w) => pid === sp && w.slot === 'Ranged' ? -1 : 0 } };
 FX[2208] = { on: { attacks: (s, c, d, pid) => { if (d.att === heroOf(s, pid).uid) trig(s, { id: 2208, k: 'roll', a: { pid } }); },
         combatEnd: (s, c, d, pid) => { if (s.abacus && s.abacus.battle === d.id && s.abacus.pid === pid) { const p = me(s, pid); readyCard(s, p.hero); p.hero.weapons.forEach(w => readyCard(s, w)); s.abacus = null; } } },
-    k: { roll: (s, a) => { const r = 1 + Math.floor(Math.random() * 6); s._hidden = true; L(s, `🎲 Abacus of Violent Odds: ${r}`);
+    k: { roll: (s, a) => rollD6(s, 'Abacus of Violent Odds', '2208:apply', a, { [a.pid === 1 ? 2 : 1]: 2 }),
+        apply: (s, a) => { const r = a.roll; s._hidden = true; L(s, `🎲 Abacus of Violent Odds: ${r}`);
         if (r % 2 === 0) { if (s.battle && s.battle.att === heroOf(s, a.pid).uid) endBattle(s, tr('Held aus dem Kampf entfernt')); }
         else if (s.battle) s.abacus = { battle: s.battle.id, pid: a.pid }; } } };
 FX[2209] = { aura: { strike: (s, src, sp, pid) => pid === sp ? -me(s, sp).hero.weapons.length : 0 } };

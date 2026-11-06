@@ -188,6 +188,20 @@ function locsOf(p) { return p.resources.filter(r => r.faceUp && r.card && r.card
 function locEntries(s) { const out = []; for (const p of [s.p1, s.p2]) for (const r of locsOf(p)) out.push({ c: r.card, pid: p.id, zone: 'resource', res: r }); return out; }
 function controlsLocation(s, pid) { return locsOf(getPlayer(s, pid)).length > 0; }
 // Zähler hinzufügen; Locations mit Kapazität: höchstens so viele (CR 306.3)
+// Würfeln (Würfel mit 6 Seiten): Ergebnis in a.roll an die Fortsetzung k. Eye of Magtheridon (Raid-Loot): "If 1 would be rolled on a die,
+// you may change it to any value on that die instead." – want: { pid: Wunschwert der KI } (sonst bleibt die 1)
+function rollD6(s, label, k, a, want = {}) {
+    const r = 1 + Math.floor(Math.random() * 6);
+    const eye = r === 1 ? [s.p1, s.p2].find(p => p.hero.armors.some(e => e.id === 3210)) : null;
+    if (eye) {
+        const w = want[eye.id] || 1;
+        ask(s, { pid: eye.id, prompt: tr`${label}: Eine 1 wurde gewürfelt – Eye of Magtheridon: Wert ändern?`, src: 'Eye of Magtheridon',
+            opts: [1, 2, 3, 4, 5, 6].map(v => ({ label: String(v), v, ai: v === w ? 2 : v === 1 ? 1 : 0 })), k: 'E:rollSet', a: { k, a } });
+        return;
+    }
+    q(s, { op: 'call', k, a: { ...a, roll: r } });
+}
+EK.rollSet = (s, a, v) => q(s, { op: 'call', k: a.k, a: { ...a.a, roll: v } });
 function addCounter(s, c, kind, n = 1) {
     if (!c || n <= 0) return 0;
     c.counters = { ...(c.counters || {}) };
@@ -520,6 +534,7 @@ const DESTROY_PRE = [];
 function leavePlay(s, c, dest = 'graveyard', info = {}) {
     const l = locate(s, c.uid); if (!l || !isInPlayZone(l.zone)) return false;
     if (info.cause !== 'damage' && info.cause !== 'limit' && kwHas(s, c, 'forsaken') && !((c.damage || 0) >= hpOf(s, c))) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Will of the Forsaken).`, '', l.pid); return false; }
+    if (info.cause !== 'limit' && hasTM(s, c, 'invincible')) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Invincible).`, '', l.pid); return false; }   // Invincible (CR Glossar)
     if (info.destroyed) for (const f of DESTROY_PRE) f(s, c);
     const p = getPlayer(s, l.pid);
     if (l.zone === 'party' && c.allyRes6) noaliRestore(s, p, c, true);   // Imp Mistress Noali (Set 6): Ressource verlässt zugleich die Ressourcenreihe
@@ -583,7 +598,7 @@ function removeFromGame(s, c) { if (cantLeavePlay(s, c) || auraAny(s, 'noRemove'
     return leavePlay(s, c, 'removed', { destroyed: false }); }
 function isIndestructible(s, c) { return hasTM(s, c, 'indestructible') || !!auraAny(s, 'kw', c, 'indestructible'); }
 // Will of the Forsaken / Invincible-artige Effekte (FX.aura.kw 'cantLeave')
-function cantLeavePlay(s, c) { return !!auraAny(s, 'kw', c, 'cantLeave'); }
+function cantLeavePlay(s, c) { return hasTM(s, c, 'invincible') || !!auraAny(s, 'kw', c, 'cantLeave'); }   // Invincible (CR Glossar): "can't leave play, be targeted, or be dealt damage"
 function bounce(s, c) { L(s, tr`↩ ${c.name}`, '', pidOf(s, c)); return leavePlay(s, c, 'hand', { destroyed: false }); }
 
 // Kontrolle wechseln (Mind Control, Helwen, Infernal, Barak)
@@ -1037,6 +1052,7 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
     for (const f of COST_MODS) mod(f(s, p.id, card) || 0);                                // Set drums: Stormwind City
     pes(s, p.id, 'nextAbilityLess').forEach(m => { if (!m.used && card.type === 'Ability') less += m.v; });
     pes(s, p.id, 'nextPetLess').forEach(m => { if (!m.used && card.isPet) less += m.v; });
+    if (card.xCost) pes(s, p.id, 'xLess').forEach(m => { if (!m.used) less += m.v; });          // The Skull of Gul'dan: "the next time you pay a cost with (X) in it"
     pes(s, p.id, 'next2HLess').forEach(m => { if (!m.used && card.type === 'Weapon' && card.twoHanded) less += m.v; });   // Halavar (Set 6)
     // Staff of the Ruins: "(1) less … for each card in your graveyard with the same name as that ability"
     pes(s, p.id, 'ruins').forEach(m => { if (!m.used && card.type === 'Ability') less += p.graveyard.filter(c => c.name === card.name).length; });
@@ -1464,6 +1480,7 @@ function finishPrep(s) {
             pes(s, p.id, 'nextCardLess').forEach(m => m.used = true);
             if (it.card.type === 'Ability') { pes(s, p.id, 'nextAbilityLess').forEach(m => m.used = true); pes(s, p.id, 'ruins').forEach(m => m.used = true); }
             if (it.card.isPet) pes(s, p.id, 'nextPetLess').forEach(m => m.used = true);
+            if (it.card.xCost) pes(s, p.id, 'xLess').forEach(m => m.used = true);
             if (it.card.type === 'Weapon' && it.card.twoHanded) pes(s, p.id, 'next2HLess').forEach(m => m.used = true);
         }
         if (it.card.type === 'Ally') pes(s, p.id, 'alliesInstant').forEach(m => m.used = true);   // The Fare of Lar'korwi
@@ -1498,7 +1515,7 @@ function resolveTop(s) {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
         p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
         if (it.faceUp && FX[it.res.id] && FX[it.res.id].enterRes) FX[it.res.id].enterRes(s, it.res, p.id);   // "As this location enters play, choose …" (Silvermoon City)
-        evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp, uid: it.res.uid, id: it.res.id });                                                   // Shard of the Flame
+        evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp, uid: it.res.uid, id: it.res.id, placed: true });                                                   // Shard of the Flame
         return;
     }
     if (it.kind === 'trigger') {
@@ -1870,6 +1887,7 @@ function dmgStep(s, o) {
     if (src && hasTM(s, src, 'unprevOut')) unprev = true;                                 // Dousing the Flames of Protection (Set 6)
     if (o.weapon && o.combat) { const w = findCharacter(s, o.weapon); if (w && (w.id === 312 || w.id === 6226)) unprev = true; } // Annihilator, Hammer of the Naaru (Set illidan)
     if (!unprev && auraAny(s, 'unprev', src, t, o)) unprev = true;                         // Surprise Attacks, Kelvor Valorshine … (Set 2/3)
+    if (amt > 0 && hasTM(s, t, 'invincible')) amt = 0;                                   // Invincible: kann keinen Schaden erhalten (auch unverhinderbaren nicht)
     if (!unprev && amt > 0) {
         const all = () => { amt = 0; };
         // Set 2/3: Verhinderung durch Dauereffekte und "this turn"-Effekte
@@ -1877,6 +1895,7 @@ function dmgStep(s, o) {
         if (o.combat && hasTM(s, t, 'noCombatDmgIn')) all();                              // Katsin Bloodoath
         if (o.combat && src && tms(s, src, 'noCombatDmgTo').some(m => m.uid === t.uid)) all();   // Kiting (Set 6)
         if (src && hasTM(s, src, 'noDmgOut')) all();                                      // Judgement Legplates: "prevent all damage … dealt by"
+        if (o.dt && tms(s, t, 'noDtIn').some(m => m.dt === o.dt)) all();                   // Phoenix-fire Band: "Prevent all fire damage that would be dealt to target … this turn"
         if (amt > 0) { const pv = auraSum(s, 'prevent', t, src, o, amt); if (pv > 0) amt = Math.max(0, amt - pv); }
         if (amt > 0 && FX[t.id] && FX[t.id].selfPrevent && active(s, t)) amt = Math.max(0, amt - (FX[t.id].selfPrevent(s, t, tp.id, src, o, amt) || 0)); // Miandra, Shelly
         if (src && attachedTo(s, src.uid, 63).length) all();                              // Blessing of Protection (verursacht von)
@@ -2641,6 +2660,7 @@ function turnStep(s, step) {
     }
     if (step === 'start') {
         s.lastTurnOf = s.lastTurnOf || {};
+        s.firstTurnOf = s.firstTurnOf || {}; if (s.firstTurnOf[s.activePlayer] === undefined) s.firstTurnOf[s.activePlayer] = s.turn;   // erster Zug des Startspielers
         let next = s.activePlayer === 1 ? 2 : 1;
         if (s.extraTurn && s.extraTurn.pid === s.activePlayer) { next = s.activePlayer; s.extraTurn = null; L(s, tr('⏳ Chromie: Zusätzlicher Zug!'), 'log-turn'); }
         // "Skip your next turn" (Lay on Hands, Gone Fishin') – Set 2/3
@@ -2649,6 +2669,7 @@ function turnStep(s, step) {
         while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, tr`⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
         s.activePlayer = next; s.turn++; s.placedResource = false; s.resPlaced = 0; s.phase = 'start';
         s.lastTurnOf[next] = s.turn;
+        if (s.firstTurnOf[next] === undefined) s.firstTurnOf[next] = s.turn;                // Preparation: "On your first turn"
         s.pe = (s.pe || []).filter(m => m.until === 'game' || m.turn >= s.turn - 1 || (m.untilTurn && m.untilTurn >= s.turn));
         // Alte "this turn"-Modifikatoren aufräumen (nur Speicher – tms() wertet ohnehin nur den aktuellen Zug)
         for (const pl of [s.p1, s.p2]) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);

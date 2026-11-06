@@ -647,7 +647,8 @@ FX[4250] = { enter: (s, c, pid) => trig(s, { id: 4250, k: 'enter', a: { pid, uid
         hit: (s, a, v) => { if (v) dealDamage(s, { src: a.uid, tgt: v, amt: 4, dt: 'Ranged' }); } } };
 // Robotic Homing Chicken: jeder Spieler würfelt; bei gleichem Wurf sterben er und alle Allies dieser Spieler
 FX[4251] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 4251, k: 'roll', a: { uid: c.uid } }); } },
-    k: { roll: (s, a) => { const r1 = 1 + Math.floor(Math.random() * 6), r2 = 1 + Math.floor(Math.random() * 6);
+    k: { roll: (s, a) => rollD6(s, 'Robotic Homing Chicken', '4251:r2', a), r2: (s, a) => rollD6(s, 'Robotic Homing Chicken', '4251:apply', { ...a, r1: a.roll }),
+        apply: (s, a) => { const r1 = a.r1, r2 = a.roll;
         L(s, tr`Robotic Homing Chicken: ${s.p1.hero.name} würfelt ${r1}, ${s.p2.hero.name} würfelt ${r2}.`);
         if (r1 !== r2) return; const c = findCharacter(s, a.uid); if (c) destroy(s, c); [s.p1, s.p2].forEach(p => alliesOf(p).forEach(x => destroy(s, x))); } } };
 FX[4252] = { aura: { atk: (s, src, sp, c) => c.type === 'Ally' && c.name !== 'Shattrath City Peacekeeper' ? -1 : 0 } };

@@ -90,8 +90,8 @@
             face.appendChild(iss);
         }
 
-        // Treasure Cards (Raid-Loot, Set 4/5) sind immer Foil – feste Foil-Art je Karte, damit sie beim Neuzeichnen nicht wechselt
-        const treasure = (card.set === 4 || card.set === 5) && !card.isToken;
+        // Treasure Cards (Raid-Loot: TREASURE_SETS in cards15.js) sind immer Foil – feste Foil-Art je Karte, damit sie beim Neuzeichnen nicht wechselt
+        const treasure = TREASURE_SETS.has(card.set) && !card.isToken;
         const foilClass = forceFoil !== null ? forceFoil : treasure ? ['n1', 'n5'][card.id % 2] : (card.isFoil ? randomFoil() : null);
         if (foilClass) { const foil = el('div', `cfx-foil ${foilClass}`); face.appendChild(foil); }
         face.appendChild(el('div', 'cfx-glare'));

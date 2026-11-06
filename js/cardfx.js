@@ -713,7 +713,8 @@ FX[306] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && me(s, pi
     powers: [{ key: 'lei', label: tr('Zerstören: Heile 1 pro Handkarte'), cost: 1, selfCost: selfDestroyCost, resolve: (s, it) => heroHeal(s, it.pl, heroOf(s, it.pl).uid, me(s, it.pl).hand.length) }] };
 FX[309] = { powers: [{ key: 'nog', label: tr('Zerstören: Würfel für einen Ally'), canUse: (s, pid) => alliesOf(me(s, pid)).length > 0 || tr('Kein eigener Ally'), selfCost: selfDestroyCost,
     resolve: (s, it) => chooseOwnAlly(s, it.pl, tr('Noggenfogger: Welchen Ally wählen?'), 'Noggenfogger', '309:roll', { pid: it.pl }, c => cardValue(s, c)) }],
-    k: { roll: (s, a, uid) => { const c = findCharacter(s, uid); if (!c) return; const r = 1 + Math.floor(Math.random() * 6); s._hidden = true; L(s, `🎲 Noggenfogger: ${r}`);
+    k: { roll: (s, a, uid) => { const c = findCharacter(s, uid); if (!c) return; rollD6(s, 'Noggenfogger', '309:apply', { ...a, uid }); },
+        apply: (s, a) => { const c = findCharacter(s, a.uid); if (!c) return; const r = a.roll; s._hidden = true; L(s, `🎲 Noggenfogger: ${r}`);
             if (r <= 2) addTM(c, { k: 'indestructible', turn: s.turn }); else if (r <= 4) readyCard(s, c); else addTM(c, { k: 'cantBeAttacked', turn: s.turn }); } } };
 FX[310] = { powers: [{ key: 'piccolo', label: tr('Alle Helden und Allies erschöpfen'), act: true, myTurn: true, cost: 1, resolve: (s) => [s.p1, s.p2].forEach(p => [p.hero, ...alliesOf(p)].forEach(c => exhaust(s, c))) }] };
 FX[314] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) { tDraw(s, pid, 1); tDraw(s, foe(s, pid).id, 1); } } } };

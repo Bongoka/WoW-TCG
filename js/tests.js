@@ -1212,6 +1212,28 @@ function runRuleTests() {
         dealDamage(s5, { src: P(s5, 1).hero.uid, tgt: h2.uid, amt: 0.5, dt: 'Melee' }); process(s5); autoResolve(s5);
         assert(Math.abs((h2.damage || 0) - d0 - 0.5) < 1e-9, `Foam Sword Rack: Schaden ${h2.damage}`);
     });
+    // ---------------- kleine Sets: Grand Melee, Raid-Loot (Magtheridon, Black Temple, Naxxramas, Icecrown Citadel)
+    test(126, 'Kleine Sets: Preparation (erster Zug ohne Kosten), Treasure immer Foil, Eye of Magtheridon, Invincible, Rückseite von Emmi/Kauno', () => {
+        const s = fresh(); const c = P(s, 1).hand[hand(s, 1, 3607)];
+        s.firstTurnOf = { 1: s.turn }; assert(!!altOf(s, 1, c), 'Preparation: im ersten eigenen Zug nicht ohne Kosten spielbar');
+        s.firstTurnOf = { 1: s.turn - 2 }; assert(!altOf(s, 1, c), 'Preparation: auch nach dem ersten Zug ohne Kosten');
+        assert([3201, 3301, 3411, 3501, 3001, 3101].every(id => TREASURE_SETS.has(CARDS[id].set)) && !TREASURE_SETS.has(CARDS[3603].set), 'Treasure-Sets falsch (immer Foil)');
+        EK.test126 = (st, a) => { st.roll126 = a.roll; };
+        const r0 = Math.random; Math.random = () => 0;
+        try {
+            const s2 = fresh(); rollD6(s2, 'Test', 'E:test126', {}); process(s2); autoResolve(s2);
+            assert(s2.roll126 === 1, `Würfel ohne Eye: ${s2.roll126}`);
+            const s3 = fresh(); put(s3, 1, 3210); rollD6(s3, 'Test', 'E:test126', {}, { 1: 6 }); process(s3); autoResolve(s3);
+            assert(s3.roll126 === 6, `Eye of Magtheridon: 1 nicht auf 6 geändert (${s3.roll126})`);
+        } finally { Math.random = r0; }
+        const s4 = fresh(); const a = put(s4, 1, 262); addTM(a, { k: 'invincible', turn: s4.turn });
+        dealDamage(s4, { src: P(s4, 2).hero.uid, tgt: a.uid, amt: 3, dt: 'Melee', unprev: true }); process(s4); autoResolve(s4);
+        assert(!(a.damage > 0), 'Invincible: Schaden erhalten');
+        destroy(s4, a); assert(P(s4, 1).allies.includes(a), 'Invincible: hat das Spiel verlassen');
+        const s5 = freshH(3601, 15); const h = P(s5, 1).hero; const at0 = atkOf(s5, h, {}); h.flipped = true;
+        assert(atkOf(s5, h, {}) === at0 + 1, 'Emmi Sprinklestrike: Rückseite ohne 1 ATK');
+        const s6 = freshH(3602, 15); const k = P(s6, 1).hero; k.flipped = true; assert(hpOf(s6, k) === 40, `Kauno Stonehoof: Rückseite ${hpOf(s6, k)} statt 40 Leben`);
+    });
     // ---------------- Set wrathgate
     test(124, 'Wrathgate: "Lesson of …" (Klassen-Ally erschöpfen statt bezahlen), Eitrigg (alles Unique), Frost Fever (kein Assault/Mend)', () => {
         const s = freshH(12010, 13); const r = put(s, 1, Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && isClassCardData(c, 'Rogue') && !FX[c.id].on && !FX[c.id].aura && !FX[c.id].powers).sort((a, b) => (a.text || '').length - (b.text || '').length)[0].id);
