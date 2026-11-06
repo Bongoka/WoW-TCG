@@ -263,3 +263,82 @@ const OCR19 = {
 };
 Object.assign(OCR, OCR19);
 applyOCR(OCR19);
+
+// ============================================================================
+// KARTENDATEN – Death Knight Starter Set (Set 20, Karten-IDs 3702–3726)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx20.js (FX[id]).
+// ============================================================================
+H(3702,"Saeryn Dusksorrow",29,'Death Knight','Horde','Blood',"(3), Flip Saeryn >>> Put target weapon from your graveyard into your hand."); Object.assign(CARDS[3702],{set:20,num:2,rarity:'Hero'});
+Ab(3703,"Blood Boil",2,'Death Knight',null,"Destroy any number of Diseases you control. Your hero deals 2 shadow damage to each opposing ally for each Disease destroyed this way.",{set:20,num:3,rarity:'Uncommon'});
+Ab(3704,"Blood Presence",4,'Death Knight',null,"Ongoing: If your hero would deal damage, it deals that much +1 instead. <p> When your hero deals damage, it heals 1 damage from itself.",{set:20,num:4,rarity:'Uncommon',ongoing:true});
+Ab(3705,"Blood Strike",1,'Death Knight',null,"Your hero deals 2 melee damage to target ally. That ally has -1 [Health] this turn for each Disease you control.",{set:20,num:5,rarity:'Uncommon',instant:true});
+Ab(3706,"Death Coil",3,'Death Knight',null,"Your hero deals 3 shadow damage to target hero or ally. <p> Ready a Ghoul you control.",{set:20,num:6,rarity:'Uncommon'});
+Ab(3707,"Death Grip",2,'Death Knight',null,"Ongoing: [Activate] >>> This turn, target opposing hero or ally must attack if able and can attack only your hero if able.",{set:20,num:7,rarity:'Uncommon',instant:true,ongoing:true});
+Ab(3708,"Frost Presence",5,'Death Knight',null,"Ongoing: Opposing cards and effects must target your hero if able. <p> Your hero has +10 [Health] and Protector.",{set:20,num:8,rarity:'Uncommon',ongoing:true});
+Ab(3709,"Icy Touch",3,'Death Knight',null,"Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 frost damage to attached hero. <p> Allies in attached hero's party have -1 ATK.",{set:20,num:9,rarity:'Uncommon',attach:true,instant:true,ongoing:true});
+Ab(3710,"Mind Freeze",4,'Death Knight',null,"Interrupt target ability or ally. If you do, exhaust all of its controller's resources.",{set:20,num:10,rarity:'Uncommon',instant:true});
+Ab(3711,"Plague Strike",2,'Death Knight',null,"Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 shadow damage to attached hero. <p> When damage is dealt this way, target ally in attached hero's party has -1 [Health] this turn.",{set:20,num:11,rarity:'Uncommon',attach:true,ongoing:true});
+Ab(3712,"Raise Dead",4,'Death Knight',null,"Ongoing: At the end of your turn, if you control no Ghouls, you may remove target ally in a graveyard from the game. If you do, put a 3 [Melee] / 3 [Health] Ghoul ally token into play.",{set:20,num:12,rarity:'Rare',ongoing:true});
+A(3713,"Ahkara",5,3,'Melee',3,'Alliance',"Draenei","Death Knight","When this ally enters play, put a 3 [Melee] / 3 [Health] Ghoul ally token into play.",{set:20,num:13,rarity:'Common',allyTypes:["Draenei","Death Knight"]});
+A(3714,"Brumdor Dreadforge",4,3,'Melee',4,'Alliance',"Dwarf","Death Knight","(1), Destroy an equipment you control >>> Draw a card.",{set:20,num:14,rarity:'Common',allyTypes:["Dwarf","Death Knight"]});
+A(3715,"Valeos Chillheart",3,2,'Frost',4,'Alliance',"Night Elf","Death Knight","Protector <p> Each ally in combat with this ally has -1 ATK for each damage on that ally.",{set:20,num:15,rarity:'Common',allyTypes:["Night","Elf","Death Knight"],protector:true});
+A(3716,"Wanda Darkfizz",1,2,'Shadow',1,'Alliance',"Gnome","Death Knight","This ally has Elusive and Untargetable while you control a weapon.",{set:20,num:16,rarity:'Common',allyTypes:["Gnome","Death Knight"]});
+A(3717,"Grogmar Deathgore",2,2,'Shadow',2,'Horde',"Orc","Death Knight","This ally has Ferocity while you control a weapon.",{set:20,num:17,rarity:'Common',allyTypes:["Orc","Death Knight"]});
+A(3718,"Rantuko Grimtouch",1,1,'Shadow',2,'Horde',"Tauren","Death Knight","When this ally readies, he deals 1 shadow damage to each opposing ally.",{set:20,num:18,rarity:'Common',allyTypes:["Tauren","Death Knight"]});
+A(3719,"Tal'zin",4,4,'Melee',3,'Horde',"Troll","Death Knight","Protector <p> When you strike with a weapon, you may ready this ally.",{set:20,num:19,rarity:'Common',allyTypes:["Troll","Death Knight"],protector:true});
+A(3720,"Vanessa Fairgraves",3,3,'Frost',3,'Horde',"Undead","Death Knight","When this ally is destroyed, put a 3 [Melee] / 3 [Health] Ghoul ally token into play.",{set:20,num:20,rarity:'Common',allyTypes:["Undead","Death Knight"]});
+Ar(3721,"Greathelm of the Scourge Champion",2,2,'Plate','Head','Dk',"When this armor is destroyed, you may put it from its owner's graveyard into his hand at the start of the next turn.",{set:20,num:21,rarity:'Uncommon'});
+W(3722,"Greatsword of the Ebon Blade",5,5,2,'Sword','Melee','Dk',"When this weapon enters play, at the start of the next turn, destroy it unless you pay (3).",{set:20,num:22,rarity:'Rare',twoHanded:true});
+W(3723,"Runed Soulblade",4,4,2,'Sword','Melee','Dk',"When this weapon enters play, you may destroy an ally you control. If you do, your hero deals shadow damage equal to that ally's ATK to target ally.",{set:20,num:23,rarity:'Uncommon',twoHanded:true});
+Q(3724,"Betrayal",'Neutral',1,"On your turn: Destroy an ally you control and pay (1) to complete this quest. <p> Reward: Draw a card.",{set:20,num:24,rarity:'Common'});
+Q(3725,"Darkness Calling",'Neutral',3,"Pay (3) to complete this quest. <p> Reward: Draw two cards, then discard a card.",{set:20,num:25,rarity:'Common'});
+Q(3726,"Hazardous Materials",'Neutral',3,"Pay (3) to complete this quest. <p> Reward: Choose one: Put a +1 ATK counter on a Weapon you control; or draw a card. If your hero is a Death Knight, you may choose both.",{set:20,num:26,rarity:'Common'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR20 = {
+3702:["Hero—Blood Elf Death Knight (Blood), Herbalism/Inscription, 29 Health","(3), Flip Saeryn >>> Put target weapon from your graveyard into your hand."],
+3703:["Ability—Blood","Destroy any number of Diseases you control. Your hero deals 2 shadow damage to each opposing ally for each Disease destroyed this way."],
+3704:["Ability—Blood, Presence (1)","Ongoing: If your hero would deal damage, it deals that much +1 instead. <p> When your hero deals damage, it heals 1 damage from itself."],
+3705:["Instant Ability—Blood","Your hero deals 2 melee damage to target ally. That ally has -1 [Health] this turn for each Disease you control."],
+3706:["Ability—Unholy","Your hero deals 3 shadow damage to target hero or ally. <p> Ready a Ghoul you control."],
+3707:["Instant Ability—Unholy","Ongoing: [Activate] >>> This turn, target opposing hero or ally must attack if able and can attack only your hero if able."],
+3708:["Ability—Frost, Presence (1)","Ongoing: Opposing cards and effects must target your hero if able. <p> Your hero has +10 [Health] and Protector."],
+3709:["Instant Ability—Frost Disease","Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 frost damage to attached hero. <p> Allies in attached hero's party have -1 ATK."],
+3710:["Instant Ability—Frost","Interrupt target ability or ally. If you do, exhaust all of its controller's resources."],
+3711:["Ability—Unholy Disease","Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 shadow damage to attached hero. <p> When damage is dealt this way, target ally in attached hero's party has -1 [Health] this turn."],
+3712:["Ability—Unholy","Ongoing: At the end of your turn, if you control no Ghouls, you may remove target ally in a graveyard from the game. If you do, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."],
+3713:["Ally—Draenei Death Knight, 3 [Melee] / 3 Health","When this ally enters play, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."],
+3714:["Ally—Dwarf Death Knight, 3 [Melee] / 4 Health","(1), Destroy an equipment you control >>> Draw a card."],
+3715:["Ally—Night Elf Death Knight, 2 [Frost] / 4 Health","Protector <p> Each ally in combat with this ally has -1 ATK for each damage on that ally."],
+3716:["Ally—Gnome Death Knight, 2 [Shadow] / 1 Health","This ally has Elusive and Untargetable while you control a weapon."],
+3717:["Ally—Orc Death Knight, 2 [Shadow] / 2 Health","This ally has Ferocity while you control a weapon."],
+3718:["Ally—Tauren Death Knight, 1 [Shadow] / 2 Health","When this ally readies, he deals 1 shadow damage to each opposing ally."],
+3719:["Ally—Troll Death Knight, 4 [Melee] / 3 Health","Protector <p> When you strike with a weapon, you may ready this ally."],
+3720:["Ally—Undead Death Knight, 3 [Frost] / 3 Health","When this ally is destroyed, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."],
+3721:["Equipment—Armor—Plate, Head (1), 2 DEF","When this armor is destroyed, you may put it from its owner's graveyard into his hand at the start of the next turn."],
+3722:["Equipment—2H Weapon—Sword, Melee (1), 5 ATK, 2 Strike","When this weapon enters play, at the start of the next turn, destroy it unless you pay (3)."],
+3723:["Equipment—2H Weapon—Sword, Melee (1), 4 ATK, 2 Strike","When this weapon enters play, you may destroy an ally you control. If you do, your hero deals shadow damage equal to that ally's ATK to target ally."],
+3724:["Quest","On your turn: Destroy an ally you control and pay (1) to complete this quest. <p> Reward: Draw a card."],
+3725:["Quest","Pay (3) to complete this quest. <p> Reward: Draw two cards, then discard a card."],
+3726:["Quest","Pay (3) to complete this quest. <p> Reward: Choose one: Put a +1 ATK counter on a Weapon you control; or draw a card. If your hero is a Death Knight, you may choose both."],
+};
+Object.assign(OCR, OCR20);
+applyOCR(OCR20);
+// ============================================================================
+// KARTENDATEN – Drums of War Crafted (Set 21, Karten-IDs 3801–3803)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx21.js (FX[id]).
+// ============================================================================
+Ar(3801,"Bulwark of the Ancient Kings",4,5,'Plate','Chest','Pa,Wa',"Blacksmithing Hero Required <p> Your hero has +5 [Health]. <p> Destroy this armor >>> Your hero has +25 [Health] until the end of your next turn.",{set:21,num:1,rarity:'Epic'});
+Ar(3802,"Tankatronic Goggles",2,2,'Plate','Head','Pa,Wa',"Engineering Hero Required <p> When this armor enters play, look at target players hand. <p> Your hero has Protector. Opposing allies lose and can't have Elusive, Stealth, and Untargetable.",{set:21,num:2,rarity:'Epic'});
+It(3803,"Goblin Rocket Launcher",4,'Trinket',2,'Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Engineering Hero Required <p> [Activate] >>> Remove the top card of your deck from the game. Your hero deals ranged damage equal to that card's cost to target ally.",{set:21,num:3,rarity:'Epic'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR21 = {
+3801:["Equipment—Armor—Plate, Chest (1), 5 DEF","Blacksmithing Hero Required <p> Your hero has +5 [Health]. <p> Destroy this armor >>> Your hero has +25 [Health] until the end of your next turn."],
+3802:["Equipment—Armor—Plate, Head (1), 2 DEF","Engineering Hero Required <p> When this armor enters play, look at target players hand. <p> Your hero has Protector. Opposing allies lose and can't have Elusive, Stealth, and Untargetable."],
+3803:["Equipment—Item, Trinket (2)","Engineering Hero Required <p> [Activate] >>> Remove the top card of your deck from the game. Your hero deals ranged damage equal to that card's cost to target ally."],
+};
+Object.assign(OCR, OCR21);
+applyOCR(OCR21);

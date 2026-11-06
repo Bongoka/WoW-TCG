@@ -501,3 +501,130 @@ FX[3529] = { reward: (s, pid) => { const l = [...s.p1.graveyard, ...s.p2.graveya
 // Securing the Ramparts: "If you control an armor, item, and weapon: Pay (1) to complete this quest. <p> Reward: Draw two cards."
 FX[3530] = { questCond: (s, pid) => { const h = me(s, pid).hero; return h.armors.some(a => a.type === 'Armor') && h.armors.some(a => a.type === 'Item') && h.weapons.length ? null : tr('Du brauchst eine Rüstung, einen Gegenstand und eine Waffe'); }, reward: (s, pid) => drawCards(s, me(s, pid), 2) };
 
+
+// ============================================================================
+// DEATH KNIGHT STARTER SET (death knight starter, IDs 3702–3726; Randolphe Mortimer = Naxxramas 3405)
+// ============================================================================
+// "<Beruf> Hero Required" (Drums of War Crafted): engine.js heroReqOk über profReq
+for (const [id, p] of [[3801, 'Blacksmithing'], [3802, 'Engineering'], [3803, 'Engineering']]) CARDS[id].profReq = p;
+const ownDiseases16 = (s, pid) => (me(s, pid).ongoing || []).filter(o => isDisease(o));
+// Saeryn Dusksorrow: "(3), Flip Saeryn >>> Put target weapon from your graveyard into your hand."
+FX[3702] = { powers: [flipPow(tr('Waffe aus dem Friedhof auf die Hand'), 3, { canUse: (s, pid) => gyCands(s, pid, c => CARDS[c.id].type === 'Weapon').length > 0 || tr('Keine Waffe im Friedhof'),
+    slots: (s, pid) => [{ label: tr('Waffe im Friedhof'), cands: gyCands(s, pid, c => CARDS[c.id].type === 'Weapon'), harm: false, ai: u => gyCard(s, u).c.cost || 0 }],
+    resolve: (s, it) => { const u = T(it)[0]; if (u) fromGyToHand(s, u); } })] };
+// Blood Boil: "Destroy any number of Diseases you control. Your hero deals 2 shadow damage to each opposing ally for each Disease destroyed this way."
+FX[3703] = { resolve: (s, it) => pickMany(s, it.pl, tr('Blood Boil: Eigene Diseases zerstören (Fertig = keine weiteren)'), 'Blood Boil', ownDiseases16(s, it.pl).map(c => c.uid), '3703:go', { pid: it.pl }, () => 1),
+    k: { go: (s, a, list) => { let n = 0; (list || []).forEach(u => { const c = findCharacter(s, u); if (!c) return; destroy(s, c); const l = locate(s, u); if (!l || !isInPlayZone(l.zone)) n++; });
+        if (n) alliesOf(foe(s, a.pid)).forEach(x => heroDmg(s, a.pid, x.uid, 2 * n, 'Shadow')); } } };
+// Blood Presence: "Ongoing: If your hero would deal damage, it deals that much +1 instead. <p> When your hero deals damage, it heals 1 damage from itself."
+FX[3704] = { aura: { dmgOut: (s, src, sp, from) => from && from.uid === heroOf(s, sp).uid ? 1 : 0 },
+    on: { dmg: (s, c, d, pid) => { if (d.amt > 0 && d.src === heroOf(s, pid).uid) trig(s, { id: 3704, k: 'heal', a: { pid } }); } },
+    k: { heal: (s, a) => { const h = heroOf(s, a.pid); heal(s, h.uid, h.uid, 1); } } };
+// Blood Strike: "Your hero deals 2 melee damage to target ally. That ally has -1 [Health] this turn for each Disease you control."
+FX[3705] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; heroDmg(s, it.pl, t.uid, 2, 'Melee'); const n = ownDiseases16(s, it.pl).length; if (n) addTM(t, { k: 'hp', v: -n, turn: s.turn }); } };
+// Death Coil: "Your hero deals 3 shadow damage to target hero or ally. <p> Ready a Ghoul you control."
+const readyGhoul16 = (s, pid, src) => { const l = alliesOf(me(s, pid)).filter(x => isGhoul(x) && x.exhausted); if (!l.length) return; if (l.length === 1) { readyCard(s, l[0]); return; }
+    mustPick(s, pid, tr`${src}: Welchen Ghoul bereit machen?`, src, l.map(x => x.uid), 'E:readyGhoul16', {}, () => 1); };
+EK.readyGhoul16 = (s, a, u) => { const g = findCharacter(s, u); if (g) readyCard(s, g); };
+FX[3706] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Shadow'); q(s, { op: 'call', k: 'E:readyGhoul16b', a: { pid: it.pl } }); } };
+EK.readyGhoul16b = (s, a) => readyGhoul16(s, a.pid, 'Death Coil');
+// Death Grip: "Ongoing: [Activate] >>> This turn, target opposing hero or ally must attack if able and can attack only your hero if able."
+FX[3707] = { powers: [actPow('grip', tr('Ziel muss angreifen, nur deinen Helden'), { slots: slotChar(tr('Gegnerisches Ziel'), true, { side: 'enemy' }),
+    resolve: (s, it) => { const t = T1(s, it); if (!t) return; addTM(t, { k: 'mustAttack', turn: s.turn }); addTM(t, { k: 'attackOnlyUid', uid: heroOf(s, it.pl).uid, turn: s.turn }); } })] };
+// Frost Presence: "Ongoing: Opposing cards and effects must target your hero if able. <p> Your hero has +10 [Health] and Protector."
+FX[3708] = { aura: { mustTarget: (s, src, sp, c, pid) => pid !== sp && c.uid === heroOf(s, sp).uid, hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 10 : 0,
+    kw: (s, src, sp, c, k) => k === 'protector' && c.uid === heroOf(s, sp).uid } };
+// Icy Touch: "Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 frost damage to attached hero. <p> Allies in attached hero's party have -1 ATK."
+FX[3709] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
+    on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) trig(s, { id: 3709, k: 'tick', a: { pid, uid: c.uid, h: c.attachedTo } }); } },
+    k: { tick: (s, a) => { if (findCharacter(s, a.h)) heroDmg(s, a.pid, a.h, 1, 'Frost', { abilityId: 3709, abilityUid: a.uid }); } },
+    aura: { atk: (s, src, sp, c) => { if (!isAllyLike(c) || !src.attachedTo) return 0; const hl = locate(s, src.attachedTo); return hl && ctrlOf(s, c) === hl.pid ? -1 : 0; } } };
+// Mind Freeze: "Interrupt target ability or ally. If you do, exhaust all of its controller's resources."
+FX[3710] = { slots: (s, pid) => [{ label: tr('Fähigkeit oder Ally in der Kette'), cands: chainCards(s, c => c.type === 'Ability' || isAllyCard(c)), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }],
+    canPlay: s => chainCards(s, c => c.type === 'Ability' || isAllyCard(c)).length > 0 || tr('Keine Fähigkeit und kein Ally in der Kette'),
+    resolve: (s, it) => { const u = T(it)[0]; const x = (s.chain || []).find(i => i.card && i.card.uid === u); if (!x || !interruptUid(s, u)) return; me(s, x.pl).resources.forEach(r => { r.exhausted = true; }); L(s, tr`Mind Freeze: Alle Ressourcen von ${me(s, x.pl).hero.name} werden erschöpft.`, '', it.pl); } };
+// Plague Strike: "Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 shadow damage to attached hero.
+// <p> When damage is dealt this way, target ally in attached hero's party has -1 [Health] this turn."
+FX[3711] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
+    on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) trig(s, { id: 3711, k: 'tick', a: { pid, uid: c.uid, h: c.attachedTo } }); } },
+    k: { tick: (s, a) => { if (findCharacter(s, a.h)) heroDmg(s, a.pid, a.h, 1, 'Shadow', { abilityId: 3711, abilityUid: a.uid, after: { k: '3711:hit', a } }); },
+        hit: (s, a) => { if (!(a.dealt > 0)) return; const h = findCharacter(s, a.h); if (!h) return; const l = alliesOf(me(s, ctrlOf(s, h))).filter(x => !untargetableBy(s, x, a.pid)); if (!l.length) return;
+            mustPick(s, a.pid, tr('Plague Strike: Ziel-Ally -1 Leben'), 'Plague Strike', l.map(x => x.uid), '3711:hp', a, u => 1 - ((findCharacter(s, u) || {}).hp || 0)); },
+        hp: (s, a, u) => { const t = findCharacter(s, u); if (t) addTM(t, { k: 'hp', v: -1, turn: s.turn }); } } };
+// Raise Dead: "Ongoing: At the end of your turn, if you control no Ghouls, you may remove target ally in a graveyard from the game. If you do, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."
+FX[3712] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid && !alliesOf(me(s, pid)).some(isGhoul) && gyAlliesAll15(s).length) trig(s, { id: 3712, k: 'ask', a: { pid } }); } },
+    k: { ask: (s, a) => { if (alliesOf(me(s, a.pid)).some(isGhoul)) return; mayPick(s, a.pid, tr('Raise Dead: Ally in einem Friedhof entfernen (Ghoul-Token)?'), 'Raise Dead', gyAlliesAll15(s), '3418:go', a, u => locate(s, u).pid === a.pid ? 1 : 3); } } };
+// Ahkara: "When this ally enters play, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."
+FX[3713] = { enter: (s, c, pid) => ghoul(s, pid) };
+// Brumdor Dreadforge: "(1), Destroy an equipment you control >>> Draw a card."
+const ownEquip16 = (s, pid) => [...me(s, pid).hero.weapons, ...me(s, pid).hero.armors].map(c => c.uid);
+FX[3714] = { powers: [{ key: 'brumdor', label: tr('Eigene Ausrüstung zerstören: Ziehe 1'), cost: 1, canUse: (s, pid) => ownEquip16(s, pid).length > 0 || tr('Keine eigene Ausrüstung'),
+    payExtra: (s, it) => mustPick(s, it.pl, tr('Brumdor Dreadforge: Welche eigene Ausrüstung zerstören?'), 'Brumdor Dreadforge', ownEquip16(s, it.pl), '3714:pay', {}, u => -((findCharacter(s, u) || {}).cost || 0)),
+    resolve: (s, it) => drawCards(s, me(s, it.pl), 1) }],
+    k: { pay: (s, a, u) => { const c = findCharacter(s, u); if (c) destroy(s, c, { cause: 'cost' }); finishPrep(s); } } };
+// Valeos Chillheart: "Protector <p> Each ally in combat with this ally has -1 ATK for each damage on that ally."
+FX[3715] = { aura: { atk: (s, src, sp, c) => c.uid !== src.uid && isAllyLike(c) && inCombatWith(s, c.uid, src.uid) ? -(c.damage || 0) : 0 } };
+// Wanda Darkfizz: "This ally has Elusive and Untargetable while you control a weapon."  Grogmar Deathgore: "This ally has Ferocity while you control a weapon."
+FX[3716] = { aura: { kw: (s, src, sp, c, k) => c.uid === src.uid && (k === 'elusive' || k === 'untargetable') && weaponsOf(s, sp).length > 0 } };
+FX[3717] = { aura: { kw: (s, src, sp, c, k) => c.uid === src.uid && k === 'ferocity' && weaponsOf(s, sp).length > 0 } };
+// Rantuko Grimtouch: "When this ally readies, he deals 1 shadow damage to each opposing ally."
+FX[3718] = { on: { readied: (s, c, d, pid) => { if (d.uid === c.uid) trig(s, { id: 3718, k: 'go', a: { pid, uid: c.uid } }); } },
+    k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; alliesOf(foe(s, a.pid)).forEach(x => dealDamage(s, { src: a.uid, tgt: x.uid, amt: 1, dt: 'Shadow' })); } } };
+// Tal'zin: "Protector <p> When you strike with a weapon, you may ready this ally."
+FX[3719] = { on: { strike: (s, c, d, pid) => { if (d.pid === pid && c.exhausted) trig(s, { id: 3719, k: 'ask', a: { pid, uid: c.uid } }); } },
+    k: { ask: (s, a) => yesNo(s, a.pid, tr("Tal'zin bereit machen?"), "Tal'zin", '3719:go', a, true), go: (s, a, v) => { const c = findCharacter(s, a.uid); if (v && c) readyCard(s, c); } } };
+// Vanessa Fairgraves: "When this ally is destroyed, put a 3 [Melee] / 3 [Health] Ghoul ally token into play."
+FX[3720] = { leave: (s, snap, dest, info) => { if (!info || !info.destroyed) return; const pid = snap.wasCtrl || snap.owner; if (pid) pushTrig(s, pid, 3720, [{ op: 'call', k: 'E:ghoul16', a: { pid } }]); } };
+EK.ghoul16 = (s, a) => ghoul(s, a.pid);
+// Greathelm of the Scourge Champion: "When this armor is destroyed, you may put it from its owner's graveyard into his hand at the start of the next turn."
+FX[3721] = { leave: (s, snap, dest, info) => { if (info && info.destroyed && dest === 'graveyard') addPE(s, snap.owner, { k: 'helm16', uid: snap.uid, until: 'game' }); } };
+onEvt('startOfTurn', (s) => { for (const m of (s.pe || []).filter(x => x.k === 'helm16' && !x.used && x.turn < s.turn)) { m.used = true; pushTrig(s, m.pid, 3721, [{ op: 'call', k: 'E:helm16', a: { pid: m.pid, uid: m.uid } }]); } });
+EK.helm16 = (s, a) => { if (gyCard(s, a.uid)) yesNo(s, a.pid, tr('Greathelm of the Scourge Champion aus dem Friedhof auf die Hand nehmen?'), 'Greathelm of the Scourge Champion', 'E:helm16Do', a, true); };
+EK.helm16Do = (s, a, v) => { if (v && gyCard(s, a.uid)) fromGyToHand(s, a.uid); };
+// Greatsword of the Ebon Blade: "When this weapon enters play, at the start of the next turn, destroy it unless you pay (3)."
+FX[3722] = { enter: (s, c, pid) => addPE(s, pid, { k: 'ebon16', uid: c.uid, until: 'game' }) };
+onEvt('startOfTurn', (s) => { for (const m of (s.pe || []).filter(x => x.k === 'ebon16' && !x.used && x.turn < s.turn)) { m.used = true; pushTrig(s, m.pid, 3722, [{ op: 'call', k: 'E:ebon16', a: { pid: m.pid, uid: m.uid } }]); } });
+EK.ebon16 = (s, a) => { const w = findCharacter(s, a.uid); if (!w) return; if (getReadyRes(me(s, a.pid)) < 3) { destroy(s, w); return; }
+    ask(s, { pid: a.pid, prompt: tr('Greatsword of the Ebon Blade: (3) bezahlen, sonst wird es zerstört?'), src: 'Greatsword of the Ebon Blade', opts: [{ label: tr('(3) bezahlen'), v: 1, ai: 2 }, { label: tr('Zerstören lassen'), v: 0, ai: 0 }], k: 'E:ebon16Do', a, auto: false }); };
+EK.ebon16Do = (s, a, v) => { const w = findCharacter(s, a.uid); if (!w) return; if (v && payRes(me(s, a.pid), 3)) return; destroy(s, w); };
+// Runed Soulblade: "When this weapon enters play, you may destroy an ally you control. If you do, your hero deals shadow damage equal to that ally's ATK to target ally."
+FX[3723] = { enter: (s, c, pid) => { const l = alliesOf(me(s, pid)); if (l.length) mayPick(s, pid, tr('Runed Soulblade: Eigenen Ally zerstören?'), 'Runed Soulblade', l.map(x => x.uid), '3723:kill', { pid }, u => { const x = findCharacter(s, u); return x && x.isToken ? 1 : -1; }); },
+    k: { kill: (s, a, u) => { const c = u && findCharacter(s, u); if (!c) return; const x = atkOf(s, c, {}); destroy(s, c); const l = locate(s, u); if (l && isInPlayZone(l.zone)) return;
+            const t = targetCands(s, a.pid, { ally: true }); if (t.length && x > 0) mustPick(s, a.pid, tr`Runed Soulblade: ${x} Schattenschaden an Ziel-Ally`, 'Runed Soulblade', t.map(y => y.uid), '3723:dmg', { ...a, x }, v => ctrlOf(s, findCharacter(s, v)) === a.pid ? -5 : 2); },
+        dmg: (s, a, u) => { if (u) heroDmg(s, a.pid, u, a.x, 'Shadow', { ability: false }); } } };
+// Betrayal: "On your turn: Destroy an ally you control and pay (1) to complete this quest. <p> Reward: Draw a card."
+FX[3724] = { questCond: (s, pid) => s.activePlayer !== pid ? tr('Nur in deinem Zug') : alliesOf(me(s, pid)).length ? null : tr('Du brauchst einen eigenen Ally'),
+    questExtra: (s, pid) => mustPick(s, pid, tr('Betrayal: Welchen eigenen Ally zerstören?'), 'Betrayal', alliesOf(me(s, pid)).map(x => x.uid), '3724:pay', { pid }, u => -((findCharacter(s, u) || {}).cost || 0)),
+    reward: (s, pid) => drawCards(s, me(s, pid), 1),
+    k: { pay: (s, a, u) => { const c = findCharacter(s, u); if (c) destroy(s, c, { cause: 'cost' }); q(s, { op: 'call', k: 'E:questPay', a: {} }); } } };
+// Darkness Calling: "Pay (3) to complete this quest. <p> Reward: Draw two cards, then discard a card."
+FX[3725] = { reward: (s, pid) => { drawCards(s, me(s, pid), 2); q(s, { op: 'call', k: 'E:discard', a: { pid, n: 1, src: 'Darkness Calling' } }); } };
+// Hazardous Materials: "Pay (3) to complete this quest. <p> Reward: Choose one: Put a +1 ATK counter on a Weapon you control; or draw a card. If your hero is a Death Knight, you may choose both."
+FX[3726] = { reward: (s, pid) => { const ws = weaponsOf(s, pid); const opts = [{ label: tr('Ziehe 1'), v: 'draw', ai: 2 }];
+        if (ws.length) opts.push({ label: tr('+1-ATK-Marke auf eine eigene Waffe'), v: 'atk', ai: 1 });
+        if (ws.length && heroOf(s, pid).class === 'Death Knight') opts.push({ label: tr('Beides'), v: 'both', ai: 3 });
+        ask(s, { pid, prompt: tr('Hazardous Materials: Wähle'), src: 'Hazardous Materials', opts, k: '3726:go', a: { pid } }); },
+    k: { go: (s, a, v) => { if (v === 'draw' || v === 'both') drawCards(s, me(s, a.pid), 1); if (v === 'atk' || v === 'both') { const ws = weaponsOf(s, a.pid); if (ws.length === 1) addCounter(s, ws[0], 'atk1', 1);
+            else if (ws.length) mustPick(s, a.pid, tr('Hazardous Materials: Auf welche Waffe?'), 'Hazardous Materials', ws.map(w => w.uid), '3726:w', a, u => weaponAtk(s, findCharacter(s, u), {})); } },
+        w: (s, a, u) => { const w = findCharacter(s, u); if (w) addCounter(s, w, 'atk1', 1); } } };
+
+// ============================================================================
+// DRUMS OF WAR CRAFTED (drums crafted, IDs 3801–3803)
+// ============================================================================
+// Bulwark of the Ancient Kings: "Blacksmithing Hero Required <p> Your hero has +5 [Health]. <p> Destroy this armor >>> Your hero has +25 [Health] until the end of your next turn."
+FX[3801] = { aura: { hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 5 : 0 },
+    powers: [{ key: 'bulwark', label: tr('Zerstören: Held +25 Leben bis zum Ende deines nächsten Zuges'), selfCost: selfDestroyCost,
+        resolve: (s, it) => addPE(s, it.pl, { k: 'bulwark16', untilTurn: s.activePlayer === it.pl ? s.turn + 2 : s.turn + 1 }) }] };
+STAT_MODS.push((s, c, st) => { if (st !== 'hp' || c.type !== 'Hero' || !s.pe || !s.pe.length) return 0; const pid = ctrlOf(s, c); return pid && c.uid === heroOf(s, pid).uid ? 25 * pes(s, pid, 'bulwark16').length : 0; });
+// Tankatronic Goggles: "Engineering Hero Required <p> When this armor enters play, look at target player's hand. <p> Your hero has Protector.
+// Opposing allies lose and can't have Elusive, Stealth, and Untargetable."
+FX[3802] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr('Tankatronic Goggles: Wessen Hand ansehen?'), src: 'Tankatronic Goggles', opts: [{ label: tr('Gegner'), v: foe(s, pid).id, ai: 2 }, { label: tr('Du selbst'), v: pid, ai: 0 }], k: '3802:look', a: { pid } }),
+    k: { look: (s, a, who) => { const h = me(s, who).hand; if (!s.real || !(s.humans || []).includes(a.pid)) return;
+        ask(s, { pid: a.pid, prompt: tr`Tankatronic Goggles – Hand von ${me(s, who).hero.name}: ${h.length ? h.map(c => c.name).join(', ') : tr('keine Karten')}`, src: 'Tankatronic Goggles', opts: [{ label: tr('OK'), v: 1, ai: 1 }], k: '3802:ok', a }); },
+        ok: () => {} },
+    aura: { kw: (s, src, sp, c, k) => k === 'protector' && c.uid === heroOf(s, sp).uid,
+        kwLose: (s, src, sp, c, k) => (k === 'elusive' || k === 'stealth' || k === 'untargetable') && isAllyLike(c) && ctrlOf(s, c) && ctrlOf(s, c) !== sp } };
+// Goblin Rocket Launcher: "Engineering Hero Required <p> [Activate] >>> Remove the top card of your deck from the game. Your hero deals ranged damage equal to that card's cost to target ally."
+FX[3803] = { powers: [actPow('rocket', tr('Oberste Deckkarte entfernen: Fernkampfschaden in Höhe ihrer Kosten'), { slots: slotAlly(tr('Ziel-Ally'), true),
+    resolve: (s, it) => { const p = me(s, it.pl); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.deckOwner || p.id); p.removed.push(c); L(s, tr`${c.name} wird aus dem Spiel entfernt.`, '', it.pl);
+        const t = T(it)[0]; const n = c.cost || 0; if (t && n > 0) heroDmg(s, it.pl, t, n, 'Ranged', { ability: false }); } })] };

@@ -1124,6 +1124,7 @@ function heroReqOk(hero, card) {
     if (card.loyalReq && hero.talent === 'Traitor') return false;                       // "Loyal Hero Required" (Set illidan): kein Traitor-Held
     if (card.classReq && !card.classReq.includes(hero.class) && !(card.scourgeOr && hero.scourge)) return false;   // "[Hunter], [Mage] … Hero Required", "Scourge or [Death Knight] Hero Required" (Sets scourgewar/icecrown)
     if (card.scourgeReq && !hero.scourge) return false;                                   // "Scourge Hero Required" (Set icecrown)
+    if (card.profReq && typeof profsOf === 'function' && !profsOf(hero).includes(card.profReq)) return false;   // "<Beruf> Hero Required" (Drums of War Crafted)
     return true;
 }
 const INSTANT_EXTRA = [];   // (s, p, card) => true
