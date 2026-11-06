@@ -77,7 +77,7 @@ function aiHoldValue(s, p) {
     const ready = getReadyRes(p); if (!ready) return 0;
     let best = 0;
     for (const c of p.hand) {
-        if (c.type === 'Quest' || !c.instant || !AI_REACTIVE.test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
+        if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !AI_REACTIVE.test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
         const cost = getPlayCost(s, p, c); if (cost > ready) continue;
         best = Math.max(best, 3 + cost * 1.2);
     }
@@ -89,6 +89,7 @@ function aiHoldValue(s, p) {
 function handCardValue(s, p, c) {
     if (!c) return 0;
     if (c.type === 'Quest') return 2.5;
+    if (c.type === 'Location') return locsOf(p).length ? 1.2 : 2.6;              // Location (Set drums): eine offene lohnt, weitere kaum
     if (!cardMatchesPlayer(c, p) || !talentReqOk(c, p.hero)) return 0.5;
     const R = p.resources.length, cost = c.xCost ? 4 : (c.cost || 0);
     let v = 2.6 + Math.min(cost, 8) * 0.18;
@@ -99,7 +100,7 @@ function handCardValue(s, p, c) {
 // Teuerste nützliche Karte in Hand und Deck (X-Kosten zählen wie 6): so viele Ressourcen braucht man höchstens
 function maxUsefulCost(p) {
     let m = 0;
-    const look = c => { if (!c || c.type === 'Quest' || !cardMatchesPlayer(c, p)) return; m = Math.max(m, c.xCost ? 6 : (c.cost || 0)); };
+    const look = c => { if (!c || c.type === 'Quest' || c.type === 'Location' || !cardMatchesPlayer(c, p)) return; m = Math.max(m, c.xCost ? 6 : (c.cost || 0)); };
     p.hand.forEach(look); p.deck.forEach(id => look(CARDS[id]));
     return Math.min(m, 10);
 }
@@ -127,7 +128,7 @@ function chooseResourceAction(s, pid, legal) {
     const p = getPlayer(s, pid);
     const res = legal.filter(a => a.type === 'PLACE_RESOURCE');
     if (!res.length || !wantResource(s, p)) return null;
-    const qUp = res.find(a => a.faceUp && (p.hand[a.handIdx].questCost || 0) <= p.resources.length + 1);
+    const qUp = res.find(a => a.faceUp && (p.hand[a.handIdx].type === 'Location' ? !locsOf(p).length : (p.hand[a.handIdx].questCost || 0) <= p.resources.length + 1));   // Location offen nur, wenn noch keine offen liegt
     if (qUp) return qUp;
     const down = res.filter(a => !a.faceUp);
     if (!down.length) return res[0];

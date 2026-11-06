@@ -43,6 +43,7 @@ function sameTurn(s, t) { return t === s.turn; }
 
 function partyOf(p) { return [p.hero, ...p.allies]; }
 function alliesOf(p) { return p.allies.slice(); }                       // Totems zählen als Allies (CR 305.3a)
+function facIs(c, f) { return !!c && (c.faction === f || (c.factions || []).includes(f)); }   // Allies beider Fraktionen (Set gladiator: "Alliance, Horde")
 function isAllyCard(c) { return !!c && (c.type === 'Ally' || !!c.totem); }
 function totemsOf(p) { return p.allies.filter(a => a.isTotem); }
 function isChar(c) { return !!c && (c.type === 'Hero' || c.type === 'Ally' || c.isTotem); }
@@ -97,7 +98,8 @@ function polymorphed(s, c) {
     }
     return false;
 }
-function active(s, c) { if (!c) return true; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }
+function regaliaFoe(s, c) { if (!s.p1.hero.armors.length && !s.p2.hero.armors.length) return false; const pid = ctrlOf(s, c); return [s.p1, s.p2].some(p => p.id !== pid && p.hero.armors.some(a => a.id === 7209 && !metalmorphed(s, a) && !attachedTo(s, a.uid, 7040).length)); }   // Gladiator's Regalia (Set drums): "Opposing allies lose and can't have powers."
+function active(s, c) { if (!c) return true; if (isAllyLike(c) && regaliaFoe(s, c)) return false; if (s.p1.ongoing.length + s.p2.ongoing.length && attachedTo(s, c.uid, 7040).length) return false; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }   // Spell Suppression (Set drums): angehängte Karte verliert ihre Kräfte
 // Metalmorph (Set 7): "Attached equipment loses and can't have powers and can't exhaust"
 function metalmorphed(s, c) { return (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') && attachedTo(s, c.uid, 5064).length > 0; }
 function cantExhaust(s, c) { return metalmorphed(s, c); }
@@ -109,8 +111,10 @@ function attachedTo(s, uid, id) {
 // Ressourcen pro Zug (CR 412.1): eine, Natural Genesis (Set 6) erlaubt jedem Spieler je eine zusätzliche
 function resAllowance(s) { return 1 + [s.p1, s.p2].reduce((n, p) => n + unattachedOngoing(p, 4026).length, 0); }
 function unattachedOngoing(p, id) { return (p.ongoing || []).filter(o => !o.attachedTo && o.id === id); }
-function hasBearForm(s, pid) { return (getPlayer(s, pid).ongoing || []).some(o => CARDS[o.id] && CARDS[o.id].bearForm); }
-function catForms(s, pid) { return (getPlayer(s, pid).ongoing || []).filter(o => CARDS[o.id] && CARDS[o.id].catForm && active(s, o)); }
+// Set drums: Helden-Form "this turn" (Oakenclaw, Maleo: PE heroForm) und Master Instinct (Karte hat diesen Zug Cat statt Bear Form: o.catTurn)
+function heroFormOn(s, pid, form) { return pes(s, pid, 'heroForm').some(m => m.form === form && !m.ended); }
+function hasBearForm(s, pid) { return (getPlayer(s, pid).ongoing || []).some(o => CARDS[o.id] && CARDS[o.id].bearForm && o.catTurn !== s.turn) || heroFormOn(s, pid, 'bear'); }
+function catForms(s, pid) { const p = getPlayer(s, pid); return (p.ongoing || []).filter(o => CARDS[o.id] && (CARDS[o.id].catForm || o.catTurn === s.turn) && active(s, o)).concat(heroFormOn(s, pid, 'cat') ? [p.hero] : []); }
 function hasCatForm(s, pid) { return catForms(s, pid).length > 0; }
 function hasForm(s, pid) { return (getPlayer(s, pid).ongoing || []).some(o => o.limitTags && o.limitTags.Form !== undefined); }
 // Typ-Wörter eines Allies ("Demon", "Wisp", "Totem" …) und Waffen-/Rüstungsarten
@@ -126,9 +130,10 @@ function auraSrcs(s) {
     for (const p of [s.p1, s.p2]) {
         if (AURA_IDS.has(p.hero.id) && (!p.hero.flipped || FX[p.hero.id].backAura)) out.push({ c: p.hero, pid: p.id });
         for (const c of p.allies) if (AURA_IDS.has(c.id) && active(s, c)) out.push({ c, pid: p.id });
-        for (const c of p.hero.weapons) if (AURA_IDS.has(c.id)) out.push({ c, pid: p.id });
-        for (const c of p.hero.armors) if (AURA_IDS.has(c.id)) out.push({ c, pid: p.id });
-        for (const c of p.ongoing) if (AURA_IDS.has(c.id) && !c.isTotem) out.push({ c, pid: p.id });
+        for (const c of p.hero.weapons) if (AURA_IDS.has(c.id) && active(s, c)) out.push({ c, pid: p.id });
+        for (const c of p.hero.armors) if (AURA_IDS.has(c.id) && active(s, c)) out.push({ c, pid: p.id });
+        for (const c of p.ongoing) if (AURA_IDS.has(c.id) && !c.isTotem && active(s, c)) out.push({ c, pid: p.id });
+        for (const r of p.resources) if (r.faceUp && r.card && r.card.type === 'Location' && AURA_IDS.has(r.card.id) && active(s, r.card)) out.push({ c: r.card, pid: p.id });   // offene Locations
     }
     return out;
 }
@@ -153,6 +158,11 @@ function pushTrig(s, pid, srcId, steps, srcUid = null) {
 }
 
 // Temporäre Modifikatoren "this turn" / "this combat"
+// Zusätzliche Wert-Änderungen ohne Karte im Spiel ("Opposing allies have -1 [Health] this turn", Set drums): (s, c, 'atk'|'hp', ctx) => Zahl
+const STAT_MODS = [];
+// Werte festsetzen ("Each ally has ATK and [Health] equal to its cost, and can't gain or lose ATK or [Health]"): (s, c, kind) => Zahl | null; die neueste Quelle gilt
+const STAT_SET = [];
+function statSetOf(s, c, kind) { let best = null, t = -1; for (const f of STAT_SET) { const r = f(s, c, kind); if (r && r.t >= t) { best = r.v; t = r.t; } } return best; }
 function addTM(c, m) { c.tm = c.tm || []; c.tm.push(m); }
 // cond: Bedingung aus TM_COND (z. B. "while attacking", "while you control a Pet") – gilt nur, solange sie erfüllt ist
 const TM_COND = { attacking: (s, c) => !!s.battle && s.battle.att === c.uid };
@@ -162,8 +172,22 @@ function addPE(s, pid, m) { s.pe = s.pe || []; s.pe.push({ pid, turn: s.turn, ..
 function pes(s, pid, k) { return (s.pe || []).filter(m => m.k === k && (pid === null || m.pid === pid) && (m.turn === s.turn || m.until === 'game' || (m.untilTurn && s.turn <= m.untilTurn))); }
 
 // ---------------------------------------------------------------- Werte
-function isHordeAlly(c) { return isAllyLike(c) && c.faction === 'Horde'; }
+function isHordeAlly(c) { return isAllyLike(c) && facIs(c, 'Horde'); }
 function faceDownRes(p) { return p.resources.filter(r => !r.faceUp).length; }
+// Locations (Set drums, CR 306): offen in der Ressourcenreihe – ihre Kräfte, Auslöser und Dauereffekte wirken dort.
+// Verdeckte Ressourcen sind leer (CR 412.1b), zählen also nicht als Location.
+function locsOf(p) { return p.resources.filter(r => r.faceUp && r.card && r.card.type === 'Location'); }
+function locEntries(s) { const out = []; for (const p of [s.p1, s.p2]) for (const r of locsOf(p)) out.push({ c: r.card, pid: p.id, zone: 'resource', res: r }); return out; }
+function controlsLocation(s, pid) { return locsOf(getPlayer(s, pid)).length > 0; }
+// Zähler hinzufügen; Locations mit Kapazität: höchstens so viele (CR 306.3)
+function addCounter(s, c, kind, n = 1) {
+    if (!c || n <= 0) return 0;
+    c.counters = { ...(c.counters || {}) };
+    const cur = c.counters[kind] || 0, cap = c.type === 'Location' && c.capacity !== undefined ? c.capacity : Infinity;
+    const add = Math.max(0, Math.min(n, cap - cur)); c.counters[kind] = cur + add;
+    return add;
+}
+function removeCounter(s, c, kind, n = 1) { if (!c || !c.counters || !(c.counters[kind] > 0)) return 0; const k = Math.min(n, c.counters[kind]); c.counters = { ...c.counters, [kind]: c.counters[kind] - k }; return k; }
 
 // "while attacking / while defending" ist ein Dauereffekt: Ohne ausdrückliche Angabe gilt der laufende Kampf
 // (Heartseeker mit Backstab, Anzeige der Werte während des Kampfes …). Ausdrückliche Angaben (Kampfschaden,
@@ -191,6 +215,7 @@ function atkOf(s, c, ctx = {}) {
             v += catForms(s, pid).length;                                                 // Cat Form: +1 ATK while attacking (je Instanz)
         }
         v += auraSum(s, 'atk', c, ctx);
+        for (const f of STAT_MODS) v += f(s, c, 'atk', ctx) || 0;
         if (ctx.weapon) v += weaponAtk(s, ctx.weapon, ctx);
         return Math.max(0, v);
     }
@@ -198,6 +223,7 @@ function atkOf(s, c, ctx = {}) {
     const b = c.b ? c.b.atk || 0 : c.atk || 0;
     v += b;
     v += auraSum(s, 'atk', c, ctx);                                                       // Dauereffekte (Set 2/3)
+    for (const f of STAT_MODS) v += f(s, c, 'atk', ctx) || 0;                       // Spieler-Effekte "this turn" (Set drums)
     if (!active(s, c)) return Math.max(0, v);
     v += 2 * attachedTo(s, c.uid, 24).length;                                             // Mark of the Wild
     v += unattachedOngoing(p, 135).length;                                                // Battle Shout
@@ -217,6 +243,7 @@ function atkOf(s, c, ctx = {}) {
         if (ctx.target) v += (p.ongoing || []).filter(o => o.id === 39 && o.attachedTo === ctx.target.uid).length; // Marked for Death
         if (c.id === 226 && ctx.target && ctx.target.exhausted) v += 3;                   // Bala Silentblade
     }
+    if (STAT_SET.length && isAllyLike(c)) { const o = statSetOf(s, c, 'atk'); if (o !== null) return o; }
     return Math.max(0, v);
 }
 function inCombatWith(s, a, b) { const t = s.battle; return !!t && ((t.att === a && t.def === b) || (t.att === b && t.def === a)); }
@@ -226,6 +253,7 @@ function weaponAtk(s, w, ctx = {}) {
     const pid = ctrlOf(s, w); const p = pid ? getPlayer(s, pid) : null;
     if (p) ctx = combatCtx(s, p.hero.uid, ctx);                                           // Waffe greift mit ihrem Helden an
     let v = w.b ? w.b.atk || 0 : w.atk || 0;
+    { const st = tms(s, w, 'watkSet'); if (st.length) v = st[st.length - 1].v; }            // Transfigure (Set drums): "ATK becomes equal to its [Strike] this turn"
     tms(s, w, 'atk').forEach(m => v += m.v);
     if (p) {
         pes(s, pid, 'heroicStrike').forEach(m => v += m.v);                               // Heroic Strike
@@ -259,9 +287,11 @@ function hpOf(s, c) {
         v += 20 * unattachedOngoing(p, 143).length;                                       // Last Stand
         v += 10 * attachedTo(s, c.uid, 167).length;                                       // Rise to the Challenge
         v += auraSum(s, 'hp', c);
+        for (const f of STAT_MODS) v += f(s, c, 'hp') || 0;
         return v;
     }
     v += auraSum(s, 'hp', c);                                                             // Dauereffekte (Set 2/3)
+    for (const f of STAT_MODS) v += f(s, c, 'hp') || 0;
     tms(s, c, 'hp').forEach(m => v += m.v);                                               // "+X / +Y this turn"
     if (!active(s, c)) return v;
     v += 2 * attachedTo(s, c.uid, 24).length;                                             // Mark of the Wild
@@ -273,6 +303,7 @@ function hpOf(s, c) {
     if (c.id === 189 && alliesOf(p).length >= 4) v += 2;                                  // Kailis
     if (c.id === 241 && alliesOf(p).length === 1) v += 3;                                 // Halnar
     if (c.id === 261) v += faceDownRes(p);                                                // Tewa
+    if (STAT_SET.length) { const o = statSetOf(s, c, 'hp'); if (o !== null) return o; }   // Marundal / Windstriker Larun (Set honor)
     return v;
 }
 function defOf(s, a) {
@@ -316,7 +347,7 @@ function hasElusive(s, c) {
     if (printedKw(c, 'elusive')) return true;
     if (hasTM(s, c, 'elusive')) return true;                                              // Sneak
     if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 151 && !o.attachedTo)) return true; // From the Shadows
-    if (c.id === 280 && p.faction === 'Alliance') return true;                            // Hippogryph
+    if (c.id === 280 && facIs(p, 'Alliance')) return true;                            // Hippogryph
     return !!auraAny(s, 'kw', c, 'elusive');
 }
 function hasFerocity(s, c) {
@@ -327,7 +358,7 @@ function hasFerocity(s, c) {
     if (hasTM(s, c, 'ferocity')) return true;                                             // Into the Fray / Leeroy
     if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 154 && !o.attachedTo)) return true; // Lust for Battle
     if (c.race === 'Orc' && alliesOf(p).some(a => a.id === 268 && active(s, a))) return true; // Goretooth
-    if (c.id === 280 && p.faction === 'Horde') return true;                               // Hippogryph
+    if (c.id === 280 && facIs(p, 'Horde')) return true;                               // Hippogryph
     return !!auraAny(s, 'kw', c, 'ferocity');
 }
 // Stealth (602.2a): Held über Fähigkeiten / Dauereffekte, Allies gedruckt oder "this turn"
@@ -360,6 +391,7 @@ function cantPlayCards(s, pid) { return pes(s, pid, 'fangLock').length > 0; }
 function playBlocked(s, pid, card) {
     if (card.type === 'Ability' && pes(s, pid, 'noAbilities').length) return tr('Du kannst in diesem Zug keine Fähigkeiten spielen');
     if (pes(s, pid, 'noCards').length) return tr('Du kannst in diesem Zug keine Karten spielen');
+    if (isAllyCard(card) && pes(s, pid, 'noAllies11').length) return tr('Du kannst in diesem Zug keine Allies spielen');   // Pin (Set honor)
     if (pes(s, pid, 'banName').some(m => m.name === card.name)) return tr`${card.name} wurde benannt und kann in diesem Zug nicht gespielt werden`;   // Jin'do's Evil Eye
     const r = auraAny(s, 'noPlay', pid, card);
     return r || null;
@@ -374,6 +406,7 @@ function cantStrike(s, pid) {
 function cantDraw(s, pid) {
     if (pes(s, null, 'noDraw').length > 0) return true;
     // "Opponents can't draw cards this turn" (Morganis Blackvein)
+    if (pid !== undefined && auraAny(s, 'noDraw', pid)) return true;                        // The Oathkeeper (Set drums)
     return pid !== undefined && pes(s, null, 'noDrawOpp').some(m => m.pid !== pid);
 }
 
@@ -381,11 +414,15 @@ function cantDraw(s, pid) {
 function exhaust(s, c) {
     if (!c || c.exhausted) return;
     if (cantExhaust(s, c)) return;
+    if (auraAny(s, 'noExhaustTurn', c)) return;                                             // Overpower (Set honor)
+    if (s.resolvingPl && hasTM(s, c, 'noExhaustOpp') && s.resolvingPl !== ctrlOf(s, c)) return;   // Nerves of Steel (Set drums): "Opposing cards and effects can't exhaust it"
     c.exhausted = true;
     if (c.id === 201 && active(s, c) && ctrlOf(s, c)) trig(s, { k: 'grayson', a: { uid: c.uid } });   // Lord Grayson
     const pid = ctrlOf(s, c); if (pid) evt(s, 'exhausted', { uid: c.uid, pid });           // "When … exhausts" (Set 2/3)
 }
-function readyCard(s, c) { if (c && c.exhausted) { c.exhausted = false; evt(s, 'readied', { uid: c.uid }); } }
+// Bereitmachen verhindern ohne Karte im Spiel (Sacred Moment, Set gladiator: "Cards in play can't ready until after your next turn")
+const READY_BLOCK = [];
+function readyCard(s, c) { if (c && c.exhausted) { if (READY_BLOCK.some(f => f(s, c))) return; c.exhausted = false; evt(s, 'readied', { uid: c.uid }); } }
 // Anzeige-Ereignisse für die Oberfläche (Schadenszahlen, Tod) – nur in echten Partien, ohne Einfluss auf die Regeln
 function fxEvent(s, e) { if (isReal(s)) (s.fxq || (s.fxq = [])).push(e); }
 // Wert je Karte für den Siegbildschirm (nur echte Partien): Schaden, Heilung, besiegte gegnerische Allies.
@@ -463,8 +500,12 @@ function lose(s, pid, why) {
 function shuffleInPlace(p) { p.deck = shuffleDeck(p.deck); }
 
 // Karte verlässt das Spiel (dest: graveyard | hand | removed | deck | deckTop | deckBottom)
+// Vor dem Zerstören (die Karte ist noch im Spiel): Revival Stone (Set drums)
+const DESTROY_PRE = [];
 function leavePlay(s, c, dest = 'graveyard', info = {}) {
     const l = locate(s, c.uid); if (!l || !isInPlayZone(l.zone)) return false;
+    if (info.cause !== 'damage' && info.cause !== 'limit' && kwHas(s, c, 'forsaken') && !((c.damage || 0) >= hpOf(s, c))) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Will of the Forsaken).`, '', l.pid); return false; }
+    if (info.destroyed) for (const f of DESTROY_PRE) f(s, c);
     const p = getPlayer(s, l.pid);
     if (l.zone === 'party') p.allies.splice(p.allies.indexOf(c), 1);
     else if (l.zone === 'equip') { const arr = p.hero.weapons.includes(c) ? p.hero.weapons : p.hero.armors; arr.splice(arr.indexOf(c), 1); }
@@ -486,6 +527,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     else if (dest === 'removed') owner.removed.push(c);
     else if (dest === 'deckTop') owner.deck.push(c.id);
     else if (dest === 'deckBottom') owner.deck.unshift(c.id);
+    else if (dest === 'resource') { owner.resources.push({ card: c, faceUp: false, exhausted: !!info.exhausted }); evt(s, 'resEnters', { pid: owner.id, faceUp: false, uid: c.uid, id: c.id }); }   // Hibernate (Set drums)
     else owner.graveyard.push(c);
     // Auslöser
     const f = FX[snapshot.id];
@@ -497,8 +539,10 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     evt(s, 'left', { snap: snapshot, dest });
     return true;
 }
+const GY_REPLACE_UID = [];
 function gyReplaced(s, c, ownerPid, ctrlPid, fromPlay) {
     if (c.type === 'Ability' && pes(s, ownerPid, 'abilityToRfg').length) return true;     // Readiness
+    if (GY_REPLACE_UID.some(f => f(s, c))) return true;                                    // Cremate (Set honor)
     return !!auraAny(s, 'gyReplace', c, ownerPid, ctrlPid, !!fromPlay);
 }
 function resetInst(c) {
@@ -519,7 +563,8 @@ function destroy(s, c, info = {}) {
     if (isAllyLike(c)) addValue(s, s.lastCard, 'kills', 1, 2 + (c.cost || 0), l.pid);
     return leavePlay(s, c, 'graveyard', { ...info, destroyed: true });
 }
-function removeFromGame(s, c) { if (cantLeavePlay(s, c)) return false; return leavePlay(s, c, 'removed', { destroyed: false }); }
+function removeFromGame(s, c) { if (cantLeavePlay(s, c) || auraAny(s, 'noRemove', c)) return false;   // Netherbane (Set drums)
+    return leavePlay(s, c, 'removed', { destroyed: false }); }
 function isIndestructible(s, c) { return hasTM(s, c, 'indestructible') || !!auraAny(s, 'kw', c, 'indestructible'); }
 // Will of the Forsaken / Invincible-artige Effekte (FX.aura.kw 'cantLeave')
 function cantLeavePlay(s, c) { return !!auraAny(s, 'kw', c, 'cantLeave'); }
@@ -554,7 +599,7 @@ function q(s, step) { (s._batch || (s._batch = [])).push(step); }
 function trig(s, t) { q(s, { op: 'trig', ...t }); }
 // Ereignis an alle Karten im Spiel melden: FX[id].on[name](s, card, data, ctrlPid)
 function evt(s, name, data) {
-    const list = inPlay(s);
+    const list = inPlay(s).concat(locEntries(s));                                          // offene Locations lösen ebenfalls aus
     // Aktiver Spieler zuerst
     list.sort((a, b) => (a.pid === s.activePlayer ? 0 : 1) - (b.pid === s.activePlayer ? 0 : 1));
     for (const e of list) {
@@ -576,7 +621,7 @@ function onEvt(name, fn) { (HOOKS[name] || (HOOKS[name] = [])).push(fn); }
 // Engine-seitige Auslöser ("when … is dealt damage / destroyed"): Wirkungen kommen auf die Kette
 const EV_CHAIN = { damaged: 'Schadens-Auslöser', destroyed: 'Zerstörungs-Auslöser' };
 // Ereignisse, deren Kartenreaktionen ausgelöste Effekte sind (sie kommen beim nächsten PPP auf die Kette)
-const CHAIN_EVENTS = { sabotages: 1, startOfTurn: 1, endOfTurn: 1, attacks: 1, defends: 1, protects: 1, allyEnters: 1, strike: 1, cardPlayed: 1,
+const CHAIN_EVENTS = { sabotages: 1, proposes: 1, targeted: 1, startOfTurn: 1, endOfTurn: 1, attacks: 1, defends: 1, protects: 1, allyEnters: 1, strike: 1, cardPlayed: 1,
     // Set 2/3: weitere ausgelöste Effekte
     dmg: 1, died: 1, exhausted: 1, healed: 1, questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1,
     // Raid-Loot: Ressource kommt ins Spiel (Shard of the Flame), Rüstung verhindert Schaden (Drillborer Disk)
@@ -715,6 +760,7 @@ function process(s) {
 function isIdle(s) { return !s.gameOver && !s.pending && !s.queue.length && !s.win && !s.chain.length && !s.battle && s.phase === 'main'; }
 
 // Zustandsbasierte Aktionen: tödlicher Schaden, Einzigartigkeit
+const STATE_FIX = [];
 function stateBased(s) {
     let changed = false;
     for (const p of [s.p1, s.p2]) {
@@ -730,6 +776,18 @@ function stateBased(s) {
     const heroDead = [s.p1, s.p2].filter(p => p.decked || (p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)) && !isIndestructible(s, p.hero)));
     if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, tr('Unentschieden!')); return true; }
     if (heroDead.length === 1) { const p = heroDead[0]; lose(s, p.id, p.decked ? 'DECKOUT' : tr`${p.hero.name} ist gefallen.`); return true; }
+    for (const f of STATE_FIX) if (f(s)) { flushBatch(s); return true; }                   // Set drums: "while … remains under your control" (Brelnor)
+    // CR 410.6f: Zähler auf verdeckten Ressourcen entfernen (betrifft hier nur Locations mit capture counters)
+    for (const p of [s.p1, s.p2]) for (const r of p.resources) if (!r.faceUp && r.card && r.card.type === 'Location' && r.card.counters && Object.keys(r.card.counters).length) r.card.counters = {};
+    // CR 410.6g: mehr als eine offene Location – eine behalten, die übrigen verdeckt umdrehen
+    for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {
+        const ls = locsOf(p);
+        if (ls.length > 1) {
+            ask(s, { pid: p.id, prompt: tr('Du darfst nur eine offene Location haben: Welche bleibt offen?'), src: 'Location',
+                opts: ls.map(r => ({ label: r.card.name, v: r.card.uid, ai: (r.card.joinedTurn || 0) + Object.values(r.card.counters || {}).reduce((a, b) => a + b, 0) })), k: 'E:keepLocation', a: { pid: p.id } });
+            flushBatch(s); return true;
+        }
+    }
     // Unique + Tag-Limits (Pet(1), Totem-Tags, Ausrüstungsplätze)
     for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {   // Zugspieler repariert zuerst (CR 414.2)
         const v = findLimitViolation(s, p);
@@ -742,7 +800,11 @@ function stateBased(s) {
     return false;
 }
 function flushBatch(s) { if (s._batch && s._batch.length) { s.queue.unshift(...s._batch); s._batch = []; } }
-EK.limitDestroy = (s, a, uid) => { const c = findCharacter(s, uid); if (c) leavePlay(s, c, 'graveyard', { destroyed: true, cause: 'limit' }); };
+EK.placeFaceUp = (s) => { const r = s.resPrep; s.resPrep = null; if (!r) return; const p = getPlayer(s, r.pid), c = r.card;
+    s.chain.push({ kind: 'resource', id: newUid('r_'), pl: p.id, res: c, faceUp: true, srcId: c.id, srcName: c.name, label: tr('Ressource') });
+    L(s, tr`Ressource: ${c.name}`, '', p.id); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); s.win = linkWindow(s, p.id, s.win); flushBatch(s); };
+EK.keepLocation = (s, a, uid) => { locsOf(getPlayer(s, a.pid)).forEach(r => { if (r.card.uid !== uid) { r.faceUp = false; L(s, tr`${r.card.name} wird verdeckt umgedreht (nur eine offene Location).`, '', a.pid); } }); };
+EK.limitDestroy = (s, a, uid) => { const c = findCharacter(s, uid); if (c && c.type === 'Hero') { pes(s, ctrlOf(s, c), 'heroForm').forEach(m => { m.ended = true; }); return; } if (c) leavePlay(s, c, 'graveyard', { destroyed: true, cause: 'limit' }); };
 function findLimitViolation(s, p) {
     const all = [...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])];
     // Unique (414.3a)
@@ -755,6 +817,7 @@ function findLimitViolation(s, p) {
         const lt = c.limitTags || {};
         for (const t in lt) (tags[t] = tags[t] || { lim: lt[t], cards: [] }).cards.push(c);
     }
+    if (pes(s, p.id, 'heroForm').some(m => !m.ended)) (tags.Form = tags.Form || { lim: 1, cards: [] }).cards.push(p.hero);   // Helden-Form (Set drums): "has Bear Form and Form (1)"
     const offH = p.hero.armors.filter(a => a.limitTags && a.limitTags['Off-Hand']);
     for (const t in tags) {
         let lim = tags[t].lim;
@@ -871,13 +934,14 @@ function respondKey(s, pid, a) {
     const p = getPlayer(s, pid);
     if (a.type === 'ACTIVATE') return a.srcUid + '|' + a.key;
     if (a.type === 'COMPLETE_QUEST') return (p.resources[a.resIdx] || { card: {} }).card.uid;
+    if (a.type === 'COMPLETE_QUEST_ZONE') return a.uid;
     return a.gyUid || (p.hand[a.handIdx] || {}).uid;
 }
 // Je Karte/Kraft/Quest höchstens drei Varianten (Ziele sind schon nach KI-Wert sortiert), insgesamt RESPOND_MAX
 function respondCandidates(s, pid, acts) {
     const p = getPlayer(s, pid), per = {}, out = [];
     for (const a of acts) {
-        const k = a.type === 'ACTIVATE' ? a.srcUid + ':' + a.key : a.type === 'COMPLETE_QUEST' ? 'q' + a.resIdx : 'c' + (a.gyUid || (p.hand[a.handIdx] || {}).id);
+        const k = a.type === 'ACTIVATE' ? a.srcUid + ':' + a.key : a.type === 'COMPLETE_QUEST' ? 'q' + a.resIdx : a.type === 'COMPLETE_QUEST_ZONE' ? 'z' + a.uid : 'c' + (a.gyUid || (p.hand[a.handIdx] || {}).id);
         if ((per[k] = (per[k] || 0) + 1) > 3) continue;
         out.push(a); if (out.length >= RESPOND_MAX) break;
     }
@@ -923,10 +987,11 @@ function chainDesc(s, it) {
 
 // ---------------------------------------------------------------- Kosten
 // targets: gewählte Ziele (beim Bezahlen bekannt) – Ring of Binding: "abilities that target your hero"
+const COST_MODS = [];   // (s, pid, card) => Änderung der Spielkosten (ohne Karte im Spiel, z. B. "next ally this turn")
 function getPlayCost(s, p, card, x = 0, targets = null) {
     if (!card) return 0;
     let cost = (card.cost || 0) + (card.xCost ? (x || 0) : 0);
-    if (card.type === 'Quest' || card.type === 'Hero') return 0;
+    if (card.type === 'Quest' || card.type === 'Location' || card.type === 'Hero') return 0;
     // Erst Erhöhungen, dann Senkungen in beliebiger Reihenfolge (CR 707.1e): die "to a minimum of (1)"-Senkungen
     // kommen zuerst – ihre Grenze gilt nur für sie selbst, danach dürfen die übrigen bis 0 senken
     let less = 0;
@@ -935,13 +1000,14 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
     pes(s, p.id, 'nextCardLess').forEach(m => { if (!m.used) less += m.v; });
     // Set 2/3: eigene Kostenregel der Karte, Dauereffekte, "next ability/Pet this turn"
     const f = FX[card.id];
-    if (f && f.selfCost) mod(f.selfCost(s, p.id, card) || 0);
+    if (f && f.selfCost) mod(f.selfCost(s, p.id, card, x) || 0);
     let minOne = 0;
     for (const e of auraSrcs(s)) {
         const h = FX[e.c.id].aura.cost; if (!h) continue;
         const r = h(s, e.c, e.pid, p.id, card, targets); if (!r) continue;
         if (typeof r === 'object') minOne += r.min1 || 0; else mod(r);
     }
+    for (const f of COST_MODS) mod(f(s, p.id, card) || 0);                                // Set drums: Stormwind City
     pes(s, p.id, 'nextAbilityLess').forEach(m => { if (!m.used && card.type === 'Ability') less += m.v; });
     pes(s, p.id, 'nextPetLess').forEach(m => { if (!m.used && card.isPet) less += m.v; });
     pes(s, p.id, 'next2HLess').forEach(m => { if (!m.used && card.type === 'Weapon' && card.twoHanded) less += m.v; });   // Halavar (Set 6)
@@ -971,6 +1037,7 @@ function strikeCost(s, p, w) {
     if (w.slot === 'Melee') pes(s, p.id, 'gorebelly').forEach(m => { if (!m.used) c -= 3; });
     tms(s, w, 'twig').forEach(m => { if (!m.used) c -= 3; });                             // Twig of the World Tree
     tms(s, w, 'strikeLess').forEach(m => { if (!m.used) c -= m.v; });                     // "You pay (N) less the next time you strike with this weapon"
+    pes(s, p.id, 'nextStrikeLess').forEach(m => { if (!m.used && (!m.slot || m.slot === w.slot)) c -= m.v; });   // "You pay (N) less the next time you strike with a [Ranged] weapon this turn"
     c += auraSum(s, 'strike', p.id, w);                                                   // Dauereffekte (Set 2/3)
     return Math.max(0, c);
 }
@@ -1001,11 +1068,13 @@ function heroReqOk(hero, card) {
 function isInstantFor(s, p, card) {
     if (alliesOf(getOpponent(s, p.id)).some(a => a.id === 6200 && active(s, a)) && p.hand.includes(card)) return false;   // Edward the Odd (Set illidan): Karten in gegnerischen Händen verlieren "instant"
     if (card.instant) return true;
+    if (pes(s, p.id, 'handInstant').some(m => !m.used) && p.hand.includes(card)) return true;   // Presence of Mind (Set drums): "Cards in your hand are instant this turn until you play a card"
     if (countCtrl(s, p.id, 324) > 0 && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(card.type)) return true; // Hand of Edward
     if (card.type === 'Weapon' && pes(s, p.id, 'weaponsInstant').length) return true;    // Victoria Jaton
     if (card.type === 'Ally' && pes(s, p.id, 'alliesInstant').some(m => !m.used)) return true; // The Fare of Lar'korwi
     if (card.isPet && pes(s, p.id, 'petsInstant').length) return true;                     // Bildros Nullvoid (Set 6)
     if (card.type === 'Ally' && auraAny(s, 'allyInstant', p.id, card)) return true;          // Magistrix Oleinas (Set 6)
+    if (card.type === 'Ability' && auraAny(s, 'abilityInstant', p.id, card)) return true;   // Concentration Aura (Set honor)
     return false;
 }
 // Darf pid jetzt etwas mit Instant-Geschwindigkeit tun?
@@ -1026,7 +1095,7 @@ function targetsPossible(s, pid, f, card, x, mode) {
 }
 function canPlayCard(s, pid, card, opts = {}) {
     const p = getPlayer(s, pid);
-    if (!card || card.type === 'Quest' || card.type === 'Hero') return tr('Diese Karte kann nicht gespielt werden');
+    if (!card || card.type === 'Quest' || card.type === 'Location' || card.type === 'Hero') return tr('Diese Karte kann nicht gespielt werden');
     if (!cardMatchesPlayer(card, p)) return tr`Karte passt nicht zu ${p.hero.name}`;
     if (cantPlayCards(s, pid)) return tr('Du kannst in diesem Zug keine Karten spielen (Fang of the Crystal Spider)');
     if (!heroReqOk(p.hero, card)) return `${card.raceReq || card.factionReq} Hero Required`;
@@ -1078,7 +1147,7 @@ function validateAction(s, a, pid) {
         }
         if (s.pending.kind === 'priority') {
             if (a.type === 'PASS') return null;
-            if (!['PLAY_CARD', 'ACTIVATE', 'COMPLETE_QUEST'].includes(a.type)) return tr('Jetzt nur Instants/Kräfte oder Passen');
+            if (!['PLAY_CARD', 'ACTIVATE', 'COMPLETE_QUEST', 'COMPLETE_QUEST_ZONE'].includes(a.type)) return tr('Jetzt nur Instants/Kräfte oder Passen');
         }
     } else if (a.type === 'CHOOSE' || a.type === 'PASS') return tr('Keine offene Entscheidung');
     switch (a.type) {
@@ -1091,8 +1160,10 @@ function validateAction(s, a, pid) {
             if (!canActMain(s, pid)) return tr('Ressourcen nur in deiner Aktionsphase');
             if (s.placedResource || (s.resPlaced || 0) >= resAllowance(s)) return tr('Du hast in diesem Zug schon eine Ressource gelegt');
             const c = p.hand[a.handIdx]; if (!c) return tr('Karte nicht auf der Hand');
-            if (a.faceUp && c.type !== 'Quest') return tr('Nur Quests werden offen gelegt');
-            if (a.faceUp && questFaceUpBlocked(s, pid)) return tr('Gegner verbietet offene Quests');          // Kam'pah (Set illidan)
+            if (a.faceUp && c.type !== 'Quest' && c.type !== 'Location') return tr('Nur Quests und Locations werden offen gelegt');   // CR 412.1b
+            if (a.faceUp && c.type === 'Quest' && questFaceUpBlocked(s, pid)) return tr('Gegner verbietet offene Quests');          // Kam'pah (Set illidan)
+            if (!a.faceUp && auraAny(s, 'noFaceDownRes', pid)) return tr('Ressourcen dürfen nicht verdeckt gelegt werden');   // Bangle of Endless Blessings (Set honor)
+            if (a.faceUp && FX[c.id] && FX[c.id].faceUpCost) { const e = FX[c.id].faceUpCost.can(s, pid, c); if (e !== true && e) return e; }   // Set gladiator: "As a cost to place this … face up"
             return null;
         }
         case 'COMPLETE_QUEST': {
@@ -1102,9 +1173,14 @@ function validateAction(s, a, pid) {
             const e = checkQuestCondition(s, p, r); if (e) return e;
             return null;
         }
+        case 'COMPLETE_QUEST_ZONE': {                                                      // Set drums: Quest aus Hand, Friedhof oder vom Deck abschließen
+            if (!canActInstant(s, pid)) return tr('Gerade keine Priorität');
+            const e = questZoneList(s, pid).find(x => x.uid === a.uid); if (!e) return tr('Quest nicht verfügbar');
+            return checkQuestCondition(s, p, { card: e.c, faceUp: true, zone: e.zone }) || null;
+        }
         case 'PLAY_CARD': {
             const src = playSource(s, p, a); if (!src) return a.gyUid ? tr('Karte nicht im Friedhof') : tr('Karte nicht auf der Hand');
-            if (a.gyUid && typeof gyLocked === 'function' && gyLocked(s, pid)) return tr('Karten können deinen Friedhof nicht verlassen (Adyen the Lightwarden)');
+            if (a.gyUid && !src.removed && typeof gyLocked === 'function' && gyLocked(s, pid)) return tr('Karten können deinen Friedhof nicht verlassen (Adyen the Lightwarden)');
             const c = src.card;
             if (a.gyUid && !canPlayFromGy(s, pid, c, src.owner)) return tr('Diese Karte kann nicht aus dem Friedhof gespielt werden');
             const e = canPlayCard(s, pid, c, a); if (e) return e;
@@ -1154,6 +1230,7 @@ function checkGivenTargets(s, pid, f, card, a) {
 function doAction(s, a, pid) {
     const p = getPlayer(s, pid);
     s._logPid = pid;                                                                       // Log-Zeilen dieser Aktion gehören pid
+    if (a.type !== 'CHOOSE') s.resolvingPl = null;                                          // neue Aktion: keine Wirkung löst gerade auf
     if (s.pending && s.pending.pid === pid) {
         const pend = s.pending;
         if (pend.kind === 'choose' && a.type === 'CHOOSE') { s.pending = null; s.queue.unshift({ op: 'call', k: pend.k, a: pend.a, v: a.v }); return; }
@@ -1169,6 +1246,7 @@ function doAction(s, a, pid) {
         case 'PLACE_RESOURCE': {
             const c = p.hand.splice(a.handIdx, 1)[0];
             s.resPlaced = (s.resPlaced || 0) + 1; s.placedResource = s.resPlaced >= resAllowance(s);   // Natural Genesis: weitere Ressource erlaubt
+            if (a.faceUp && FX[c.id] && FX[c.id].faceUpCost) { s.resPrep = { pid: p.id, uid: c.uid, card: c }; FX[c.id].faceUpCost.pay(s, p.id, c); q(s, { op: 'call', k: 'E:placeFaceUp', a: {} }); flushBatch(s); return; }
             // Eine Ressource zu legen fügt sie der Kette hinzu (CR 412.1a, 705.2); verdeckt bleibt sie unbekannt (707.1a),
             // unterbrechen kann man sie nicht (711.3) – sie heißt deshalb "res" statt "card". Ins Spiel kommt sie beim Auflösen.
             s.chain.push({ kind: 'resource', id: newUid('r_'), pl: p.id, res: c, faceUp: !!a.faceUp, srcId: a.faceUp ? c.id : null,
@@ -1181,6 +1259,7 @@ function doAction(s, a, pid) {
             return;
         }
         case 'COMPLETE_QUEST': startQuest(s, p, a.resIdx); break;
+        case 'COMPLETE_QUEST_ZONE': startQuestZone(s, p, a.uid); break;
         case 'PLAY_CARD': startPlay(s, p, a); break;
         case 'ACTIVATE': startPower(s, p, a); break;
         case 'ATTACK': startAttack(s, p, a); break;
@@ -1191,11 +1270,15 @@ function doAction(s, a, pid) {
 // --- Spielablauf einer Karte: Parameter sammeln -> Kosten -> Kette
 // Karte einer PLAY_CARD-Aktion: aus der Hand (handIdx) oder aus einem Friedhof (gyUid, Set 2/3)
 function playSource(s, p, a) {
-    if (a.gyUid) { const l = locate(s, a.gyUid); return l && l.zone === 'graveyard' ? { card: l.c, owner: l.pid } : null; }
+    if (a.gyUid) { const l = locate(s, a.gyUid); return l && (l.zone === 'graveyard' || l.zone === 'removed') ? { card: l.c, owner: l.pid, removed: l.zone === 'removed' } : null; }   // Set gladiator: auch aus dem Exil
     const c = p.hand[a.handIdx]; return c ? { card: c } : null;
 }
+// Set gladiator: aus dem Exil spielen – Echo Totem (eine bestimmte Karte, ohne Kosten), Felshroud (Fähigkeiten im eigenen Zug)
+function canPlayFromRemoved(s, pid, card, ownerPid) { return pes(s, pid, 'rfgPlayUid').some(m => m.uid === card.uid) || !!auraAny(s, 'playFromRemoved', pid, card, ownerPid); }
 // Darf pid diese Karte aus dem Friedhof von ownerPid spielen? (Dramla Lifebender, Readiness, Greed Before Need)
 function canPlayFromGy(s, pid, card, ownerPid) {
+    { const l = locate(s, card.uid); if (l && l.zone === 'removed') return canPlayFromRemoved(s, pid, card, ownerPid); }
+    if (ownerPid === pid && FX[card.id] && FX[card.id].playFromGySelf) return true;                // Twinblade of the Phoenix (Set gladiator)
     if (card.type === 'Ability' && ownerPid === pid && pes(s, pid, 'abilitiesFromGy').length) return true;
     if (pes(s, pid, 'gyPlayUid').some(m => m.uid === card.uid)) return true;                // Morn Walks-the-Path / Salts-the-Land (Set 7): "You can play target ability from … graveyard this turn"
     return !!auraAny(s, 'playFromGy', pid, card, ownerPid);
@@ -1203,7 +1286,7 @@ function canPlayFromGy(s, pid, card, ownerPid) {
 function startPlay(s, p, a) {
     const src = playSource(s, p, a); const card = src.card;
     const it = { kind: 'card', pl: p.id, card, x: a.x, mode: a.mode, targets: a.targets ? a.targets.map(t => [...t]) : null, extra: {}, firstTarget: a.firstTarget || null };
-    if (a.gyUid) { const o = getPlayer(s, src.owner); o.graveyard.splice(o.graveyard.indexOf(card), 1); it.fromGy = src.owner; }
+    if (a.gyUid) { const o = getPlayer(s, src.owner); const z = src.removed ? o.removed : o.graveyard; z.splice(z.indexOf(card), 1); if (src.removed) it.fromRfg = src.owner; else it.fromGy = src.owner; }
     else p.hand.splice(a.handIdx, 1);
     s.chainPrep = it;                       // Karte "in der Hand des Spielers auf dem Weg zur Kette"
     q(s, { op: 'call', k: 'E:prepItem', a: {} });
@@ -1212,6 +1295,7 @@ function startPlay(s, p, a) {
 // Gemeinsame Vorbereitung für Karten und Kräfte: X, Modus, Ziele, Zusatzkosten
 EK.prepItem = (s) => {
     const it = s.chainPrep; if (!it) return;
+    if (lollyOn(s) && !it.lolly) { it.lolly = true; it.targets = null; it.firstTarget = null; }   // Lolly the Unsuspecting (Set drums): alle Ziele zufällig
     const p = getPlayer(s, it.pl);
     const f = it.kind === 'card' ? fx(it.card) : getPower(s, findCharacter(s, it.src), it.key);
     const card = it.kind === 'card' ? it.card : findCharacter(s, it.src);
@@ -1280,8 +1364,12 @@ function takeFirstTarget(it, cands) {
     if (!cands.includes(u)) return false;
     it._slot.picked.push(u); return true;
 }
+// Lolly the Unsuspecting (Set drums): "All targets are chosen at random." – so viele Ziele wie nötig (mindestens eins), zufällig
+function lollyOn(s) { return [s.p1, s.p2].some(p => p.allies.some(a => a.id === 7134 && active(s, a))); }
+function lollyPick(st, cands) { const left = cands.filter(u => !st.picked.includes(u)); if (!left.length || st.picked.length >= Math.max(1, st.mn)) return '__done'; return left[Math.floor(Math.random() * left.length)]; }
 function askTarget(s, pid, card, sl, cands, it) {
     const st = it._slot;
+    if (lollyOn(s)) { q(s, { op: 'call', k: 'E:prepTarget', a: {}, v: lollyPick(st, cands) }); return; }
     const opts = cands.filter(u => !st.picked.includes(u)).map(u => ({ label: targetLabel(s, u, pid), v: u, ai: sl.ai ? sl.ai(u, s) : aiTargetValue(s, pid, u, sl.harm) }));
     if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? tr('Fertig') : tr('Kein Ziel'), v: '__done', ai: sl.stopAi !== undefined ? sl.stopAi : -0.5 });
     ask(s, { pid, prompt: `${card.name}: ${sl.label}${st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : ''}`, src: card.name, opts, k: 'E:prepTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
@@ -1307,6 +1395,7 @@ function abortPrep(s, why) {
 }
 // Abgebrochene Karte zurück an ihren Ursprung (Hand oder Friedhof)
 function returnPrepCard(s, it) {
+    if (it.fromRfg) { getPlayer(s, it.fromRfg).removed.push(it.card); return; }
     if (it.fromGy) getPlayer(s, it.fromGy).graveyard.push(it.card);
     else getPlayer(s, it.pl).hand.push(it.card);
 }
@@ -1326,7 +1415,7 @@ function finishPrep(s) {
         }
         if (it.card.type === 'Ally') pes(s, p.id, 'alliesInstant').forEach(m => m.used = true);   // The Fare of Lar'korwi
         addPE(s, p.id, { k: 'playedCard', id: it.card.id, type: it.card.type });              // Slow, Naolin Sunsurge …
-        if (!it.fromGy) evt(s, 'handLeft', { pid: p.id, uid: it.card.uid });                  // Evocation
+        if (!it.fromGy && !it.fromRfg) evt(s, 'handLeft', { pid: p.id, uid: it.card.uid });                  // Evocation
         s.chain.push(it);
         L(s, tr`▶ ${it.card.name}` + `${it.x !== undefined && it.x !== null ? ` (X=${it.x})` : ''}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('play');
@@ -1337,6 +1426,7 @@ function finishPrep(s) {
         s.chain.push(it);
         L(s, `▶ ${nameOf(s, it.src)}: ${it.label || tr('Kraft')}${it.targets && it.targets.flat().length ? ' → ' + it.targets.flat().map(u => nameOf(s, u)).join(', ') : ''}`);
     }
+    if (it.targets && it.targets.flat().length) evt(s, 'targeted', { uids: it.targets.flat(), pl: it.pl, item: it.id });   // Escape Artist (Set honor)
     // Wer einen Link hinzufügt, bekommt danach wieder Priorität (CR 410.2)
     const ow = s.win;
     s.win = linkWindow(s, it.pl, ow);
@@ -1346,6 +1436,7 @@ EK.finishPrep = (s) => finishPrep(s);
 
 function resolveTop(s) {
     const it = s.chain.pop(); if (!it) return;
+    s.resolvingPl = it.pl;                                                                 // wer die gerade auflösende Wirkung kontrolliert (Nerves of Steel, Set drums)
     s._logPid = it.pl;                                                                     // Wirkungen gehören dem Controller des Links
     const p = getPlayer(s, it.pl);
     s.resolvingCard = null;
@@ -1353,10 +1444,12 @@ function resolveTop(s) {
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
         p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
+        if (it.faceUp && FX[it.res.id] && FX[it.res.id].enterRes) FX[it.res.id].enterRes(s, it.res, p.id);   // "As this location enters play, choose …" (Silvermoon City)
         evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp, uid: it.res.uid, id: it.res.id });                                                   // Shard of the Flame
         return;
     }
     if (it.kind === 'trigger') {
+        s.trigSrc = it.src || null;
         if (it.interrupted) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         it.steps.forEach(st => q(s, st));
         return;
@@ -1371,7 +1464,7 @@ function resolveTop(s) {
     }
     // Interrupt oder alle Ziele illegal -> unterbrochen
     // Barkskin (Set 6): "Your abilities, allies, and equipment can't be interrupted" – gilt für Unterbrechungen durch Effekte
-    let interrupted = !!it.interrupted && !(it.kind === 'card' && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(it.card.type) && unattachedOngoing(p, 4019).length);
+    let interrupted = !!it.interrupted && !(it.kind === 'card' && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(it.card.type) && (unattachedOngoing(p, 4019).length || (it.kind === 'card' && it.card.type === 'Ability' && !!auraAny(s, 'noInterruptAbility', p.id))));
     if (!interrupted && it.targets && it.targets.length) {
         const f = it.kind === 'card' ? fx(it.card) : powerDef(it);
         const card = it.kind === 'card' ? it.card : (findCharacter(s, it.src) || { uid: it.src, id: it.srcId, name: it.srcName });
@@ -1391,7 +1484,10 @@ function resolveTop(s) {
     if (it.kind === 'card') resolveCard(s, it);
     else { const src = findCharacter(s, it.src) || { uid: it.src, id: it.srcId, name: it.srcName, gone: true }; const pw = powerDef(it); if (pw && pw.resolve) pw.resolve(s, it, src); }
 }
+const GY_REDIRECT = [];   // (s, it) => 'hand' | null (A Taste of Divinity)
 function leaveChain(s, it, dest) {
+    if (it.copy) return;                                                                   // Kopie (Lightning Overload, Set drums) hört auf zu existieren
+    for (const f of GY_REDIRECT) { const d = f(s, it); if (d === 'hand') { const o = getPlayer(s, it.card.owner || it.pl); resetInst(it.card); o.hand.push(it.card); L(s, tr`${it.card.name} geht auf die Hand zurück.`, '', o.id); return; } }
     const owner = getPlayer(s, it.card.owner || it.pl);
     resetInst(it.card);
     if (dest === 'graveyard' && gyReplaced(s, it.card, owner.id, it.pl)) dest = 'removed';
@@ -1456,6 +1552,7 @@ EK.placeAbility = (s, a) => {
 };
 
 // ---------------------------------------------------------------- Kräfte (Activate, (X) >>>, Helden-Flip)
+const HERO_GRANTS = [];
 function getPowers(s, src) {
     if (!src) return [];
     const l = locate(s, src.uid); if (!l) return [];
@@ -1463,12 +1560,14 @@ function getPowers(s, src) {
     // Kräfte, die man von der Hand aus nutzt ("(1), Discard this weapon from your hand >>> …", Obsidian Edged Blade)
     if (l.zone === 'hand') return (f.powers || []).filter(pw => pw.fromHand);
     if (l.zone === 'removed') return (f.powers || []).filter(pw => pw.fromRemoved);           // Blinky (Set 6): "If this ally is removed from the game: …"
+    if (l.zone === 'resource') return l.res.faceUp && src.type === 'Location' && active(s, src) ? (f.powers || []).filter(pw => !pw.fromHand && !pw.fromRemoved) : [];   // offene Location (Set drums)
     if (!isInPlayZone(l.zone)) return [];
     const out = [];
     const noFlip = src.type === 'Hero' && auraAny(s, 'noFlip', src);                     // Ingrid Shadowstorm (Set 6): "lose and can't have flip powers"
     if (f.powers && active(s, src)) f.powers.forEach(pw => { if (!pw.fromHand && !pw.fromRemoved && !(noFlip && pw.flip)) out.push(pw); });
     // verliehene Kräfte: Blessing of Wisdom, Face Smash
     if (isChar(src)) {
+        if (src.type === 'Hero') for (const g of HERO_GRANTS) (g(s, src) || []).forEach(k => out.push({ ...FX_GRANT[k], key: k, grant: k }));   // Spark (Set honor)
         attachedTo(s, src.uid, 64).forEach(o => out.push({ ...FX_GRANT.bow, key: 'bow_' + o.uid, grant: 'bow' }));
         if (src.type === 'Ally' && hasTM(s, src, 'faceSmash')) out.push({ ...FX_GRANT.faceSmash, grant: 'faceSmash' });
         // Set 2/3: Kräfte durch Dauereffekte (Lightwell, Field Repair Bot)
@@ -1491,21 +1590,34 @@ function powerDef(it) {
     if (it.borrowed) { const fb = FX[it.borrowed.id]; return fb && fb.powers ? fb.powers.find(p => p.key === it.borrowed.key) : null; }
     const f = FX[it.srcId]; return f && f.powers ? f.powers.find(p => p.key === it.key) : null;
 }
+// Kosten einer Kraft nach Senkungen (Aura of Accuracy, Set drums: "cards and effects with one or more targets … to a minimum of (1)")
+function powerCostOf(s, pid, pw, src) {
+    let c = typeof pw.cost === 'number' ? pw.cost : 0, min1 = 0;
+    for (const e of auraSrcs(s)) { const h = FX[e.c.id].aura.powerCost; if (!h) continue; const r = h(s, e.c, e.pid, pid, pw, src); if (r && typeof r === 'object') min1 += r.min1 || 0; else if (r) c += r; }
+    if (min1 > 0) c = Math.max(Math.min(c, 1), c - min1);
+    return Math.max(0, c);
+}
 function canUsePower(s, pid, src, pw, a = {}) {
-    const l = locate(s, src.uid); if (!l || !(isInPlayZone(l.zone) || (l.zone === 'hand' && pw.fromHand) || (l.zone === 'removed' && pw.fromRemoved))) return tr('Nicht im Spiel');
-    if (l.pid !== pid) return tr('Nicht deine Karte');
+    const l = locate(s, src.uid);
+    const loc = l && l.zone === 'resource' && l.res.faceUp && src.type === 'Location';   // offene Location: [Activate] = diese Ressource erschöpfen
+    if (!l || !(isInPlayZone(l.zone) || loc || (l.zone === 'hand' && pw.fromHand) || (l.zone === 'removed' && pw.fromRemoved))) return tr('Nicht im Spiel');
+    if (l.pid !== pid && !pw.anyPlayer) return tr('Nicht deine Karte');
     if (!canActInstant(s, pid)) return tr('Gerade keine Priorität');
     if (pw.myTurn && s.activePlayer !== pid) return tr('Nur in deinem Zug');
     if (pw.oppTurn && s.activePlayer === pid) return tr('Nur im Zug eines Gegners');
     if (pw.flip && src.flipped) return tr('Held wurde bereits umgedreht');
-    if (pw.act) {
+    if (pw.act && loc) {
+        if (l.res.exhausted) return tr('Bereits erschöpft');
+        const cost = typeof pw.cost === 'number' ? pw.cost : 0;
+        if (getReadyRes(getPlayer(s, pid)) - 1 < cost) return tr('Nicht genug Ressourcen');
+    } else if (pw.act) {
         if (src.exhausted) return tr('Bereits erschöpft');
         // Time is Money / Breanna Greenmother: [Activate] schon im Zug, in dem der Ally die Party betritt
         if (isAllyLike(src) && !(src.joinedTurn !== undefined && src.joinedTurn < turnStartOf(s, pid)) && !kwHas(s, src, 'activateNow')) return tr('Erst ab dem nächsten eigenen Zug ([Activate])');
     }
     if (pw.exhaustHero && getPlayer(s, pid).hero.exhausted) return tr('Held ist erschöpft');
     if (pw.once === 'turn' && (src.usedTurn || {})[pw.key] === s.turn) return tr('Nur einmal pro Zug');
-    const cost = typeof pw.cost === 'number' ? pw.cost : 0;
+    const cost = typeof pw.cost === 'number' ? powerCostOf(s, pid, pw, src) : 0;
     if (getReadyRes(getPlayer(s, pid)) < cost) return tr('Nicht genug Ressourcen');
     if (pw.canUse) { const e = pw.canUse(s, pid, src); if (e !== true && e) return e; }
     if (!targetsPossible(s, pid, pw, src, a.x, a.mode)) return tr('Kein legales Ziel');
@@ -1522,6 +1634,7 @@ function startPower(s, p, a) {
 }
 EK.prepItemPower = (s) => {
     const it = s.chainPrep; const p = getPlayer(s, it.pl);
+    if (lollyOn(s) && !it.lolly) { it.lolly = true; it.targets = null; it.firstTarget = null; }
     const src = findCharacter(s, it.src); const pw = getPower(s, src, it.key);
     if (!pw) return abortPrep(s, tr('Kraft nicht verfügbar'));
     if ((pw.cost === 'X' || pw.xRange) && (it.x === undefined || it.x === null)) {
@@ -1553,9 +1666,11 @@ EK.prepItemPower = (s) => {
     // Kosten der Kraft
     if (!it.costPaid) {
         it.costPaid = true;
-        const cost = pw.cost === 'X' ? (it.x || 0) : (pw.cost || 0);
+        const cost = pw.cost === 'X' ? (it.x || 0) : powerCostOf(s, p.id, pw, src);
+        const rl = pw.act && locate(s, src.uid);
+        if (rl && rl.zone === 'resource') rl.res.exhausted = true;                         // Location: erst sich selbst erschöpfen, dann bezahlen
         if (!payRes(p, cost)) return abortPrep(s, tr('Nicht genug Ressourcen'));
-        if (pw.act) exhaust(s, src);
+        if (pw.act && !(rl && rl.zone === 'resource')) exhaust(s, src);
         if (pw.exhaustHero) exhaust(s, p.hero);
         if (pw.once === 'turn') { src.usedTurn = src.usedTurn || {}; src.usedTurn[pw.key] = s.turn; }
         if (pw.flip) { src.flipped = true; L(s, tr`🔄 ${src.name} wird umgedreht.`); fxEvent(s, { t: 'flip', uid: src.uid, back: true }); }
@@ -1566,6 +1681,7 @@ EK.prepItemPower = (s) => {
 };
 function askTargetPower(s, pid, src, sl, cands, it) {
     const st = it._slot;
+    if (lollyOn(s)) { q(s, { op: 'call', k: 'E:prepPowerTarget', a: {}, v: lollyPick(st, cands) }); return; }
     const opts = cands.filter(u => !st.picked.includes(u)).map(u => ({ label: targetLabel(s, u, pid), v: u, ai: sl.ai ? sl.ai(u, s) : aiTargetValue(s, pid, u, sl.harm) }));
     if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? tr('Fertig') : tr('Kein Ziel'), v: '__done', ai: -0.5 });
     ask(s, { pid, prompt: `${src.name}: ${sl.label}${st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : ''}`, src: src.name, opts, k: 'E:prepPowerTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
@@ -1620,6 +1736,7 @@ function targetCands(s, pid, spec) {
     });
     // Highlord Bolvar Fordragon (Set 7): "Opposing cards and effects must target this ally if able"
     const bol = res.filter(c => c.id === 5136 && ctrlOf(s, c) !== pid && active(s, c));
+    if (!bol.length) { const must = res.filter(c => auraAny(s, 'mustTarget', c, pid)); if (must.length) return must.map(c => c.uid); }   // Grounding Totem (Set drums)
     return (bol.length ? bol : res).map(c => c.uid);
 }
 function targetLabel(s, uid, pid) {
@@ -1648,7 +1765,7 @@ function dmgStep(s, o) {
     if (!o.redirected) {
         const iv = (tl.c.tm || []).find(m => m.k === 'intervene' && m.turn === s.turn && !m.used);
         const to = iv ? getPlayer(s, iv.pid).hero.uid : auraAny(s, 'redirect', tl.c, o);
-        if (to && to !== tl.c.uid) { if (iv) iv.used = true; L(s, tr`↪ Schaden an ${tl.c.name} geht an ${nameOf(s, to)}.`); o = { ...o, tgt: to, redirected: true }; tl = locate(s, to); if (!tl) return; }
+        if (to && to !== tl.c.uid) { if (iv && !iv.all) iv.used = true; L(s, tr`↪ Schaden an ${tl.c.name} geht an ${nameOf(s, to)}.`); o = { ...o, tgt: to, redirected: true }; tl = locate(s, to); if (!tl) return; }
     }
     // Set 7: Ersatzeffekte mit Wahl (Plague Fleshbane/Demonsoul, Blessed Life) – fragen pausiert den Schritt, EK.s7dmg setzt fort
     if (typeof s7DmgReplace === 'function') { const r = s7DmgReplace(s, o, tl); if (r === 'ask') return; if (r) { o = r; tl = locate(s, o.tgt); if (!tl) return; } }
@@ -1735,7 +1852,7 @@ function dmgShields(s, c) {
     if (c.reflect > 0 && src) dealDamage(s, { src: tp.hero.uid, tgt: src.uid, amt: c.reflect, dt: 'Holy' }); // Holy Shield
     // 3) Rüstung
     if (t && t.type === 'Hero' && !c.unprev && c.amt > 0) {
-        const armors = tp.hero.armors.filter(a => a.type === 'Armor' && !a.exhausted && !cantExhaust(s, a) && defOf(s, a) > 0);
+        const armors = tp.hero.armors.filter(a => (a.type === 'Armor' || (a.type === 'Item' && (a.def || 0) > 0)) && !a.exhausted && !cantExhaust(s, a) && defOf(s, a) > 0);
         if (armors.length) {
             s._batch.push({ op: 'call', k: 'E:armorAsk', a: { st }, v: null });
             return;
@@ -1750,7 +1867,7 @@ function shieldLabel(s, m) {
 }
 EK.armorAsk = (s, a) => {
     const st = a.st; const tp = getPlayer(s, st.tp);
-    const armors = tp.hero.armors.filter(x => x.type === 'Armor' && !x.exhausted && !cantExhaust(s, x) && defOf(s, x) > 0);
+    const armors = tp.hero.armors.filter(x => (x.type === 'Armor' || (x.type === 'Item' && (x.def || 0) > 0)) && !x.exhausted && !cantExhaust(s, x) && defOf(s, x) > 0);
     if (!armors.length || st.amt <= 0) { q(s, { ...st, op: 'dmgApply' }); return; }
     const opts = armors.map(x => ({ label: tr`${x.name} erschöpfen (verhindert ${Math.min(defOf(s, x), st.amt)})`, v: x.uid, ai: Math.min(defOf(s, x), st.amt) * 2 - defOf(s, x) * 0.1 }));
     opts.push({ label: tr`Keine Rüstung – ${st.amt} Schaden nehmen`, v: '__none', ai: 0 });
@@ -1863,7 +1980,7 @@ EV.damaged = (s, d) => {
 };
 // Allgemeine Auslöser-Fortsetzungen
 EK.destroyUid = (s, a) => { const c = findCharacter(s, a.uid); if (c) destroy(s, c); };
-EK.destroyOngoing = (s, a) => { const c = findCharacter(s, a.uid); if (c) destroy(s, c); };
+EK.destroyOngoing = (s, a) => { const c = findCharacter(s, a.uid); if (!c) return; if (a.byAbility && countCtrl(s, ctrlOf(s, c), 7217) > 0) return; destroy(s, c); };   // Rune of Metamorphosis (Set drums): Forms werden nicht durch eigene Fähigkeiten zerstört
 EK.readyUids = (s, a) => a.uids.forEach(u => readyCard(s, findCharacter(s, u)));
 EK.healHero = (s, a) => { const p = getPlayer(s, a.pid); heal(s, p.hero.uid, p.hero.uid, a.amt); };
 EK.healList = (s, a) => a.tgts.forEach(u => heal(s, a.src, u, a.amt));
@@ -2027,6 +2144,7 @@ EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexO
 // Abschlusskosten einer Quest (Travel Form: "You pay (1) less to complete your next quest this turn")
 function questCostOf(s, p, card) {
     let c = card.questCost || 0;
+    { const f = FX[card.id]; if (f && f.questSelfLess) c -= f.questSelfLess(s, p.id) || 0; }   // Corruption of Earth and Seed (Set drums)
     pes(s, p.id, 'questLess').forEach(m => { if (!m.used && (!m.quest || m.quest === card.uid)) c -= m.v; });   // Marksman Glous (Set 7): nur für die inspirierte Quest
     const less = auraSum(s, 'questLess', p.id, card);                                    // Aspect of the Cheetah (Set 6): "to a minimum of (1)"
     if (less > 0) c = Math.max(Math.min(c, 1), c - less); else if (less < 0) c -= less;   // Ja'zoona (Set 6): Gegner zahlen (1) mehr
@@ -2044,6 +2162,23 @@ function checkQuestCondition(s, p, r) {
 // Kam'pah (Set illidan): "Opponents can't place quests face up."
 function questFaceUpBlocked(s, pid) { return alliesOf(getOpponent(s, pid)).some(a => a.id === 6159 && active(s, a)); }
 function blockedQuests(s, pid) { return !!auraAny(s, 'noQuest', pid); }   // Greefer: "Opponents can't complete quests."
+// Quests aus anderen Zonen (Set drums): QUEST_ZONES liefert je Spieler [{ c, zone, uid }] – zone 'hand' | 'graveyard' | 'deck' (oberste Karte).
+// "As you do, remove them from the game as an additional cost."
+const QUEST_ZONES = [];
+function questZoneList(s, pid) { const out = []; for (const f of QUEST_ZONES) for (const e of (f(s, pid) || [])) if (e.c && e.c.type === 'Quest' && !out.some(x => x.uid === e.uid)) out.push(e); return out; }
+function startQuestZone(s, p, uid) {
+    const e = questZoneList(s, p.id).find(x => x.uid === uid); if (!e) return;
+    let c = e.c;
+    if (e.zone === 'hand') { p.hand.splice(p.hand.indexOf(c), 1); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); }
+    else if (e.zone === 'graveyard') p.graveyard.splice(p.graveyard.indexOf(c), 1);
+    else if (e.zone === 'deck') { p.deck.pop(); c = makeCardInst(e.c.id, false, p.id); }
+    (p.removed = p.removed || []).push(c);
+    L(s, tr`📜 ${c.name} wird abgeschlossen und aus dem Spiel entfernt.`, 'log-heal', p.id);
+    s.questPrep = { pid: p.id, uid: c.uid, zone: e.zone };
+    const f = FX[c.id] || {};
+    if (f.questExtra) { f.questExtra(s, p.id, { card: c, faceUp: true, zone: e.zone }); return; }
+    EK.questPay(s, {});
+}
 function startQuest(s, p, resIdx) {
     const r = p.resources[resIdx]; const f = FX[r.card.id] || {};
     s.questPrep = { pid: p.id, uid: r.card.uid };
@@ -2053,10 +2188,12 @@ function startQuest(s, p, resIdx) {
 EK.questPay = (s) => {
     const qp = s.questPrep; s.questPrep = null; if (!qp) return;
     const p = getPlayer(s, qp.pid);
-    const r = p.resources.find(x => x.card.uid === qp.uid);
-    if (!r) return;
+    const r = p.resources.find(x => x.card.uid === qp.uid) || (qp.zone ? { card: (p.removed || []).find(x => x.uid === qp.uid), faceUp: true, zone: qp.zone } : null);
+    if (!r || !r.card) return;
     const f = FX[r.card.id] || {};
+    const was = p.resources.map(x => x.exhausted);
     if (!f.questNoPay && !payRes(p, questCostOf(s, p, r.card))) { L(s, tr('Nicht genug Ressourcen'), 'log-hit'); return; }
+    s.questPaid = p.resources.filter((x, i) => x.exhausted && !was[i]).map(x => x.card.uid);   // Chief Researcher Kartos (Set drums)
     if (!f.questNoPay) pes(s, p.id, 'questLess').forEach(m => m.used = true);
     r.faceUp = false;
     L(s, tr`📜 ${r.card.name} erfüllt`, "log-heal", p.id);
@@ -2071,6 +2208,8 @@ EK.questPay = (s) => {
 };
 
 // ---------------------------------------------------------------- Kampf
+const CANT_ATTACK = [];   // (s, c) => true: c kann nicht angreifen (Effekte ohne Karte im Spiel)
+const SKIP_DRAW_STEP = [];
 function canAttackNow(s, c, p) {
     if (!c || !p || s.gameOver) return false;
     const pid = ctrlOf(s, c); if (pid !== p.id) return false;
@@ -2078,6 +2217,7 @@ function canAttackNow(s, c, p) {
     if (c.isTotem) return false;
     if (hasTM(s, c, 'cantAttack')) return false;
     if (kwHas(s, c, 'cantAttack')) return false;                                          // Set 2/3: Dauereffekte (Deep Freeze, Cyclone …)
+    if (CANT_ATTACK.some(f => f(s, c))) return false;                                       // Set honor
     if (c.type === 'Ally') {
         if (!active(s, c)) return false;                                                  // Polymorph
         if (c.cantAttack) return false;                                                   // Guardian Steelhorn
@@ -2093,13 +2233,14 @@ function canAttackNow(s, c, p) {
 }
 function attackTargets(s, att) {
     const pid = ctrlOf(s, att); const o = getOpponent(s, pid);
-    let list = partyOf(o).filter(d => !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked'));
+    let list = partyOf(o).filter(d => (!hasElusive(s, d) || (FX[att.id] && FX[att.id].attackElusive && active(s, att)) || pes(s, pid, 'huntElusive11').length > 0) && !hasTM(s, d, 'cantBeAttacked'));
     // Gamon: "Any hero or ally can attack this ally. (Including characters you control.)"
     getPlayer(s, pid).allies.forEach(d => { if (d.id === 1209 && active(s, d) && d !== att && !hasElusive(s, d)) list.push(d); });
     // Dashel Stonefist (Set illidan): "This ally can attack friendly heroes and allies (including other characters you control)."
     if (FX[att.id] && FX[att.id].attackFriendly && active(s, att)) partyOf(getPlayer(s, pid)).forEach(d => { if (d !== att && !list.includes(d) && !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked')) list.push(d); });
     // Set 2/3: einzelne Angriffssperren (Wing Clip, Mind Soothe, Grace of Air ohne Bezahlung ist erlaubt → atkTax)
     list = list.filter(d => !(tms(s, att, 'cantAttackUid').some(m => m.uid === d.uid)) && !auraAny(s, 'atkBlock', att, d));
+    { const ao = tms(s, att, 'attackOnlyUid')[0]; if (ao) { const x = list.filter(d => d.uid === ao.uid); if (x.length) list = x; } }   // Karta Foultongue (Set gladiator)
     // Mocking Blow: kann nur den Helden des Wirkers angreifen
     const mock = tms(s, att, 'mocked')[0];
     if (mock) { const h = getPlayer(s, mock.by).hero; if (list.includes(h)) list = [h]; }
@@ -2165,7 +2306,7 @@ function startAttack(s, p, a) {
     const att = findCharacter(s, a.attackerUid), def = findCharacter(s, a.defenderUid);
     const wc = winterCost(s, att, def); if (wc) payRes(p, wc);
     s.chain.push({ kind: 'proposal', id: newUid('pr_'), pl: p.id, att: att.uid, def: def.uid, label: tr('Angriff'), sabotage: !!a.sabotage });
-    
+    evt(s, 'proposes', { att: att.uid, def: def.uid, apid: p.id, item: s.chain[s.chain.length - 1].id });   // Battle Tactics (Set drums)
     s.lastAttack = { att: att.uid, def: def.uid, t: Date.now() };
     const ow = s.win;
     s.win = linkWindow(s, p.id, ow);
@@ -2247,6 +2388,7 @@ function protectorsFor(s) {
         if (c.id === 42 && def.type === 'Hero') return true;                               // Old Bones: kann den Helden schützen
         if (FX[c.id] && FX[c.id].canProtect && FX[c.id].canProtect(s, c, def)) return true;      // Durae Crystalshield (Set 6): "can protect friendly allies"
         if (auraAny(s, 'protectFor', c, def)) return true;                                    // Yellowspine (Set 6): "Other allies you control can protect this ally"
+        if (kwHas(s, att, 'conspicuous')) return true;                                 // Conspicuous (Set drums): jeder gegnerische Held oder Ally darf schützen
         return false;
     });
 }
@@ -2304,6 +2446,7 @@ EK.strikeDo = (s, a, v) => {
         if (w && !w.exhausted && payRes(p, strikeCost(s, p, w))) {
             exhaust(s, w);
             if (w.slot === 'Melee') pes(s, pid, 'gorebelly').forEach(m => m.used = true);
+            pes(s, pid, 'nextStrikeLess').forEach(m => { if (!m.used && (!m.slot || m.slot === w.slot)) m.used = true; });   // Feera Quickshot, Bonefist Gauntlets (Set gladiator/honor)
             tms(s, w, 'twig').forEach(m => m.used = true);
             tms(s, w, 'strikeLess').forEach(m => m.used = true);
             const first = a.side === 'A' ? b.strikeA : b.strikeD;
@@ -2311,7 +2454,7 @@ EK.strikeDo = (s, a, v) => {
             else if (a.side === 'A') b.strikeA = w.uid; else b.strikeD = w.uid;
             L(s, tr`🗡 ${w.name}`, "log-combat", p.id);
             evt(s, 'strike', { pid, weapon: w.uid, side: a.side });
-            if (w.id === 311 || w.id === 319) { if (a.side === 'A') b.longRange = true; }  // Long-Range
+            if (w.id === 311 || w.id === 319 || (FX[w.id] && FX[w.id].strikeLR && active(s, w))) { if (a.side === 'A') b.longRange = true; }   // Set drums: "When you strike with this weapon, your hero has Long-Range this combat"  // Long-Range
             if (w.id === 337) addTM(p.hero, { k: 'shield', v: 3, turn: s.turn, combat: b.id }); // Truesilver Champion
             // Bear Form / Cat Form: "Destroy this card when you strike with a weapon"
             (p.ongoing || []).filter(o => (CARDS[o.id].bearForm || CARDS[o.id].catForm) && !o.attachedTo).forEach(o => asTrigger(s, o, pid, () => trig(s, { k: 'destroyOngoing', a: { uid: o.uid } })));
@@ -2342,7 +2485,7 @@ function combatDamage(s) {
     const att = findCharacter(s, b.att), def = findCharacter(s, b.def);
     const aw = b.strikeA ? findCharacter(s, b.strikeA) : null, dw = b.strikeD ? findCharacter(s, b.strikeD) : null;
     const aw2 = b.strikeA2 ? findCharacter(s, b.strikeA2) : null, dw2 = b.strikeD2 ? findCharacter(s, b.strikeD2) : null;   // Dual Wield
-    const wdt = w => w.dmgType || (w.slot === 'Ranged' ? 'Ranged' : 'Melee');
+    const wdt = w => auraAny(s, 'wdt', w) || w.dmgType || (w.slot === 'Ranged' ? 'Ranged' : 'Melee');   // Elemental Weapons (Set honor)
     const longR = (b.longRange && !auraAny(s, 'kwLose', att, 'longRange')) || hasLongRange(s, att);                                      // Long-Range (auch Allies, Set 2/3)
     let aDmg = atkOf(s, att, { attacking: true, target: def, weapon: att.type === 'Hero' ? aw : null });
     if (att.type === 'Hero' && aw2) aDmg += weaponAtk(s, aw2, { attacking: true, target: def });
@@ -2424,9 +2567,10 @@ function turnStep(s, step) {
             if (isAllyLike(c) && earthbind) continue;
             if (c.id === 126 && active(s, c)) { helwens.push(c.uid); continue; }          // Helwen: darf nicht readien
             if (auraAny(s, 'noReady', c)) continue;                                       // Set 2/3: Hamstring, Ivus, Borlis Brode …
+            if (READY_BLOCK.some(f => f(s, c))) continue;
             c.exhausted = false; evt(s, 'readied', { uid: c.uid });                         // "When this … readies" gilt auch im Ready-Step
         }
-        p.resources.forEach(r => r.exhausted = false);
+        p.resources.forEach(r => { if (r.exhausted && (auraAny(s, 'noReady', r.card) || READY_BLOCK.some(f => f(s, r.card)))) return; r.exhausted = false; });   // Immobilize (Set drums): auch Ressourcen
         helwens.forEach(u => q(s, { op: 'call', k: 'E:helwenReady', a: { uid: u } }));
         q(s, { op: 'call', k: 'E:inspire', a: { pid: o.id, done: [] } });                // Inspire (CR 501.1b): der andere Spieler readyt gleichzeitig
         flushBatch(s);
@@ -2446,7 +2590,7 @@ function turnStep(s, step) {
     }
     if (step === 'draw') {
         s.phase = 'draw';
-        if (!(s.turn === 1)) drawCards(s, p, 1);
+        if (!(s.turn === 1) && !SKIP_DRAW_STEP.some(f => f(s, p.id))) drawCards(s, p, 1);   // Icy Veins (Set honor): Draw-Step überspringen
         flushBatch(s);
         s.queue.push({ op: 'window', first: s.activePlayer, reason: 'draw' });      // Fenster im Draw-Step
         s.queue.push({ op: 'turn', step: 'main' });
@@ -2503,19 +2647,21 @@ function getPriorityActions(s, pid) {
     const acts = [];
     const p = getPlayer(s, pid);
     // Instants aus der Hand (und aus Friedhöfen, wenn erlaubt)
-    p.hand.forEach((c, i) => { if (c.type !== 'Quest' && isInstantFor(s, p, c)) acts.push(...playVariants(s, pid, c, i, true)); });
+    p.hand.forEach((c, i) => { if (c.type !== 'Quest' && c.type !== 'Location' && isInstantFor(s, p, c)) acts.push(...playVariants(s, pid, c, i, true)); });
     gyPlayables(s, pid).forEach(c => { if (isInstantFor(s, p, c)) acts.push(...playVariants(s, pid, c, -1, true, c.uid)); });
     acts.push(...powerVariants(s, pid, true));
     p.resources.forEach((r, i) => { if (r.faceUp && r.card.type === 'Quest' && !checkQuestCondition(s, p, r)) acts.push({ type: 'COMPLETE_QUEST', resIdx: i, actorId: pid, desc: `Quest: ${r.card.name}` }); });
+    questZoneList(s, pid).forEach(e => { if (!checkQuestCondition(s, p, { card: e.c, faceUp: true, zone: e.zone })) acts.push({ type: 'COMPLETE_QUEST_ZONE', uid: e.uid, actorId: pid, desc: `Quest: ${e.c.name}` }); });
     return acts;
 }
 // Karten in Friedhöfen, die pid gerade spielen dürfte (Dramla, Readiness, Greed Before Need)
 function gyPlayables(s, pid) {
     const out = [], seen = new Set();
     for (const o of [s.p1, s.p2]) for (const c of o.graveyard) {
-        if (c.type === 'Quest' || c.type === 'Hero' || seen.has(c.id)) continue;
+        if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || seen.has(c.id)) continue;
         if (canPlayFromGy(s, pid, c, o.id)) { seen.add(c.id); out.push(c); }
     }
+    for (const o of [s.p1, s.p2]) for (const c of (o.removed || [])) { if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || c.isToken || seen.has(c.uid)) continue; if (canPlayFromRemoved(s, pid, c, o.id)) { seen.add(c.uid); out.push(c); } }
     return out;
 }
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
@@ -2578,10 +2724,10 @@ function targetCombos(s, pid, slots, distinct) {
 }
 function powerVariants(s, pid, instantOnly) {
     const out = [];
-    for (const e of [...inPlay(s), ...getPlayer(s, pid).hand.filter(c => FX[c.id] && (FX[c.id].powers || []).some(pw => pw.fromHand)).map(c => ({ c, pid })),
+    for (const e of [...inPlay(s), ...locEntries(s), ...getPlayer(s, pid).hand.filter(c => FX[c.id] && (FX[c.id].powers || []).some(pw => pw.fromHand)).map(c => ({ c, pid })),
             ...getPlayer(s, pid).removed.filter(c => FX[c.id] && (FX[c.id].powers || []).some(pw => pw.fromRemoved)).map(c => ({ c, pid }))]) {
-        if (e.pid !== pid) continue;
         for (const pw of getPowers(s, e.c)) {
+            if (e.pid !== pid && !pw.anyPlayer) continue;
             if (canUsePower(s, pid, e.c, pw)) continue;
             if (pw.aiSkip && pw.aiSkip(s, pid, e.c)) continue;
             const xs = (pw.cost === 'X' || pw.xRange) ? (() => { const xr = pw.xRange ? pw.xRange(s, pid, e.c) : { min: 0, max: 9 }; const lim = Math.min(xr.max, pw.cost === 'X' ? getReadyRes(getPlayer(s, pid)) : 99);
@@ -2613,11 +2759,14 @@ function getLegalActions(s, pid) {
     if (!s.placedResource) {
         const seen = new Set();
         p.hand.forEach((c, i) => {
-            const vs = c.type === 'Quest' && !questFaceUpBlocked(s, pid) ? [true, false] : [false];
-            vs.forEach(fu => { const k = c.id + '|' + fu; if (seen.has(k)) return; seen.add(k); acts.push({ type: 'PLACE_RESOURCE', handIdx: i, faceUp: fu, actorId: pid, desc: c.type === 'Quest' ? `Quest ${c.name} ${fu ? tr('offen') : tr('verdeckt')}` : tr`Ressource: ${c.name}` }); });
+            const fuc = FX[c.id] && FX[c.id].faceUpCost, fuOk = !fuc || (e => e === true || !e)(fuc.can(s, pid, c));
+            const vs = ((c.type === 'Quest' && !questFaceUpBlocked(s, pid)) || c.type === 'Location') && fuOk ? [true, false] : [false];
+            if (auraAny(s, 'noFaceDownRes', pid)) { const i0 = vs.indexOf(false); if (i0 >= 0) vs.splice(i0, 1); }
+            vs.forEach(fu => { const k = c.id + '|' + fu; if (seen.has(k)) return; seen.add(k); acts.push({ type: 'PLACE_RESOURCE', handIdx: i, faceUp: fu, actorId: pid, desc: c.type === 'Quest' || c.type === 'Location' ? `${c.type === 'Quest' ? 'Quest' : 'Location'} ${c.name} ${fu ? tr('offen') : tr('verdeckt')}` : tr`Ressource: ${c.name}` }); });
         });
     }
     p.resources.forEach((r, i) => { if (r.faceUp && r.card.type === 'Quest' && !checkQuestCondition(s, p, r)) acts.push({ type: 'COMPLETE_QUEST', resIdx: i, actorId: pid, desc: `Quest: ${r.card.name}` }); });
+    questZoneList(s, pid).forEach(e => { if (!checkQuestCondition(s, p, { card: e.c, faceUp: true, zone: e.zone })) acts.push({ type: 'COMPLETE_QUEST_ZONE', uid: e.uid, actorId: pid, desc: `Quest: ${e.c.name}` }); });
     const seen = new Set();
     p.hand.forEach((c, i) => { if (seen.has(c.id)) return; seen.add(c.id); acts.push(...playVariants(s, pid, c, i, false)); });
     gyPlayables(s, pid).forEach(c => acts.push(...playVariants(s, pid, c, -1, false, c.uid)));
@@ -2728,7 +2877,7 @@ function doPartialMulligan(s, pid, uids) {
 }
 function aiWantsMulligan(s, pid) {
     const p = getPlayer(s, pid);
-    const playable = p.hand.filter(c => c.type !== 'Quest' && cardMatchesPlayer(c, p));
+    const playable = p.hand.filter(c => c.type !== 'Quest' && c.type !== 'Location' && cardMatchesPlayer(c, p));
     const cheap = playable.filter(c => (c.cost || 0) <= 3).length;
     return cheap === 0 || playable.length <= 2;
 }

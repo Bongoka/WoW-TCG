@@ -36,6 +36,10 @@ function It(id, name, cost, slot, slotMax, classes, text, extra = {}) {
 function Q(id, name, faction, questCost, text, extra = {}) {
     CARDS[id] = { id, name, type:'Quest', cost:0, questCost, faction, allowedFactions: faction === 'Neutral' ? null : [faction], text, ...extra };
 }
+// Location (Set drums, CR 306): wird nur als Ressource gelegt; capacity = Höchstzahl ihrer Zähler (CR 306.3)
+function Loc(id, name, faction, text, extra = {}) {
+    CARDS[id] = { id, name, type:'Location', cost:0, faction, allowedFactions: faction === 'Neutral' ? null : [faction], text, ...extra };
+}
 
 // --- HELDEN 1–16 ---
 H(1,"Boris Brightbeard",26,"Priest","Alliance","Holy","On your turn: (X), Flip Boris >>> Boris heals X damage from target hero or ally.");
@@ -806,6 +810,7 @@ function applyOCR(map) {
         if (/Your hero has Cat Form/.test(tx)) c.catForm = true;
         if (/Your hero has Bear Form/.test(tx)) c.bearForm = true;
         if (c.type === 'Hero') { const m = tl.match(/\(([^)]+)\)/); if (m) c.talent = m[1]; const r = tl.match(/Hero—(.+?) \w+ \(/); if (r) c.race = r[1]; continue; }
+        if (c.type === 'Location') { c.limitTags = {}; continue; }                     // "Objective (5)" ist die Kapazität, kein Limit
         c.instant = /^Instant/.test(tl);
         c.talentCard = /\bTalent\b/.test(tl);
         // Tags mit Limit: "Form (1)", "Pet (1)", "Earth Totem (1)", "Ring (2)" …

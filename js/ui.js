@@ -99,6 +99,7 @@ function renderResourceTray(player, containerId, isHuman) {
             const cardNode = createCardDOM(r.card, false);
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
+            if (r.card.type === 'Location' && isHuman) decorateInPlay(cardNode, r.card);         // offene Location (Set drums): Kräfte per Klick
             if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
                 wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
                 wrap.title = tr("Klicken: Quest abschließen");
@@ -113,6 +114,14 @@ function renderResourceTray(player, containerId, isHuman) {
             if (!isHuman) markSabotageTarget(slot, r.card.uid);
             shown.push([r, slot, back]);
         }
+    });
+    // Set drums: Quests, die gerade aus Friedhof oder vom Deck abgeschlossen werden dürfen (Aquatic Form, Unending Breath), halbtransparent daneben
+    if (isHuman) questZoneList(G, 1).filter(e => e.zone !== 'hand' && !validateAction(G, { type: 'COMPLETE_QUEST_ZONE', uid: e.uid }, 1)).forEach(e => {
+        const wrap = document.createElement("div"); wrap.className = "quest-card-large quest-ready zone-quest";
+        const cardNode = createCardDOM(e.c, false); cardNode.classList.add("can-act"); wrap.appendChild(cardNode);
+        wrap.title = e.zone === 'deck' ? tr('Klicken: oberste Deckkarte als Quest abschließen (wird entfernt)') : tr('Klicken: Quest aus dem Friedhof abschließen (wird entfernt)');
+        wrap.onclick = () => humanAct({ type: 'COMPLETE_QUEST_ZONE', uid: e.uid });
+        activeRow.appendChild(wrap);
     });
     if (miniRow.children.length > 0) box.appendChild(miniRow);
     if (activeRow.children.length > 0) box.appendChild(activeRow);
@@ -135,7 +144,7 @@ function renderResourceTray(player, containerId, isHuman) {
             const under = document.elementsFromPoint(e.clientX, e.clientY).map(x => x.closest && x.closest('[data-uid].target-drop-valid')).find(Boolean);
             if (under) { dropOn(under.dataset.uid); return; }
             const d = UI.drag; UI.drag = null;
-            if (d && d.kind === 'hand') humanAct({ type: 'PLACE_RESOURCE', handIdx: d.idx, faceUp: d.card.type === 'Quest' });
+            if (d && d.kind === 'hand') humanAct({ type: 'PLACE_RESOURCE', handIdx: d.idx, faceUp: d.card.type === 'Quest' || d.card.type === 'Location' });
         };
     }
 }
@@ -1052,7 +1061,14 @@ function renderPlayerHand(p) {
 }
 function openHandCardMenu(idx) {
     const card = G.p1.hand[idx]; if (!card) return;
-    if (card.type === 'Quest') {
+    const zq = card.type === 'Quest' && questZoneList(G, 1).find(e => e.zone === 'hand' && e.c.uid === card.uid && !validateAction(G, { type: 'COMPLETE_QUEST_ZONE', uid: e.uid }, 1));
+    if (zq) {                                                                          // Water Breathing (Set drums): Quest aus der Hand abschließen
+        const opts = [{ label: tr('Abschließen (wird entfernt)'), cls: 'success', action: () => humanAct({ type: 'COMPLETE_QUEST_ZONE', uid: zq.uid }) }];
+        if (canMain() && !G.placedResource) opts.push({ label: tr('Als Ressource legen'), action: () => humanAct({ type: 'PLACE_RESOURCE', handIdx: idx, faceUp: true }) });
+        openDecisionModal(card.name, tr('Was möchtest du tun?'), [...opts, { label: tr('Abbrechen'), action: () => {} }]);
+        return;
+    }
+    if (card.type === 'Quest' || card.type === 'Location') {
         if (!canMain()) return;
         if (G.placedResource) { addLog(tr("Du hast in diesem Zug schon eine Ressource gelegt."), "log-hit"); showToast(tr("Du hast in diesem Zug schon eine Ressource gelegt.")); render(); return; }
         humanAct({ type: 'PLACE_RESOURCE', handIdx: idx, faceUp: true });
@@ -1604,6 +1620,9 @@ function priorityChoices() {
         } else if (a.type === 'COMPLETE_QUEST') {
             const r = G.p1.resources[a.resIdx]; if (!r || seen.has(r.card.uid)) continue; seen.add(r.card.uid);
             out.push({ card: r.card, caption: tr('Quest abschließen'), run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: a.resIdx }) });
+        } else if (a.type === 'COMPLETE_QUEST_ZONE') {                                     // Set drums: aus Hand, Friedhof oder vom Deck
+            const e = questZoneList(G, 1).find(x => x.uid === a.uid); if (!e || seen.has(a.uid)) continue; seen.add(a.uid);
+            out.push({ card: e.c, caption: tr('Quest abschließen (wird entfernt)'), run: () => humanAct({ type: 'COMPLETE_QUEST_ZONE', uid: a.uid }) });
         }
         out[out.length - 1].key = respondKey(G, 1, a);
     }

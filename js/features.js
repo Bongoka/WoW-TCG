@@ -8,11 +8,12 @@ const DB_TYPES = [
     { k: 'Ability', label: tr('Fähigkeiten'), color: '#9b4fd1', is: c => c.type === 'Ability' },
     { k: 'Equipment', label: tr('Ausrüstung'), color: '#8f959b', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
     { k: 'Quest', label: 'Quests', color: '#c8642a', is: c => c.type === 'Quest' },
+    { k: 'Location', label: 'Locations', color: '#3f8f5a', is: c => c.type === 'Location' },          // Set drums
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
 // Kosten-Kugel je Karte (icons/cost/, ausgeschnitten aus den Kartenrahmen) und ihre Farbe (Mittelwert der Kugel)
 const dbOrb = c => c.type === 'Ally' ? (c.faction === 'Alliance' ? 'alliance' : c.faction === 'Horde' ? 'horde' : 'neutral')
-    : c.type === 'Quest' ? 'quest' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equip' : 'ability';
+    : c.type === 'Quest' || c.type === 'Location' ? 'quest' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equip' : 'ability';
 const DB_ORB_COLOR = { alliance: '#1c78b4', horde: '#c41e2a', neutral: '#d0b509', ability: '#9b4fd1', equip: '#8f959b', quest: '#c8642a' };
 let currentDeckBuilder = { id: null, heroId: null, name: '', cards: [] };
 const DBF = { type: 'All', cost: 'all', cls: null, neutralAb: true, neutralKey: undefined };
@@ -125,7 +126,7 @@ function renderDBPool() {
         if (!DBF.neutralAb && card.type === 'Ability' && !(card.allowedClasses || []).length) return false;   // neutrale Fähigkeiten
         if (hero ? !dbLegal(card, hero) : DBF.cls && !dbClassOk(card, DBF.cls)) return false;   // Held > Klasse > alle Karten
         if (DBF.type !== 'All' && dbTypeOf(card).k !== DBF.type) return false;
-        if (DBF.cost !== 'all') { const c = card.type === 'Quest' ? -1 : (card.cost || 0); if (DBF.cost === '7' ? c < 7 : c !== +DBF.cost) return false; }
+        if (DBF.cost !== 'all') { const c = card.type === 'Quest' || card.type === 'Location' ? -1 : (card.cost || 0); if (DBF.cost === '7' ? c < 7 : c !== +DBF.cost) return false; }
         if (set !== 'all' && String(card.set || 1) !== set) return false;
         if (search && !card.name.toLowerCase().includes(search) && !(card.text || '').toLowerCase().includes(search)) return false;
         return true;
@@ -134,7 +135,7 @@ function renderDBPool() {
     const setNum = c => [(c.set || 1), c.set ? c.num : c.id];   // Set 1 hat keine eigene Nummer: ID = Kartennummer
     list.sort((a, b) => sort === 'set' ? (setNum(a)[0] - setNum(b)[0] || setNum(a)[1] - setNum(b)[1])
         : sort === 'name' ? a.name.localeCompare(b.name) : sort === 'type' ? (typeIdx(a) - typeIdx(b) || (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name))
-        : ((a.type === 'Quest' ? 99 : a.cost || 0) - (b.type === 'Quest' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
+        : ((a.type === 'Quest' || a.type === 'Location' ? 99 : a.cost || 0) - (b.type === 'Quest' || b.type === 'Location' ? 99 : b.cost || 0) || a.name.localeCompare(b.name)));
     document.getElementById("db-pool-count").textContent = tr`${list.length} Karten`;
     // Nicht alle Karten auf einmal zeichnen: erst DB_POOL_BATCH, weitere, sobald das Ende der Liste näher als
     // anderthalb Bildschirmhöhen kommt – das Nachladen passiert vor dem Hinsehen
@@ -220,7 +221,7 @@ function dbRenderStats(cards, curve, tb, tl) {
     const n = cards.length;
     curve.innerHTML = '';
     const buckets = Array.from({ length: 8 }, () => ({}));
-    cards.forEach(id => { const c = CARDS[id]; if (c.type === 'Quest') return; const b = Math.min(7, c.cost || 0); const k = dbTypeOf(c).k; buckets[b][k] = (buckets[b][k] || 0) + 1; });
+    cards.forEach(id => { const c = CARDS[id]; if (c.type === 'Quest' || c.type === 'Location') return; const b = Math.min(7, c.cost || 0); const k = dbTypeOf(c).k; buckets[b][k] = (buckets[b][k] || 0) + 1; });
     const maxB = Math.max(4, ...buckets.map(b => Object.values(b).reduce((x, y) => x + y, 0)));
     buckets.forEach((b, i) => {
         const tot = Object.values(b).reduce((x, y) => x + y, 0);
@@ -251,7 +252,7 @@ function dbRenderRows(box, cards, hero, o = {}) {
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
             row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === o.highlightId ? ' pulse' : '');
-            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
+            row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : c.type === 'Location' ? 'L' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + (o.edit ? `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>` : `<span></span><span class="db-row-n">${counts[id]}</span><span></span>`);
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
             const art = document.createElement('div'); art.className = 'db-row-art';
@@ -346,7 +347,7 @@ function dbExportText() {
 }
 // Namen vergleichbar machen: Groß/klein, Apostrophe, Anführungszeichen ("Chipper" Ironbane), Punkte („Junk . . .“), Satzzeichen und Leerzeichen egal
 const dbNorm = s => s.toLowerCase().replace(/[’‘`´]/g, "'").replace(/["“”„.…]/g, ' ').replace(/[^a-z0-9äöüß'!?,:-]+/g, ' ').replace(/\s+/g, ' ').trim();
-const DB_SET_CODES = { illidan: 8, 'hunt for illidan': 8, 'the hunt for illidan': 8, thfi: 8, betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
+const DB_SET_CODES = { honor: 11, 'fields of honor': 11, foh: 11, gladiator: 10, gladiators: 10, 'blood of gladiators': 10, bog: 10, drums: 9, 'drums of war': 9, dow: 9, illidan: 8, 'hunt for illidan': 8, 'the hunt for illidan': 8, thfi: 8, betrayer: 7, 'servants of the betrayer': 7, sotb: 7, legion: 6, 'march of the legion': 6, motl: 6, azeroth: 1, 'heroes of azeroth': 1, hoa: 1, 'dark portal': 2, darkportal: 2, 'through the dark portal': 2, tdp: 2, outland: 3, 'fires of outland': 3, foo: 3, onyxia: 4, "onyxia's lair": 4, 'molten core': 5, moltencore: 5 };
 // Kartenliste lesen (sehr nachsichtig): ergibt { heroId, name, cards, report[] }
 //  "4 Name", "4x Name", "4 x Name", "4Name", "Name" (= 1×) · Klammern wie "(AZEROTH 32/361)" werden ignoriert
 //  bzw. zur eindeutigen Zuordnung genutzt · "Name: …" = Deckname · "Hero: …" oder eine Zeile mit einem Heldennamen = Held
@@ -455,6 +456,9 @@ const BOOSTER_SETS = [
     { set: 6, name: 'March of the Legion', imgs: ['booster/march1.jpg', 'booster/march 2.jpg'] },
     { set: 7, name: 'Servants of the Betrayer', imgs: ['booster/betrayer 1.jpg', 'booster/betrayer 2.jpg'] },
     { set: 8, name: 'The Hunt for Illidan', imgs: ['booster/illidan 1.jpg', 'booster/illidan 2.jpg'] },
+    { set: 9, name: 'Drums of War', imgs: ['booster/drums 1.png', 'booster/drums 2.jpg'] },
+    { set: 10, name: 'Blood of Gladiators', imgs: ['booster/gladiators 1.jpg', 'booster/gladiators 2.jpg'] },
+    { set: 11, name: 'Fields of Honor', imgs: ['booster/honor 1.jpeg', 'booster/honor 2.jpg'] },
 ];
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)
@@ -747,8 +751,8 @@ function importTourneyDecks() {
             if (d && rev < REV && hero && d.hero === hero.id && r.cards.length > d.cards.length && d.cards.every(c => r.cards.includes(c))) d.cards = r.cards;
             return;
         }
-        // Listen, deren Held es im Spiel noch nicht gibt (Worlds 2009), werden übernommen, sobald er da ist
-        if (!hero || !r.cards.length) return;
+        // Listen mit Karten, die es im Spiel noch nicht gibt, werden erst übernommen, wenn alle Karten da sind
+        if (!hero || !r.cards.length || tourneyMissing(text).length) return;
         done.push(i + 1);
         const name = head ? tr`Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
         if (list.some(d => d.name === name)) return;
@@ -805,7 +809,7 @@ function deckPreview(deck, tile) {
             const h = l.match(/^(?:hero|held)\s*:?\s*(.+)$/i), m = l.match(/^(\d+)\s+(.+)$/), name = h ? h[1].trim() : m ? m[2].trim() : l;
             return `<div class="dp-raw${miss.has(name) ? ' miss' : ''}${h ? ' hero' : ''}"><b>${h ? tr('Held') : m ? m[1] + '×' : ''}</b><span>${esc(name)}</span></div>`;
         });
-        box.innerHTML = `<div class="dp-locked">🔒 ${tr('Noch nicht spielbar: Die Karten dieses Decks (Sets nach Hunt for Illidan) gibt es im Spiel noch nicht.')}</div><div class="db-deck-list">${rows.join('')}</div>`;
+        box.innerHTML = `<div class="dp-locked">🔒 ${tr`Noch nicht spielbar – diese Karten gibt es im Spiel noch nicht: ${deck.miss.join(', ')}`}</div><div class="db-deck-list">${rows.join('')}</div>`;
         box.classList.remove('dp-in'); void box.offsetWidth; box.classList.add('dp-in');
         return;
     }
@@ -852,9 +856,9 @@ function openDeckOverview(opts = {}) {
     decks.filter(isTourneyDeck).forEach(d => { const i = +String(d.id).replace('custom_tourney_', '') - 1; addTo(tourneyMeta(i), d); });
     if (typeof TOURNEY_DECKS !== 'undefined') TOURNEY_DECKS.forEach((text, i) => {
         const m = tourneyMeta(i), miss = tourneyMissing(text);
-        if (!m.hero || !miss.includes(m.hero) || decks.some(d => d.id === `custom_tourney_${i + 1}`)) return;   // nur Listen ohne Helden im Spiel
-        const hi = (typeof TOURNEY_HEROES !== 'undefined' && TOURNEY_HEROES[m.hero]) || [];
-        addTo(m, { id: `locked_tourney_${i + 1}`, locked: true, miss, text, hero: null, heroName: m.hero, faction: hi[0], class: hi[1], name: tr`Platz ${m.place} · ${m.player} · ${m.event}` });
+        if (!miss.length || decks.some(d => d.id === `custom_tourney_${i + 1}`)) return;   // gesperrt: Karten fehlen noch (schon übernommene Decks bleiben)
+        const hc = Object.values(CARDS).find(c => c.type === 'Hero' && c.name === m.hero), hi = hc ? [hc.faction, hc.class] : (typeof TOURNEY_HEROES !== 'undefined' && TOURNEY_HEROES[m.hero]) || [];
+        addTo(m, { id: `locked_tourney_${i + 1}`, locked: true, miss, text, hero: hc ? hc.id : null, heroName: m.hero, faction: hi[0], class: hi[1], name: tr`Platz ${m.place} · ${m.player} · ${m.event}` });
     });
     const rank = f => f.worlds ? -f.worlds.year : f.key === 'dmf' ? 0 : 1;                  // Worlds (neueste zuerst), dann Darkmoon Faire
     const order = Object.values(folders).sort((a, b) => rank(a) - rank(b));
@@ -1070,7 +1074,7 @@ function tourneySimDecks() {
     return TOURNEY_DECKS.map((text, i) => {
         const head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
         const r = dbParseList(text, null), hero = CARDS[r.heroId];
-        if (!hero || !r.cards.length) return null;
+        if (!hero || !r.cards.length || tourneyMissing(text).length) return null;
         const name = head ? `#${head[1]} ${head[2].trim().split(' ').slice(-1)[0]} · ${shortEvent(head[3].trim())}` : `Turnier-Deck ${i + 1}`;
         return { id: `tourney_sim_${i + 1}`, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards };
     }).filter(Boolean);

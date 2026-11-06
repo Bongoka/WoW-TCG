@@ -696,9 +696,9 @@ FX[5212] = { powers: [pathaleonPow(false), pathaleonPow(true)],
 
 // X-51 Nether-Rocket
 FX[5216] = { powers: [
-    { key: 'horde', label: tr('Horde-Ally: Ferocity diesen Zug, am Zugende zerstören'), cost: 1, act: true, slots: slotAlly(tr('Eigener Horde-Ally'), false, { side: 'friendly', filter: c => c.faction === 'Horde' }),
+    { key: 'horde', label: tr('Horde-Ally: Ferocity diesen Zug, am Zugende zerstören'), cost: 1, act: true, slots: slotAlly(tr('Eigener Horde-Ally'), false, { side: 'friendly', filter: c => facIs(c, 'Horde') }),
         resolve: (s, it) => { const t = T1(s, it); if (!t) return; addTM(t, { k: 'ferocity', turn: s.turn }); (s.delayed = s.delayed || []).push({ at: 'nextEnd', pid: it.pl, srcId: 5216, srcName: 'X-51 Nether-Rocket', k: '5216:boom', a: { uid: t.uid } }); } },
-    { key: 'alli', label: tr('Allianz-Ally: [Activate]-Kräfte diesen Zug, am Zugende zerstören'), cost: 1, act: true, slots: slotAlly(tr('Eigener Allianz-Ally'), false, { side: 'friendly', filter: c => c.faction === 'Alliance' }),
+    { key: 'alli', label: tr('Allianz-Ally: [Activate]-Kräfte diesen Zug, am Zugende zerstören'), cost: 1, act: true, slots: slotAlly(tr('Eigener Allianz-Ally'), false, { side: 'friendly', filter: c => facIs(c, 'Alliance') }),
         resolve: (s, it) => { const t = T1(s, it); if (!t) return; addTM(t, { k: 'activateNow', turn: s.turn }); (s.delayed = s.delayed || []).push({ at: 'nextEnd', pid: it.pl, srcId: 5216, srcName: 'X-51 Nether-Rocket', k: '5216:boom', a: { uid: t.uid } }); } }],
     k: { boom: (s, a) => { const t = findCharacter(s, a.uid); if (t) destroy(s, t); } } };
 

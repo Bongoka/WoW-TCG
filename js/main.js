@@ -3,7 +3,7 @@ let _cfgImgPath = "AZEROTH-{id}-EA.png";
 // (Hand/Spielfeld/Deck Builder, 358 px) – bearbeitet, Dateien <PRÄFIX>-<Nr>[-EA|-Back]_ergebnis.webp (big auch .png).
 // "<set> scans" / "<set> scans small": fotografierte Originalkarten, benannt nach Kartenname (' → _, : → ' -',
 // Heldenrückseite " - Backside"); Scans haben keine Extended Art.
-const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia treasure', 'ONYXIA'], 5: ['molten core treasure', 'MOLTEN CORE'], 6: ['legion', 'LEGION'], 7: ['betrayer', 'BETRAYER'], 8: ['illidan', 'ILLIDAN'] };
+const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia treasure', 'ONYXIA'], 5: ['molten core treasure', 'MOLTEN CORE'], 6: ['legion', 'LEGION'], 7: ['betrayer', 'BETRAYER'], 8: ['illidan', 'ILLIDAN'], 9: ['drums', 'DRUMS'], 10: ['gladiator', 'GLADIATOR'], 11: ['honor', 'HONOR'] };
 const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };   // alte Ablage cards/<PRÄFIX>-<Nr>.png (Rückfall)
 // Einstellung Kartenbilder: 'edited' Normal, 'scans' Original-Scans, 'hq' Normal + High Resolution (Zoom aus "<set> big").
 // Nötig ist nur der Ordner "<set>" – alle anderen sind optional, fehlende Bilder fallen auf die vorhandenen zurück.
@@ -136,6 +136,7 @@ function describeUndoAction(snap, action) {
     if (action.type === 'PLACE_RESOURCE') { const c = p.hand[action.handIdx]; return c ? tr`Ressource (${c.name})` : tr('Ressource'); }
     if (action.type === 'PLAY_CARD') { const c = p.hand[action.handIdx]; return c ? c.name : tr('Karte'); }
     if (action.type === 'COMPLETE_QUEST') { const r = p.resources[action.resIdx]; return r && r.card ? `Quest ${r.card.name}` : 'Quest'; }
+    if (action.type === 'COMPLETE_QUEST_ZONE') return action.desc || 'Quest';
     if (action.type === 'ATTACK') return tr('Angriff');
     if (action.type === 'ACTIVATE') return tr('Kraft');
     return tr('Aktion');

@@ -436,8 +436,8 @@ FX[2191] = { enter: (s, c, pid) => trig(s, { id: 2191, k: 'pick', a: { pid, n: 0
         oppDo: (s, a, v) => { const c = findCharacter(s, v); if (c) destroy(s, c); q(s, { op: 'call', k: '2191:opp', a: { ...a, left: a.left - 1 } }); } } };
 FX[2192] = { enter: (s, c, pid) => { L(s, '📣 "I bring PANDAMONIUM!"', 'log-combat'); addPE(s, pid, { k: 'alliesCantAttack' }); },
     powers: [{ key: 'chen', label: tr('Sag "Another round?": Ziel-Ally kann nicht angreifen'), cost: 3, slots: slotAlly('Ziel-Ally', true), resolve: (s, it) => { const t = T1(s, it); if (t) { L(s, '📣 "Another round?"', 'log-combat'); addTM(t, { k: 'cantAttack', turn: s.turn }); } } }] };
-FX[2193] = { aura: { hp: (s, src, sp, c) => heroOf(s, sp).faction === 'Alliance' && isAllyLike(c) && ctrlOf(s, c) === sp && hasElusive(s, c) ? 1 : 0,
-    atk: (s, src, sp, c) => heroOf(s, sp).faction === 'Horde' && isAllyLike(c) && ctrlOf(s, c) === sp && hasFerocity(s, c) ? 1 : 0 } };
+FX[2193] = { aura: { hp: (s, src, sp, c) => facIs(heroOf(s, sp), 'Alliance') && isAllyLike(c) && ctrlOf(s, c) === sp && hasElusive(s, c) ? 1 : 0,
+    atk: (s, src, sp, c) => facIs(heroOf(s, sp), 'Horde') && isAllyLike(c) && ctrlOf(s, c) === sp && hasFerocity(s, c) ? 1 : 0 } };
 
 // ============================================================================
 // AUSRÜSTUNG

@@ -426,7 +426,7 @@ FX[4145] = { aura: { atk: (s, src, sp, c) => c.type !== 'Ally' || c.uid === src.
     hp: (s, src, sp, c) => c.type !== 'Ally' || c.uid === src.uid ? 0 : c.atkType === 'Shadow' ? 2 : -2 } };
 FX[4146] = { canProtect: (s, c, def) => def.type === 'Ally' && ctrlOf(s, def) === ctrlOf(s, c) };
 FX[4147] = { enter: (s, c, pid) => trig(s, { id: 4147, k: 'ask', a: { pid } }),
-    k: { ask: (s, a) => mustPick(s, a.pid, tr('Danath Trollbane: Horde-Ally zerstören'), 'Force Commander Danath Trollbane', targetCands(s, a.pid, { ally: true, filter: x => x.faction === 'Horde' }), '4147:do', a),
+    k: { ask: (s, a) => mustPick(s, a.pid, tr('Danath Trollbane: Horde-Ally zerstören'), 'Force Commander Danath Trollbane', targetCands(s, a.pid, { ally: true, filter: x => facIs(x, 'Horde') }), '4147:do', a),
         do: (s, a, v) => { const t = v && findCharacter(s, v); if (t) destroy(s, t); } } };
 FX[4150] = { aura: { atk: (s, src, sp, c) => c.type === 'Ally' && ctrlOf(s, c) !== sp && inCombatWith(s, c.uid, src.uid) ? -2 : 0 } };
 FX[4151] = { aura: { hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 5 : 0 } };
@@ -513,7 +513,7 @@ FX[4194] = { powers: [{ key: 'kallas', label: tr('Andere eigene [Fire]-Allies +1
 FX[4195] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 4195, k: 'burn', a: { uid: c.uid } }); } },
     k: { burn: (s, a) => { if (findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: a.uid, amt: 3, dt: 'Fire' }); } } };
 FX[4196] = { enter: (s, c, pid) => trig(s, { id: 4196, k: 'ask', a: { pid } }),
-    k: { ask: (s, a) => mustPick(s, a.pid, tr('Nazgrel: Allianz-Ally zerstören'), 'Nazgrel, Advisor to Thrall', targetCands(s, a.pid, { ally: true, filter: x => x.faction === 'Alliance' }), '4196:do', a),
+    k: { ask: (s, a) => mustPick(s, a.pid, tr('Nazgrel: Allianz-Ally zerstören'), 'Nazgrel, Advisor to Thrall', targetCands(s, a.pid, { ally: true, filter: x => facIs(x, 'Alliance') }), '4196:do', a),
         do: (s, a, v) => { const t = v && findCharacter(s, v); if (t) destroy(s, t); } } };
 FX[4197] = { on: { dmg: (s, c, d, pid) => { const x = d.src && findCharacter(s, d.src); if (d.combat && x && x.type === 'Ally' && x.atkType === 'Shadow' && d.spid === pid && d.amt > 0) trig(s, { id: 4197, k: 'ready', a: { pid, n: d.amt } }); } },
     k: { ready: (s, a) => me(s, a.pid).resources.filter(r => r.exhausted).slice(0, a.n).forEach(r => { r.exhausted = false; }) } };

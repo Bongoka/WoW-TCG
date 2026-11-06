@@ -71,7 +71,7 @@ EK.lookPick = (s, a) => {
     s._hidden = true;
     p.looking = ids;
     const costOk = c => (a.minCost === undefined || (c.cost || 0) >= a.minCost) && (a.maxCost === undefined || (c.cost || 0) <= a.maxCost);
-    const ok = ids.map((id, i) => ({ id, i })).filter(x => costOk(CARDS[x.id]) && (!a.type || (a.type === 'Equipment' ? ['Weapon', 'Armor', 'Item'].includes(CARDS[x.id].type) : CARDS[x.id].type === a.type)));
+    const ok = ids.map((id, i) => ({ id, i })).filter(x => costOk(CARDS[x.id]) && (!a.pred || (PRED[a.pred] && PRED[a.pred](CARDS[x.id], a))) && (!a.type || (a.type === 'Equipment' ? ['Weapon', 'Armor', 'Item'].includes(CARDS[x.id].type) : CARDS[x.id].type === a.type)));
     const opts = ok.map(x => ({ label: CARDS[x.id].name, v: x.i, card: x.id, ai: (CARDS[x.id].cost || 0) + 1 }));
     if (!opts.length) { EK.lookPickDo(s, a, -1); return; }
     if (a.optional) opts.push({ label: tr('Keine nehmen'), v: -1, ai: 0 });
@@ -144,7 +144,7 @@ function retK(id) {
 }
 // Bear Form: "Destroy this card when you strike with a weapon or play a non-Feral ability."
 const bearOn = {
-    cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability' && d.card.school !== 'Feral') trig(s, { k: 'destroyOngoing', a: { uid: c.uid } }); },
+    cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability' && d.card.school !== 'Feral') trig(s, { k: 'destroyOngoing', a: { uid: c.uid, byAbility: true } }); },
 };
 // "At the start of your turn, your hero deals N <type> damage to attached character"
 function dotOnStart(n, dt) {

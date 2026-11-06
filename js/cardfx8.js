@@ -86,11 +86,11 @@ const facAllies = (s, pid, fac) => alliesOf(me(s, pid)).filter(a => a.type === '
 FX[6019] = { backAura: true, powers: [flipPow(tr('Drei [Alliance]-Allies auf die Hand: umdrehen'), 1, { canUse: (s, pid) => facAllies(s, pid, 'Alliance').length >= 3 || tr('Du brauchst drei [Alliance]-Allies'),
     payExtra: (s, it) => pickN(s, it.pl, tr('Kurzon: [Alliance]-Ally auf die Hand'), 'Kurzon the False', facAllies(s, it.pl, 'Alliance'), 3, '6019:pay', {}), resolve: () => {} })],
     k: { pay: (s, a, list) => { (list || []).forEach(u => { const c = findCharacter(s, u); if (c) leavePlay(s, c, 'hand'); }); finishPrep(s); } },
-    aura: { kw: (s, src, sp, c, k) => src.flipped && k === 'elusive' && c.type === 'Ally' && c.faction === 'Alliance' && ctrlOf(s, c) === sp } };
+    aura: { kw: (s, src, sp, c, k) => src.flipped && k === 'elusive' && c.type === 'Ally' && facIs(c, 'Alliance') && ctrlOf(s, c) === sp } };
 FX[6020] = { backAura: true, powers: [flipPow(tr('Drei [Horde]-Allies zerstören: umdrehen'), 3, { canUse: (s, pid) => facAllies(s, pid, 'Horde').length >= 3 || tr('Du brauchst drei [Horde]-Allies'),
     payExtra: (s, it) => pickN(s, it.pl, tr('Famish: [Horde]-Ally zerstören'), 'Famish the Binder', facAllies(s, it.pl, 'Horde'), 3, '6020:pay', {}), resolve: () => {} })],
     k: { pay: (s, a, list) => { (list || []).forEach(u => { const c = findCharacter(s, u); if (c) destroy(s, c); }); finishPrep(s); } },
-    aura: { kw: (s, src, sp, c, k) => src.flipped && k === 'ferocity' && c.type === 'Ally' && c.faction === 'Horde' && ctrlOf(s, c) === sp } };
+    aura: { kw: (s, src, sp, c, k) => src.flipped && k === 'ferocity' && c.type === 'Ally' && facIs(c, 'Horde') && ctrlOf(s, c) === sp } };
 FX[6021] = { backAura: true, aura: { kw: (s, src, sp, c, k) => k === 'elusive' && c.uid === src.uid } };   // Imp Lord Pinprik: Elusive auf beiden Seiten
 FX[6023] = { backAura: true, aura: { tagLimit: (s, src, sp, pid, t, cards) => pid === sp && t === 'Pet' ? cards.length : 0 } };   // Obliveron: beliebig viele Pets
 FX[6024] = { powers: [flipPow(tr('Kontrolle über Ziel-Ally'), 0, { myTurn: true, slots: slotAlly(tr('Ziel-Ally'), true, { side: 'enemy' }), resolve: (s, it) => { const t = T1(s, it); if (t) changeControl(s, t, it.pl); } })] };
@@ -419,7 +419,7 @@ FX[6143] = { on: { defends: (s, c, d, pid) => { if (d.def === c.uid) trig(s, { i
 FX[6144] = { noFatal: true };
 FX[6145] = { enter: (s, c, pid) => trig(s, { id: 6145, k: 'ask', a: { pid, uid: c.uid } }),
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Alecia Hall: 3 heilen'), 'Alecia Hall', targetCands(s, a.pid, { char: true }), '6145:do', a, u => aiTargetValue(s, a.pid, u, false)), do: (s, a, v) => { if (v) heal(s, a.uid, v, 3); } } };
-FX[6146] = { on: { allyEnters: (s, c, d, pid) => { const x = findCharacter(s, d.uid); if (d.pid === pid && d.uid !== c.uid && x && x.faction === 'Horde') trig(s, { id: 6146, k: 'ask', a: { pid } }); } },
+FX[6146] = { on: { allyEnters: (s, c, d, pid) => { const x = findCharacter(s, d.uid); if (d.pid === pid && d.uid !== c.uid && x && facIs(x, 'Horde')) trig(s, { id: 6146, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Blood Guard Gulmok: Ziel-Ally zerstören?'), 'Blood Guard Gulmok', targetCands(s, a.pid, { ally: true }), 'E:optDestroy', a) } };
 FX[6147] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 6147, k: 'ask', a: { pid, uid: c.uid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Blood Knight Kyria: 4 heilen'), 'Blood Knight Kyria', targetCands(s, a.pid, { char: true }), '6147:do', a, u => aiTargetValue(s, a.pid, u, false)), do: (s, a, v) => { if (v && findCharacter(s, a.uid)) heal(s, a.uid, v, 4); } } };

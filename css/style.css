@@ -337,6 +337,7 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .bottom-row .resource-tray { max-width: 40%; }
 .active-quests-row { flex-wrap: nowrap; justify-content: flex-start; max-width: 100%; min-width: 0; }
 .active-quests-row .quest-card-large { flex: 0 1 var(--hand-w); min-width: 28px; }
+.quest-card-large.zone-quest { opacity: .72; } .quest-card-large.zone-quest:hover { opacity: 1; }   /* Set drums: Quest aus Friedhof/Deck abschließbar */
 .active-quests-row .quest-card-large:last-child { flex-shrink: 0; }
 .active-quests-row .quest-card-large:hover { z-index: 100; }
 .quest-card-large.quest-ready { cursor: pointer; }
@@ -1115,6 +1116,7 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #db-set-filter option[class^="set-"] { color: #f1f5f9; }
 #db-set-filter option.set-block1 { background: #1e3a5f; }
 #db-set-filter option.set-block2 { background: #2f4a1c; }
+#db-set-filter option.set-block3 { background: #4a2f1c; }
 #db-set-filter option.set-raid { background: #5c1f1f; }
 
 /* Deck-Übersicht: jedes Deck als Deck-Box (vorne Heldenbild, oben Klassen-Icon, Farbe nach Fraktion) */

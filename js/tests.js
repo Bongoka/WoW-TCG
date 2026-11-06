@@ -1077,6 +1077,81 @@ function runRuleTests() {
         for (let i = 0; i < 10 && s.pending; i++) { applyAction(s, { type: 'PASS' }, true, s.pending.pid); process(s); }
         assert(!(mine.damage > 0) && s.p1.allies.includes(mine) && !att.exhausted, 'Angriff trotz "can\'t attack" ausgeführt');
     });
+    // ---------------- Set drums
+    test(115, 'Locations (CR 306, 410.6g): offen legen, [Activate]-Kraft erschöpft die Location, nur eine offene Location', () => {
+        const s = fresh(); s.placedResource = false; res(s, 1, 3);
+        const i = hand(s, 1, 7265);                                                      // Hellfire Citadel
+        assert(act(s, getLegalActions(s, 1).find(a => a.type === 'PLACE_RESOURCE' && a.handIdx === i && a.faceUp), 1), 'Location nicht offen legbar');
+        const r = locsOf(P(s, 1))[0]; assert(r && r.card.id === 7265, 'Location liegt nicht offen');
+        res(s, 1, 4); const foe2 = put(s, 2, 262), vi = hand(s, 1, 171);                  // Vanquish auf einen gegnerischen Ally
+        act(s, getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === vi && (x.targets || []).flat().includes(foe2.uid)), 1);
+        assert(((r.card.counters || {}).capture || 0) === 1, 'kein capture counter nach zerstörtem gegnerischem Ally');
+        r.card.counters.capture = 5; const n0 = P(s, 1).hand.length;
+        const a = getLegalActions(s, 1).find(x => x.type === 'ACTIVATE' && x.srcUid === r.card.uid); assert(a, 'Kraft der Location nicht nutzbar');
+        act(s, a, 1);
+        assert(r.exhausted && r.card.counters.capture === 2 && P(s, 1).hand.length === n0 + 1, 'Kraft: Location nicht erschöpft, Zähler nicht entfernt oder keine Karte gezogen');
+        assert(r.card.counters.capture <= 3, 'Kapazität überschritten');
+        // zweite offene Location: eine wählen, die andere wird verdeckt
+        P(s, 1).resources.push({ card: makeCardInst(7264, false, 1), faceUp: true, exhausted: false }); s.pending = null; stateBased(s); process(s);
+        if (s.pending && s.pending.kind === 'choose') act(s, { type: 'CHOOSE', v: s.pending.opts[0].v }, s.pending.pid);
+        assert(locsOf(P(s, 1)).length === 1, 'zwei offene Locations');
+    });
+    test(116, 'Diplomacy, Shadowmeld, Berserking, War Stomp (CR-Glossar)', () => {
+        const s = fresh(); res(s, 1, 5);
+        put(s, 1, 7120);                                                                  // Daniel Soortan: Diplomacy: Dwarves
+        const dwarf = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && c.race === 'Dwarf' && c.cost === 3);
+        assert(getPlayCost(s, P(s, 1), dwarf) === 2, 'Diplomacy senkt die Kosten nicht um (1)');
+        const one = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && c.race === 'Dwarf' && c.cost === 1);
+        if (one) assert(getPlayCost(s, P(s, 1), one) === 1, 'Diplomacy unter (1)');
+        const cy = put(s, 2, 7119);                                                       // Cymbre Shadowdrifter: Shadowmeld
+        assert(hasElusive(s, cy) && untargetableBy(s, cy, 1), 'Shadowmeld: bereit nicht Elusive/Untargetable');
+        cy.exhausted = true; assert(!hasElusive(s, cy) && !untargetableBy(s, cy, 1), 'Shadowmeld: erschöpft noch Elusive');
+        const z = put(s, 1, 7198, { damage: 2 });                                         // Zari'zari: Berserking
+        assert(atkOf(s, z, {}) === 4, `Berserking: ATK ${atkOf(s, z, {})} statt 4`);
+        const sorga = put(s, 1, 7196), tgt = put(s, 2, 262);                              // Sorga the Swift: War Stomp
+        act(s, { type: 'ATTACK', attackerUid: sorga.uid, defenderUid: P(s, 2).hero.uid }, 1);
+        assert(tgt.exhausted || P(s, 2).hero.exhausted, 'War Stomp hat nichts erschöpft');
+    });
+    test(117, 'Water Breathing: Quest aus der Hand abschließen, dabei aus dem Spiel entfernen', () => {
+        const s = fresh(); res(s, 1, 4); put(s, 1, 7073);
+        const q = CARDS[7247];                                                          // The Last Barov: Pay (3), Reward: Draw a card
+        const qi = hand(s, 1, q.id), qc = P(s, 1).hand[qi], n0 = P(s, 1).hand.length;
+        const a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST_ZONE' && x.uid === qc.uid); assert(a, 'Quest aus der Hand nicht abschließbar');
+        act(s, a, 1);
+        assert(P(s, 1).removed.some(c => c.uid === qc.uid) && P(s, 1).hand.length === n0 && getReadyRes(P(s, 1)) === 1, 'Quest nicht entfernt, keine Karte gezogen oder nicht bezahlt');
+    });
+    // ---------------- Set gladiator
+    test(118, 'Gladiator: Kosten beim offenen Legen (Ring of Blood), Arena-Schlüsselwörter, Inspiring Presence, Hardiness', () => {
+        const s = fresh(); s.placedResource = false; res(s, 1, 3);
+        const qi = hand(s, 1, 8196), h0 = P(s, 1).hero.damage || 0;                      // The Final Challenge: 2 Schaden auf den eigenen Helden
+        assert(act(s, getLegalActions(s, 1).find(a => a.type === 'PLACE_RESOURCE' && a.handIdx === qi && a.faceUp), 1), 'Quest nicht offen legbar');
+        assert((P(s, 1).hero.damage || 0) === h0 + 2 && P(s, 1).resources.some(r => r.faceUp && r.card.id === 8196), 'Kosten beim offenen Legen nicht bezahlt');
+        const s2 = fresh(); s2.placedResource = false; const ri = hand(s2, 1, 8202);       // The Ring of Blood: ohne Arena-Karte nicht offen
+        assert(!getLegalActions(s2, 1).some(a => a.type === 'PLACE_RESOURCE' && a.handIdx === ri && a.faceUp), 'Ring of Blood ohne Arena-Karte offen legbar');
+        put(s, 1, 8100); const ar = put(s, 1, 8101);                                      // Katianna (Elusive) + Keward (Protector) für Arena-Allies
+        assert(hasElusive(s, ar) && hasProtector(s, ar), 'Arena-Ally ohne Elusive/Protector');
+        put(s, 1, 8096); const t = put(s, 2, 262), d0 = t.damage || 0;                     // Elder Achillia: Inspiring Presence
+        heroDmg(s, 1, t.uid, 1, 'Fire'); process(s); autoResolve(s);
+        assert((t.damage || 0) - d0 === 2, `Inspiring Presence: ${(t.damage || 0) - d0} statt 2 Schaden`);
+        const k = put(s, 2, 8120); heroDmg(s, 1, k.uid, 2, 'Fire'); process(s); autoResolve(s);        // Aknot Whetstone (0/4): Hardiness
+        assert((k.damage || 0) === 2, `Hardiness: ${k.damage || 0} statt 2 Schaden (2 + 1 Inspiring Presence - 1)`);
+    });
+    // ---------------- Set honor
+    test(119, 'Honor: Will of the Forsaken, honor counters (Battleground), Bangle of Endless Blessings, Marundal the Kindred', () => {
+        const s = fresh(); res(s, 1, 6);
+        const nv = put(s, 2, 10137);                                                      // Nathaniel Voran: Will of the Forsaken
+        assert(!bounce(s, nv) && P(s, 2).allies.includes(nv), 'Will of the Forsaken: Ally ging auf die Hand');
+        nv.damage = hpOf(s, nv); stateBased(s);
+        assert(!P(s, 2).allies.includes(nv), 'Will of the Forsaken: mit tödlichem Schaden nicht zerstört');
+        const ab = makeCardInst(10203, false, 1); P(s, 1).resources.push({ card: ab, faceUp: true, exhausted: false });   // Arathi Basin
+        const vi = hand(s, 1, 171), foe2 = put(s, 2, 262);
+        act(s, getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === vi), 1);
+        assert(((ab.counters || {}).honor || 0) === 1, 'kein honor counter beim Spielen einer Karte');
+        const s2 = fresh(); s2.placedResource = false; put(s2, 1, 10165); const hi = hand(s2, 1, 262);   // Bangle: nicht verdeckt legbar
+        assert(!getLegalActions(s2, 1).some(a => a.type === 'PLACE_RESOURCE' && a.handIdx === hi), 'Bangle: Ressource trotzdem verdeckt legbar');
+        const m = put(s2, 1, 10108), big = put(s2, 2, 262);                                // Marundal: ATK und [Health] = Kosten
+        assert(atkOf(s2, big, {}) === (big.cost || 0) && hpOf(s2, big) === (big.cost || 0), `Marundal: ${atkOf(s2, big, {})}/${hpOf(s2, big)} statt ${big.cost}/${big.cost}`);
+    });
     LANG = prevLang;
     return results;
 }
@@ -1187,6 +1262,8 @@ function runCardTests(ids) {
         ['Gegner-Ally greift Held an, eigener Protector fängt ab', s => { oppTurn(s); const pr = makeCardInst(protector.id, false, 1); pr.joinedTurn = 1; s.p1.allies.push(pr); return atk(s, 2, fresh2(s).uid, s.p1.hero.uid); }],
         ['Eigener Ally greift an, Protector fängt ab', s => { const pr = makeCardInst(protector.id, false, 2); pr.joinedTurn = 1; s.p2.allies.push(pr); return atk(s, 1, s.p1.allies[0].uid, s.p2.hero.uid); }],
         ['Gegner spielt Fähigkeit', oppCast],
+        // Set drums: eigene Bear Form und gegnerische Fähigkeit auf der Kette (Feral Charge)
+        ['Bear Form, Gegner spielt Fähigkeit', s => { const bf = Object.values(CARDS).find(c => c.bearForm && c.type === 'Ability' && !c.isToken); const x = makeCardInst(bf.id, false, 1); x.joinedTurn = 1; s.p1.ongoing.push(x); return oppCast(s); }],
         ['Held hat Stealth', s => { addTM(s.p1.hero, { k: 'stealth', turn: s.turn }); return true; }],
         ['20 Ressourcen', s => { for (let i = 0; i < 10; i++) s.p1.resources.push({ card: makeCardInst(vanilla(1).id, false, 1), faceUp: false, exhausted: false }); return true; }],
         // Set 6: Gegner spielt einen Ally bzw. eine Ausrüstung (Swallow Soul, Wreck, Nether Fracture …)
@@ -1223,6 +1300,19 @@ function runCardTests(ids) {
             const p = s0.p1; p.resources.push({ card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false });
             const r = tryRun(() => { checkQuestCondition(s0, p, p.resources[p.resources.length - 1]); const qa = getLegalActions(s0, 1).find(a => a.type === 'COMPLETE_QUEST'); if (qa) { applyAction(s0, qa, true, 1); autoResolve(s0); } return zonesOk(s0); });
             if (r) bad('Quest: ' + r);
+            continue;
+        }
+        if (c.type === 'Location') {                                                        // Set drums: offen als Ressource legen, dann jede Kraft nutzen
+            const t = cloneState(s0); t.placedResource = false; t.p1.hand.unshift(makeCardInst(c.id, false, 1));
+            if (fx(c).faceUpCost) { const ar = Object.values(CARDS).find(x => x.arena && !x.isToken && x.type === 'Ally'); t.p1.hand.push(makeCardInst(ar.id, false, 1)); }   // The Ring of Blood: Arena-Karte aufdecken
+            const pa = getLegalActions(t, 1).find(a => a.type === 'PLACE_RESOURCE' && a.handIdx === 0 && a.faceUp);
+            const r = pa ? tryRun(() => { if (!applyAction(t, pa, true, 1)) return 'Location: Legen abgelehnt'; autoResolve(t); return locsOf(t.p1).some(x => x.card.id === c.id) ? zonesOk(t) : 'Location liegt nicht offen'; }) : 'Location: kann nicht offen gelegt werden';
+            if (r) { bad(r); continue; }
+            const sp = cloneState(s0), src = makeCardInst(c.id, false, 1); src.counters = { capture: 200 }; sp.p1.resources.push({ card: src, faceUp: true, exhausted: false });
+            for (const a of getLegalActions(sp, 1).filter(a => a.type === 'ACTIVATE' && a.srcUid === src.uid).slice(0, 4)) {
+                const e = tryRun(() => { const x = cloneState(sp); if (!applyAction(x, a, true, 1)) return 'Kraft abgelehnt: ' + a.desc; autoResolve(x); return zonesOk(x); });
+                if (e) { bad('Location-Kraft: ' + e); break; }
+            }
             continue;
         }
         if (c.type !== 'Hero') {
