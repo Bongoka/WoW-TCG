@@ -1,8 +1,8 @@
 let _cfgImgPath = "AZEROTH-{id}-EA.png";
-// Kartenbilder je Set in cards/<set>…: "<set> big" (sehr hoch aufgelöst), "<set>" (Zoom, 716 px), "<set> small"
-// (Hand/Spielfeld/Deck Builder, 358 px) – bearbeitet, Dateien <PRÄFIX>-<Nr>[-EA|-Back]_ergebnis.webp (big auch .png).
-// "<set> scans" / "<set> scans small": fotografierte Originalkarten, benannt nach Kartenname (' → _, : → ' -',
-// Heldenrückseite " - Backside"); Scans haben keine Extended Art.
+// Kartenbilder je Set in cards/<set>…: "<set> big" (sehr hoch aufgelöst, 1432 px), "<set>" (Zoom, 716 px), "<set> small"
+// (Hand/Spielfeld/Deck Builder, 358 px), "<set> scans" / "<set> scans small" (fotografierte Originalkarten, 745/372 px,
+// ohne Extended Art). Dateien überall: "<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp" (cardImgBase), z. B.
+// "AZEROTH-100 Lobotomize (EA).webp", Heldenrückseite "AZEROTH-1 Boris Brightbeard (Back).webp".
 const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia treasure', 'ONYXIA'], 5: ['molten core treasure', 'MOLTEN CORE'], 6: ['legion', 'LEGION'], 7: ['betrayer', 'BETRAYER'], 8: ['illidan', 'ILLIDAN'], 9: ['drums', 'DRUMS'], 10: ['gladiator', 'GLADIATORS'], 11: ['honor', 'HONOR'], 12: ['scourgewar', 'SCOURGEWAR'], 13: ['wrathgate', 'WRATHGATE'], 14: ['icecrown', 'ICECROWN'] };
 const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };   // alte Ablage cards/<PRÄFIX>-<Nr>.png (Rückfall)
 // Einstellung Kartenbilder: 'edited' Normal, 'scans' Original-Scans, 'hq' Normal + High Resolution (Zoom aus "<set> big").
@@ -12,23 +12,21 @@ const imgStyle = () => { try { return localStorage.getItem(IMG_STYLE_KEY) || 'ed
 const useScans = () => imgStyle() === 'scans';
 const useHQ = () => imgStyle() === 'hq';
 const useSmall = () => imgStyle() === 'small';                                       // überall nur "<set> small" (weniger Daten)
-// Scan-Dateinamen: Akzente weg, " und ? weg, ' → _, : → ' -', " . . ." → "..."; dazu Tippfehler/Abweichungen der Dateien
-const SCAN_NAME_FIX = { 'Nerra Lifeboon': 'Nerra Lifeboom', 'Deacon Johanna': 'Decon Johanna', 'Valthak Spiritdrinker': 'Valthak Spiritdinker',
-    'Stronghold Gauntlets': 'Stronghold Guantlets', 'Nathressa Darkstrider': 'Nathressa Darksrider', 'Operation Recombobulation': 'Opertation Recombobulation',
-    'Tanwa the Marksman': 'Tanwa Marksman', 'Wanted: "Hogger"': 'Wanted Hogger', 'Broan Charges-the-Fight': 'Broan Charges-the-Flight',
-    'Gauntlets of Vindication': 'Guantlets of Vindication', 'Tempest, Son-of-Storms': 'Tempest, Son-of-Storms_' };
-const scanName = c => SCAN_NAME_FIX[c.name] || c.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/["?]/g, '')
-    .replace(/[’']/g, '_').replace(/:/g, ' -').replace(/ \. \. \./g, '...').trim();
+// Kartenname als Dateiname: Akzente weg, ’ → ', : → ' -', / → '-', "?*<>| weg, " . . ." → "...", Punkte/Leerzeichen am Ende weg
+const imgFileName = name => name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/’/g, "'").replace(/:/g, ' -').replace(/\//g, '-')
+    .replace(/["?*<>|]/g, '').replace(/ \. \. \./g, '...').replace(/\s+/g, ' ').replace(/[. ]+$/, '').trim();
+const cardImgBase = cd => `${SET_IMG[cd.set || 1][1]}-${cd.set ? cd.num : cd.id} ${imgFileName(cd.name)}`;
+const IMG_SUF = { '': '', '-EA': ' (EA)', '-Back': ' (Back)' };
 // Optionale Ordner, die es nicht gibt (beim Start einmal geprüft): werden dann gar nicht erst angefragt
 const IMG_DIR_MISSING = new Set();
 function probeImageDirs(done) {
     let open = 0;
     const finish = () => { if (--open === 0 && done) done(); };
     for (const [set, [dir, pre]] of Object.entries(SET_IMG)) {
-        const first = Object.values(CARDS).find(c => !c.isToken && (c.set || 1) === +set && (c.set ? c.num : c.id) === 1); if (!first) continue;
-        const ed = [`${pre}-1_ergebnis.webp`, `${pre}-1.png`];
-        const tries = { [dir]: ed, [dir + ' small']: ed, [dir + ' big']: ed,
-            [dir + ' scans']: [`${scanName(first)}_ergebnis.webp`], [dir + ' scans small']: [`${scanName(first)}_ergebnis.webp`] };
+        // Probe: die ersten drei Karten des Sets (einzelne Bilder dürfen fehlen, ohne dass der Ordner als fehlend gilt)
+        const firsts = Object.values(CARDS).filter(c => !c.isToken && (c.set || 1) === +set && (c.set ? c.num : c.id) <= 3); if (!firsts.length) continue;
+        const ed = firsts.map(c => `${cardImgBase(c)}.webp`);
+        const tries = { [dir]: ed, [dir + ' small']: ed, [dir + ' big']: ed, [dir + ' scans']: ed, [dir + ' scans small']: ed };
         for (const [folder, files] of Object.entries(tries)) {
             open++; let k = 0; const img = new Image();
             img.onload = finish;
@@ -54,7 +52,7 @@ function updateImgStyleOptions() {
         try { localStorage.setItem(IMG_STYLE_KEY, pick); } catch (e) {} sel.value = pick; if (G) render();
     }
 }
-// Token-Bilder: "Tokens small/<Name>_ergebnis.webp" (Hand/Spielfeld), "Tokens/<Name>.webp" (große Vorschau).
+// Token-Bilder: "Tokens small/<Name>.webp" (Hand/Spielfeld), "Tokens/<Name>.webp" (große Vorschau).
 // Auf GitHub liegen nur diese Tokens (Whitelist am Ende von .gitignore) – neue Einträge dort ergänzen.
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
     9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton',
@@ -72,12 +70,12 @@ function getImageCandidates(id, mode = 'ea') {
 function imageCandidatesAll(id, mode = 'ea') {
     const cd = CARDS[id];
     if (TOKEN_IMG[id]) {
-        const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.webp`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}_ergebnis.webp`);
+        const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.webp`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}.webp`);
         return mode === 'full' || mode === 'eaBig' ? [big, small] : [small, big];
     }
     const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
-    const [dir, pre] = si, num = cd.set ? cd.num : id;
-    const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${pre}-${num}${suf}_ergebnis.webp`), encodeURI(`cards/${folder}/${pre}-${num}${suf}.png`)];
+    const [dir] = si, num = cd.set ? cd.num : id, base = cardImgBase(cd);
+    const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${base}${IMG_SUF[suf]}.webp`)];
     // Einstellung "Nur kleine Bilder": auch Zoom und Booster nehmen die kleinen Bilder
     const small = suf => ed(dir + ' small', suf), norm = suf => useSmall() ? small(suf) : ed(dir, suf), big = suf => useSmall() ? small(suf) : ed(dir + ' big', suf);
     const zoom = suf => useHQ() ? [...big(suf), ...norm(suf)] : [...norm(suf), ...big(suf)];
@@ -85,7 +83,7 @@ function imageCandidatesAll(id, mode = 'ea') {
     // Modi: 'ea' Hand/Spielfeld (Extended Art bevorzugt), 'full' Zoom/Booster (normales Bild), 'back' Heldenrückseite,
     // 'eaCard' / 'eaBig' Extended-Art-Karte aus dem Booster – die gibt es nur bearbeitet, auch wenn Scans gewählt sind
     if (mode === 'eaBig') return [...zoom('-EA'), ...zoom(''), ...old];
-    const sc = (folder, back) => IMG_DIR_MISSING.has(`${dir} ${folder}`) ? [] : [encodeURI(`cards/${dir} ${folder}/${scanName(cd)}${back ? ' - Backside' : ''}_ergebnis.webp`)];
+    const sc = (folder, back) => IMG_DIR_MISSING.has(`${dir} ${folder}`) ? [] : [encodeURI(`cards/${dir} ${folder}/${base}${back ? IMG_SUF['-Back'] : ''}.webp`)];
     const scans = back => [...sc('scans small', back), ...sc('scans', back)];                // letzter Rückfall, falls keine bearbeiteten Bilder da sind
     if (mode === 'eaCard') return [...small('-EA'), ...norm('-EA'), ...small(''), ...norm(''), ...scans(false), ...old];
     if (useScans()) {

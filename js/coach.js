@@ -77,7 +77,9 @@ function coachStats(hero, ids) {
     S.discardSrc = t(COACH_RE.discard, S.nonQ);
     // Karten, die nur eine Kartenart des Gegners treffen – nutzlos, wenn er davon wenig spielt
     S.antiAlly = t(/[Dd]estroy target (opposing )?ally|damage to (target|each) (opposing )?all(y|ies)\b|Remove target ally|each opposing ally|opposing allies (have|get) -|Exhaust target (opposing )?ally/, S.nonQ);
-    S.antiEquip = t(/[Dd]estroy (target|all|each) (\w+ )?(armor|weapon|item|equipment)|destroys an? (\w+ )?(equipment|armor|weapon)/, S.nonQ);
+    // Allies (Körper mit Zusatzwirkung, z. B. Zalan Ragewind) und Karten mit Wahl ("Choose one", z. B. Meltdown) treffen nicht nur Ausrüstung
+    S.antiEquip = t(/[Dd]estroy (target|all|each) (\w+ )?(armor|weapon|item|equipment)|destroys an? (\w+ )?(equipment|armor|weapon)/, S.nonQ)
+        .filter(c => c.type !== 'Ally' && !/Choose one/.test(coachTxt(c)));
     S.antiAbil = t(/[Dd]estroy (target|all|each) (\w+ )?abilit|Interrupt target (\w+ )?ability|destroys an ability|Interrupt all/, S.nonQ);
     S.pump = t(/\+\d+ ATK (this turn|until)/, S.nonQ);
     S.selfDmg = t(/put \d+ damage on your hero/, S.nonQ);
@@ -467,7 +469,7 @@ function coachFaceStyle(id) {
     const clamp = v => Math.max(0, Math.min(100, v * 100)).toFixed(1);
     return `background-size: ${s * 100}% auto; background-position: ${clamp((fx * s - .5) / (s - 1))}% ${clamp((fy * h - .5) / (h - 1))}%;`;
 }
-const coachImgs = hero => getImageCandidates(hero.id, 'full').filter(u => !/-EA[_.]/.test(u)).slice(0, 4)   // Gesichtsausschnitt (COACH_FACE) passt zur normalen Karte
+const coachImgs = hero => getImageCandidates(hero.id, 'full').filter(u => !/\(EA\)\./.test(u)).slice(0, 4)   // Gesichtsausschnitt (COACH_FACE) passt zur normalen Karte
    .map(u => `url("${u}")`).join(', ');
 
 // Neues Deck im Builder: alles zurücksetzen (ohne „erwachen“-Animation beim Öffnen)

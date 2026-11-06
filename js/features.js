@@ -741,9 +741,9 @@ function importTourneyDecks() {
     try { done = JSON.parse(localStorage.getItem(TOURNEY_KEY) || '[]');
         if (localStorage.getItem('wow_tcg_tourney_imported_v1')) done = [...new Set([...done, ...Array.from({ length: 16 }, (_, i) => i + 1)])];   // alte Fassung: Listen 1–16
     } catch (e) { return; }
-    // Kartenstand der Listen: steigt, wenn neue Karten dazukommen (2 = Raid-Loot Onyxia / Molten Core) –
-    // vorhandene, unveränderte Turnier-Decks werden dann neu eingelesen
-    const REV = 2; let rev = 1;
+    // Kartenstand der Listen: steigt, wenn neue Karten dazukommen (2 = Raid-Loot Onyxia / Molten Core,
+    // 3 = drums bis icecrown) – vorhandene, unveränderte Turnier-Decks werden dann neu eingelesen
+    const REV = 3; let rev = 1;
     try { rev = +(localStorage.getItem(TOURNEY_KEY + '_rev') || 1); } catch (e) {}
     const list = loadCustomDecks();
     TOURNEY_DECKS.forEach((text, i) => {
@@ -774,7 +774,7 @@ function deckBoxHTML(deck, size = '') {                                      // 
     const mini = size === true || size === 'mini';
     const hero = CARDS[deck.hero], cls = deck.class || (hero && hero.class) || '', fac = (deck.faction || (hero && hero.faction) || 'neutral').toLowerCase();
     // Heldenbild (klein, ohne Extended Art) im Bildfenster der Front, auf das Gesicht gezoomt (Ausschnitt wie beim Coach-Avatar, COACH_FACE)
-    const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/-EA[_.]/.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
+    const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/\(EA\)\./.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
     let pos = 'background-size: cover; background-position: center 25%';
     const f = hero && typeof COACH_FACE !== 'undefined' && COACH_FACE[hero.id];
     if (f) {

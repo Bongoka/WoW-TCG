@@ -69,16 +69,19 @@ V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\
 
 Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
 
+### Kartenbilder
+Ordner je Set (`SET_IMG` in main.js): `cards/<set>` (716×1000), `<set> small` (358×500), `<set> big` (1432×2000), `<set> scans` (745×1040) und `<set> scans small` (372×519), alles WebP mit Qualität 92. Auf GitHub liegen nur `<set>` und `<set> small`. Dateinamen überall `<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp` (`cardImgBase`/`imgFileName` in main.js), z. B. `AZEROTH-100 Lobotomize (EA).webp`.
+
+Neue Bilder: PNG mit diesem Namen in den Ordner legen und mit `bin/conv.sh <png> card` (Set-Ordner → normal, small, big) bzw. `bin/conv.sh <png> scan` (Scan-Ordner → scans, scans small) umwandeln. Das PNG wird danach gelöscht. Das Skript nutzt ImageMagick portable in `bin/imagemagick/` (nur lokal, von den GitHub-Releases von ImageMagick). Quelle der Bilder: `D:\warcraft tcg\NoRules\<Set>` (EA, sonst normal), sonst `D:\warcraft tcg\Scans\<Set>`.
+
 ### Doppelte Kartenbilder (nicht auf GitHub)
-Hat eine Karte eine Extended-Art-Fassung (`…-EA_ergebnis.webp`), ist die EA die vollständige Karte – die normale Fassung bleibt lokal (Abschnitt `EA-Doppel` in `.gitignore`). Das Spiel nimmt überall zuerst die EA (`imageCandidatesAll`), nur Helden (ohne EA) und der Coach-Avatar nutzen die normale Karte. Nach neuen Kartenbildern den Abschnitt neu erzeugen:
+Hat eine Karte eine Extended-Art-Fassung (`… (EA).webp`), ist die EA die vollständige Karte – die normale Fassung bleibt lokal (Abschnitt `EA-Doppel` in `.gitignore`). Das Spiel nimmt überall zuerst die EA (`imageCandidatesAll`), nur Helden (ohne EA) und der Coach-Avatar nutzen die normale Karte. Nach neuen Kartenbildern den Abschnitt neu erzeugen und danach `git add -A cards`:
 
 ```bash
-git ls-files cards | grep -E -- "-EA(_ergebnis\.webp|\.png)$" | grep -v -E "/[^/]* (big|scans|scans small)/" | sed -E 's/-EA(_ergebnis\.webp|\.png)$/\1/' | sort -u > /tmp/c.txt
-git ls-files cards | grep -Fxf - /tmp/c.txt > /tmp/d.txt   # Normale Bilder, die noch in Git sind
-sed -i "/^# <<< EA-Doppel/e sed 's#^#/#' /tmp/d.txt" .gitignore   # neue Pfade vor dem Abschnittsende anhängen
-tr '\n' '\0' < /tmp/d.txt | xargs -0 -r git rm -q --cached --
+find cards -path '* big' -prune -o -path '* scans*' -prune -o -name '* (EA).webp' -print | sed 's/ (EA)\.webp$/.webp/' | while IFS= read -r f; do [ -e "$f" ] && echo "/$f"; done | sort > /tmp/d.txt
+sed -i '/^# >>> EA-Doppel/,/^# <<< EA-Doppel/{//!d}' .gitignore && sed -i '/^# >>> EA-Doppel/r /tmp/d.txt' .gitignore
+git ls-files -ci --exclude-standard -z | xargs -0 -r git rm -q --cached --   # schon eingecheckte Doppel aus Git nehmen
 ```
-Der Befehl hängt nur neue Pfade an; schon eingetragene Bilder sind nicht mehr in Git und tauchen in `git ls-files` nicht mehr auf.
 
 ## Testen
 
