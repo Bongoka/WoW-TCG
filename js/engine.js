@@ -2862,6 +2862,7 @@ function powerVariants(s, pid, instantOnly) {
             if (e.pid !== pid && !pw.anyPlayer && tabiOwner(s) !== pid) continue;
             if (canUsePower(s, pid, e.c, pw)) continue;
             if (pw.aiSkip && pw.aiSkip(s, pid, e.c)) continue;
+            // aiSkipT: einzelne Ziele, die die KI auslässt (Searing Light: Held erst, wenn er fast besiegt ist)
             const xs = (pw.cost === 'X' || pw.xRange) ? (() => { const xr = pw.xRange ? pw.xRange(s, pid, e.c) : { min: 0, max: 9 }; const lim = Math.min(xr.max, pw.cost === 'X' ? getReadyRes(getPlayer(s, pid)) : 99);
                 if (pw.xValues) return [...new Set(pw.xValues(s, pid, e.c))].filter(x => x !== undefined && x >= xr.min && x <= lim);   // X nach möglichen Zielen
                 const a = []; for (let x = Math.max(1, xr.min); x <= lim; x++) a.push(x); return a.length > 3 ? [a[0], a[a.length - 1]] : a; })() : [undefined];
@@ -2871,7 +2872,7 @@ function powerVariants(s, pid, instantOnly) {
                     const slots = targetSlots(s, pid, pw, e.c, { x, mode });
                     const combos = targetCombos(s, pid, slots, pw.distinct);
                     if (combos === null) continue;
-                    combos.forEach(tg => out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
+                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
                 }
             }
         }

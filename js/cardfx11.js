@@ -163,10 +163,12 @@ FX[10048] = { modes: (s, pid) => [['Ability', tr('Fähigkeit')], ['Ally', 'Ally'
         const opts = [...handK.map(c => ({ label: tr`${c.name} abwerfen`, v: 'd:' + c.uid, card: c.id, ai: 2 - (c.cost || 0) * 0.2 })), ...inPlayK.map(c => ({ label: tr`${c.name} zerstören`, v: 'x:' + c.uid, ai: -cardValue(s, c) }))];
         ask(s, { pid: o.id, prompt: tr('Mist of Corrosion: Karte dieser Art zerstören oder abwerfen?'), src: 'Mist of Corrosion', opts, k: '10048:do', a: {} }); },
     k: { do: (s, a, v) => { const [k, u] = v.split(':'); if (k === 'd') EK.discardDo(s, {}, u); else { const c = findCharacter(s, u); if (c) destroy(s, c); } } } };
+// KI: den gegnerischen Helden erst treffen, wenn er höchstens 6 Leben übrig hat – sonst die Karte für Allies aufheben
+const searingAi11 = (s, pid, c, tg) => { const t = tg[0] && findCharacter(s, tg[0][0]); return !!t && t.type === 'Hero' && hpOf(s, t) - (t.damage || 0) > 6; };
 FX[10049] = { powers: [{ key: 'searing', label: tr('Fähigkeit abwerfen: 3 unverhinderbarer Heiligschaden'), cost: 2, slots: slotChar(tr('Ziel'), true), canUse: (s, pid) => me(s, pid).hand.some(c => c.type === 'Ability') || tr('Keine Fähigkeit auf der Hand'),
         payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('Searing Light: Fähigkeit abwerfen'), src: 'Searing Light', opts: p.hand.filter(c => c.type === 'Ability').map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -(c.cost || 0) })), k: 'E:discardCostDo', a: {} }); },
-        resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } },
-    { key: 'searing2', label: tr('Zerstören: 3 unverhinderbarer Heiligschaden'), selfCost: selfDestroyCost, slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } }] };
+        aiSkipT: searingAi11, resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } },
+    { key: 'searing2', label: tr('Zerstören: 3 unverhinderbarer Heiligschaden'), selfCost: selfDestroyCost, aiSkipT: searingAi11, slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } }] };
 FX[10050] = { backToHand: true, slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Holy', { unprev: true, after: { k: '10050:back', a: { pid: it.pl, uid: t, card: it.card.uid } } }); },
     k: { back: (s, a) => { const t = findCharacter(s, a.uid); if (t && (t.damage || 0) < hpOf(s, t)) s.tasteBack11 = a.card; } } };
 // "put this ability into its owner's hand" statt Friedhof: beim Verlassen der Kette

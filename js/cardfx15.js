@@ -790,3 +790,54 @@ FX[3962] = { powers: [actPow('poultry', tr('Feder-Zähler: Ziel-Ally wird diesen
 FX[3963] = { aura: resistHero17('Frost'), powers: [actPow('frost', tr('10/10 Frozen Elemental-Token'), { cost: 6, myTurn: true, resolve: (s, it) => makeToken(s, 3972, it.pl) })] };
 FX[3972] = resist('Frost');
 CARD_ISSUES[3906] = '"Each face-down resource you control is also an armor with 1 [DEF]": Verdeckte Ressourcen als Rüstung (verhindern, Ziel von Rüstungs-Effekten, zählen als Ausrüstung) bildet die Engine nicht ab.';
+
+// ============================================================================
+// FEAST OF WINTER VEIL (winter veil, IDs 3981–3990; Pirate-Token 3973)
+// ============================================================================
+CARDS[3973] = { id: 3973, name: 'Pirate', type: 'Ally', cost: 0, atk: 1, hp: 1, atkType: 'Melee', faction: 'Neutral', race: 'Pirate', allyTypes: ['Pirate'], text: '', isToken: true };
+PRED.winterVeil = c => c.set === 28;   // "[Winter Veil] card": Karte mit dem Set-Symbol Feast of Winter Veil
+// Hardpacked Snowball: "Attach to target hero or ally and exhaust it. <p> Ongoing: Attached character can't attack or protect
+// and has '[Activate] >>> Attach this ability to target hero or ally and exhaust it.'"
+const snowballOn18 = (s, c) => (s.p1.ongoing || []).concat(s.p2.ongoing || []).filter(o => o.id === 3981 && o.attachedTo === c.uid);
+FX[3981] = { slots: slotChar(tr('Ziel (anhängen und erschöpfen)'), true), resolve: (s, it) => { const t = T(it)[0]; it.attachTo = t; const c = t && findCharacter(s, t); if (c) exhaust(s, c); },
+    aura: { kw: (s, src, sp, c, k) => (k === 'cantAttack' || k === 'cantProtect') && src.attachedTo === c.uid,
+        grant: (s, src, sp, c) => src.attachedTo === c.uid ? ['snowball18'] : [] } };
+FX_GRANT.snowball18 = { label: tr('Hardpacked Snowball weiterwerfen (anhängen und erschöpfen)'), act: true,
+    canUse: (s, pid, src) => snowballOn18(s, src).length > 0 || tr('Kein Hardpacked Snowball angehängt'),
+    slots: (s, pid, src) => [{ label: tr('Ziel für den Schneeball'), cands: targetCands(s, pid, { char: true }).filter(u => !src || u !== src.uid), harm: true }],
+    resolve: (s, it) => { const b = snowballOn18(s, { uid: it.src })[0]; const t = T(it)[0]; const c = t && findCharacter(s, t); if (!b || !c) return;
+        b.attachedTo = t; exhaust(s, c); L(s, tr`❄ Hardpacked Snowball trifft ${c.name}.`, '', it.pl); } };
+// Greatfather Winter: "Once per turn: (0) >>> Put a card from your hand into target player's hand. (He owns that card for the rest of the game.)"
+FX[3983] = { powers: [{ key: 'gfw', label: tr('Handkarte in die Hand von Ziel-Spieler'), cost: 0, once: 'turn', modes: playerModes(-1, -2),
+    canUse: (s, pid) => me(s, pid).hand.length > 0 || tr('Keine Handkarte'),
+    resolve: (s, it) => { const p = me(s, it.pl); if (!p.hand.length) return;
+        ask(s, { pid: it.pl, prompt: tr('Greatfather Winter: Welche Handkarte verschenken?'), src: 'Greatfather Winter', opts: p.hand.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -cardHandValue(s, p, c) })), k: '3983:give', a: { pid: it.pl, to: it.mode } }); } }],
+    k: { give: (s, a, u) => { const p = me(s, a.pid), to = me(s, a.to); const i = p.hand.findIndex(c => c.uid === u); if (i < 0) return; const c = p.hand[i];
+        if (to !== p) { p.hand.splice(i, 1); c.owner = to.id; to.hand.push(c); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); }
+        L(s, tr`🎁 Greatfather Winter: ${p.hero.name} schenkt ${to.hero.name} eine Karte.`, '', a.pid); } } };
+// Great-father Winter: "Once per turn: (0) >>> Target player gains control of target ability, ally, or equipment you control."
+FX[3984] = { powers: [{ key: 'gfw2', label: tr('Ziel-Spieler erhält die Kontrolle über eine eigene Karte'), cost: 0, once: 'turn', modes: playerModes(-5, -1),
+    slots: (s, pid) => [{ label: tr('Eigene Fähigkeit, Ally oder Ausrüstung'), cands: nonHeroCards(s, me(s, pid)).map(c => c.uid), harm: false, ai: u => -((findCharacter(s, u) || {}).cost || 0) }],
+    resolve: (s, it) => { const c = T1(s, it); if (!c || it.mode === ctrlOf(s, c)) return;
+        if (isEquip(c)) moveEquip(s, c, it.mode); else if (isAllyLike(c)) changeControl(s, c, it.mode); else moveOngoing(s, c, it.mode); } }] };
+// The Abominable Greench: "If an opponent would draw a card, you draw one instead." (Ersatzeffekt; zwei Greench ersetzen sich nicht endlos)
+DRAW_REPLACE.push((s, p) => { if (s._greench18) return false; const o = getOpponent(s, p.id); if (!alliesOf(o).some(a => a.id === 3985 && active(s, a))) return false;
+    s._greench18 = true; try { L(s, tr`The Abominable Greench: ${o.hero.name} zieht statt ${p.hero.name}.`, '', o.id); drawCards(s, o, 1); } finally { s._greench18 = false; } return true; });
+// Metzen the Reindeer: "Elusive <p> When this ally enters play, target opponent puts three 1/1 Pirate ally tokens into play.
+// <p> If no Pirates are in play: [Activate] >>> Ready target hero or ally."
+const piratesInPlay18 = s => [...alliesOf(s.p1), ...alliesOf(s.p2)].some(raceIs('Pirate'));
+FX[3986] = { enter: (s, c, pid) => { const o = foe(s, pid).id; for (let i = 0; i < 3; i++) makeToken(s, 3973, o); },
+    powers: [actPow('metzen', tr('Ziel bereit machen'), { canUse: s => !piratesInPlay18(s) || tr('Es sind Piraten im Spiel'), slots: slotChar(tr('Ziel'), false, { filter: c => c.exhausted }),
+        resolve: (s, it) => { const t = T1(s, it); if (t) readyCard(s, t); } })] };
+// Gingerbread Cookie: "Destroy this item >>> Each hero heals 7 damage from itself."
+FX[3987] = { powers: [{ key: 'cookie', label: tr('Zerstören: Jeder Held heilt 7'), cost: 0, selfCost: selfDestroyCost,
+    resolve: (s, it) => [s.p1, s.p2].forEach(p => heal(s, p.hero.uid, p.hero.uid, 7)) }] };
+// Mistletoe: "You and another friendly player each exhaust your heroes >>> You and that player each draw a card." – 1 gegen 1 gibt es keinen befreundeten Spieler
+FX[3988] = { powers: [{ key: 'mistle', label: tr('Mit einem befreundeten Spieler: beide ziehen'), cost: 0, canUse: () => tr('Kein befreundeter Spieler (1 gegen 1)'), resolve: () => {} }] };
+// The Reason for the Season: "On your turn: Pay (3) to complete this quest. <p> Reward: Draw a card. If it's December, draw another card." (Monat des echten Datums)
+FX[3989] = { questCond: (s, pid) => s.activePlayer === pid ? null : tr('Nur in deinem Zug'), reward: (s, pid) => drawCards(s, me(s, pid), new Date().getMonth() === 11 ? 2 : 1) };
+// Treats for Great-father Winter: "Reward: Draw a card. Then, you may discard a card named Gingerbread Cookie. If you do, search your deck for a [Winter Veil] card, reveal it, and put it into your hand."
+FX[3990] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); q(s, { op: 'call', k: '3990:ask', a: { pid } }); },
+    k: { ask: (s, a) => { const l = me(s, a.pid).hand.filter(c => c.name === 'Gingerbread Cookie').map(c => c.uid); if (l.length) mayPick(s, a.pid, tr('Treats for Great-father Winter: Gingerbread Cookie abwerfen, um eine [Winter Veil]-Karte zu suchen?'), 'Treats for Great-father Winter', l, '3990:go', a, () => 1); },
+        go: (s, a, u) => { if (!u) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === u); if (!c) return; EK.discardDo(s, {}, u); if (p.hand.includes(c)) return; searchDeck(s, a.pid, 'Treats for Great-father Winter', 'winterVeil'); } } };
+CARD_ISSUES[3982] = '"All allies also have that type": Ein zusätzlicher Typ für alle Allies müsste in jede Typ-Prüfung der Engine (Rasse, Ally-Typ, Pet, Totem …) eingreifen – nicht umgesetzt.';

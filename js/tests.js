@@ -1254,6 +1254,20 @@ function runRuleTests() {
         s5.chainPrep = { kind: 'power', pl: 1, src: owl.uid, key: 'owl' }; EK.prepItemPower(s5);
         const q = ([...(s5._batch || []), ...(s5.queue || [])].find(x => x.op === 'ask') || {}).dec; assert(q && q.opts && q.opts.some(x => x.v === 3), 'Talasite Owl: X = 3 ohne bereite Ressourcen nicht wählbar');
     });
+    test(129, 'Winter Veil: Greench (Ziehen ersetzt), Snowball (kein Angriff, Kraft weiterwerfen), Great-father Winter (Kontrolle); Death Coil nach Klasse des Helden', () => {
+        const s = fresh(); put(s, 2, 3985); const h1 = P(s, 1).hand.length, h2 = P(s, 2).hand.length;
+        drawCards(s, P(s, 1), 1); assert(P(s, 1).hand.length === h1 && P(s, 2).hand.length === h2 + 1, 'Greench: Gegner zieht statt des Spielers nicht');
+        put(s, 1, 3985); drawCards(s, P(s, 1), 1); assert(P(s, 1).hand.length + P(s, 2).hand.length === h1 + h2 + 2, 'Greench auf beiden Seiten: Ziehen hängt oder fällt weg');
+        const s2 = fresh(); const a = put(s2, 2, 262); const b = put(s2, 1, 3981, { attachedTo: a.uid });
+        assert(kwHas(s2, a, 'cantAttack') && kwHas(s2, a, 'cantProtect'), 'Snowball: Ally kann angreifen oder schützen');
+        assert(getPowers(s2, a).some(p => p.grant === 'snowball18'), 'Snowball: angehängter Ally hat die Kraft nicht');
+        const s3 = fresh(); const w = put(s3, 1, 3984); const e = put(s3, 1, 3905);
+        FX[3984].powers[0].resolve(s3, { pl: 1, src: w.uid, mode: 2, targets: [[e.uid]] }); assert(P(s3, 2).hero.weapons.includes(e), 'Great-father Winter: Ausrüstung nicht übergeben');
+        if (typeof dbParseList !== 'function') return;   // Deck-Import (features.js) nur im Browser
+        const dk = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Death Knight'), wl = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Warlock');
+        assert(CARDS[dbParseList(`4 Death Coil\nHero: ${dk.name}`, null).cards[0]].set === 20, 'Death Coil: Todesritter bekommt die Hexenmeister-Karte');
+        assert(CARDS[dbParseList(`Hero: ${wl.name}\n4 Death Coil`, null).cards[0]].set === 3, 'Death Coil: Hexenmeister bekommt die Todesritter-Karte');
+    });
     // ---------------- Set wrathgate
     test(124, 'Wrathgate: "Lesson of …" (Klassen-Ally erschöpfen statt bezahlen), Eitrigg (alles Unique), Frost Fever (kein Assault/Mend)', () => {
         const s = freshH(12010, 13); const r = put(s, 1, Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && isClassCardData(c, 'Rogue') && !FX[c.id].on && !FX[c.id].aura && !FX[c.id].powers).sort((a, b) => (a.text || '').length - (b.text || '').length)[0].id);

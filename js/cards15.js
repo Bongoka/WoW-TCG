@@ -467,3 +467,35 @@ const OCR27 = {
 };
 Object.assign(OCR, OCR27);
 applyOCR(OCR27);
+
+// ============================================================================
+// KARTENDATEN – Feast of Winter Veil (Set 28, Karten-IDs 3981–3990)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx28.js (FX[id]).
+// ============================================================================
+Ab(3981,"Hardpacked Snowball",3,null,null,"Attach to target hero or ally and exhaust it. <p> Ongoing: Attached character can't attack or protect and has \"[Activate] >>> Attach this ability to target hero or ally and exhaust it.\"",{set:28,num:1,rarity:'Rare',attach:true,instant:true,ongoing:true});
+Ab(3982,"PX-238 Winter Wondervolt",3,null,null,"Ongoing: As this ability enters play, choose an ally type. <p> All allies also have that type. (Examples of types are Chicken, Demon, Druid, Gnome, and Yeti.)",{set:28,num:2,rarity:'Rare',ongoing:true});
+A(3983,"Greatfather Winter",4,2,'Melee',5,'Alliance',"Dwarf","","Once per turn: (0) >>> Put a card from your hand into target player's hand. (He owns that card for the rest of the game.)",{set:28,num:3,rarity:'Rare',allyTypes:["Dwarf"],unique:true});
+A(3984,"Great-father Winter",4,3,'Melee',4,'Horde',"Orc","","Once per turn: (0) >>> Target player gains control of target ability, ally, or equipment you control.",{set:28,num:4,rarity:'Rare',allyTypes:["Orc"],unique:true});
+A(3985,"The Abominable Greench",9,7,'Melee',5,'Neutral',"Yeti","","If an opponent would draw a card, you draw one instead.",{set:28,num:5,rarity:'Rare',allyTypes:["Yeti"],unique:true});
+A(3986,"Metzen the Reindeer",1,0,'Melee',2,'Neutral',"Reindeer","","Elusive <p> When this ally enters play, target opponent puts three 1 [Melee] / 1 [Health] Pirate ally tokens into play. <p> If no Pirates are in play: [Activate] >>> Ready target hero or ally.",{set:28,num:6,rarity:'Rare',allyTypes:["Reindeer"],elusive:true,unique:true});
+It(3987,"Gingerbread Cookie",3,null,0,'Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Destroy this item >>> Each hero heals 7 damage from itself.",{set:28,num:7,rarity:'Rare',itemSub:'Cookie'});
+It(3988,"Mistletoe",3,null,0,'Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"You and another friendly player each exhaust your heroes >>> You and that player each draw a card.",{set:28,num:8,rarity:'Rare'});
+Q(3989,"The Reason for the Season",'Neutral',3,"On your turn: Pay (3) to complete this quest. <p> Reward: Draw a card. If it's December, draw another card.",{set:28,num:9,rarity:'Rare'});
+Q(3990,"Treats for Great-father Winter",'Neutral',3,"Pay (3) to complete this quest. <p> Reward: Draw a card. Then, you may discard a card named Gingerbread Cookie. If you do, search your deck for a [Winter Veil] card, reveal it, and put it into your hand.",{set:28,num:10,rarity:'Rare'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR28 = {
+3981:["Instant Ability","Attach to target hero or ally and exhaust it. <p> Ongoing: Attached character can't attack or protect and has \"[Activate] >>> Attach this ability to target hero or ally and exhaust it.\""],
+3982:["Ability","Ongoing: As this ability enters play, choose an ally type. <p> All allies also have that type. (Examples of types are Chicken, Demon, Druid, Gnome, and Yeti.)"],
+3983:["Ally—Dwarf, Unique, 2 [Melee] / 5 Health","Once per turn: (0) >>> Put a card from your hand into target player's hand. (He owns that card for the rest of the game.)"],
+3984:["Ally—Orc, Unique, 3 [Melee] / 4 Health","Once per turn: (0) >>> Target player gains control of target ability, ally, or equipment you control."],
+3985:["Ally—Yeti, Unique, 7 [Melee] / 5 Health","If an opponent would draw a card, you draw one instead."],
+3986:["Ally—Reindeer, Unique, 0 [Melee] / 2 Health","Elusive <p> When this ally enters play, target opponent puts three 1 [Melee] / 1 [Health] Pirate ally tokens into play. <p> If no Pirates are in play: [Activate] >>> Ready target hero or ally."],
+3987:["Equipment—Item—Cookie","Destroy this item >>> Each hero heals 7 damage from itself."],
+3988:["Equipment—Item","You and another friendly player each exhaust your heroes >>> You and that player each draw a card."],
+3989:["Quest","On your turn: Pay (3) to complete this quest. <p> Reward: Draw a card. If it's December, draw another card."],
+3990:["Quest","Pay (3) to complete this quest. <p> Reward: Draw a card. Then, you may discard a card named Gingerbread Cookie. If you do, search your deck for a [Winter Veil] card, reveal it, and put it into your hand."],
+};
+Object.assign(OCR, OCR28);
+applyOCR(OCR28);

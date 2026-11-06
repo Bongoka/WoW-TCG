@@ -88,8 +88,10 @@ FX[3022] = { aura: { atk: (s, src, sp, c) => {
     return 0; } } };
 FX[3023] = { aura: { hp: (s, src, sp, c) => isAllyLike(c) && ctrlOf(s, c) === sp ? 2 : 0 } };
 FX[3024] = { powers: [{ key: 'pack', label: tr('Ausrüstung abwerfen: Ziehe 1'), act: true, canUse: (s, pid) => me(s, pid).hand.some(isEquip) || tr('Keine Ausrüstung auf der Hand'),
-    payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('Onyxia Hide Backpack: Welche Ausrüstung abwerfen?'), src: 'Onyxia Hide Backpack', opts: p.hand.filter(isEquip).map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: '278:pay', a: {} }); },
-    resolve: (s, it) => drawCards(s, me(s, it.pl), 1), aiSkip: () => true }] };
+    payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('Onyxia Hide Backpack: Welche Ausrüstung abwerfen?'), src: 'Onyxia Hide Backpack', opts: p.hand.filter(isEquip).map(c => ({ label: c.name, v: c.uid, ai: -handCardValue(s, p, c) })), k: '278:pay', a: {} }); },
+    resolve: (s, it) => drawCards(s, me(s, it.pl), 1),
+    // KI: mit zwei oder mehr Ausrüstungen auf der Hand oder einer, die wenig wert ist (unspielbar, billig im Lategame) – die schwächste wird abgeworfen
+    aiSkip: (s, pid) => { const p = me(s, pid), eq = p.hand.filter(isEquip); return !(eq.length >= 2 || eq.some(c => handCardValue(s, p, c) <= 2.6)); } }] };
 FX[3025] = { aura: { atk: (s, src, sp, c, ctx) => isAllyLike(c) && ctrlOf(s, c) === sp && ctx.attacking ? 2 : 0 } };
 // Ring of Binding: Ziele sind beim Bezahlen bekannt (getPlayCost … targets)
 FX[3026] = { aura: { cost: (s, src, sp, pid, card, targets) => pid !== sp && card.type === 'Ability' && (targets || []).flat().includes(heroOf(s, sp).uid) ? 1 : 0 } };
