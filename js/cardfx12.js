@@ -65,8 +65,7 @@ function mendList(s, c) {
     const g = s._mendIn || (s._mendIn = []); if (g.includes(c.uid)) return [];   // Zirkel (zwei Soulseeker Huulo) – gilt nicht für sich selbst
     g.push(c.uid); try { return mendList0(s, c); } finally { g.pop(); if (!g.length) delete s._mendIn; }
 }
-// "lose and can't have Assault and Mend" (Frost Fever, Set wrathgate): (s, c) => true
-const NO_ASSAULT_MEND = [];
+// "lose and can't have Assault and Mend" (Frost Fever, Set wrathgate): NO_ASSAULT_MEND steht in cardfx.js (wird schon in cardfx8.js gebraucht)
 function mendList0(s, c) {
     if (NO_ASSAULT_MEND.length && NO_ASSAULT_MEND.some(f => f(s, c))) return [];
     const out = [];

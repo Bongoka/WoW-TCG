@@ -20,6 +20,9 @@ const foe = (s, pid) => getOpponent(s, pid);
 const heroOf = (s, pid) => getPlayer(s, pid).hero;
 const CH = { char: true };
 const ALLY = { ally: true };
+// Früh definiert, weil schon ältere Set-Dateien sie beim Laden brauchen (cardfx6: Gurok, cardfx8: Alashon, Gloves of the High Magus)
+const actPow = (key, label, o) => ({ key, label, act: true, ...o });                  // "[Activate] >>> …"
+const NO_ASSAULT_MEND = [];                                                              // "lose and can't have Assault and Mend": (s, c) => true
 const slotChar = (label, harm, extra = {}) => (s, pid) => [{ label, cands: targetCands(s, pid, { char: true, ...extra }), harm }];
 const slotAlly = (label, harm, extra = {}) => (s, pid) => [{ label, cands: targetCands(s, pid, { ally: true, ...extra }), harm }];
 // "Your hero deals X damage"

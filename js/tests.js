@@ -1234,6 +1234,11 @@ function runRuleTests() {
         assert(atkOf(s5, h, {}) === at0 + 1, 'Emmi Sprinklestrike: Rückseite ohne 1 ATK');
         const s6 = freshH(3602, 15); const k = P(s6, 1).hero; k.flipped = true; assert(hpOf(s6, k) === 40, `Kauno Stonehoof: Rückseite ${hpOf(s6, k)} statt 40 Leben`);
     });
+    // Ladeabbruch (Hilfsfunktion erst in einer später geladenen Datei definiert): Karten am Ende von cardfx6/cardfx8 fehlten
+    test(127, 'Alle Karten-Dateien vollständig geladen (Karten am Dateiende vorhanden)', () => {
+        for (const id of [4304, 6209, 7234, 8208, 10208, 11270, 12219, 13218, 3530]) assert(FX[id] || CARD_ISSUES[id] || !CARDS[id], `FX[${id}] fehlt – Datei wurde nicht bis zum Ende geladen`);
+        assert(!!CARD_ISSUES[4307], 'CARD_ISSUES am Ende von cardfx6.js fehlt');
+    });
     // ---------------- Set wrathgate
     test(124, 'Wrathgate: "Lesson of …" (Klassen-Ally erschöpfen statt bezahlen), Eitrigg (alles Unique), Frost Fever (kein Assault/Mend)', () => {
         const s = freshH(12010, 13); const r = put(s, 1, Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && isClassCardData(c, 'Rogue') && !FX[c.id].on && !FX[c.id].aura && !FX[c.id].powers).sort((a, b) => (a.text || '').length - (b.text || '').length)[0].id);

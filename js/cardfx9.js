@@ -414,7 +414,6 @@ function taxInterrupt(s, uid, n, srcName) {
 }
 EK.taxDo = (s, a, v) => { const x = (s.chain || []).find(i => i.card && i.card.uid === a.uid); if (!x) return; if (v && payRes(me(s, x.pl), a.n)) return; interruptUid(s, a.uid); };
 const chainSlot = (label) => (s, pid) => [{ label, cands: chainCards(s, () => true), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }];
-const actPow = (key, label, o) => ({ key, label, act: true, ...o });
 // "Discard a card" als Zusatzkosten einer Kraft
 const discardCost = (id, extra) => (s, it) => { const p = me(s, it.pl); if (!p.hand.length) return abortPrep(s, tr('Keine Karte zum Abwerfen'));
     ask(s, { pid: it.pl, prompt: tr`${CARDS[id].name}: Karte abwerfen`, src: CARDS[id].name, opts: p.hand.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -cardHandValue(s, p, c) })), k: 'E:discardCostDo', a: { extra: extra || null } }); };
