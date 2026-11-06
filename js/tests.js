@@ -1239,6 +1239,21 @@ function runRuleTests() {
         for (const id of [4304, 6209, 7234, 8208, 10208, 11270, 12219, 13218, 3530]) assert(FX[id] || CARD_ISSUES[id] || !CARDS[id], `FX[${id}] fehlt – Datei wurde nicht bis zum Ende geladen`);
         assert(!!CARD_ISSUES[4307], 'CARD_ISSUES am Ende von cardfx6.js fehlt');
     });
+    test(128, 'Crafted-Karten: Felsteel Reaper, Swiftsteel Bracers, Eternium Runed Blade, Flying Carpet (mehrere Locations), Ebonweave Robe, Talasite Owl (X ohne Mana)', () => {
+        const s = fresh(); res(s, 1, 4); const w = put(s, 1, 3905);
+        assert(weaponAtk(s, w, {}) === P(s, 1).resources.length, `Felsteel Reaper: ATK ${weaponAtk(s, w, {})} statt ${P(s, 1).resources.length}`);
+        const sc = strikeCost(s, P(s, 1), w); put(s, 1, 3913); assert(strikeCost(s, P(s, 1), w) === Math.max(0, sc - 5), 'Swiftsteel Bracers: Schlagkosten nicht um 5 gesenkt');
+        const s2 = fresh(); const i = hand(s2, 2, 262); put(s2, 1, 3908); assert(!!playBlocked(s2, 2, P(s2, 2).hand[i]), 'Eternium Runed Blade: Gegner kann Allies spielen');
+        const a = put(s2, 2, 262); destroy(s2, a); assert(P(s2, 2).allies.includes(a), 'Eternium Runed Blade: Ally wurde zerstört');
+        const s3 = fresh(); const loc = Object.values(CARDS).filter(c => c.type === 'Location' && !c.isToken).slice(0, 2).map(c => c.id);
+        loc.forEach(id => P(s3, 1).resources.push({ card: makeCardInst(id, false, 1), faceUp: true, exhausted: false }));
+        put(s3, 1, 3953); process(s3); autoResolve(s3); assert(locsOf(P(s3, 1)).length === 2, 'Magnificent Flying Carpet: zweite Location wurde umgedreht');
+        const s4 = fresh(); put(s4, 1, 3942); const e = put(s4, 2, 262);
+        const o = { src: e.uid, tgt: P(s4, 1).hero.uid, amt: 2, dt: 'Melee' }; DMG_PRE.forEach(f => f(s4, o)); assert(o.dt === 'Shadow', `Ebonweave Robe: Schadensart ${o.dt} statt Shadow`);
+        const s5 = fresh(); P(s5, 1).resources.forEach(r => { r.exhausted = true; }); const owl = put(s5, 1, 3914); owl.counters = { hoot: 3 };
+        s5.chainPrep = { kind: 'power', pl: 1, src: owl.uid, key: 'owl' }; EK.prepItemPower(s5);
+        const q = ([...(s5._batch || []), ...(s5.queue || [])].find(x => x.op === 'ask') || {}).dec; assert(q && q.opts && q.opts.some(x => x.v === 3), 'Talasite Owl: X = 3 ohne bereite Ressourcen nicht wählbar');
+    });
     // ---------------- Set wrathgate
     test(124, 'Wrathgate: "Lesson of …" (Klassen-Ally erschöpfen statt bezahlen), Eitrigg (alles Unique), Frost Fever (kein Assault/Mend)', () => {
         const s = freshH(12010, 13); const r = put(s, 1, Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && isClassCardData(c, 'Rogue') && !FX[c.id].on && !FX[c.id].aura && !FX[c.id].powers).sort((a, b) => (a.text || '').length - (b.text || '').length)[0].id);

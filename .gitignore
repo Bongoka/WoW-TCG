@@ -604,6 +604,34 @@ cards/* scans small/
 /cards/azeroth/AZEROTH-97 Eviscerate.webp
 /cards/azeroth/AZEROTH-98 Expose Armor.webp
 /cards/azeroth/AZEROTH-99 Gouge.webp
+/cards/bc crafted small/BC CRAFTED-1 Black Felsteel Bracers.webp
+/cards/bc crafted small/BC CRAFTED-10 Belt of Deep Shadow.webp
+/cards/bc crafted small/BC CRAFTED-11 Alchemist's Stone.webp
+/cards/bc crafted small/BC CRAFTED-12 Bindings of Lightning Reflexes.webp
+/cards/bc crafted small/BC CRAFTED-13 Swiftsteel Bracers.webp
+/cards/bc crafted small/BC CRAFTED-14 Talasite Owl.webp
+/cards/bc crafted small/BC CRAFTED-2 Cobrascale Hood.webp
+/cards/bc crafted small/BC CRAFTED-3 Girdle of Ruination.webp
+/cards/bc crafted small/BC CRAFTED-4 Netherdrake Gloves.webp
+/cards/bc crafted small/BC CRAFTED-5 Felsteel Reaper.webp
+/cards/bc crafted small/BC CRAFTED-6 Bracers of the Green Fortress.webp
+/cards/bc crafted small/BC CRAFTED-7 Spellstrike Hood.webp
+/cards/bc crafted small/BC CRAFTED-8 Eternium Runed Blade.webp
+/cards/bc crafted small/BC CRAFTED-9 Belt of Blasting.webp
+/cards/bc crafted/BC CRAFTED-1 Black Felsteel Bracers.webp
+/cards/bc crafted/BC CRAFTED-10 Belt of Deep Shadow.webp
+/cards/bc crafted/BC CRAFTED-11 Alchemist's Stone.webp
+/cards/bc crafted/BC CRAFTED-12 Bindings of Lightning Reflexes.webp
+/cards/bc crafted/BC CRAFTED-13 Swiftsteel Bracers.webp
+/cards/bc crafted/BC CRAFTED-14 Talasite Owl.webp
+/cards/bc crafted/BC CRAFTED-2 Cobrascale Hood.webp
+/cards/bc crafted/BC CRAFTED-3 Girdle of Ruination.webp
+/cards/bc crafted/BC CRAFTED-4 Netherdrake Gloves.webp
+/cards/bc crafted/BC CRAFTED-5 Felsteel Reaper.webp
+/cards/bc crafted/BC CRAFTED-6 Bracers of the Green Fortress.webp
+/cards/bc crafted/BC CRAFTED-7 Spellstrike Hood.webp
+/cards/bc crafted/BC CRAFTED-8 Eternium Runed Blade.webp
+/cards/bc crafted/BC CRAFTED-9 Belt of Blasting.webp
 /cards/betrayer small/BETRAYER-100 Maelstrom Weapon.webp
 /cards/betrayer small/BETRAYER-101 Shamanistic Dual Wield.webp
 /cards/betrayer small/BETRAYER-102 Stoneskin Totem.webp
@@ -2046,6 +2074,12 @@ cards/* scans small/
 /cards/drums/DRUMS-96 Eagle Sight.webp
 /cards/drums/DRUMS-98 Fire and Ice.webp
 /cards/drums/DRUMS-99 Immobilize.webp
+/cards/gladiator crafted small/GLADIATORS CRAFTED-1 Battlecast Pants.webp
+/cards/gladiator crafted small/GLADIATORS CRAFTED-2 Cloak of Darkness.webp
+/cards/gladiator crafted small/GLADIATORS CRAFTED-3 Shadowprowler's Chestguard.webp
+/cards/gladiator crafted/GLADIATORS CRAFTED-1 Battlecast Pants.webp
+/cards/gladiator crafted/GLADIATORS CRAFTED-2 Cloak of Darkness.webp
+/cards/gladiator crafted/GLADIATORS CRAFTED-3 Shadowprowler's Chestguard.webp
 /cards/gladiator small/GLADIATORS-100 Gladiator Katianna.webp
 /cards/gladiator small/GLADIATORS-101 Gladiator Keward.webp
 /cards/gladiator small/GLADIATORS-102 Gladiator Kinivus.webp
@@ -2412,6 +2446,12 @@ cards/* scans small/
 /cards/grand melee/GRAND MELEE-7 Power Word - Courage.webp
 /cards/grand melee/GRAND MELEE-8 Shadow Tactics.webp
 /cards/grand melee/GRAND MELEE-9 Maelstrom of Steel.webp
+/cards/honor crafted small/HONOR CRAFTED-1 Fletcher's Gloves of the Phoenix.webp
+/cards/honor crafted small/HONOR CRAFTED-2 Gloves of Immortal Dusk.webp
+/cards/honor crafted small/HONOR CRAFTED-3 Sunfire Handwraps.webp
+/cards/honor crafted/HONOR CRAFTED-1 Fletcher's Gloves of the Phoenix.webp
+/cards/honor crafted/HONOR CRAFTED-2 Gloves of Immortal Dusk.webp
+/cards/honor crafted/HONOR CRAFTED-3 Sunfire Handwraps.webp
 /cards/honor small/HONOR-100 Gromble the Apt.webp
 /cards/honor small/HONOR-102 Illiyana Moonblaze.webp
 /cards/honor small/HONOR-103 Iravar.webp
@@ -2590,6 +2630,12 @@ cards/* scans small/
 /cards/honor/HONOR-97 Dimzer the Prestidigitator.webp
 /cards/honor/HONOR-98 Durgle Wizzledab.webp
 /cards/honor/HONOR-99 Endina the Hunted.webp
+/cards/icecrown crafted small/ICECROWN CRAFTED-1 Trollwoven Spaulders.webp
+/cards/icecrown crafted small/ICECROWN CRAFTED-2 Gnomish Poultryizer.webp
+/cards/icecrown crafted small/ICECROWN CRAFTED-3 Titanium Frostguard Ring.webp
+/cards/icecrown crafted/ICECROWN CRAFTED-1 Trollwoven Spaulders.webp
+/cards/icecrown crafted/ICECROWN CRAFTED-2 Gnomish Poultryizer.webp
+/cards/icecrown crafted/ICECROWN CRAFTED-3 Titanium Frostguard Ring.webp
 /cards/icecrown small/ICECROWN-100 Bronwyn Lightborn.webp
 /cards/icecrown small/ICECROWN-103 Hazlow Mudshuggle.webp
 /cards/icecrown small/ICECROWN-104 Jaina, Lady of Theramore.webp
@@ -4176,6 +4222,12 @@ cards/* scans small/
 /cards/outland/OUTLAND-97 Spell Reflection.webp
 /cards/outland/OUTLAND-98 Strength of Arms.webp
 /cards/outland/OUTLAND-99 Victory Rush.webp
+/cards/scourgewar crafted small/SCOURGEWAR CRAFTED-1 Boots of Utter Darkness.webp
+/cards/scourgewar crafted small/SCOURGEWAR CRAFTED-2 Ebonweave Robe.webp
+/cards/scourgewar crafted small/SCOURGEWAR CRAFTED-3 Khorium Boar.webp
+/cards/scourgewar crafted/SCOURGEWAR CRAFTED-1 Boots of Utter Darkness.webp
+/cards/scourgewar crafted/SCOURGEWAR CRAFTED-2 Ebonweave Robe.webp
+/cards/scourgewar crafted/SCOURGEWAR CRAFTED-3 Khorium Boar.webp
 /cards/scourgewar small/SCOURGEWAR-100 Rhuunom.webp
 /cards/scourgewar small/SCOURGEWAR-103 Terrifying Visage.webp
 /cards/scourgewar small/SCOURGEWAR-106 Gushing Wound.webp
@@ -4456,6 +4508,12 @@ cards/* scans small/
 /cards/scourgewar/SCOURGEWAR-96 Dreadsteed.webp
 /cards/scourgewar/SCOURGEWAR-98 Jek'kresh.webp
 /cards/scourgewar/SCOURGEWAR-99 Offering to the Nether.webp
+/cards/wrathgate crafted small/WRATHGATE CRAFTED-1 Belt of the Black Eagle.webp
+/cards/wrathgate crafted small/WRATHGATE CRAFTED-2 Deathchill Cloak.webp
+/cards/wrathgate crafted small/WRATHGATE CRAFTED-3 Magnificent Flying Carpet.webp
+/cards/wrathgate crafted/WRATHGATE CRAFTED-1 Belt of the Black Eagle.webp
+/cards/wrathgate crafted/WRATHGATE CRAFTED-2 Deathchill Cloak.webp
+/cards/wrathgate crafted/WRATHGATE CRAFTED-3 Magnificent Flying Carpet.webp
 /cards/wrathgate small/WRATHGATE-102 Landro's Gift.webp
 /cards/wrathgate small/WRATHGATE-105 Arlen the Untamed.webp
 /cards/wrathgate small/WRATHGATE-107 Ayluro Nightwind.webp

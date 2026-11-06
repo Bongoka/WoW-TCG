@@ -628,3 +628,165 @@ FX[3802] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr('Tankatronic Goggles
 FX[3803] = { powers: [actPow('rocket', tr('Oberste Deckkarte entfernen: Fernkampfschaden in Höhe ihrer Kosten'), { slots: slotAlly(tr('Ziel-Ally'), true),
     resolve: (s, it) => { const p = me(s, it.pl); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.deckOwner || p.id); p.removed.push(c); L(s, tr`${c.name} wird aus dem Spiel entfernt.`, '', it.pl);
         const t = T(it)[0]; const n = c.cost || 0; if (t && n > 0) heroDmg(s, it.pl, t, n, 'Ranged', { ability: false }); } })] };
+
+// ============================================================================
+// CRAFTED-KARTEN: Burning Crusade Crafted (bc crafted, 3901–3914), Blood of Gladiators Crafted (gladiator crafted, 3921–3923),
+// Fields of Honor Crafted (honor crafted, 3931–3933), Scourgewar Crafted (scourgewar crafted, 3941–3943),
+// Wrathgate Crafted (wrathgate crafted, 3951–3953), Icecrown Crafted (icecrown crafted, 3961–3963); Tokens 3971–3972
+// ============================================================================
+Object.assign(CARDS, {
+    3971: { id: 3971, name: 'Netherdrake', type: 'Ally', cost: 0, atk: 3, hp: 3, atkType: 'Melee', faction: 'Neutral', race: 'Netherdrake', allyTypes: ['Netherdrake'], text: '', isToken: true },
+    3972: { id: 3972, name: 'Frozen Elemental', type: 'Ally', cost: 0, atk: 10, hp: 10, atkType: 'Frost', faction: 'Neutral', race: 'Elemental', allyTypes: ['Elemental'], unique: true, text: 'Frost Resistance', isToken: true },
+});
+// "<Beruf> Hero Required" (engine.js heroReqOk über profReq)
+for (const [id, p] of [[3911, 'Alchemy'], [3914, 'Jewelcrafting'], [3941, 'Leatherworking'], [3943, 'Jewelcrafting'], [3953, 'Tailoring'], [3962, 'Engineering']]) CARDS[id].profReq = p;
+const resistHero17 = dt => ({ prevent: (s, src, sp, t, from, o, amt) => t.uid === heroOf(s, sp).uid && o.dt === dt && !resistLost(s, t) ? amt : 0 });
+const cnt17 = (c, k) => ((c && c.counters) || {})[k] || 0;
+const takeCounters17 = (c, k, n) => { if (!c) return; c.counters = { ...(c.counters || {}) }; c.counters[k] = Math.max(0, (c.counters[k] || 0) - n); };
+
+// ---------------------------------------------------------------- Burning Crusade Crafted
+// Black Felsteel Bracers: "[Activate] >>> Put a +1 ATK counter on target weapon."
+FX[3901] = { powers: [actPow('bfb', tr('+1 ATK-Zähler auf Ziel-Waffe'), { slots: (s, pid) => [{ label: tr('Ziel-Waffe'), cands: targetCands(s, pid, { equipment: true, filter: c => c.type === 'Weapon' }), harm: false,
+        ai: u => { const w = findCharacter(s, u); return w && ctrlOf(s, w) === pid ? 3 : -5; } }],
+    resolve: (s, it) => { const w = T1(s, it); if (w) addCounter(s, w, 'atk1', 1); } })] };
+// Cobrascale Hood: "At the start of your turn, your hero deals 2 nature damage to each opposing hero for each face-up resource its controller has."
+FX[3902] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3902, k: 'go', a: { pid } }); } },
+    k: { go: (s, a) => { const o = foe(s, a.pid); const n = o.resources.filter(r => r.faceUp).length; if (n > 0) heroDmg(s, a.pid, o.hero.uid, 2 * n, 'Nature', { ability: false }); } } };
+// Girdle of Ruination: "At the start of your turn, destroy the ability, ally, or equipment with the lowest cost. If two or more are tied, destroy all with that cost."
+FX[3903] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3903, k: 'go', a: { pid } }); } },
+    k: { go: (s, a) => { const all = [...nonHeroCards(s, s.p1), ...nonHeroCards(s, s.p2)]; if (!all.length) return;
+        const m = Math.min(...all.map(c => c.cost || 0)); all.filter(c => (c.cost || 0) === m).forEach(c => destroy(s, c)); } } };
+// Netherdrake Gloves: "[Activate], Destroy this armor >>> Put a 3 [Melee] / 3 [Health] Netherdrake ally token into play."
+FX[3904] = { powers: [actPow('ndrake', tr('Zerstören: 3/3 Netherdrake-Token'), { selfCost: selfDestroyCost, resolve: (s, it) => makeToken(s, 3971, it.pl) })] };
+// Felsteel Reaper: "This weapon has +1 ATK for each resource you control."
+FX[3905] = { aura: { watk: (s, src, sp, w) => w.uid === src.uid ? me(s, sp).resources.length : 0 } };
+// Spellstrike Hood: "(2), [Activate] >>> When you next play a nonOngoing ability this turn, copy it. (You may choose new targets for the copy.)"
+FX[3907] = { powers: [actPow('sstrike', tr('Nächste Nicht-Ongoing-Fähigkeit in diesem Zug kopieren'), { cost: 2, resolve: (s, it) => addPE(s, it.pl, { k: 'spellstrike17' }) })] };
+onEvt('cardPlayed', (s, d) => { if (d.card.type !== 'Ability' || d.card.ongoing || d.card.isCopy) return;
+    const m = pes(s, d.pid, 'spellstrike17').find(x => !x.used && x.turn === s.turn); if (!m) return; m.used = true;
+    pushTrig(s, d.pid, 3907, [{ op: 'call', k: 'E:spellstrike17', a: { pid: d.pid, card: d.card.uid } }]); });
+EK.spellstrike17 = (s, a) => copyChainCard(s, a.pid, a.card, 'Spellstrike Hood');
+// Eternium Runed Blade: "Players can't play allies. <p> Allies can't be destroyed."
+FX[3908] = { aura: { noPlay: (s, src, sp, pid, card) => isAllyCard(card) ? tr('Eternium Runed Blade: Niemand kann Allies spielen') : null,
+    kw: (s, src, sp, c, k) => k === 'indestructible' && isAllyLike(c) } };
+// Belt of Blasting: "(X), Exhaust your hero >>> Your hero deals X arcane damage to target hero or ally."
+FX[3909] = { powers: [{ key: 'blast', label: tr('Held erschöpfen: X Arkanschaden'), cost: 'X', xRange: (s, pid) => ({ min: 1, max: getReadyRes(me(s, pid)) }), exhaustHero: true,
+    slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t && it.x > 0) heroDmg(s, it.pl, t, it.x, 'Arcane', { ability: false }); } }] };
+// Belt of Deep Shadow: "Your hero has Stealth. <p> If your hero would deal combat damage, it deals that much +2 instead."
+FX[3910] = { aura: { kw: (s, src, sp, c, k) => k === 'stealth' && c.uid === heroOf(s, sp).uid,
+    dmgOut: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && o && o.combat ? 2 : 0 } };
+// Alchemist's Stone: "Alchemy Hero Required <p> [Activate] >>> Reveal the top card of your deck. You may discard a card with a different type. If you do, put that revealed card into your hand."
+const cardType17 = c => isEquip(c) ? 'Equipment' : c.type;   // CR: Waffe, Rüstung und Gegenstand sind alle "Equipment"
+FX[3911] = { powers: [actPow('alch', tr('Oberste Karte aufdecken, Handkarte anderen Typs abwerfen: aufgedeckte nehmen'), {
+    resolve: (s, it) => { const p = me(s, it.pl); if (!p.deck.length) return; const top = p.deck[p.deck.length - 1]; L(s, tr`👁 ${p.hero.name} deckt auf: ${CARDS[top].name}`);
+        const l = p.hand.filter(c => cardType17(c) !== cardType17(CARDS[top])).map(c => c.uid); if (!l.length) return;
+        mayPick(s, it.pl, tr`Alchemist's Stone: Karte abwerfen, um ${CARDS[top].name} auf die Hand zu nehmen?`, "Alchemist's Stone", l, '3911:go', { pid: it.pl, top },
+            u => { const c = p.hand.find(x => x.uid === u); return (CARDS[top].cost || 0) - (c ? c.cost || 0 : 0) - 1; }); } })],
+    k: { go: (s, a, u) => { if (!u) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === u); if (!c) return; EK.discardDo(s, {}, u); if (p.hand.includes(c)) return;
+        if (p.deck.length && p.deck[p.deck.length - 1] === a.top) { p.hand.push(makeCardInst(p.deck.pop(), false, p.id)); L(s, tr`${p.hero.name} nimmt ${CARDS[a.top].name} auf die Hand.`, '', a.pid); } } } };
+// Bindings of Lightning Reflexes: "When you play an ability, add a bolt counter. <p> Heroes and allies in combat with your hero have -1 ATK for each bolt counter."
+FX[3912] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 3912, k: 'add', a: { uid: c.uid } }); } },
+    k: { add: (s, a) => addCounter(s, findCharacter(s, a.uid), 'bolt', 1) },
+    aura: { atk: (s, src, sp, c) => { const b = s.battle; if (!b || !cnt17(src, 'bolt')) return 0; const h = heroOf(s, sp).uid;
+        return (b.att === h && b.def === c.uid) || (b.def === h && b.att === c.uid) ? -cnt17(src, 'bolt') : 0; } } };
+// Swiftsteel Bracers: "You pay (5) less to strike with weapons."
+FX[3913] = { aura: { strike: (s, src, sp, pid) => pid === sp ? -5 : 0 } };
+// Talasite Owl: "Jewelcrafting Hero Required <p> [Activate] >>> Add a hoot counter. <p> [Activate], Remove X hoot counters, destroy this item >>> Ready X resources you control."
+FX[3914] = { powers: [actPow('hoot', tr('Hoot-Zähler hinzufügen'), { resolve: (s, it) => addCounter(s, findCharacter(s, it.src), 'hoot', 1) }),
+    actPow('owl', tr('X Hoot-Zähler entfernen, zerstören: X Ressourcen bereit machen'), { xRange: (s, pid, src) => ({ min: 1, max: cnt17(src, 'hoot') }),
+        canUse: (s, pid, src) => cnt17(src, 'hoot') > 0 || tr('Keine Hoot-Zähler'),
+        selfCost: (s, it, src) => { takeCounters17(src, 'hoot', it.x || 0); destroy(s, src, { cause: 'cost' }); },
+        resolve: (s, it) => q(s, { op: 'call', k: 'E:readyRes17', a: { pid: it.pl, n: it.x || 0, src: 'Talasite Owl' } }) })] };
+// "Ready X resources you control": der Spieler wählt, welche erschöpften Ressourcen
+EK.readyRes17 = (s, a) => { const p = me(s, a.pid); const l = p.resources.filter(r => r.exhausted); if (a.n <= 0 || !l.length) return;
+    if (l.length <= a.n) { l.forEach(r => readyRes17(s, r)); return; }
+    mustPick(s, a.pid, tr`${a.src}: Welche Ressource bereit machen? (noch ${a.n})`, a.src, l.map(r => r.card.uid), 'E:readyRes17b', a, u => { const r = p.resources.find(x => x.card.uid === u); return r && r.faceUp ? 2 : 1; }); };
+EK.readyRes17b = (s, a, u) => { const r = me(s, a.pid).resources.find(x => x.card.uid === u); if (r) readyRes17(s, r); q(s, { op: 'call', k: 'E:readyRes17', a: { ...a, n: a.n - 1 } }); };
+function readyRes17(s, r) { if (!r.exhausted || auraAny(s, 'noReady', r.card) || READY_BLOCK.some(f => f(s, r.card))) return; r.exhausted = false; }
+
+// ---------------------------------------------------------------- Blood of Gladiators Crafted
+// Battlecast Pants: "[Activate] >>> Cards in your hand are instant this turn until you play a card." (wie Presence of Mind: handInstant)
+FX[3921] = { powers: [actPow('bcpants', tr('Handkarten sind Instant, bis du eine Karte spielst'), { resolve: (s, it) => addPE(s, it.pl, { k: 'handInstant' }) })] };
+// Cloak of Darkness: "[Activate] >>> Add a +1 [DEF] counter. <p> [Activate], Remove all +1 [DEF] counters >>> Your hero deals 1 shadow damage to target hero or ally for each counter removed this way."
+FX[3922] = { powers: [actPow('cdef', tr('+1 [DEF]-Zähler hinzufügen'), { resolve: (s, it) => addCounter(s, findCharacter(s, it.src), 'def', 1) }),
+    actPow('cdmg', tr('Alle +1 [DEF]-Zähler entfernen: 1 Schatten je Zähler'), { canUse: (s, pid, src) => cnt17(src, 'def') > 0 || tr('Keine +1 [DEF]-Zähler'),
+        selfCost: (s, it, src) => { it.n17 = cnt17(src, 'def'); takeCounters17(src, 'def', it.n17); }, slots: slotChar(tr('Ziel'), true),
+        resolve: (s, it) => { const t = T(it)[0]; if (t && it.n17 > 0) heroDmg(s, it.pl, t, it.n17, 'Shadow', { ability: false }); } })] };
+// Shadowprowler's Chestguard: "Your hero has +1 ATK while attacking for each hero and ally you control with Stealth."
+FX[3923] = { aura: { atk: (s, src, sp, c) => { const h = heroOf(s, sp); if (c.uid !== h.uid || !s.battle || s.battle.att !== h.uid) return 0;
+    return [h, ...alliesOf(me(s, sp))].filter(x => kwHas(s, x, 'stealth')).length; } } };
+
+// ---------------------------------------------------------------- Fields of Honor Crafted
+// Fletcher's Gloves of the Phoenix: "You can play this armor from your graveyard. <p> [Activate] >>> Target ally has Long-Range and Fire Resistance this turn."
+FX[3931] = { playFromGySelf: true, powers: [actPow('fletch', tr('Ziel-Ally: Long-Range und Fire Resistance'), { slots: slotAlly(tr('Ziel-Ally'), false),
+    resolve: (s, it) => { const t = T1(s, it); if (!t) return; addTM(t, { k: 'longRange', turn: s.turn }); addTM(t, { k: 'resist10', dt: 'Fire', turn: s.turn }); } })] };
+// Gloves of Immortal Dusk: "When this armor enters play, you may put the top card of your deck into your resource row face down and exhausted.
+// <p> When this armor is destroyed, you may destroy target resource."
+FX[3932] = { enter: (s, c, pid) => { if (me(s, pid).deck.length) yesNo(s, pid, tr('Gloves of Immortal Dusk: Oberste Deckkarte verdeckt und erschöpft als Ressource legen?'), 'Gloves of Immortal Dusk', '3932:res', { pid }, true); },
+    leave: (s, snap, dest, info) => { if (!info || !info.destroyed) return; const pid = snap.wasCtrl || snap.owner; if (pid) pushTrig(s, pid, 3932, [{ op: 'call', k: '3932:ask', a: { pid } }]); },
+    k: { res: (s, a, v) => { if (!v) return; const p = me(s, a.pid); if (!p.deck.length) return; const c = makeCardInst(p.deck.pop(), false, p.id);
+            p.resources.push({ card: c, faceUp: false, exhausted: true }); evt(s, 'resEnters', { pid: p.id, faceUp: false, uid: c.uid, id: c.id }); s._hidden = true;
+            L(s, tr`${p.hero.name} legt die oberste Deckkarte verdeckt und erschöpft in die Ressourcenreihe.`, '', a.pid); },
+        ask: (s, a) => { const l = allResCands(s); if (l.length) mayPick(s, a.pid, tr('Gloves of Immortal Dusk: Ziel-Ressource zerstören?'), 'Gloves of Immortal Dusk', l, '3932:kill', a, u => { const x = locate(s, u); return x && x.pid === a.pid ? -10 : 3; }); },
+        kill: (s, a, u) => { if (u) destroyResource(s, u); } } };
+// Sunfire Handwraps: "This armor enters play with a +1 [DEF] counter for each friendly hero an[d] ally. <p> [Activate], Remove a +1 [DEF] counter >>> Draw a card."
+FX[3933] = { enter: (s, c, pid) => addCounter(s, c, 'def', 1 + alliesOf(me(s, pid)).length),
+    powers: [actPow('sunfire', tr('+1 [DEF]-Zähler entfernen: Ziehe 1'), { canUse: (s, pid, src) => cnt17(src, 'def') > 0 || tr('Keine +1 [DEF]-Zähler'),
+        selfCost: (s, it, src) => takeCounters17(src, 'def', 1), resolve: (s, it) => drawCards(s, me(s, it.pl), 1) })] };
+
+// ---------------------------------------------------------------- Scourgewar Crafted
+// Boots of Utter Darkness: "Leatherworking Hero Required <p> While you control an ability, your hero has Untargetable. <p> While you control an ally,
+// your hero has Elusive. <p> While you control a weapon, your hero has Stealth."
+FX[3941] = { aura: { kw: (s, src, sp, c, k) => { const p = me(s, sp); if (c.uid !== p.hero.uid) return false;
+    if (k === 'untargetable') return (p.ongoing || []).some(o => o.type === 'Ability');
+    if (k === 'elusive') return alliesOf(p).length > 0;
+    if (k === 'stealth') return p.hero.weapons.length > 0;
+    return false; } } };
+// Ebonweave Robe: "Allies you control have Shadow Resistance. <p> If an opposing ally would deal any type of damage, it deals shadow damage instead."
+FX[3942] = { aura: { prevent: (s, src, sp, t, from, o, amt) => isAllyLike(t) && ctrlOf(s, t) === sp && o.dt === 'Shadow' && !resistLost(s, t) ? amt : 0 } };
+DMG_PRE.unshift((s, o) => { if (!o.src) return; const a = findCharacter(s, o.src); if (!a || !isAllyLike(a)) return; const ap = ctrlOf(s, a); if (!ap) return;
+    const op = getOpponent(s, ap); if (op.hero.armors.some(x => x.id === 3942 && active(s, x))) o.dt = 'Shadow'; });
+// Khorium Boar: "Jewelcrafting Hero Required <p> Weapons you control have +1 ATK. <p> Death Rattle: Put a 1 [Melee] / 1 [Health] Boar ally token into play."
+FX[3943] = fxMix({ aura: { watk: (s, src, sp, w) => ctrlOf(s, w) === sp ? 1 : 0 } }, deathRattle((s, a) => makeToken(s, 9203, a.pid)));
+
+// ---------------------------------------------------------------- Wrathgate Crafted
+// Belt of the Black Eagle: "(1), [Activate], Turn a resource you control face down >>> Look at the top two cards of your deck. Put one into your hand and the other into your graveyard."
+FX[3951] = { powers: [actPow('eagle', tr('Ressource verdeckt umdrehen: Obere zwei ansehen, eine auf die Hand'), { cost: 1,
+    canUse: (s, pid) => me(s, pid).resources.some(r => r.faceUp) || tr('Keine offene Ressource'),
+    payExtra: (s, it) => { const l = me(s, it.pl).resources.filter(r => r.faceUp);
+        ask(s, { pid: it.pl, prompt: tr('Welche eigene Ressource verdeckt umdrehen?'), src: 'Belt of the Black Eagle', opts: l.map(r => ({ label: r.card.name, v: r.card.uid, ai: r.card.type === 'Location' ? 0 : 1 })), k: 'E:turnDown17', a: {} }); },
+    resolve: (s, it) => { const p = me(s, it.pl); const n = Math.min(2, p.deck.length); if (!n) return; const ids = p.deck.splice(p.deck.length - n, n).reverse(); s._hidden = true;
+        if (ids.length === 1) { p.hand.push(makeCardInst(ids[0], false, p.id)); return; }
+        p.looking = ids; ask(s, { pid: it.pl, prompt: tr`Belt of the Black Eagle: Welche Karte auf die Hand? Die andere kommt in den Friedhof. (${ids.map(id => CARDS[id].name).join(', ')})`, src: 'Belt of the Black Eagle',
+            opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: (CARDS[id].cost || 0) + 1 })), k: '3951:pick', a: { pid: it.pl } }); } })],
+    k: { pick: (s, a, i) => { const p = me(s, a.pid); const ids = p.looking || []; p.looking = null; ids.forEach((id, j) => { const c = makeCardInst(id, false, p.id); if (j === i) p.hand.push(c); else p.graveyard.push(c); });
+        L(s, tr`${p.hero.name} nimmt eine Karte auf die Hand und legt ${CARDS[ids[i === 0 ? 1 : 0]].name} in den Friedhof.`, '', a.pid); } } };
+EK.turnDown17 = (s, a, v) => { const it = s.chainPrep; if (!it) return; turnResDown(s, v); finishPrep(s); };
+// Deathchill Cloak: "When this armor prevents damage that would be dealt by an attacking ally, that ally can't ready while this armor remains under your control."
+FX[3952] = { on: { armorPrevented: (s, c, d, pid) => { if (d.uid !== c.uid || !d.src || !s.battle || s.battle.att !== d.src) return; const a = findCharacter(s, d.src);
+        if (a && isAllyLike(a)) trig(s, { id: 3952, k: 'chill', a: { pid, uid: a.uid, armor: c.uid } }); } },
+    k: { chill: (s, a) => { const t = findCharacter(s, a.uid); const ar = findCharacter(s, a.armor); if (t && ar && ctrlOf(s, ar) === a.pid) addTM(t, { k: 'deathchill17', armor: a.armor, pid: a.pid }); } } };
+READY_BLOCK.push((s, c) => (c.tm || []).some(m => m.k === 'deathchill17' && (() => { const ar = findCharacter(s, m.armor); const l = ar && locate(s, ar.uid); return !!l && isInPlayZone(l.zone) && ctrlOf(s, ar) === m.pid; })()));
+// Magnificent Flying Carpet: "Tailoring Hero Required <p> You can control any number of locations. <p> When you place a resource face up into your resource row, you may ready all locations you control."
+LOC_ANY.push((s, p) => p.hero.armors.some(x => x.id === 3953 && active(s, x)));
+FX[3953] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid && d.placed && d.faceUp) trig(s, { id: 3953, k: 'ask', a: { pid } }); } },
+    k: { ask: (s, a) => { if (locsOf(me(s, a.pid)).some(r => r.exhausted)) yesNo(s, a.pid, tr('Magnificent Flying Carpet: Alle eigenen Locations bereit machen?'), 'Magnificent Flying Carpet', '3953:go', a, true); },
+        go: (s, a, v) => { if (v) locsOf(me(s, a.pid)).forEach(r => readyRes17(s, r)); } } };
+
+// ---------------------------------------------------------------- Icecrown Crafted
+// Trollwoven Spaulders: "At the start of your turn, your hero has Berserking and Conspicuous this turn."
+FX[3961] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3961, k: 'go', a: { pid } }); } },
+    k: { go: (s, a) => { const h = heroOf(s, a.pid); addTM(h, { k: 'berserk17', turn: s.turn }); addTM(h, { k: 'conspicuous', turn: s.turn }); } } };
+// Berserking: "This character has +1 ATK for each damage on it." (CR Glossar)
+STAT_MODS.push((s, c, st) => st === 'atk' && (c.tm || []).some(m => m.k === 'berserk17' && m.turn === s.turn) ? (c.damage || 0) : 0);
+// Gnomish Poultryizer: "Engineering Hero Required. <p> (3), [Activate] >>> Add a feather counter. This turn, target ally can't attack or protect,
+// loses and can't have powers, and is also a Chicken. <p> Chickens have -1 / -1 for each feather counter."
+const isChicken17 = (s, c) => isAllyLike(c) && (raceIs('Chicken')(c) || (c.tm || []).some(m => m.k === 'alsoType' && m.v === 'Chicken' && (m.turn === undefined || m.turn === s.turn)));
+FX[3962] = { powers: [actPow('poultry', tr('Feder-Zähler: Ziel-Ally wird diesen Zug zum Huhn'), { cost: 3, slots: slotAlly(tr('Ziel-Ally'), true),
+    resolve: (s, it) => { addCounter(s, findCharacter(s, it.src), 'feather', 1); const t = T1(s, it); if (!t) return;
+        ['cantAttack', 'cantProtect', 'noPowers'].forEach(k => addTM(t, { k, turn: s.turn })); addTM(t, { k: 'alsoType', v: 'Chicken', turn: s.turn }); } })],
+    aura: { atk: (s, src, sp, c) => isChicken17(s, c) ? -cnt17(src, 'feather') : 0, hp: (s, src, sp, c) => isChicken17(s, c) ? -cnt17(src, 'feather') : 0 } };
+// Titanium Frostguard Ring: "Your hero has Frost Resistance. <p> On your turn: (6), [Activate] >>> Put a 10 [Frost] / 10 [Health] Unique Frozen Elemental ally token into play with Frost Resistance."
+FX[3963] = { aura: resistHero17('Frost'), powers: [actPow('frost', tr('10/10 Frozen Elemental-Token'), { cost: 6, myTurn: true, resolve: (s, it) => makeToken(s, 3972, it.pl) })] };
+FX[3972] = resist('Frost');
+CARD_ISSUES[3906] = '"Each face-down resource you control is also an armor with 1 [DEF]": Verdeckte Ressourcen als Rüstung (verhindern, Ziel von Rüstungs-Effekten, zählen als Ausrüstung) bildet die Engine nicht ab.';

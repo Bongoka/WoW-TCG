@@ -185,6 +185,7 @@ function faceDownRes(p) { return p.resources.filter(r => !r.faceUp).length; }
 // Locations (Set drums, CR 306): offen in der Ressourcenreihe – ihre Kräfte, Auslöser und Dauereffekte wirken dort.
 // Verdeckte Ressourcen sind leer (CR 412.1b), zählen also nicht als Location.
 function locsOf(p) { return p.resources.filter(r => r.faceUp && r.card && r.card.type === 'Location'); }
+const LOC_ANY = [];   // (s, Spieler) => true: darf beliebig viele offene Locations haben (Magnificent Flying Carpet)
 function locEntries(s) { const out = []; for (const p of [s.p1, s.p2]) for (const r of locsOf(p)) out.push({ c: r.card, pid: p.id, zone: 'resource', res: r }); return out; }
 function controlsLocation(s, pid) { return locsOf(getPlayer(s, pid)).length > 0; }
 // Zähler hinzufügen; Locations mit Kapazität: höchstens so viele (CR 306.3)
@@ -816,10 +817,11 @@ function stateBased(s) {
     for (const f of STATE_FIX) if (f(s)) { flushBatch(s); return true; }                   // Set drums: "while … remains under your control" (Brelnor)
     // CR 410.6f: Zähler auf verdeckten Ressourcen entfernen (betrifft hier nur Locations mit capture counters)
     for (const p of [s.p1, s.p2]) for (const r of p.resources) if (!r.faceUp && r.card && r.card.type === 'Location' && r.card.counters && Object.keys(r.card.counters).length) r.card.counters = {};
+    // "You can control any number of locations" (Magnificent Flying Carpet): LOC_ANY
     // CR 410.6g: mehr als eine offene Location – eine behalten, die übrigen verdeckt umdrehen
     for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {
         const ls = locsOf(p);
-        if (ls.length > 1) {
+        if (ls.length > 1 && !LOC_ANY.some(f => f(s, p))) {
             ask(s, { pid: p.id, prompt: tr('Du darfst nur eine offene Location haben: Welche bleibt offen?'), src: 'Location',
                 opts: ls.map(r => ({ label: r.card.name, v: r.card.uid, ai: (r.card.joinedTurn || 0) + Object.values(r.card.counters || {}).reduce((a, b) => a + b, 0) })), k: 'E:keepLocation', a: { pid: p.id } });
             flushBatch(s); return true;
@@ -1724,7 +1726,7 @@ EK.prepItemPower = (s) => {
     if (!pw) return abortPrep(s, tr('Kraft nicht verfügbar'));
     if ((pw.cost === 'X' || pw.xRange) && (it.x === undefined || it.x === null)) {
         const xr = pw.xRange ? pw.xRange(s, p.id, src) : { min: 0, max: getReadyRes(p) };
-        const opts = []; for (let x = xr.min; x <= Math.min(xr.max, getReadyRes(p)); x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
+        const opts = []; for (let x = xr.min; x <= (pw.cost === 'X' ? Math.min(xr.max, getReadyRes(p)) : xr.max); x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
         if (!opts.length) return abortPrep(s, tr('X nicht bezahlbar'));
         ask(s, { pid: p.id, prompt: tr`${src.name}: Wähle X`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'x' }, keep: true });
         return;

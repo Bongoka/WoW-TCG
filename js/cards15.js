@@ -342,3 +342,128 @@ const OCR21 = {
 };
 Object.assign(OCR, OCR21);
 applyOCR(OCR21);
+
+// ============================================================================
+// KARTENDATEN – Burning Crusade Crafted (Set 22, Karten-IDs 3901–3914)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx22.js (FX[id]).
+// ============================================================================
+Ar(3901,"Black Felsteel Bracers",2,0,'Plate','Wrist','Pa,Wa',"[Activate] >>> Put a +1 ATK counter on target weapon.",{set:22,num:1,rarity:'Epic'});
+Ar(3902,"Cobrascale Hood",2,0,'Leather','Head','Dr,Ro',"At the start of your turn, your hero deals 2 nature damage to each opposing hero for each face-up resource its controller has.",{set:22,num:2,rarity:'Epic'});
+Ar(3903,"Girdle of Ruination",6,1,'Cloth','Waist','Ma,Pr,Lo',"At the start of your turn, destroy the ability, ally, or equipment with the lowest cost. If two or more are tied, destroy all with that cost.",{set:22,num:3,rarity:'Epic'});
+Ar(3904,"Netherdrake Gloves",4,3,'Mail','Hands','Hu,Sh',"[Activate], Destroy this armor >>> Put a 3 [Melee] / 3 [Health] Netherdrake ally token into play.",{set:22,num:4,rarity:'Epic'});
+W(3905,"Felsteel Reaper",8,0,0,'Axe','Melee','Pa,Wa',"This weapon has +1 ATK for each resource you control.",{set:22,num:5,rarity:'Epic',twoHanded:true});
+Ar(3906,"Bracers of the Green Fortress",3,0,'Plate','Wrist','Pa,Wa',"Each face-down resource you control is also an armor with 1 [DEF].",{set:22,num:6,rarity:'Epic'});
+Ar(3907,"Spellstrike Hood",5,1,'Cloth','Head','Ma,Pr,Lo',"(2), [Activate] >>> When you next play a nonOngoing ability this turn, copy it. (You may choose new targets for the copy.)",{set:22,num:7,rarity:'Epic'});
+W(3908,"Eternium Runed Blade",7,1,4,'Dagger','Melee','Ma,Pr,Sh,Lo',"Players can't play allies. <p> Allies can't be destroyed.",{set:22,num:8,rarity:'Epic'});
+Ar(3909,"Belt of Blasting",6,1,'Cloth','Waist','Ma,Pr,Lo',"(X), Exhaust your hero >>> Your hero deals X arcane damage to target hero or ally.",{set:22,num:9,rarity:'Epic'});
+Ar(3910,"Belt of Deep Shadow",4,0,'Leather','Waist','Dr,Ro',"Your hero has Stealth. <p> If your hero would deal combat damage, it deals that much +2 instead.",{set:22,num:10,rarity:'Epic'});
+It(3911,"Alchemist's Stone",2,'Trinket',2,'Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Alchemy Hero Required <p> [Activate] >>> Reveal the top card of your deck. You may discard a card with a different type. If you do, put that revealed card into your hand.",{set:22,num:11,rarity:'Epic'});
+Ar(3912,"Bindings of Lightning Reflexes",3,0,'Mail','Wrist','Hu,Sh',"When you play an ability, add a bolt counter. <p> Heroes and allies in combat with your hero have -1 ATK for each bolt counter.",{set:22,num:12,rarity:'Epic'});
+Ar(3913,"Swiftsteel Bracers",5,3,'Plate','Wrist','Pa,Wa',"You pay (5) less to strike with weapons.",{set:22,num:13,rarity:'Epic'});
+It(3914,"Talasite Owl",2,'Trinket',2,'Dr,Hu,Ma,Pa,Pr,Sh,Lo',"Jewelcrafting Hero Required <p> [Activate] >>> Add a hoot counter. <p> [Activate]. Remove X hoot counters, destroy this item >>> Ready X resources you control.",{set:22,num:14,rarity:'Epic',itemSub:'Figurine'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR22 = {
+3901:["Equipment—Armor—Plate, Wrist (1), 0 DEF","[Activate] >>> Put a +1 ATK counter on target weapon."],
+3902:["Equipment—Armor—Leather, Head (1), 0 DEF","At the start of your turn, your hero deals 2 nature damage to each opposing hero for each face-up resource its controller has."],
+3903:["Equipment—Armor—Cloth, Waist (1), 1 DEF","At the start of your turn, destroy the ability, ally, or equipment with the lowest cost. If two or more are tied, destroy all with that cost."],
+3904:["Equipment—Armor—Mail, Hands (1), 3 DEF","[Activate], Destroy this armor >>> Put a 3 [Melee] / 3 [Health] Netherdrake ally token into play."],
+3905:["Equipment—2H Weapon—Axe, Melee (1), 0 ATK, 0 Strike","This weapon has +1 ATK for each resource you control."],
+3906:["Equipment—Armor—Plate, Wrist (1), 0 DEF","Each face-down resource you control is also an armor with 1 [DEF]."],
+3907:["Equipment—Armor—Cloth, Head (1), 1 DEF","(2), [Activate] >>> When you next play a nonOngoing ability this turn, copy it. (You may choose new targets for the copy.)"],
+3908:["Equipment—1H Weapon—Dagger, Melee (1), 1 ATK, 4 Strike","Players can't play allies. <p> Allies can't be destroyed."],
+3909:["Equipment—Armor—Cloth, Waist (1), 1 DEF","(X), Exhaust your hero >>> Your hero deals X arcane damage to target hero or ally."],
+3910:["Equipment—Armor—Leather, Waist (1), 0 DEF","Your hero has Stealth. <p> If your hero would deal combat damage, it deals that much +2 instead."],
+3911:["Equipment—Item, Trinket (2)","Alchemy Hero Required <p> [Activate] >>> Reveal the top card of your deck. You may discard a card with a different type. If you do, put that revealed card into your hand."],
+3912:["Equipment—Armor—Mail, Wrist (1), 0 DEF","When you play an ability, add a bolt counter. <p> Heroes and allies in combat with your hero have -1 ATK for each bolt counter."],
+3913:["Equipment—Armor—Plate, Wrist (1), 3 DEF","You pay (5) less to strike with weapons."],
+3914:["Equipment—Item—Figurine, Trinket (2)","Jewelcrafting Hero Required <p> [Activate] >>> Add a hoot counter. <p> [Activate]. Remove X hoot counters, destroy this item >>> Ready X resources you control."],
+};
+Object.assign(OCR, OCR22);
+applyOCR(OCR22);
+// ============================================================================
+// KARTENDATEN – Blood of Gladiators Crafted (Set 23, Karten-IDs 3921–3923)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx23.js (FX[id]).
+// ============================================================================
+Ar(3921,"Battlecast Pants",3,0,'Cloth','Legs','Ma,Pr,Lo',"[Activate] >>> Cards in your hand are instant this turn until you play a card.",{set:23,num:1,rarity:'Epic'});
+Ar(3922,"Cloak of Darkness",2,0,'Cloth','Back','Dr,Hu,Pa,Ro,Sh,Wa',"[Activate] >>> Add a +1 [DEF] counter. <p> [Activate], Remove all +1 [DEF] counters >>> Your hero deals 1 shadow damage to target hero or ally for each counter removed this way.",{set:23,num:2,rarity:'Epic'});
+Ar(3923,"Shadowprowler's Chestguard",1,1,'Leather','Chest','Dr,Ro',"Your hero has +1 ATK while attacking for each hero and ally you control with Stealth.",{set:23,num:3,rarity:'Epic'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR23 = {
+3921:["Equipment—Armor—Cloth, Legs (1), 0 DEF","[Activate] >>> Cards in your hand are instant this turn until you play a card."],
+3922:["Equipment—Armor—Cloth, Back (1), 0 DEF","[Activate] >>> Add a +1 [DEF] counter. <p> [Activate], Remove all +1 [DEF] counters >>> Your hero deals 1 shadow damage to target hero or ally for each counter removed this way."],
+3923:["Equipment—Armor—Leather, Chest (1), 1 DEF","Your hero has +1 ATK while attacking for each hero and ally you control with Stealth."],
+};
+Object.assign(OCR, OCR23);
+applyOCR(OCR23);
+// ============================================================================
+// KARTENDATEN – Fields of Honor Crafted (Set 24, Karten-IDs 3931–3933)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx24.js (FX[id]).
+// ============================================================================
+Ar(3931,"Fletcher's Gloves of the Phoenix",3,2,'Mail','Hands','Hu,Sh',"You can play this armor from your graveyard. <p> [Activate] >>> Target ally has Long-Range and Fire Resistance this turn.",{set:24,num:1,rarity:'Epic'});
+Ar(3932,"Gloves of Immortal Dusk",4,1,'Leather','Hands','Dr,Ro',"When this armor enters play, you may put the top card of your deck into your resource row face down and exhausted. <p> When this armor is destroyed, you may destroy target resource.",{set:24,num:2,rarity:'Epic'});
+Ar(3933,"Sunfire Handwraps",4,0,'Cloth','Hands','Ma,Pr,Lo',"This armor enters play with a +1 [DEF] counter for each friendly hero an ally. <p> [Activate], Remove a +1 [DEF] counter >>> Draw a card.",{set:24,num:3,rarity:'Epic'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR24 = {
+3931:["Equipment—Armor—Mail, Hands (1), 2 DEF","You can play this armor from your graveyard. <p> [Activate] >>> Target ally has Long-Range and Fire Resistance this turn."],
+3932:["Equipment—Armor—Leather, Hands (1), 1 DEF","When this armor enters play, you may put the top card of your deck into your resource row face down and exhausted. <p> When this armor is destroyed, you may destroy target resource."],
+3933:["Equipment—Armor—Cloth, Hands (1), 0 DEF","This armor enters play with a +1 [DEF] counter for each friendly hero an ally. <p> [Activate], Remove a +1 [DEF] counter >>> Draw a card."],
+};
+Object.assign(OCR, OCR24);
+applyOCR(OCR24);
+// ============================================================================
+// KARTENDATEN – Scourgewar Crafted (Set 25, Karten-IDs 3941–3943)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx25.js (FX[id]).
+// ============================================================================
+Ar(3941,"Boots of Utter Darkness",2,1,'Leather','Feet','Dr,Ro',"Leatherworking Hero Required <p> While you control an ability, your hero has Untargetable. <p> While you control an ally, your hero has Elusive. <p> While you contorl a weapon, your hero has Stealth.",{set:25,num:1,rarity:'Epic'});
+Ar(3942,"Ebonweave Robe",4,1,'Cloth','Chest','Ma,Pr,Lo',"Allies you control have Shadow Resistance. <p> If an opposing ally would deal any type of damage, it deals shadow damage instead.",{set:25,num:2,rarity:'Epic'});
+It(3943,"Khorium Boar",1,'Trinket',2,'Dk,Dr,Hu,Pa,Ro,Sh,Wa',"Jewelcrafting Hero Required <p> Weapons you control have +1 ATK. <p> Death Rattle: Put a 1 [Melee] / 1 [Health] Boar ally token into play.",{set:25,num:3,rarity:'Epic'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR25 = {
+3941:["Equipment—Armor—Leather, Feet (1), 1 DEF","Leatherworking Hero Required <p> While you control an ability, your hero has Untargetable. <p> While you control an ally, your hero has Elusive. <p> While you contorl a weapon, your hero has Stealth."],
+3942:["Equipment—Armor—Cloth, Chest (1), 1 DEF","Allies you control have Shadow Resistance. <p> If an opposing ally would deal any type of damage, it deals shadow damage instead."],
+3943:["Equipment—Item, Trinket (2)","Jewelcrafting Hero Required <p> Weapons you control have +1 ATK. <p> Death Rattle: Put a 1 [Melee] / 1 [Health] Boar ally token into play."],
+};
+Object.assign(OCR, OCR25);
+applyOCR(OCR25);
+// ============================================================================
+// KARTENDATEN – Wrathgate Crafted (Set 26, Karten-IDs 3951–3953)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx26.js (FX[id]).
+// ============================================================================
+Ar(3951,"Belt of the Black Eagle",2,1,'Mail','Waist','Hu,Sh',"(1), [Activate], Turn a resource you control face down >>> Look at the top two cards of your deck. Put one into your hand and the other into your graveyard.",{set:26,num:1,rarity:'Epic'});
+Ar(3952,"Deathchill Cloak",3,1,'Cloth','Back','Dr,Ma,Pr,Sh,Lo',"When this armor prevents damage that would be dealt by an attacking ally, that ally can't ready while this armor remains under your control.",{set:26,num:2,rarity:'Epic'});
+It(3953,"Magnificent Flying Carpet",2,'Mount',1,'Dk,Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Tailoring Hero Required <p> You can control any number of locations. <p> When you place a resource face up into your resource row, you may ready all locations you control.",{set:26,num:3,rarity:'Epic'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR26 = {
+3951:["Equipment—Armor—Mail, Waist (1), 1 DEF","(1), [Activate], Turn a resource you control face down >>> Look at the top two cards of your deck. Put one into your hand and the other into your graveyard."],
+3952:["Equipment—Armor—Cloth, Back (1), 1 DEF","When this armor prevents damage that would be dealt by an attacking ally, that ally can't ready while this armor remains under your control."],
+3953:["Equipment—Item, Mount (1)","Tailoring Hero Required <p> You can control any number of locations. <p> When you place a resource face up into your resource row, you may ready all locations you control."],
+};
+Object.assign(OCR, OCR26);
+applyOCR(OCR26);
+// ============================================================================
+// KARTENDATEN – Icecrown Crafted (Set 27, Karten-IDs 3961–3963)
+// Erzeugt aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte.
+// Das Verhalten jeder Karte steht in js/cardfx27.js (FX[id]).
+// ============================================================================
+Ar(3961,"Trollwoven Spaulders",5,1,'Leather','Shoulder','Dr,Ro',"At the start of your turn, your hero has Berserking and Conspicuous this turn.",{set:27,num:1,rarity:'Rare'});
+It(3962,"Gnomish Poultryizer",3,'Trinket',2,'Dk,Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Engineering Hero Required. <p> (3), [Activate] >>> Add a feather counter. This turn, target ally can't attack or protect, loses and can't have powers, and is also a Chicken. <p> Chickens have -1 / -1 for each feather counter.",{set:27,num:2,rarity:'Rare',itemSub:'Trinket'});
+It(3963,"Titanium Frostguard Ring",4,'Ring',2,'Dk,Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"Your hero has Frost Resistance. <p> On your turn: (6), [Activate] >>> Put a 10 [Frost] / 10 [Health] Unique Frozen Elemtal ally token into play with Frost Resistance.",{set:27,num:3,rarity:'Rare'});
+
+// Typzeilen und Texte exakt aus der OCR
+const OCR27 = {
+3961:["Equipment—Armor—Leather, Shoulder (1), 1 DEF","At the start of your turn, your hero has Berserking and Conspicuous this turn."],
+3962:["Equipment—Item—Trinket, Trinket (2)","Engineering Hero Required. <p> (3), [Activate] >>> Add a feather counter. This turn, target ally can't attack or protect, loses and can't have powers, and is also a Chicken. <p> Chickens have -1 / -1 for each feather counter."],
+3963:["Equipment—Item, Ring (2)","Your hero has Frost Resistance. <p> On your turn: (6), [Activate] >>> Put a 10 [Frost] / 10 [Health] Unique Frozen Elemtal ally token into play with Frost Resistance."],
+};
+Object.assign(OCR, OCR27);
+applyOCR(OCR27);
