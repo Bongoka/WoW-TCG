@@ -757,25 +757,36 @@ function deathAnim(e, r, delay) {
     ], { duration: 1300, delay, easing: 'ease-in-out', fill: 'both' }).finished.then(() => ghost.remove());
     burstParticles(r, ['#57534e', '#a8a29e', '#292524'], 16, delay + 450, true);
 }
-// Held wird umgedreht (Flip): fliegt groß in die Mitte, dreht sich dort von der alten auf die neue Seite, bleibt kurz
-// stehen und fliegt zurück – so sieht man, welcher Held gerade seine Kraft benutzt hat
+// Held wird umgedreht (Flip): fliegt groß in die Mitte, der Kartentext (die Flip-Kraft) leuchtet auf, erst dann dreht
+// er sich auf die neue Seite, bleibt kurz stehen und fliegt zurück. UI.flipWait: die CPU wartet, bis das vorbei ist.
+const FLIP_MS = 3400, FLIP_AT = { mid: 0.16, glow: 0.48, turned: 0.62, back: 0.84 };     // Anteile der Gesamtdauer
 function heroFlipAnim(node, r, e) {
     const c = findCharacter(G, e.uid); if (!c) return;
+    const T = FLIP_AT;
     const face = back => { const d = createCardDOM(c, true, null, { imageMode: back ? 'back' : 'ea' }); d.style.cssText += ';position:absolute;inset:0;width:100%;height:100%;margin:0;backface-visibility:hidden;'; return d; };
     const box = document.createElement('div');
     box.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:99000;pointer-events:none;perspective:1200px;`;
     const card = document.createElement('div'); card.style.cssText = 'position:absolute;inset:0;transform-style:preserve-3d;';
     const from = face(!e.back), to = face(e.back); to.style.transform = 'rotateY(180deg)';
+    // Leuchten über dem Textfeld der Seite, deren Kraft gerade benutzt wird
+    const glow = document.createElement('div');
+    glow.style.cssText = 'position:absolute;left:5%;right:5%;top:61%;bottom:8%;border-radius:6%;pointer-events:none;opacity:0;mix-blend-mode:screen;'
+        + 'background:radial-gradient(ellipse at center, rgba(255,226,120,.55), rgba(255,190,60,.18) 60%, transparent 80%);box-shadow:0 0 22px 8px rgba(255,200,80,.75), inset 0 0 14px 4px rgba(255,236,170,.6);';
+    from.appendChild(glow);
     card.append(from, to); box.appendChild(card); document.body.appendChild(box);
     node.style.visibility = 'hidden'; UI.flipHide = e.uid;
     const sc = Math.min(2.6, (innerHeight * 0.5) / r.height);
     const dx = innerWidth / 2 - (r.left + r.width / 2), dy = innerHeight / 2 - (r.top + r.height / 2);
     const mid = `translate(${dx}px, ${dy}px) scale(${sc})`;
-    box.animate([{ transform: 'none' }, { transform: mid, offset: 0.22 }, { transform: mid, offset: 0.78 }, { transform: 'none' }],
-        { duration: 2400, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' });
-    card.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: 0.26 }, { transform: 'rotateY(180deg)', offset: 0.48 }, { transform: 'rotateY(180deg)' }],
-        { duration: 2400, easing: 'ease-in-out', fill: 'both' }).finished.then(() => { box.remove(); UI.flipHide = null; document.querySelectorAll(`#arena [data-uid="${e.uid}"]`).forEach(n => { n.style.visibility = ''; }); });
-    if (typeof sfx !== 'undefined') sfx.play('play');
+    const opt = { duration: FLIP_MS, fill: 'both' };
+    box.animate([{ transform: 'none', filter: 'none' }, { transform: mid, filter: 'none', offset: T.mid },
+        { transform: mid, filter: 'drop-shadow(0 0 18px rgba(255,200,80,.9))', offset: (T.mid + T.glow) / 2 }, { transform: mid, filter: 'none', offset: T.turned },
+        { transform: mid, filter: 'none', offset: T.back }, { transform: 'none', filter: 'none' }], { ...opt, easing: 'cubic-bezier(.3,.7,.3,1)' });
+    glow.animate([{ opacity: 0 }, { opacity: 0, offset: T.mid }, { opacity: 1, offset: T.mid + 0.08 }, { opacity: 0.55, offset: T.mid + 0.17 },
+        { opacity: 1, offset: T.glow - 0.06 }, { opacity: 0, offset: T.glow + 0.04 }, { opacity: 0 }], opt);
+    UI.flipWait = card.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: T.glow }, { transform: 'rotateY(180deg)', offset: T.turned }, { transform: 'rotateY(180deg)' }],
+        { ...opt, easing: 'ease-in-out' }).finished.catch(() => {}).then(() => { box.remove(); UI.flipHide = null; UI.flipWait = null; document.querySelectorAll(`#arena [data-uid="${e.uid}"]`).forEach(n => { n.style.visibility = ''; }); });
+    if (typeof sfx !== 'undefined') { sfx.play('play'); setTimeout(() => sfx.play('play'), FLIP_MS * T.glow); }
 }
 function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;

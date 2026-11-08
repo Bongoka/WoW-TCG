@@ -252,13 +252,14 @@
         const pimg = clone.querySelector('.card-image-layer');
         if (pimg && meta.cardId != null && typeof getImageCandidates === 'function') {
             // Vorschau in derselben Variante wie die kleine Karte (das tatsächlich geladene Bild entscheidet):
-            // Extended Art → große Extended Art, Rückseite → Rückseite, sonst das normale Bild
+            // Extended Art → große Extended Art, sonst das normale Bild. Geflippte Helden zeigen hier die Vorderseite,
+            // damit man die benutzte Flip-Kraft nachlesen kann.
             const shown = decodeURI((tilt.querySelector('.card-image-layer') || {}).src || '');
             const list = meta.previewMode === 'ea' || / \(EA\)\.\w+$/.test(shown) ? getImageCandidates(meta.cardId, 'eaBig')
-                : / \(Back\)\.\w+$/.test(shown) ? [shown]
                 : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
             let k = 0; const probe = new Image();
-            probe.onload = () => { pimg.src = probe.src; };
+            if (/ \(Back\)\.\w+$/.test(shown)) pimg.style.visibility = 'hidden';            // Rückseite nicht kurz aufblitzen lassen
+            probe.onload = () => { pimg.src = probe.src; pimg.style.visibility = ''; };
             probe.onerror = () => { imgFailed(probe.src); k++; if (k < list.length) probe.src = list[k]; };
             probe.src = list[0];
         }

@@ -56,7 +56,10 @@ function updateImgStyleOptions() {
 // Auf GitHub liegen nur diese Tokens (Whitelist am Ende von .gitignore) – neue Einträge dort ergänzen.
 const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
     9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton',
-    9501: 'Fel Reaver', 9601: 'Snake', 9602: 'Bear', 9603: 'Naga' };
+    9501: 'Fel Reaver', 9601: 'Snake', 9602: 'Bear', 9603: 'Naga',
+    3652: 'Flame of Azzinoth 1', 3653: 'Flame of Azzinoth 2', 3655: 'Snake', 3656: 'Dwarf', 3657: 'Undead - Champion Deck', 9801: 'Felhunter Demon', 9802: 'Peasant',
+    9804: 'Pandaren', 9805: 'Halaani', 9901: 'Treant - Champion Deck', 9906: 'Arena Gladiator', 10505: 'Wolf', 11501: 'Ghoul - Champion Deck', 11503: 'Spirit Wolf',
+    11504: 'Blighthound', 12501: 'Treant - Champion Deck', 12504: 'Spider - Wrathgate', 12505: 'Father Kamaros - Wrathgate', 13502: 'Treant - Champion Deck' };
 // Bild-Adressen, die schon einmal fehlten (404), nicht erneut anfragen: Extended Art u. a. fehlen bei manchen Karten,
 // sonst probiert jede neu gezeichnete Karte dieselben Dateien wieder durch
 const IMG_BAD = new Set();
@@ -344,6 +347,7 @@ async function driveCpu() {
     let steps = 0, announced = false;
     try {
         while (!G.gameOver) {
+            if (UI.flipWait) await UI.flipWait;                       // Flip eines Helden erst ganz zeigen (heroFlipAnim)
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
             if (G.activePlayer !== 2) break;
