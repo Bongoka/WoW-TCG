@@ -774,7 +774,7 @@ function deckBoxHTML(deck, size = '') {                                      // 
     const mini = size === true || size === 'mini';
     const hero = CARDS[deck.hero], cls = deck.class || (hero && hero.class) || '', fac = (deck.faction || (hero && hero.faction) || 'neutral').toLowerCase();
     // Heldenbild (klein, ohne Extended Art) im Bildfenster der Front, auf das Gesicht gezoomt (Ausschnitt wie beim Coach-Avatar, COACH_FACE)
-    const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/\(EA\)\./.test(u)).slice(0, 3).map(u => `url("${u}")`).join(', ') : '';
+    const imgs = hero ? getImageCandidates(hero.id, 'ea').filter(u => !/\(EA\)\./.test(u)).slice(0, 3).map(u => `url("${u.replace(/'/g, '%27')}")`).join(', ') : '';   // ' würde das style-Attribut beenden (Ta'zo)
     let pos = 'background-size: cover; background-position: center 25%';
     const f = hero && typeof COACH_FACE !== 'undefined' && COACH_FACE[hero.id];
     if (f) {

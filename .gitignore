@@ -4736,6 +4736,8 @@ cards/* scans small/
 
 # Werkzeuge (ImageMagick portable, Umwandlung PNG → WebP: bin/conv.sh), siehe CLAUDE.md
 /bin/imagemagick/
+# Kartenbilder des Addons (TGA, 143 MB), aus cards/azeroth small erzeugt
+/addon/WoWTCG/Art/
 
 # Tokens: nur die im Spiel verwendeten (TOKEN_IMG in js/main.js) – neue dort und hier ergänzen
 Tokens/*
