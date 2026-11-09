@@ -1306,6 +1306,31 @@ function runRuleTests() {
         assert(!ts.includes(mine.uid), 'Spell Suppression: KI darf den eigenen Ally wählen');
         assert(ts.includes(theirs.uid), 'Spell Suppression: gegnerischer Ally fehlt als Ziel');
     });
+    test(132, 'Hausregel: "target attacking ally" schon beim angekündigten Angriff (Brainwash übernimmt, Angriff bricht ab; Freezing Arrow bricht ab)', () => {
+        const pr = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Priest' && !c.isToken).id;
+        // Mensch = Spieler 1: der Angriff bleibt im ersten Fenster als Ankündigung auf der Kette
+        const announce = (s, a) => { s.humans = [1]; s.real = false; applyAction(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s, 1).hero.uid, actorId: 2 }, false, 2);
+            for (let g = 0; g < 10 && !(s.pending && s.pending.pid === 1); g++) { if (s.pending) applyAction(s, { type: 'PASS', actorId: s.pending.pid }, false, s.pending.pid); else process(s); } };
+        const s = freshH(pr, 15, 2); P(s, 1).hand = []; res(s, 1, 6);
+        const att = put(s, 2, 262); att.joinedTurn = 1; const i = hand(s, 1, 1067);
+        announce(s, att);
+        assert(!s.battle && s.chain.some(x => x.kind === 'proposal'), 'Angriff liegt nicht als Ankündigung auf der Kette');
+        assert(isAttackerNow(s, att), 'angekündigter Angreifer zählt nicht als Angreifer');
+        s.humans = []; applyAction(s, { type: 'PLAY_CARD', handIdx: i, targets: [[att.uid]], actorId: 1 }, true, 1); autoResolve(s);
+        assert(ctrlOf(s, att) === 1 && P(s, 1).hero.damage === 0 && !s.battle, 'Brainwash beim angekündigten Angriff: Ally nicht übernommen oder Angriff läuft weiter');
+        const s2 = freshH(pr, 15, 2); P(s2, 1).hand = []; res(s2, 1, 6); hand(s2, 1, 1067); const a2 = put(s2, 2, 262); a2.joinedTurn = 1;
+        announce(s2, a2);
+        assert(!s2.battle && s2.chain.some(x => x.kind === 'proposal'), 'Test-Aufbau: Angriff nicht angekündigt');
+        s2.humans = []; removeFromCombat(s2, a2.uid); applyAction(s2, { type: 'PASS', actorId: 1 }, true, 1); autoResolve(s2);
+        assert(!s2.battle && P(s2, 1).hero.damage === 0, 'aus dem Kampf entfernen bricht den angekündigten Angriff nicht ab');
+    });
+    test(133, 'Arcanite Dragonling: als Ally nur angreifen, wenn er seit Zugbeginn im Spiel ist (CR 601.2a)', () => {
+        const s = fresh(); const old = put(s, 1, 7216), neu = put(s, 1, 7216, { joined: s.turn });
+        FX[7216].powers[0].resolve(s, { src: old.uid, pl: 1 }); FX[7216].powers[0].resolve(s, { src: neu.uid, pl: 1 });
+        assert(old.allyItem9 && neu.allyItem9, 'Dragonling wird kein Ally');
+        assert(canAttackNow(s, old, P(s, 1)), 'Dragonling aus einem früheren Zug kann nicht angreifen');
+        assert(!canAttackNow(s, neu, P(s, 1)), 'Dragonling, diesen Zug ausgespielt, greift ohne Ferocity an');
+    });
     LANG = prevLang;
     return results;
 }

@@ -173,7 +173,7 @@ FX[1032] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { i
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Chops: Ziel-Held oder -Ally erschöpfen?'), 'Chops', targetCands(s, a.pid, { char: true, filter: x => !x.exhausted }), 'E:optExhaust', a) } };
 FX[1033] = { alt: TRAP, resolve: (s, it) => { removeAttackers(s, false); addPE(s, it.pl, { k: 'cantAttackAll' }); } };
 FX[1034] = { aura: { atk: (s, src, sp, c) => ctrlOf(s, c) !== sp ? -1 : 0 } };
-FX[1035] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Held oder Ally'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[1035] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Held oder Ally'), cands: targetCands(s, pid, { char: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(2, 'Fire') };
 FX[1036] = { aura: { atk: (s, src, sp, c) => ctrlOf(s, c) !== sp && inCombatWith(s, c.uid, heroOf(s, sp).uid) ? -1 : 0 } };
 FX[1037] = { slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
@@ -233,7 +233,7 @@ FX[1059] = { on: { healed: (s, c, d, pid) => { if (d.healer !== heroOf(s, pid).u
 FX[1060] = { slots: slotChar(tr('Heile 3'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heroHeal(s, it.pl, t, 3); drawCards(s, me(s, it.pl), 1); } };
 FX[1061] = { slots: slotChar(tr('Heile allen Schaden'), false), aiSkip: (s, pid, c, o) => { const t = o.targets && o.targets[0] && findCharacter(s, o.targets[0][0]); return !t || (t.damage || 0) < 8; },
     resolve: (s, it) => { const t = T(it)[0]; if (t) heal(s, heroOf(s, it.pl).uid, t, 'all'); me(s, it.pl).resources.forEach(r => r.exhausted = true); s.skip = s.skip || {}; s.skip[it.pl] = (s.skip[it.pl] || 0) + 1; L(s, tr`${me(s, it.pl).hero.name} setzt den nächsten Zug aus.`); } };
-FX[1062] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[1062] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 FX[1063] = { on: { dmg: (s, c, d, pid) => { if (d.combat && d.weapon && d.src === heroOf(s, pid).uid) heroDmg(s, pid, d.tgt, 2, 'Holy', { ability: false }); } },
     powers: [{ key: 'seal', label: tr('Zerstören: 4 Heilig an erschöpftes Ziel'), cost: 1, selfCost: selfDestroyCost, slots: slotChar(tr('Erschöpftes Ziel'), true, { exhausted: true }), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 4, 'Holy', { ability: false }); } }] };
@@ -248,7 +248,7 @@ FX[1066] = { aura: { kw: (s, src, sp, c, k) => k === 'protector' && c.uid === he
 // ============================================================================
 // FÄHIGKEITEN – Priester
 // ============================================================================
-FX[1067] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[1067] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) changeControl(s, t, it.pl); } };
 FX[1068] = { powers: [{ key: 'clarity', label: tr('Ziehe 1 (Held unverletzt)'), act: true, canUse: (s, pid) => !heroOf(s, pid).damage || tr('Dein Held ist verletzt'), resolve: (s, it) => drawCards(s, me(s, it.pl), 1) }] };
 FX[1069] = { slots: slotAlly('Ziel-Ally', false), resolve: (s, it) => { const t = T(it)[0]; if (!t) return; heal(s, heroOf(s, it.pl).uid, t, 'all'); q(s, { op: 'call', k: '1069:pick', a: { pid: it.pl, host: t } }); },
@@ -485,7 +485,8 @@ FX[1152] = { modes: playerModes(-5, 3), resolve: (s, it) => playerDestroys(s, it
 // ============================================================================
 PRED.staff = c => c.wsub === 'Staff';
 const selfDestroyThen = selfDestroyCost;
-const removeFromCombat = (s, uid) => { if (s.battle && (s.battle.att === uid || s.battle.def === uid)) endBattle(s, tr`${nameOf(s, uid)} wird aus dem Kampf entfernt`); };
+// Ohne laufenden Kampf (angekündigter Angriff, isAttackerNow): der Angriff wird abgebrochen
+const removeFromCombat = (s, uid) => { if (s.battle) { if (s.battle.att === uid || s.battle.def === uid) endBattle(s, tr`${nameOf(s, uid)} wird aus dem Kampf entfernt`); return; } (s.chain || []).forEach(x => { if (x.kind === 'proposal' && (x.att === uid || x.def === uid)) x.removed = true; }); };
 FX[1154] = { powers: [{ key: 'avan', label: tr('Aus dem Kampf entfernen'), cost: 1, canUse: (s, pid, src) => inCombat(s, src.uid) || tr('Nicht im Kampf'), resolve: (s, it) => removeFromCombat(s, it.src) }] };
 FX[1155] = { powers: [{ key: 'barn', label: tr('Schaden auf jedem Ally verdoppeln'), act: true, cost: 1, resolve: (s, it) => [...alliesOf(s.p1), ...alliesOf(s.p2)].forEach(a => putDamage(s, a, a.damage || 0)),
     aiSkip: (s, pid) => alliesOf(foe(s, pid)).filter(a => a.damage > 0).length === 0 }] };

@@ -433,8 +433,7 @@ function updateCpuStatus(active, text = "") {
 
 function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
-    // Tests und Debug-Werkzeuge (Menü rechts „Tests“) nur lokal – auf GitHub Pages sehen Spieler sie nicht
-    document.body.classList.toggle('dev', IS_DEV);
+    document.body.classList.add('dev');                                                // Tests und Debug (Menü rechts „Tests“) überall sichtbar – auf Wunsch auch auf GitHub Pages (Handy-Tests)
     if (matchMedia('(hover: none)').matches) { const h = document.querySelector('.db-hint'); if (h) h.textContent = tr('Tippen: hinzufügen · „−“ in der Deckliste: entfernen'); }
     // Tastatur: Leertaste/Enter = Zug beenden, Strg+Z = Rückgängig, Esc = Fenster schließen / Abbrechen
     const openModals = () => ['decision-modal', 'deck-builder-modal', 'sim-modal', 'deck-overview-modal', 'graveyard-modal', 'booster-modal', 'db-io-modal', 'choice-modal', 'hs-mulligan', 'gameover']

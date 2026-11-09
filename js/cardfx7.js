@@ -120,7 +120,7 @@ FX[5046] = { resolve: (s, it) => partyOf(me(s, it.pl)).forEach(c => heal(s, hero
 CARDS[5046].xCost = true;
 FX[5047] = { enter: (s, c, pid) => trig(s, { id: 5047, k: 'ask', a: { pid, uid: c.uid } }),
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Bogspike: 1 Nahkampfschaden an Ziel-Ally?'), 'Bogspike', targetCands(s, a.pid, { ally: true }), '5047:do', a), do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: 1, dt: 'Melee' }); } } };
-FX[5048] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: a => attackingAlly(s) === a }), harm: true }],
+FX[5048] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: a => isAttackerNow(s, a) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const owner = ctrlOf(s, t); destroy(s, t); if (!isInPlayZone((locate(s, t.uid) || {}).zone)) partyOf(me(s, owner)).forEach(c => heroDmg(s, it.pl, c.uid, 1, 'Nature')); } };
 FX[5049] = { slots: (s, pid) => [{ label: 'Pet', cands: targetCands(s, pid, { ally: true, side: 'friendly', pet: true }), harm: false }],
     addCost: (s, it) => pickMany(s, it.pl, tr('Feeding Frenzy: Eigene Allies zerstören (beliebig viele)'), 'Feeding Frenzy', alliesOf(me(s, it.pl)).filter(a => !(it.targets && it.targets[0] && it.targets[0].includes(a.uid))).map(a => a.uid), '5049:pay', { it }, () => -1),

@@ -242,6 +242,7 @@ function render() {
     // Positionen vor dem Neuzeichnen merken: Karten, die das Spiel verlassen, sterben an ihrem alten Platz
     const prevRects = new Map();
     if (G.fxq && G.fxq.length) document.querySelectorAll('#arena [data-uid]').forEach(n => prevRects.set(n.dataset.uid, n.getBoundingClientRect()));
+    if (G.fxq && G.fxq.length) noteDyingAllies(G.fxq);                                  // Platz zerstörter Allies frei halten (renderBattlefield)
     document.getElementById("turn-badge").textContent = tr`Zug ${G.turn}`;
     document.getElementById("btn-end-turn").disabled = !canMain();
     document.getElementById("btn-cancel-action").style.display = UI.attacker ? "block" : "none";
@@ -280,7 +281,7 @@ function render() {
         wrapper.className = "opp-hand-card-wrapper";
         wrapper.style.transform = `translateY(${Math.abs(offset) * 10}px) rotate(${offset * 5}deg)`;
         wrapper.style.zIndex = i;
-        if (typeof handRevealed === 'function' && handRevealed(G, 2)) {   // Mind Vision: Hand offen
+        if (G.gameOver || (typeof handRevealed === 'function' && handRevealed(G, 2))) {   // Mind Vision: Hand offen; Spielende: Gegnerhand aufdecken
             const node = createCardDOM(G.p2.hand[i], false); node.classList.add('opp-hand-card-img'); wrapper.appendChild(node);
         } else { const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.className = "opp-hand-card-img"; wrapper.appendChild(img); }
         th.appendChild(wrapper);
@@ -990,6 +991,37 @@ function isAsleep(ally, pid) {
 }
 // Schlachtfeld-Reihe: Allies (inkl. Totems) und daneben Ausrüstung + laufende Fähigkeiten.
 // Eigene Reihe: Ausrüstung baut sich von rechts nach links auf; Gegner gespiegelt (von links).
+// Zerstörter Ally: sein Platz in der Reihe bleibt frei, solange er dort zerfällt (deathAnim) – sonst rückten die
+// übrigen Allies sofort nach und lägen unter der sterbenden Karte. Danach schrumpft die Lücke, die anderen rücken sanft auf.
+const DYING_GAP_MS = 1750;
+UI.dying = new Map();   // uid → { cid, idx, ex, until }
+function noteDyingAllies(evs) {
+    const now = performance.now();
+    for (const e of evs) {
+        if (e.t !== 'leave' || !['graveyard', 'removed', 'token'].includes(e.dest)) continue;
+        const n = document.querySelector(`#top-allies .bf-ally-zone [data-uid="${e.uid}"], #bot-allies .bf-ally-zone [data-uid="${e.uid}"]`); if (!n) continue;
+        const slot = n.closest('.bf-slot'), zone = slot && slot.parentElement; if (!zone) continue;
+        const idx = [...zone.children].filter(x => !x.dataset.gap || UI.dying.has(x.dataset.gap)).indexOf(slot);
+        UI.dying.set(e.uid, { cid: n.closest('#top-allies, #bot-allies').id, idx, ex: slot.classList.contains('ex'), until: now + DYING_GAP_MS });
+        setTimeout(() => closeDyingGap(e.uid), DYING_GAP_MS);
+    }
+}
+function insertDyingGaps(zone, cid) {
+    const now = performance.now();
+    [...UI.dying].filter(([, d]) => d.cid === cid && d.until > now).sort((a, b) => a[1].idx - b[1].idx).forEach(([uid, d]) => {
+        if (isInPlayZone((locate(G, uid) || {}).zone)) { UI.dying.delete(uid); return; }                     // doch nicht gestorben (z. B. unzerstörbar)
+        const gap = document.createElement('div'); gap.className = 'bf-slot' + (d.ex ? ' ex' : ''); gap.dataset.gap = uid;
+        zone.insertBefore(gap, zone.children[d.idx] || null);
+    });
+}
+function closeDyingGap(uid) {
+    UI.dying.delete(uid);
+    document.querySelectorAll(`[data-gap="${uid}"]`).forEach(g => {
+        const cs = getComputedStyle(g);
+        g.animate([{ flexBasis: cs.flexBasis, minWidth: cs.minWidth }, { flexBasis: '0px', minWidth: '0px' }], { duration: 380, easing: 'ease-in-out', fill: 'forwards' })
+            .finished.catch(() => {}).then(() => g.remove());
+    });
+}
 function renderBattlefield(p, containerId, isOpponent) {
     const row = document.getElementById(containerId); row.innerHTML = "";
     const allyZone = document.createElement("div"); allyZone.className = "bf-ally-zone";
@@ -1001,6 +1033,7 @@ function renderBattlefield(p, containerId, isOpponent) {
         decorateInPlay(node, ally);
         slot.appendChild(node); allyZone.appendChild(slot);
     });
+    insertDyingGaps(allyZone, containerId);
     // Angelegte Karten (Polymorph, Gifte, Segen …) liegen an ihrer Hauptkarte (placeAttachments), nicht in dieser Reihe
     const equip = [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].filter(c => !attachHost(c));
     equip.forEach(c => {

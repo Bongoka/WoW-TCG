@@ -287,7 +287,7 @@ FX[11043] = { modes: (s, pid) => { const n = stingNames(s, pid), out = [];
         if (m & 1) { const t = T1(s, it, i++); if (t) destroy(s, t); }
         if (m & 2) { const t = T1(s, it, i++); if (t) destroy(s, t); }
         if (m & 4) { const u = T(it, i++)[0]; if (u) destroyResource(s, u); } } };
-FX[11044] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[11044] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) trig(s, { id: 11044, k: 'burn', a: { pid, uid: c.uid, host: c.attachedTo } }); } },
     k: { burn: (s, a) => { const hl = locate(s, a.host); if (!hl) return; partyOf(me(s, hl.pid)).filter(x => x.uid !== a.host).forEach(x => heroDmg(s, a.pid, x.uid, 1, 'Fire', { abilityId: 11044, abilityUid: a.uid })); } } };

@@ -314,7 +314,7 @@ FX[8109] = fxMix(inspiring, { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !
 FX[8110] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 8110, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Kristina Soulcinder: Ziel-Ally +2 / -2'), 'Kristina Soulcinder', targetCands(s, a.pid, { ally: true }), '8110:do', a, u => { const c = findCharacter(s, u); return ctrlOf(s, c) === a.pid ? (hpOf(s, c) - (c.damage || 0) > 2 ? 2 : -3) : (hpOf(s, c) - (c.damage || 0) <= 2 ? 5 : -1); }),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) { addTM(c, { k: 'atk', v: 2, turn: s.turn }); addTM(c, { k: 'hp', v: -2, turn: s.turn }); } } } };
-FX[8111] = { powers: [{ key: 'kurdoc', label: tr('Held erschöpfen: angreifender Ally -3 ATK'), exhaustHero: true, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: s.battle ? targetCands(s, pid, { ally: true, filter: c => c.uid === s.battle.att }) : [], harm: true }],
+FX[8111] = { powers: [{ key: 'kurdoc', label: tr('Held erschöpfen: angreifender Ally -3 ATK'), exhaustHero: true, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: -3, turn: s.turn }); } }] };
 FX[8112] = { on: { readied: (s, c, d, pid) => { const t = findCharacter(s, d.uid); if (t && isChar(t) && ctrlOf(s, t) !== pid) trig(s, { id: 8112, k: 'hit', a: { src: c.uid, tgt: t.uid } }); } },
     k: { hit: (s, a) => { if (findCharacter(s, a.src)) dealDamage(s, { src: a.src, tgt: a.tgt, amt: 2, dt: 'Ranged' }); } } };

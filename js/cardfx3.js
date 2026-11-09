@@ -80,7 +80,7 @@ FX[2028] = { powers: [{ key: 'monkey', label: tr('Karte abwerfen: Gegner −2 AT
     payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('Aspect of the Monkey: Welche Karte abwerfen?'), src: 'Aspect of the Monkey', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: '278:pay', a: {} }); },
     resolve: (s, it) => addPE(s, it.pl, { k: 'monkey' }), aiSkip: (s, pid) => !s.battle || (s.battle.def !== heroOf(s, pid).uid && s.battle.att !== heroOf(s, pid).uid) }],
     aura: { atk: (s, src, sp, c) => isAllyLike(c) && ctrlOf(s, c) !== sp && pes(s, sp, 'monkey').length && inCombatWith(s, c.uid, heroOf(s, sp).uid) ? -2 : 0 } };
-FX[2029] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[2029] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T(it)[0]; if (!t) return; it.attachTo = t; removeFromCombat(s, t); },
     aura: { kw: (s, src, sp, c, k) => (k === 'cantAttack' || k === 'cantProtect') && c.uid === src.attachedTo } };
 FX[2030] = { distinct: true, slots: (s, pid) => [{ label: tr('Eigenes Pet'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: a => a.isPet }), harm: false, ai: u => atkOf(s, findCharacter(s, u)) }, { label: 'Ziel-Ally', cands: targetCands(s, pid, ALLY), harm: true }],
@@ -138,7 +138,7 @@ FX[2047] = { slots: slotAlly('Ziel-Ally', false), resolve: (s, it) => { it.attac
     on: { exhausted: (s, c, d, pid) => { if (d.uid === c.attachedTo) heroHeal(s, pid, d.uid, 1); } } };
 FX[2048] = { resolve: (s, it) => { addPE(s, it.pl, { k: 'abilitiesLessMin1', v: 1 }); drawCards(s, me(s, it.pl), 1); } };
 FX[2049] = { slots: slotAlly('Ziel-Ally', false), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'shield', v: 3, turn: s.turn }); } };
-FX[2050] = { slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[2050] = { slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } };
 FX[2051] = { slots: (s, pid) => [{ label: tr('Ally aus deinem Friedhof'), cands: gyCands(s, pid, c => isAllyCard(c) && (c.cost || 0) <= me(s, pid).resources.length), harm: false, ai: u => findCharacter(s, u).cost || 0 }],
     resolve: (s, it) => { const u = T(it)[0]; const c = u && findCharacter(s, u); if (c && (c.cost || 0) <= me(s, it.pl).resources.length) fromGyToPlay(s, u, it.pl); drawCards(s, me(s, it.pl), 1); } };

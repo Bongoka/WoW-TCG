@@ -132,7 +132,7 @@ FX[13032] = { slots: (s, pid) => [{ label: tr('Bis zu drei Pets (verschiedene Na
 FX[13033] = fxMix(resist('Frost'), { aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === heroOf(s, sp).uid && o.dt === 'Frost' && !resistLost(s, t) ? amt : 0 } });
 // Deuce: "While this ally is in your graveyard, you can control an additional Pet." (engine.js findLimitViolation: auraSum tagLimit – hier ohne Karte im Spiel)
 TAG_LIMIT_EXTRA.push((s, pid, t) => t === 'Pet' ? me(s, pid).graveyard.filter(c => c.id === 13034).length : 0);
-FX[13035] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Gegnerischer Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid && ctrlOf(s, c) !== pid }), harm: true }],
+FX[13035] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Gegnerischer Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => isAttackerNow(s, c) && ctrlOf(s, c) !== pid }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; removeFromCombat(s, t.uid); addTM(t, { k: 'noReady' }); } };
 // Penetrating Shots: "Choose X of the following" – X = Anzahl der gewählten Modi
 const PEN = [{ k: 'h', label: tr('3 Fernkampfschaden an Ziel-Held') }, { k: 'a', label: tr('3 Fernkampfschaden an Ziel-Ally') }, { k: 'H', label: tr('Ziel-Held -3 ATK') }, { k: 'A', label: tr('Ziel-Ally -3 ATK') }];

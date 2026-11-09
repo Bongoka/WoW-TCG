@@ -48,8 +48,8 @@ FX[4012] = { powers: [flipPow(tr('1 unverhinderbarer Heiligschaden'), 2, { myTur
 FX[4013] = { powers: [flipPow(tr('2 Schatten, heilt sich je verursachtem Schaden'), 3, { myTurn: true, slots: slotChar(tr('Ziel'), true),
     resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Shadow', { ability: false, after: { k: '4013:heal', a: { pid: it.pl } } }); } })],
     k: { heal: (s, a) => { if (a.dealt > 0) { const h = heroOf(s, a.pid); heal(s, h.uid, h.uid, a.dealt); } } } };
-FX[4014] = { powers: [flipPow(tr('Angreifenden Ally zerstören'), 4, { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: a => attackingAlly(s) === a }), harm: true }],
-    resolve: (s, it) => { const t = T1(s, it); if (t && attackingAlly(s) === t) destroy(s, t); } })] };
+FX[4014] = { powers: [flipPow(tr('Angreifenden Ally zerstören'), 4, { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: a => isAttackerNow(s, a) }), harm: true }],
+    resolve: (s, it) => { const t = T1(s, it); if (t && isAttackerNow(s, t)) destroy(s, t); } })] };
 FX[4015] = { powers: [flipPow(tr('Pet +3 ATK'), 2, { slots: (s, pid) => [{ label: 'Pet', cands: targetCands(s, pid, { ally: true, filter: a => a.isPet }), harm: false }],
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: 3, turn: s.turn }); } })] };
 FX[4016] = { powers: [flipPow(tr('3 Natur oder heile 6'), 4, { myTurn: true, modes: () => [{ label: tr('3 Naturschaden'), v: 0 }, { label: tr('Heile 6'), v: 1 }],

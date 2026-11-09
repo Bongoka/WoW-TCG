@@ -142,7 +142,7 @@ FX[12040] = { slots: (s, pid) => [{ label: tr('Bis zu drei Ziele'), cands: targe
     resolve: (s, it) => { const ws = me(s, it.pl).hero.weapons.filter(w => w.slot === 'Ranged'); const x = ws.length ? Math.max(...ws.map(w => weaponAtk(s, w, {}))) : 0; if (x > 0) T(it).forEach(u => heroDmg(s, it.pl, u, x, 'Ranged')); } };
 FX[12041] = { alt: lessonAlt('Hunter'), slots: (s, pid) => [{ label: tr('Eigenes Pet'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: c => c.isPet }), harm: false }, { label: tr('Zweiter Ziel-Ally'), cands: targetCands(s, pid, { ally: true }), harm: true }],
     resolve: (s, it) => { const p = T1(s, it, 0), u = T(it, 1)[0]; if (p && u && u !== p.uid) dealDamage(s, { src: p.uid, tgt: u, amt: atkOf(s, p, {}), dt: 'Melee', ability: true }); } };
-FX[12042] = { slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => !!s.battle && s.battle.att === c.uid }), harm: true }],
+FX[12042] = { slots: (s, pid) => [{ label: tr('Angreifer'), cands: targetCands(s, pid, { char: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; heroDmg(s, it.pl, t.uid, 2, 'Melee'); addTM(t, { k: 'atk', v: -2, turn: s.turn }); } };
 FX[12043] = { on: { exhausted: (s, c, d, pid) => { if (d.uid === c.uid) trig(s, { id: 12043, k: 'go', a: { pid } }); } }, k: { go: (s, a) => tgtResReady(s, a.pid, 3) } };
 

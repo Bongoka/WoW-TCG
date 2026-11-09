@@ -1607,7 +1607,7 @@ function resolveCard(s, it) {
     }
     if (c.type === 'Master Hero') { becomeHero(s, p, c); return; }                         // Master Hero (CR 301.4a): ersetzt den Helden, ohne Kette
     if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
-    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
+    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.joinedTurn = s.turn; c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     // Fähigkeit
     it.dest = c.ongoing ? 'play' : 'graveyard';
     if (f.resolve) f.resolve(s, it);
@@ -2341,7 +2341,7 @@ function canAttackNow(s, c, p) {
     if (hasTM(s, c, 'cantAttack')) return false;
     if (kwHas(s, c, 'cantAttack')) return false;                                          // Set 2/3: Dauereffekte (Deep Freeze, Cyclone …)
     if (CANT_ATTACK.some(f => f(s, c))) return false;                                       // Set honor
-    if (c.type === 'Ally') {
+    if (c.type === 'Ally' || c.allyItem9) {                                              // Arcanite Dragonling (Set drums): als Ally auch "seit Zugbeginn unter Kontrolle" (CR 601.2a)
         if (!active(s, c)) return false;                                                  // Polymorph
         if (c.cantAttack) return false;                                                   // Guardian Steelhorn
         if (attachedTo(s, c.uid, 162).length) return false;                               // Interest You in a Pint?
@@ -2445,6 +2445,15 @@ function startAttack(s, p, a) {
     flushBatch(s);
 }
 // CR 601.3: Beim Auflösen wird die Legalität erneut geprüft, dann beginnt der Kampfschritt.
+// Ziel "attacking …" / "attacker": auch der angekündigte Angreifer, solange sein Angriff auf der Kette liegt.
+// Bewusste Vereinfachung auf Wunsch des Nutzers (abweichend von CR 602.1: angreifend erst im Kampfschritt) – so geht
+// Brainwash u. a. schon im ersten Fenster nach der Ansage, statt erst nach einem Pass. Wird der Angreifer dabei z. B.
+// übernommen oder zerstört, ist der Angriff beim Auflösen nicht mehr rechtmäßig (CR 601.2f/601.3).
+function isAttackerNow(s, c) {
+    if (!c) return false;
+    if (s.battle) return s.battle.att === c.uid;
+    return (s.chain || []).some(x => x.kind === 'proposal' && x.att === c.uid && !x.removed);
+}
 function resolveProposal(s, it) {
     const att = findCharacter(s, it.att), def = findCharacter(s, it.def);
     const p = getPlayer(s, it.pl);
@@ -2452,7 +2461,7 @@ function resolveProposal(s, it) {
     const zoneOk = z => isInPlayZone(z) || (it.sabotage && z === 'resource');            // Sabotage: auch Ressourcen/Quests
     const legal = att && def && canAttackNow(s, att, p) && (it.sabotage ? sabotageTargets(s, att).some(x => x.uid === def.uid) : attackTargets(s, att).includes(def))
         && isInPlayZone((locate(s, att.uid) || {}).zone) && zoneOk((locate(s, def.uid) || {}).zone);
-    if (!legal) { L(s, tr`✖ Angriff ${att ? att.name : '?'} → ${def ? def.name : '?'} wurde unterbrochen.`, "log-hit"); return; }
+    if (!legal || it.removed) { L(s, tr`✖ Angriff ${att ? att.name : '?'} → ${def ? def.name : '?'} wurde unterbrochen.`, "log-hit"); return; }
     if (s.win) closeWindow(s);
     s.battle = { id: newUid('b_'), att: att.uid, def: def.uid, orig: def.uid, apid: p.id, dpid: ctrlOf(s, def), step: 'start', strikeA: null, strikeD: null, longRange: false, sabotage: !!it.sabotage };
 }

@@ -87,7 +87,7 @@ git ls-files -ci --exclude-standard -z | xargs -0 -r git rm -q --cached --   # s
 
 ## Testen
 
-Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü. Der Bereich „Tests“ im Menü rechts erscheint nur lokal (`IS_DEV` in main.js: localhost oder file://) – auf GitHub Pages ist er ausgeblendet.
+Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü. Der Bereich „Tests“ im Menü rechts ist überall sichtbar, auch auf GitHub Pages (zum Testen auf dem Handy; `body.dev` in main.js).
 
 Ohne Browser mit Node: die Skripte in Ladereihenfolge (ohne UI-Dateien) in einen gemeinsamen Kontext laden und `runRuleTests()` aufrufen:
 

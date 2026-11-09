@@ -114,7 +114,7 @@ FX[10025] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { it.a
 FX[10026] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.combat && d.src === c.uid && d.amt > 0 && t && isAllyLike(t)) trig(s, { id: 10026, k: 'ask', a: { pid, uid: c.uid, n: d.amt, first: t.uid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr`Crusty: ${a.n} Nahkampfschaden an ein zweites Ziel?`, 'Crusty', targetCands(s, a.pid, { char: true }).filter(u => u !== a.first), '10026:do', a), do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: a.n, dt: 'Melee' }); } } };
 FX[10027] = { on: { startOfTurn: (s, c) => { c.dundee11 = s.turn; } }, aura: { prevent: (s, src, sp, t, from, o, amt) => { if (t.uid !== src.uid || src.dundee11 !== s.turn || amt <= 0) return 0; src.dundee11 = -1; return amt; } } };
-FX[10028] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: s.battle ? targetCands(s, pid, { ally: true, filter: c => c.uid === s.battle.att }) : [], harm: true }],
+FX[10028] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const pid = ctrlOf(s, t); if (destroy(s, t)) partyOf(me(s, pid)).forEach(c => exhaust(s, c)); } };
 FX[10029] = { aura: { noReady: (s, src, sp, c) => isChar(c) && ctrlOf(s, c) !== sp && alliesOf(me(s, sp)).some(a => a.isPet) } };
 FX[10030] = { slots: (s, pid) => [{ label: tr('Fähigkeit in deinem Friedhof'), cands: gyCands(s, pid, c => c.type === 'Ability'), harm: false }],
@@ -151,7 +151,7 @@ FX[10040] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { con
 TM_COND.defending11 = (s, c) => !!s.battle && s.battle.def === c.uid;
 FX[10041] = { aura: { atk: (s, src, sp, c) => isAllyLike(c) && ctrlOf(s, c) === sp ? (c.cost || 0) : 0, hp: (s, src, sp, c) => isAllyLike(c) && ctrlOf(s, c) === sp ? (c.cost || 0) : 0 } };
 FX[10042] = { aura: { noInterruptAbility: (s, src, sp, pid) => pid === sp, abilityInstant: (s, src, sp, pid, card) => pid === sp && card.type === 'Ability' } };
-FX[10043] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: s.battle ? targetCands(s, pid, { ally: true, filter: c => c.uid === s.battle.att }) : [], harm: true }],
+FX[10043] = { slots: (s, pid) => [{ label: tr('Angreifender Ally'), cands: targetCands(s, pid, { ally: true, filter: c => isAttackerNow(s, c) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const n = atkOf(s, t); if (destroy(s, t)) heroHeal(s, it.pl, heroOf(s, it.pl).uid, n); } };
 FX[10044] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T(it)[0]; if (!t) return; heroDmg(s, it.pl, t, 2, 'Melee'); heroDmg(s, it.pl, t, 2, 'Holy', { unprev: true }); } };
 FX[10045] = { aura: { watk: (s, src, sp, w) => ctrlOf(s, w) === sp ? me(s, sp).hero.armors.filter(a => a.type === 'Armor').length : 0, strike: (s, src, sp, pid) => pid === sp ? -me(s, sp).hero.armors.filter(a => a.type === 'Armor').length : 0 } };
