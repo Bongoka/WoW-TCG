@@ -242,7 +242,7 @@ FX[4078] = { slots: slotAlly(tr('Ziel-Ally'), true), aiSkip: (s, pid, c, o) => {
 // Adrenaline Rush: alle Ressourcen bereit, bis zum Handlimit ziehen, am nächsten Zugende die Hand abwerfen
 FX[4079] = { resolve: (s, it) => { const p = me(s, it.pl); p.resources.forEach(r => { r.exhausted = false; }); const n = maxHandSize(s, p) - p.hand.length; if (n > 0) drawCards(s, p, n); addPE(s, it.pl, { k: 'adrenaline', until: 'game' }); } };
 onEvt('endOfTurn', (s, d) => { for (const pid of [1, 2]) { const m = pes(s, pid, 'adrenaline').find(x => !x.used); if (m) { m.used = true; pushTrig(s, pid, 4079, [{ op: 'trig', id: 4079, k: 'discard', a: { pid } }]); } } });
-FX[4079].k = { discard: (s, a) => { if (auraAny(s, 'noDiscard', a.pid)) return; const p = me(s, a.pid); const n = p.hand.length; p.graveyard.push(...p.hand.splice(0)); if (n) L(s, tr`Adrenaline Rush: ${p.hero.name} wirft ${n} Karten ab.`, '', p.id); } };
+FX[4079].k = { discard: (s, a) => { discardHand(s, me(s, a.pid)); } };
 FX[4080] = { modes: playerModes(-5, 3), resolve: (s, it) => addPE(s, it.mode, { k: 'noCards' }) };
 // Cheat Death: Held aus dem Spiel, kommt zu Beginn deines nächsten Zugs zurück (gleiche Seite, gleicher Schaden)
 const CD_TM = ['untargetable', 'cantAttack', 'cantBeAttacked', 'preventAll', 'noHeal', 'noPowers', 'elusive'];

@@ -1331,6 +1331,16 @@ function runRuleTests() {
         assert(canAttackNow(s, old, P(s, 1)), 'Dragonling aus einem früheren Zug kann nicht angreifen');
         assert(!canAttackNow(s, neu, P(s, 1)), 'Dragonling, diesen Zug ausgespielt, greift ohne Ferocity an');
     });
+    test(134, 'Ganze Hand abwerfen (Darkness, Babagahnoosh) löst "When an opponent discards a card" aus: Orlund 3 Schaden je Karte', () => {
+        const s = fresh(); put(s, 1, 10113); P(s, 2).hand = []; for (let i = 0; i < 3; i++) hand(s, 2, 262);
+        const d0 = P(s, 2).hero.damage;
+        FX[5078].resolve(s, { pl: 1, mode: 2 }); process(s); autoResolve(s);
+        assert(P(s, 2).hand.length === 0 && P(s, 2).graveyard.length >= 3, 'Darkness: Hand nicht abgeworfen');
+        assert(P(s, 2).hero.damage - d0 === 9, `Orlund nach Darkness: ${P(s, 2).hero.damage - d0} statt 9 Schaden`);
+        const s2 = fresh(); put(s2, 2, 10113); P(s2, 1).hand = []; hand(s2, 1, 262); hand(s2, 1, 262); const d1 = P(s2, 1).hero.damage;
+        discardHand(s2, P(s2, 1)); process(s2); autoResolve(s2);
+        assert(P(s2, 1).hero.damage - d1 === 6, `Orlund nach discardHand: ${P(s2, 1).hero.damage - d1} statt 6 Schaden`);
+    });
     LANG = prevLang;
     return results;
 }

@@ -2134,6 +2134,15 @@ EK.discardOne = (s, a) => {
     ask(s, { pid: p.id, prompt: tr`${a.src ? a.src + ': ' : ''}Wirf eine Karte ab`, src: a.src || 'Abwerfen', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: 'E:discardDo', a: {} });
 };
 EK.discardDo = (s, a, uid) => { const l = locate(s, uid); if (!l || l.zone !== 'hand' || auraAny(s, 'noDiscard', l.pid)) return; const p = getPlayer(s, l.pid); p.hand.splice(p.hand.indexOf(l.c), 1); p.graveyard.push(l.c); L(s, tr`🗑 ${l.c.name} abgeworfen`, '', p.id); evt(s, 'discarded', { pid: p.id, uid }); evt(s, 'cardDiscarded', { pid: p.id, uid, id: l.c.id }); evt(s, 'handLeft', { pid: p.id, uid }); };
+// Ganze Hand abwerfen (Darkness, Retainer Athan, Babagahnoosh …): jede Karte einzeln mit denselben Ereignissen wie
+// E:discardDo – sonst lösen "When … discards a card" (Orlund u. a.) nicht aus. Ergebnis: Anzahl der abgeworfenen Karten.
+function discardHand(s, p) {
+    if (!p.hand.length || auraAny(s, 'noDiscard', p.id)) return 0;
+    const cards = p.hand.splice(0);
+    for (const c of cards) { p.graveyard.push(c); evt(s, 'discarded', { pid: p.id, uid: c.uid }); evt(s, 'cardDiscarded', { pid: p.id, uid: c.uid, id: c.id }); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); }
+    L(s, tr`🗑 ${p.hero.name} wirft ${cards.length} Karten ab.`, '', p.id);
+    return cards.length;
+}
 EK.destroyOwnResource = (s, a) => {
     const p = getPlayer(s, a.pid); if (!p.resources.length) return;
     ask(s, { pid: p.id, prompt: tr('Zerstöre eine eigene Ressource'), src: tr('The Cruel Hand of Timmy'), opts: p.resources.map((r, i) => ({ label: r.faceUp ? r.card.name + ' (Quest)' : tr`Verdeckte Ressource ${i + 1}${r.exhausted ? tr(tr(tr(tr(' (erschöpft)')))) : ''}`, v: r.card.uid, ai: r.exhausted ? 1 : 0 })), k: 'E:destroyResDo', a: {} });

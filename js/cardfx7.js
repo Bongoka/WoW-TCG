@@ -87,7 +87,7 @@ FX[5031] = { powers: [flipPow(tr('Ally mit Protector zerstören'), 2, { myTurn: 
 FX[5032] = { powers: [flipPow(tr('Fähigkeit aus gegnerischem Friedhof spielbar'), 3, { slots: (s, pid) => [{ label: tr('Fähigkeit im gegnerischen Friedhof'), cands: foe(s, pid).graveyard.filter(c => c.type === 'Ability').map(c => c.uid), harm: false }],
     resolve: (s, it) => { const u = T(it)[0]; if (u) addPE(s, it.pl, { k: 'gyPlayUid', uid: u }); } })] };
 FX[5034] = { powers: [flipPow(tr('Hand abwerfen, Gegner wirft genauso viele ab'), 5, { myTurn: true, aiSkip: (s, pid) => me(s, pid).hand.length > 2,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.graveyard.push(...p.hand.splice(0)); if (n) q(s, { op: 'call', k: 'E:discard', a: { pid: foe(s, it.pl).id, n, src: 'Bloodtusk' } }); } })] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = discardHand(s, p); if (n) q(s, { op: 'call', k: 'E:discard', a: { pid: foe(s, it.pl).id, n, src: 'Bloodtusk' } }); } })] };
 // Vor'na the Wretched: am Ende dieses Zugs zerstört der Zugspieler seine Allies, die weder angegriffen haben noch ins Spiel kamen
 const idleAllies = (s, p) => alliesOf(p).filter(a => a.type === 'Ally' && a.attackedTurn !== s.turn && a.joinedTurn !== s.turn);
 FX[5035] = { powers: [flipPow(tr('Zugende: untätige Allies des Zugspielers zerstören'), 3, { resolve: (s, it) => addPE(s, it.pl, { k: 'vorna' }) })] };
@@ -171,7 +171,7 @@ FX[5075] = { on: { dmg: (s, c, d, pid) => { if (d.combat && d.src === heroOf(s, 
         resolve: (s, it) => mustPick(s, it.pl, tr('Seal of Redemption: Ally aus deinem Friedhof auf die Hand'), 'Seal of Redemption', gyCands(s, it.pl, c => isAllyCard(c)), '5075:do', { pid: it.pl }, u => (findCharacter(s, u) || {}).cost || 0) }] };
 FX[5076] = { resolve: (s) => [s.p1, s.p2].forEach(p => alliesOf(p).filter(a => a.attackedTurn === s.turn).forEach(a => destroy(s, a))) };
 FX[5077] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, heroOf(s, it.pl).damage > 0 ? 2 : 6, 'Holy', { unprev: true }); } };
-FX[5078] = { modes: playerModes(-6, 4), resolve: (s, it) => { const p = me(s, it.mode); const n = p.hand.length; if (n && !auraAny(s, 'noDiscard', p.id)) { p.graveyard.push(...p.hand.splice(0)); L(s, tr`${p.hero.name} wirft ${n} Karten ab.`, '', p.id); } } };
+FX[5078] = { modes: playerModes(-6, 4), resolve: (s, it) => { const p = me(s, it.mode); discardHand(s, p); } };
 FX[5079] = { on: { healed: (s, c, d, pid) => { if (d.tpid && d.tpid !== pid && d.amt > 0) trig(s, { id: 5079, k: 'hit', a: { pid, uid: d.tgt, n: d.amt * 2 } }); } }, k: { hit: (s, a) => { if (findCharacter(s, a.uid)) heroDmg(s, a.pid, a.uid, a.n, 'Shadow'); } } };
 FX[5080] = { selfCost: (s, pid) => -me(s, pid).graveyard.filter(c => c.type === 'Ability').length,
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 5080, k: 'win', a: { pid } }); } }, k: { win: (s, a) => lose(s, foe(s, a.pid).id, tr('Enlightenment')) } };
@@ -204,7 +204,7 @@ FX[5091] = { aura: { prevent: (s, src, sp, t, from, o, amt) => o.combat && t.uid
 FX[5093] = { finishingMove: true, xRange: (s, pid) => ({ min: 0, max: Math.min(5, me(s, pid).graveyard.filter(c => isAllyCard(c)).length) }), slots: slotChar(tr('Ziel'), true),
     addCost: (s, it) => { let n = it.x || 0; for (const c of [...me(s, it.pl).graveyard]) { if (n <= 0) break; if (isAllyCard(c)) { gyRemove(s, c.uid); n--; } } finishPrep(s); },
     resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2 + (it.x || 0), 'Melee'); } };
-FX[5094] = { resolve: (s, it) => { const o = foe(s, it.pl); if (auraAny(s, 'noDiscard', o.id)) return; const n = o.hand.length; o.graveyard.push(...o.hand.splice(0)); for (let i = 0; i < n; i++) { drawCards(s, o, 1); heroDmg(s, it.pl, o.hero.uid, 1, 'Melee'); } } };
+FX[5094] = { resolve: (s, it) => { const o = foe(s, it.pl); if (auraAny(s, 'noDiscard', o.id)) return; const n = discardHand(s, o); for (let i = 0; i < n; i++) { drawCards(s, o, 1); heroDmg(s, it.pl, o.hero.uid, 1, 'Melee'); } } };
 FX[5095] = { slots: (s, pid) => [{ label: tr('Held (Kampfschaden deines Helden erhalten)'), cands: targetCands(s, pid, { hero: true, filter: c => tms(s, c, 'hitBy').some(m => m.cmb && m.by === heroOf(s, pid).uid) }), harm: true }],
     resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c, d, pid) => { const h = c.attachedTo && findCharacter(s, c.attachedTo); if (h && d.pid === ctrlOf(s, h)) trig(s, { id: 5095, k: 'go', a: { pid: d.pid } }); } }, k: { go: (s, a) => playerDestroys(s, a.pid, 'ally', 'Sacrificial Poison') } };
@@ -424,7 +424,7 @@ FX[5200] = { backToHand: true, enter: (s, c, pid) => trig(s, { id: 5200, k: 'loo
         do: (s, a, v) => { const p = me(s, a.pid); if (!p.deck.length) return; if (!v) { p.deck.unshift(p.deck.pop()); return; } drawCards(s, p, 1); const c = findCharacter(s, a.uid); if (c && isInPlayZone((locate(s, a.uid) || {}).zone)) leavePlay(s, c, 'hand', { destroyed: false }); } } };
 FX[5202] = { leave: onDestroyed(5202),
     k: { died: (s, a) => ask(s, { pid: a.pid, prompt: tr('Retainer Athan: Welcher Spieler wirft seine Hand ab und zieht neu?'), src: 'Retainer Athan', opts: [{ label: tr('Gegner'), v: foe(s, a.pid).id, ai: 1 }, { label: tr('Du selbst'), v: a.pid, ai: 0 }], k: '5202:do', a, auto: false }),
-        do: (s, a, v) => { const p = me(s, v); if (auraAny(s, 'noDiscard', v)) return; const n = p.hand.length; p.graveyard.push(...p.hand.splice(0)); if (n) drawCards(s, p, n); } } };
+        do: (s, a, v) => { const p = me(s, v); if (auraAny(s, 'noDiscard', v)) return; const n = discardHand(s, p); if (n) drawCards(s, p, n); } } };
 FX[5203] = { sabotage: 'Equipment', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5203, k: 'take', a: { pid, uid: d.tgt } }); } },
     k: { take: (s, a) => { const t = findCharacter(s, a.uid), l = locate(s, a.uid); if (!t || !l || l.zone !== 'equip') return; const from = me(s, l.pid).hero, to = me(s, a.pid).hero; const arr = t.type === 'Weapon' ? 'weapons' : 'armors'; from[arr].splice(from[arr].indexOf(t), 1); to[arr].push(t); L(s, tr`Retainer Cara übernimmt ${t.name}.`, '', a.pid); } } };
 FX[5206] = { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? -[s.p1, s.p2].flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0, hp: (s, src, sp, c) => c.uid === src.uid ? -[s.p1, s.p2].flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0 } };
