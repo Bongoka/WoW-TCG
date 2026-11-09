@@ -2820,6 +2820,10 @@ function gyPlayables(s, pid) {
     for (const o of [s.p1, s.p2]) for (const c of (o.removed || [])) { if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || c.isToken || seen.has(c.uid)) continue; if (canPlayFromRemoved(s, pid, c, o.id)) { seen.add(c.uid); out.push(c); } }
     return out;
 }
+// KI: Karten, die einer Karte ihre Kräfte nehmen, nie auf eigene Karten spielen. Die Bewertung sieht verlorene Kräfte nicht
+// (z. B. Inspiring Presence), zählt die eigene laufende Fähigkeit aber als Plus – so landete Spell Suppression auf dem eigenen Ally.
+// Spell Suppression, Polymorph, Polymorph: Penguin, Metalmorph, Scald, Smoke or Croak
+const AI_NO_OWN_TARGET = new Set([7040, 58, 11057, 5064, 12050, 6052]);
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     const out = [];
     const p = getPlayer(s, pid);
@@ -2838,6 +2842,7 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
             if (combos === null) continue;
             for (const tg of combos) {
                 if (f.aiSkip && f.aiSkip(s, pid, c, { x, mode, targets: tg })) continue;
+                if (AI_NO_OWN_TARGET.has(c.id) && tg.flat().some(u => { const l = locate(s, u); return l && l.pid === pid; })) continue;
                 const act = { type: 'PLAY_CARD', handIdx: idx, x, mode, targets: tg, actorId: pid, desc: `${c.name}${gyUid ? tr(tr(tr(tr(' (aus dem Friedhof)')))) : ''}${x !== undefined ? ' X=' + x : ''}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` };
                 if (gyUid) act.gyUid = gyUid;
                 out.push(act);

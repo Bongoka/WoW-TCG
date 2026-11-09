@@ -1298,6 +1298,14 @@ function runRuleTests() {
         assert(babaPlayable(2, 0) && babaPlayable(1, 1), 'Babagahnoosh: KI spielt ihn nicht, obwohl nur 2 Karten verloren gehen');
         assert(!babaPlayable(5, 0) && !babaPlayable(1, 2), 'Babagahnoosh: KI spielt ihn trotz 3+ verlorener Karten');
     });
+    test(131, 'KI: Spell Suppression (Kräfte weg) nie auf eigene Karten – nur auf gegnerische', () => {
+        const mage = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Mage' && !c.isToken).id;
+        const s = freshH(mage, 15); P(s, 1).hand = []; res(s, 1, 4);
+        const mine = put(s, 1, 262), theirs = put(s, 2, 262), i = hand(s, 1, 7040);
+        const ts = getLegalActions(s, 1).filter(a => a.type === 'PLAY_CARD' && a.handIdx === i).map(a => a.targets.flat()[0]);
+        assert(!ts.includes(mine.uid), 'Spell Suppression: KI darf den eigenen Ally wählen');
+        assert(ts.includes(theirs.uid), 'Spell Suppression: gegnerischer Ally fehlt als Ziel');
+    });
     LANG = prevLang;
     return results;
 }
