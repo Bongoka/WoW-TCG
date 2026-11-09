@@ -44,7 +44,10 @@
                 
                 const hpEl = el('div', 'cfx-stat-badge hp-badge');
                 hpEl.id = 'hp-badge-' + card.uid;
-                hpEl.innerHTML = `<img src="Bottom Icons/Health.png" alt="HP"><span>${Math.max(0, (card.hp || 0) - (card.damage || 0))}</span>`;
+                // Schaden über dem Tod hinaus (Gift of Nature u. a.) als negativer Wert, damit Heilung sichtbar bleibt
+                const hpLeft = (card.hp || 0) - (card.damage || 0);
+                hpEl.innerHTML = `<img src="Bottom Icons/Health.png" alt="HP"><span>${hpLeft}</span>`;
+                if (hpLeft < 0) hpEl.classList.add('overkill');
                 statsBar.appendChild(hpEl);
             } else if (card.type === 'Weapon') {
                 const atkEl = el('div', 'cfx-stat-badge lean');
