@@ -1284,6 +1284,20 @@ function runRuleTests() {
         put(s3, 2, 12025, { attachedTo: P(s3, 1).hero.uid });
         assert(atkOf(s3, g, {}) === 0, `Frost Fever: Assault wirkt noch (ATK ${atkOf(s3, g, {})})`);
     });
+    test(130, 'Will of the Forsaken als gedrucktes Schlüsselwort (ohne Kräfte weg); KI: Babagahnoosh nur, wenn höchstens 2 Karten verloren gehen (Hand + offene Quests)', () => {
+        const s = fresh(); const a = put(s, 1, 10127);
+        assert(!(FX[10127].aura) && kwHas(s, a, 'forsaken'), 'Dethvir: Will of the Forsaken fehlt oder ist noch ein Dauereffekt');
+        put(s, 2, 58, { attachedTo: a.uid });
+        assert(!kwHas(s, a, 'forsaken'), 'Dethvir mit Polymorph: Will of the Forsaken bleibt');
+        const q = Object.values(CARDS).find(c => c.type === 'Quest' && !c.isToken).id;
+        const babaPlayable = (nHand, nQuests) => {
+            const s2 = fresh(); P(s2, 1).hand = []; res(s2, 1, nQuests, q); const i = hand(s2, 1, 13165);
+            for (let k = 0; k < nHand; k++) hand(s2, 1, 262);
+            return getLegalActions(s2, 1).some(x => x.type === 'PLAY_CARD' && x.handIdx === i);
+        };
+        assert(babaPlayable(2, 0) && babaPlayable(1, 1), 'Babagahnoosh: KI spielt ihn nicht, obwohl nur 2 Karten verloren gehen');
+        assert(!babaPlayable(5, 0) && !babaPlayable(1, 2), 'Babagahnoosh: KI spielt ihn trotz 3+ verlorener Karten');
+    });
     LANG = prevLang;
     return results;
 }

@@ -3,7 +3,9 @@
 // Kopien des Zustands (cloneState). Entscheidungen innerhalb von Effekten
 // (Ziele, "you may", Protector, Waffenschlag) trifft die Engine per aiPick.
 // ============================================================================
-function evaluateState(s, pid) {
+// Bewertung verändert den Zustand nicht: Dauereffekte und active() dabei nur einmal je Karte berechnen (readScope, engine.js)
+function evaluateState(s, pid) { return readScope(s, () => evaluateStateNow(s, pid)); }
+function evaluateStateNow(s, pid) {
     if (s.gameOver) return s.winner === pid ? 100000 : (s.winner ? -100000 : 0);
     const me = getPlayer(s, pid), opp = getOpponent(s, pid);
     const myHp = hpOf(s, me.hero) - me.hero.damage, oppHp = hpOf(s, opp.hero) - opp.hero.damage;

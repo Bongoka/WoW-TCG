@@ -3600,4 +3600,7 @@ var I18N_EN = {
     'abgebrochen': 'stopped',
     'fertig': 'done',
     'Es läuft schon eine Simulation.': 'A simulation is already running.',
+    '1 Kern': '1 core',
+    '{0} Kerne': '{0} cores',
+    '<div style="color:#fbbf24;font-size:12px;margin-bottom:8px;">⚠️ Das Spiel ist als Datei geöffnet (file://). Der Browser sperrt dort Web Worker – die Simulation rechnet nur auf einem Kern. Starte das Spiel über <b>Spiel starten.bat</b> im Spielordner, dann rechnen alle Kerne.</div>': '<div style="color:#fbbf24;font-size:12px;margin-bottom:8px;">⚠️ The game is opened as a file (file://). The browser blocks Web Workers there – the simulation runs on a single core. Start the game with <b>Spiel starten.bat</b> in the game folder to use all cores.</div>',
 };

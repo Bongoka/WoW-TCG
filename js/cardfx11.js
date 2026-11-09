@@ -12,7 +12,11 @@ const escapeArtist = id => ({ on: { targeted: (s, c, d, pid) => { if (d.uids.inc
 const findTreasure = id => fxMix(onEnter(id, 'treasure'), { k: { treasure: (s, a) => yesNo(s, a.pid, tr`${CARDS[id].name}: Find Treasure – eine Karte ziehen und dann eine abwerfen?`, CARDS[id].name, `${id}:ft`, a, true),
     ft: (s, a, v) => { if (!v) return; drawCards(s, me(s, a.pid), 1); q(s, { op: 'call', k: 'E:discard', a: { pid: a.pid, n: 1, src: CARDS[id].name } }); } } });
 // Will of the Forsaken (engine.js leavePlay: Schlüsselwort "forsaken")
-const forsaken = { aura: { kw: (s, src, sp, c, k) => k === 'forsaken' && c.uid === src.uid } };
+// Als gedrucktes Schlüsselwort (CARDS[id].forsaken, kwHas → printedKw), nicht als Dauereffekt: gleiche Wirkung (ohne Kräfte
+// kein Schlüsselwort, kwHas prüft active), aber die Engine muss die Karte nicht bei jeder Werte-Abfrage als Aura-Quelle prüfen.
+const forsaken = {};
+const FORSAKEN_IDS = [10123, 10125, 10126, 10127, 10137, 10142, 10146];
+FORSAKEN_IDS.forEach(id => { if (CARDS[id]) CARDS[id].forsaken = true; });
 // honor counters und Battlegrounds
 const isBattleground = c => !!c && (c.itemSub === 'Battleground' || c.locType === 'Battleground' || /—Battleground/.test(c.typeLine || ''));
 const ownCardsAndRes = (s, pid) => { const p = me(s, pid); return [...cardsInPlayOf(s, p), ...p.resources.map(r => r.card)]; };
@@ -365,7 +369,7 @@ const mojo = (id, spec, label) => ({ on: { died: (s, c, d, pid) => { if (d.snap.
 FX[10134] = mojo(10134, { ability: true }, tr('Mojo Masher Shakko: Ziel-Fähigkeit zerstören?'));
 FX[10135] = mojo(10135, { equipment: true }, tr("Mojo Masher Ven'dango: Ziel-Ausrüstung zerstören?"));
 FX[10136] = onlyOneAttacks(10136);
-CARDS[10137].forsaken = true; FX[10137] = forsaken;
+FX[10137] = {};
 FX[10138] = fxMix(onlyOneAttacks(10138), { powers: [{ key: 'nazguk', label: tr('Anderen eigenen Ally zerstören: Ferocity'), cost: 2, canUse: (s, pid, src) => alliesOf(me(s, pid)).some(a => a.uid !== src.uid) || tr('Kein anderer eigener Ally'),
     payExtra: (s, it) => mustPick(s, it.pl, tr('Nazguk Sharptongue: anderen eigenen Ally zerstören'), 'Nazguk Sharptongue', alliesOf(me(s, it.pl)).filter(a => a.uid !== it.src).map(a => a.uid), '10138:pay', {}, u => -cardValue(s, findCharacter(s, u))),
     resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'ferocity', turn: s.turn }); } }] });
@@ -375,7 +379,7 @@ const sameName4 = (s, pid) => { const m = {}; ownCardsAndRes(s, pid).forEach(c =
 FX[10140] = { alt: { label: tr('Ohne Kosten spielen (vier gleichnamige Karten)'), ai: 5, can: (s, pid) => sameName4(s, pid), pay: (s, it) => altDone(s) } };
 FX[10141] = { on: { dmg: (s, c, d, pid) => { if (d.src === c.uid && d.amt > 0) trig(s, { id: 10141, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Rakasa Mournewind: Ziel kann nicht angreifen oder beschützen'), 'Rakasa Mournewind', targetCands(s, a.pid, { char: true, side: 'enemy' }), '10141:do', a), do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) { addTM(c, { k: 'cantAttack', turn: s.turn }); addTM(c, { k: 'cantProtect', turn: s.turn }); } } } };
-CARDS[10142].forsaken = true; FX[10142] = forsaken;
+FX[10142] = {};
 FX[10143] = { on: { cardPlayed: (s, c, d, pid) => {} } };
 onEvt('cardPlayed', (s, d) => { if (d.card.id === 10143) pushTrig(s, d.pid, 10143, [{ op: 'call', k: '10143:ask', a: { pid: d.pid } }]); });
 FX[10143].k = { ask: (s, a) => { const p = me(s, a.pid); const n = p.deck.filter(id => id === 10143).length + p.hand.filter(c => c.id === 10143).length; if (n) yesNo(s, a.pid, tr`Scout Kurgo: ${n} weitere Scout Kurgo aus Deck und Hand ins Spiel bringen?`, 'Scout Kurgo', '10143:do', a, true); },

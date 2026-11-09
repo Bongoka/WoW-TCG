@@ -101,7 +101,11 @@ function polymorphed(s, c) {
 function regaliaFoe(s, c) { if (!s.p1.hero.armors.length && !s.p2.hero.armors.length) return false; const pid = ctrlOf(s, c); return [s.p1, s.p2].some(p => p.id !== pid && p.hero.armors.some(a => a.id === 7209 && !metalmorphed(s, a) && !attachedTo(s, a.uid, 7040).length)); }   // Gladiator's Regalia (Set drums): "Opposing allies lose and can't have powers."
 // Weitere "lose and can't have powers"-Quellen: (s, c) => true (dürfen active() nicht aufrufen)
 const NO_POWERS = [];
-function active(s, c) { if (!c) return true; if (NO_POWERS.length && NO_POWERS.some(f => f(s, c))) return false; if (isAllyLike(c) && regaliaFoe(s, c)) return false; if (s.p1.ongoing.length + s.p2.ongoing.length && attachedTo(s, c.uid, 7040).length) return false; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }   // Spell Suppression (Set drums): angehängte Karte verliert ihre Kräfte
+function active(s, c) {
+    if (READ_SCOPE && c && READ_SCOPE.s === s) { const m = READ_SCOPE.act; let v = m.get(c); if (v === undefined) { v = activeNow(s, c); m.set(c, v); } return v; }   // readScope: je Karte nur einmal
+    return activeNow(s, c);
+}
+function activeNow(s, c) { if (!c) return true; if (NO_POWERS.length && NO_POWERS.some(f => f(s, c))) return false; if (isAllyLike(c) && regaliaFoe(s, c)) return false; if (s.p1.ongoing.length + s.p2.ongoing.length && attachedTo(s, c.uid, 7040).length) return false; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }   // Spell Suppression (Set drums): angehängte Karte verliert ihre Kräfte
 // Metalmorph (Set 7): "Attached equipment loses and can't have powers and can't exhaust"
 function metalmorphed(s, c) { return (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') && attachedTo(s, c.uid, 5064).length > 0; }
 const CANT_EXHAUST = [];   // (s, c) => true ohne Karte im Spiel (Kungen the Thunderer, Ice Nova – Set wrathgate)
@@ -127,7 +131,20 @@ function hasType(c, t) { return !!c && ((c.allyTypes && c.allyTypes.includes(t))
 // FX[id].aura = { atk, hp, def, watk, kw, cost, strike, dmgOut, dmgIn, prevent, heal, noPlay, atkBlock, atkTax }
 // Jede Funktion bekommt (s, src, srcPid, …) – src ist die Karte im Spiel, die den Effekt erzeugt.
 let AURA_IDS = null;
+// Nur-Lese-Abschnitt (readScope): solange der Zustand nicht verändert wird – Tote suchen in stateBased, KI-Bewertung –,
+// werden die Dauereffekt-Quellen und active() je Karte nur einmal berechnet. Ohne das prüfte jedes hpOf/atkOf/kwHas
+// alle Karten neu; bei vielen Allies wuchs das quadratisch (Turnier-Decks mit vielen kleinen Allies: Sekunden pro Partie).
+let READ_SCOPE = null;
+function readScope(s, fn) {
+    if (READ_SCOPE) return fn();
+    READ_SCOPE = { s, aura: null, act: new Map() };
+    try { return fn(); } finally { READ_SCOPE = null; }
+}
 function auraSrcs(s) {
+    if (READ_SCOPE && READ_SCOPE.s === s) return READ_SCOPE.aura || (READ_SCOPE.aura = auraSrcsNow(s));
+    return auraSrcsNow(s);
+}
+function auraSrcsNow(s) {
     if (!AURA_IDS) AURA_IDS = new Set(Object.keys(FX).filter(id => FX[id] && FX[id].aura).map(Number));
     const out = [];
     for (const p of [s.p1, s.p2]) {
@@ -804,14 +821,21 @@ function stateBased(s) {
     for (const p of [s.p1, s.p2]) {
         // Gift of Nature (Set 7): "Allies you control can't be destroyed by fatal damage" (zerstört am Zugende, siehe FX[5040])
         const gon = unattachedOngoing(p, 5040).length > 0;
-        const dead = gon ? [] : p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a) && !(FX[a.id] && FX[a.id].noFatal && active(s, a)));   // Zorus (Set illidan)
+        const dead = gon ? [] : readScope(s, () => p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a) && !(FX[a.id] && FX[a.id].noFatal && active(s, a))));   // Zorus (Set illidan)
         for (const a of dead) { L(s, tr`💀 ${a.name}`, "log-hit", p.id); addValue(s, a.lastHitBy, 'kills', 1, 2 + (a.cost || 0), p.id); leavePlay(s, a, 'graveyard', { destroyed: true, cause: 'damage' }); changed = true; }
     }
     if (changed) { flushBatch(s); return true; }
     // Held zerstört oder "decked" (aus leerem Deck ziehen müssen, CR 410.6b) – beide gleichzeitig: Unentschieden (CR 102.1a)
     // Reincarnation (Set 6): "If your hero would be destroyed, remove this ability from the game and remove all but 14 damage from your hero instead."
-    for (const p of [s.p1, s.p2]) { if (p.decked || p.hero.damage < hpOf(s, p.hero) || isIndestructible(s, p.hero)) continue; const r = unattachedOngoing(p, 4097)[0]; if (r && removeFromGame(s, r) !== false) { p.hero.damage = Math.min(p.hero.damage, 14); L(s, tr`Reincarnation: ${p.hero.name} überlebt mit 14 Schaden.`, '', p.id); } }
-    const heroDead = [s.p1, s.p2].filter(p => p.decked || (p.hero.damage >= hpOf(s, p.hero) && !alliesOf(p).some(a => a.id === 263 && active(s, a)) && !isIndestructible(s, p.hero)));
+    // Beide Prüfungen in einem Nur-Lese-Durchgang; nach einer Reincarnation (Zustand geändert) neu prüfen
+    const heroCheck = () => readScope(s, () => {
+        const fatal = [s.p1, s.p2].filter(p => !p.decked && p.hero.damage >= hpOf(s, p.hero) && !isIndestructible(s, p.hero));
+        return { fatal, dead: [s.p1, s.p2].filter(p => p.decked || (fatal.includes(p) && !alliesOf(p).some(a => a.id === 263 && active(s, a)))) };
+    });
+    let hc = heroCheck(), reinc = false;
+    for (const p of hc.fatal) { const r = unattachedOngoing(p, 4097)[0]; if (r && removeFromGame(s, r) !== false) { p.hero.damage = Math.min(p.hero.damage, 14); L(s, tr`Reincarnation: ${p.hero.name} überlebt mit 14 Schaden.`, '', p.id); reinc = true; } }
+    if (reinc) hc = heroCheck();
+    const heroDead = hc.dead;
     if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, tr('Unentschieden!')); return true; }
     if (heroDead.length === 1) { const p = heroDead[0]; lose(s, p.id, p.decked ? 'DECKOUT' : tr`${p.hero.name} ist gefallen.`); return true; }
     for (const f of STATE_FIX) if (f(s)) { flushBatch(s); return true; }                   // Set drums: "while … remains under your control" (Brelnor)

@@ -1111,7 +1111,7 @@ function simProgressUI(title) {
         const rem = Math.ceil(ms / done * (total - done) / 1000);
         const left = rem > 60 ? tr`Noch ca. ${Math.floor(rem / 60)}m ${rem % 60}s` : tr`Noch ca. ${rem}s`;
         ui.eta.textContent = left;
-        ui.progress.textContent = tr`Simuliere... ${done}/${total} (${(ms / 1000).toFixed(1)}s)`;
+        ui.progress.textContent = tr`Simuliere... ${done}/${total} (${(ms / 1000).toFixed(1)}s)` + (ui.mode ? ` · ${ui.mode}` : '');
         const now = performance.now();
         if (now - lastBadge > 250 || done === total) { lastBadge = now; simBadgeUpdate(`${Math.floor(100 * done / total)} % · ${left}`, done / total); }
     };
@@ -1159,13 +1159,19 @@ async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
     };
     try {
         const pool = simPool();
+        // Anzeige, wie viele Kerne rechnen – und warum nur einer (Seite als Datei geöffnet: Chrome sperrt dort Web Worker)
+        const oneCore = () => {
+            ui.mode = tr('1 Kern');
+            if (location.protocol === 'file:') ui.content.innerHTML = ui.warn = tr`<div style="color:#fbbf24;font-size:12px;margin-bottom:8px;">⚠️ Das Spiel ist als Datei geöffnet (file://). Der Browser sperrt dort Web Worker – die Simulation rechnet nur auf einem Kern. Starte das Spiel über <b>Spiel starten.bat</b> im Spielordner, dann rechnen alle Kerne.</div>`;
+        };
+        if (pool) ui.mode = tr`${pool.length} Kerne`; else oneCore();
         if (pool) await Promise.all(pool.map(async w => {
             let job;
             while (!SIM_POOL.failed && (job = takeJob())) {
                 let res;
                 try { res = await simInWorker(w, job[0], job[1]); }
                 catch (e) {
-                    if (e && e.fatal) { if (!SIM_POOL.failed) { console.warn('Simulations-Worker nicht nutzbar, weiter im Haupt-Thread:', e.msg); simPoolBroken(); } retry.push(job); return; }
+                    if (e && e.fatal) { if (!SIM_POOL.failed) { console.warn('Simulations-Worker nicht nutzbar, weiter im Haupt-Thread:', e.msg); simPoolBroken(); oneCore(); } retry.push(job); return; }
                     console.error("Simulationsfehler:", e && e.msg || e); continue;
                 }
                 record(job[0], job[1], res);
@@ -1201,7 +1207,7 @@ async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
     html += wrTable(tr('Klassen'), sorted(classStats), tr('Klasse'));
     html += renderCardAnalysis(cardStats, totalGames);
     } catch (e) { console.error("Auswertung abgebrochen:", e); html += tr`<div style="color:#f87171;">Fehler in der Auswertung: ${esc(e.message)} – angezeigt ist der Teil bis dahin.</div>`; }
-    ui.content.innerHTML = html;
+    ui.content.innerHTML = (ui.warn || '') + html;
     addLog(tr`🧪 ${title}: ${totalGames} Spiele${stopReason ? ` (abgebrochen, ${pct(totalGames, totalPlanned)})` : ''}.`, "log-turn");
 }
 // Turnier-Decks (js/tourneydecks.js) für die Simulation: direkt aus den Listen, unabhängig von "Deine Decks"

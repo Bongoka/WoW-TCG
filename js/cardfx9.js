@@ -264,7 +264,8 @@ FX[7053] = { modes: playerModes(-3, 3), resolve: (s, it) => { const n = alliesOf
 FX[7054] = { powers: [{ key: 'misery', label: tr('Ziel-Spieler legt die obersten X Karten in den Friedhof'), cost: 'X', act: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -3 }],
     resolve: (s, it) => millN(s, it.mode, it.x || 0) }] };
 function millN(s, pid, n) { const p = me(s, pid); let k = 0; for (let i = 0; i < n && p.deck.length; i++) { p.graveyard.push(makeCardInst(p.deck.pop(), false, p.deckOwner || pid)); k++; } if (k) L(s, tr`${p.hero.name} legt ${k} Karte(n) vom Deck in den Friedhof.`, '', pid); }
-FX[7055] = { xRange: () => ({ min: 0, max: 20 }), modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }],
+// KI: nicht, wenn der Gegner einem damit Babagahnoosh (Set icecrown) geben kann und das zu viele Karten kostet
+FX[7055] = { aiSkip: (s, pid, c, o) => typeof babaTooCostly === 'function' && getOpponent(s, pid).hand.some(a => a.id === 13165 && (a.cost || 0) <= (o.x || 0)) && babaTooCostly(s, pid, c), xRange: () => ({ min: 0, max: 20 }), modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }],
     resolve: (s, it) => { const o = me(s, oppPid(s, it.pl)); showHand(s, it.pl, o.id, 'Precognition'); const l = o.hand.filter(c => c.type === 'Ally' && (c.cost || 0) <= (it.x || 0)); if (!l.length) return;
         ask(s, { pid: o.id, prompt: tr`Precognition: Welcher Ally (Kosten ≤ ${it.x || 0}) geht ins Spiel des Gegners?`, src: 'Precognition', opts: l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -(c.cost || 0) })), k: '7055:do', a: { pid: it.pl, from: o.id } }); },
     k: { do: (s, a, v) => { const p = me(s, a.from), c = p.hand.find(x => x.uid === v); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); putIntoPlay(s, c, a.pid); } } };
