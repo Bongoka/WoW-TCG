@@ -1630,3 +1630,14 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(-
     .pod-tile .dbox { --w: 92px; --h: 126px; --d: 36px; }
     .wpod.p1 .pod-tile .dbox { --w: 108px; --h: 148px; --d: 42px; }
 }
+
+/* Simulation im Hintergrund: kleine Anzeige oben in der Mitte (Fortschritt, Restzeit), Klick öffnet das Fenster */
+#sim-badge { position: fixed; top: 6px; left: 50%; transform: translateX(-50%); z-index: 99500; min-width: 190px; padding: 5px 12px 6px; border-radius: 10px;
+    background: rgba(20, 16, 10, 0.92); border: 1px solid var(--gold-dark); box-shadow: 0 4px 14px rgba(0,0,0,.6); color: var(--text-main); font-size: 12px; cursor: pointer; user-select: none; }
+#sim-badge:hover { border-color: var(--gold-light); }
+#sim-badge .sb-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+#sim-badge .sb-bar { height: 3px; margin-top: 4px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+#sim-badge .sb-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--gold-dark), var(--gold-light)); transition: width .25s ease-out; }
+#sim-badge.done { border-color: #4ade80; animation: sim-badge-pulse 1.6s ease-in-out infinite; }
+#sim-badge.done .sb-bar { display: none; }
+@keyframes sim-badge-pulse { 0%, 100% { box-shadow: 0 4px 14px rgba(0,0,0,.6); } 50% { box-shadow: 0 0 16px rgba(74,222,128,.55); } }

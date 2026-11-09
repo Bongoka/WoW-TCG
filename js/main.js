@@ -446,7 +446,7 @@ function bootGame() {
             const dm = open.find(m => m.id === 'decision-modal');
             if (dm) { const b = [...dm.querySelectorAll('#decision-actions button')].find(x => x.textContent === tr('Abbrechen')); if (b) b.click(); return; }
             const close = open.find(m => ['sim-modal', 'deck-overview-modal', 'graveyard-modal'].includes(m.id));
-            if (close) { if (close.id === 'sim-modal') document.getElementById('sim-close-btn').click(); else close.style.display = 'none'; }
+            if (close) { if (close.id === 'sim-modal') { if (SIM_STOP.running) simToBackground(); else document.getElementById('sim-close-btn').click(); } else close.style.display = 'none'; }   // laufende Simulation: Esc = im Hintergrund weiter
             return;
         }
         if (open.length || !G || G.gameOver) return;
@@ -493,7 +493,7 @@ function bootGame() {
     popBtn.onclick = () => { try { localStorage.setItem(NET_POPUP_KEY, netPopupsOn() ? "off" : "on"); } catch (e) {} updPop(); netBackground(); };
     updPop();
     setTimeout(netBackground, 3000);                                                      // im Hintergrund verbinden: Hinweise auf neue Lobbys
-    document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; document.getElementById("sim-modal").style.display = "none"; };   // laufende Simulation beenden
+    document.getElementById("sim-close-btn").onclick = () => { SIM_STOP.req = true; SIM_STOP.closed = true; document.getElementById("sim-modal").style.display = "none"; const b = document.getElementById("sim-badge"); if (b) b.style.display = "none"; };   // laufende Simulation beenden (keine Hintergrund-Anzeige)
     document.getElementById("deck-overview-close-btn").onclick = () => { document.getElementById("deck-overview-modal").style.display = "none"; };
     document.getElementById("graveyard-close-btn").onclick = () => { document.getElementById("graveyard-modal").style.display = "none"; };
     document.getElementById("graveyard-modal").onclick = (e) => { if (e.target.id === "graveyard-modal") e.target.style.display = "none"; };

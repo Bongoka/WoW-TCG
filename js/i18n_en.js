@@ -3593,4 +3593,11 @@ var I18N_EN = {
     'Kein befreundeter Spieler (1 gegen 1)': 'No friendly player (1 vs 1)',
     'Treats for Great-father Winter: Gingerbread Cookie abwerfen, um eine [Winter Veil]-Karte zu suchen?': 'Treats for Great-father Winter: Discard Gingerbread Cookie to search for a [Winter Veil] card?',
     '"All allies also have that type": Ein zusätzlicher Typ für alle Allies müsste in jede Typ-Prüfung der Engine (Rasse, Ally-Typ, Pet, Totem …) eingreifen – nicht umgesetzt.': '"All allies also have that type": an extra type for all allies would have to reach into every type check of the engine (race, ally type, Pet, Totem …) – not implemented.',
+    'Initialisiere...': 'Initializing...',
+    'Simuliere... {0}/{1} ({2}s)': 'Simulating... {0}/{1} ({2}s)',
+    'Im Hintergrund weiterlaufen lassen': 'Keep running in the background',
+    '{0}: {1} – ansehen': '{0}: {1} – view',
+    'abgebrochen': 'stopped',
+    'fertig': 'done',
+    'Es läuft schon eine Simulation.': 'A simulation is already running.',
 };

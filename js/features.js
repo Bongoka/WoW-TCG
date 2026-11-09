@@ -1024,29 +1024,96 @@ function simYield() {
     if (!SIM_YIELD.ch) SIM_YIELD.ch = new MessageChannel();
     return new Promise(r => { SIM_YIELD.ch.port1.onmessage = () => r(); SIM_YIELD.ch.port2.postMessage(0); });
 }
-// Abbruch einer laufenden Simulation (Knopf „Abbrechen & auswerten“ oder Schließen): wird zwischen zwei Spielen geprüft
-const SIM_STOP = { req: false };
+// Abbruch einer laufenden Simulation (Knopf „Abbrechen & auswerten“ oder Schließen): wird zwischen zwei Spielen geprüft.
+// running: es läuft gerade eine Simulation (nur eine gleichzeitig)
+const SIM_STOP = { req: false, running: false };
+
+// Web Worker für die Simulation (js/simworker.js): je Kern eine Partie gleichzeitig, zwei Kerne bleiben für Seite
+// und CPU-Gegner frei. Geht kein Worker (z. B. Chrome mit file://), spielt runSimulation wie früher im Haupt-Thread.
+const SIM_POOL = { list: null, failed: false };
+function simPool() {
+    if (SIM_POOL.failed || typeof Worker === 'undefined') return null;
+    if (SIM_POOL.list) return SIM_POOL.list;
+    const ver = ((document.querySelector('script[src*="main.js"]') || {}).src || '').replace(/^[^?]*/, '');
+    const n = Math.max(1, Math.min(32, (navigator.hardwareConcurrency || 4) - 2));
+    try { SIM_POOL.list = Array.from({ length: n }, () => new Worker('js/simworker.js' + ver)); }
+    catch (e) { console.warn('Simulation ohne Worker:', e); SIM_POOL.failed = true; return null; }
+    return SIM_POOL.list;
+}
+function simPoolBroken() {
+    SIM_POOL.failed = true;
+    const list = SIM_POOL.list || []; SIM_POOL.list = null;
+    list.forEach(w => { w.terminate(); if (w._rej) w._rej({ fatal: true, msg: 'beendet' }); });   // wartende Partien freigeben (kommen auf "retry")
+}
+// Eine Partie in einem Worker. Fehler in der Partie: { game: true } (Spiel überspringen), Ladefehler des Workers: { fatal: true }
+function simInWorker(w, a, b) {
+    return new Promise((res0, rej0) => {
+        const resolve = v => { w._rej = null; res0(v); }, reject = v => { w._rej = null; rej0(v); };
+        w._rej = reject;
+        w.onmessage = e => e.data.error ? reject({ game: true, msg: e.data.error }) : resolve(e.data.res);
+        w.onerror = ev => { ev.preventDefault(); reject({ fatal: true, msg: ev.message || 'Worker-Fehler' }); };
+        w.postMessage({ a, b, lang: LANG });
+    });
+}
+
+// Kleine Anzeige oben in der Mitte, solange die Simulation im Hintergrund läuft (Fenster zu, Spiel geht weiter).
+// Klick öffnet das Simulationsfenster wieder.
+function simBadge() {
+    let b = document.getElementById('sim-badge');
+    if (!b) {
+        b = document.createElement('div'); b.id = 'sim-badge';
+        b.innerHTML = '<div class="sb-row"><span class="sb-ico">🧪</span><span class="sb-text"></span></div><div class="sb-bar"><div></div></div>';
+        b.onclick = () => { document.getElementById('sim-modal').style.display = 'flex'; b.style.display = 'none'; };
+        document.body.appendChild(b);
+    }
+    return b;
+}
+function simBadgeUpdate(text, frac, done) {
+    if (SIM_STOP.closed) return;                                                              // vom Nutzer geschlossen: keine Anzeige
+    const b = simBadge();
+    b.querySelector('.sb-text').textContent = text;
+    b.querySelector('.sb-bar > div').style.width = `${Math.round(frac * 100)}%`;
+    b.classList.toggle('done', !!done);
+    b.style.display = document.getElementById('sim-modal').style.display === 'none' ? '' : 'none';
+}
+// Simulationsfenster in den Hintergrund schicken (Simulation läuft weiter)
+function simToBackground() {
+    document.getElementById('sim-modal').style.display = 'none';
+    simBadge().style.display = '';
+}
+
 function simProgressUI(title) {
     const modal = document.getElementById("sim-modal");
     document.getElementById("sim-title").textContent = title; modal.style.display = "flex";
     const ui = { progress: document.getElementById("sim-progress-text"), eta: document.getElementById("sim-progress-eta"), bar: document.getElementById("sim-progress-bar"), content: document.getElementById("sim-content"), t0: performance.now() };
-    ui.content.innerHTML = ""; ui.progress.textContent = "Initialisiere..."; ui.eta.textContent = ""; ui.bar.style.width = "0%";
-    SIM_STOP.req = false;
+    ui.content.innerHTML = ""; ui.progress.textContent = tr("Initialisiere..."); ui.eta.textContent = ""; ui.bar.style.width = "0%";
+    SIM_STOP.req = false; SIM_STOP.closed = false;
+    const close = document.getElementById("sim-close-btn");
     let stop = document.getElementById("sim-stop-btn");
     if (!stop) {
-        const close = document.getElementById("sim-close-btn");
-        stop = document.createElement("button"); stop.id = "sim-stop-btn"; stop.textContent = tr("Abbrechen & auswerten"); stop.style.marginRight = "8px";
+        stop = document.createElement("button"); stop.id = "sim-stop-btn"; stop.style.marginRight = "8px";
         close.parentNode.insertBefore(stop, close);
     }
+    let bg = document.getElementById("sim-bg-btn");
+    if (!bg) {
+        bg = document.createElement("button"); bg.id = "sim-bg-btn"; bg.style.marginRight = "8px";
+        close.parentNode.insertBefore(bg, stop);
+    }
+    bg.textContent = tr("Im Hintergrund weiterlaufen lassen"); bg.onclick = simToBackground; bg.style.display = "";
     stop.onclick = () => { SIM_STOP.req = true; stop.disabled = true; stop.textContent = tr("Breche ab…"); };
     stop.disabled = false; stop.textContent = tr("Abbrechen & auswerten"); stop.style.display = "";
-    ui.done = () => { stop.style.display = "none"; };
+    const short = title.length > 34 ? title.slice(0, 33) + '…' : title;
+    ui.done = (msg) => { stop.style.display = "none"; bg.style.display = "none"; if (!SIM_STOP.closed) simBadgeUpdate(tr`${short}: ${msg} – ansehen`, 1, true); };
+    let lastBadge = 0;
     ui.step = (done, total) => {
         const ms = performance.now() - ui.t0;
         ui.bar.style.width = `${(done / total) * 100}%`;
         const rem = Math.ceil(ms / done * (total - done) / 1000);
-        ui.eta.textContent = rem > 60 ? tr`Noch ca. ${Math.floor(rem / 60)}m ${rem % 60}s` : tr`Noch ca. ${rem}s`;
-        ui.progress.textContent = `Simuliere... ${done}/${total} (${(ms / 1000).toFixed(1)}s)`;
+        const left = rem > 60 ? tr`Noch ca. ${Math.floor(rem / 60)}m ${rem % 60}s` : tr`Noch ca. ${rem}s`;
+        ui.eta.textContent = left;
+        ui.progress.textContent = tr`Simuliere... ${done}/${total} (${(ms / 1000).toFixed(1)}s)`;
+        const now = performance.now();
+        if (now - lastBadge > 250 || done === total) { lastBadge = now; simBadgeUpdate(`${Math.floor(100 * done / total)} % · ${left}`, done / total); }
     };
     return ui;
 }
@@ -1056,6 +1123,11 @@ function simProgressUI(title) {
 // pairs (optional): Liste von [deckA, deckB] oder Funktionen, die bei jedem Spiel ein neues Paar liefern
 // (All-Cards-Test: Zufallsdecks). Ohne pairs: jedes Deck aus decks gegen jedes.
 async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = tr("CPU vs CPU – Deck-Simulation"), pairs = null) {
+    if (SIM_STOP.running) { simBadge().onclick(); showToast(tr('Es läuft schon eine Simulation.'), false, 3000); return; }
+    SIM_STOP.running = true;
+    try { await runSimulationInner(gamesPerMatchup, decks, title, pairs); } finally { SIM_STOP.running = false; }
+}
+async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
     const ui = simProgressUI(title);
     const cardStats = {}; let firstWins = 0, secondWins = 0, totalGames = 0, timeouts = 0;
     const factionStats = {}, classStats = {}, deckStats = {};
@@ -1065,24 +1137,50 @@ async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = tr("CP
     const bump = (o, k, won) => { const e = o[k] || (o[k] = { games: 0, wins: 0 }); e.games++; if (won) e.wins++; };
     // Abbruch (Knopf/Schließen) oder unerwarteter Fehler: Schleife verlassen und das bisher Gesammelte auswerten
     let stopReason = null;
-    // In Runden: jede Runde spielt jede Paarung einmal – ein abgebrochener Test bleibt so ausgewogen
-    for (let g = 0; g < gamesPerMatchup && !stopReason; g++) {
-        try { for (let mi = 0; mi < matchups.length; mi++) {
-            const m = matchups[mi], [deckA, deckB] = typeof m === 'function' ? m() : m;
-            if (SIM_STOP.req) { stopReason = tr('vom Nutzer abgebrochen'); break; }
+    // In Runden: jede Runde spielt jede Paarung einmal – ein abgebrochener Test bleibt so ausgewogen.
+    // Die Partien werden in dieser Reihenfolge ausgegeben; mit Workern laufen mehrere gleichzeitig.
+    let k = 0; const retry = [];
+    const takeJob = () => {
+        if (stopReason) return null;
+        if (SIM_STOP.req) { stopReason = tr('vom Nutzer abgebrochen'); return null; }
+        if (retry.length) return retry.pop();
+        if (k >= totalPlanned) return null;
+        const m = matchups[k++ % matchups.length];
+        return typeof m === 'function' ? m() : m;
+    };
+    const record = (deckA, deckB, res) => {
+        totalGames++; if (res.timeout) timeouts++;
+        if (res.winner === 1) firstWins++; else secondWins++;
+        bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
+        bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
+        bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
+        recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
+        ui.step(totalGames, totalPlanned);
+    };
+    try {
+        const pool = simPool();
+        if (pool) await Promise.all(pool.map(async w => {
+            let job;
+            while (!SIM_POOL.failed && (job = takeJob())) {
+                let res;
+                try { res = await simInWorker(w, job[0], job[1]); }
+                catch (e) {
+                    if (e && e.fatal) { if (!SIM_POOL.failed) { console.warn('Simulations-Worker nicht nutzbar, weiter im Haupt-Thread:', e.msg); simPoolBroken(); } retry.push(job); return; }
+                    console.error("Simulationsfehler:", e && e.msg || e); continue;
+                }
+                record(job[0], job[1], res);
+            }
+        }));
+        // Ohne Worker (oder Worker ausgefallen): wie früher nacheinander im Haupt-Thread
+        let job;
+        while ((job = takeJob())) {
             let res;
-            try { res = simulateOneGame(deckA, deckB); } catch (e) { console.error("Simulationsfehler:", e); continue; }
-            totalGames++; if (res.timeout) timeouts++;
-            if (res.winner === 1) firstWins++; else secondWins++;
-            bump(factionStats, getDeckFaction(deckA), res.winner === 1); bump(factionStats, getDeckFaction(deckB), res.winner === 2);
-            bump(classStats, getDeckClass(deckA), res.winner === 1); bump(classStats, getDeckClass(deckB), res.winner === 2);
-            bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
-            recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
-            ui.step(totalGames, totalPlanned);
+            try { res = simulateOneGame(job[0], job[1]); } catch (e) { console.error("Simulationsfehler:", e); continue; }
+            record(job[0], job[1], res);
             await simYield();
-        } } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = tr`Fehler: ${e.message}`; }
-    }
-    ui.done();
+        }
+    } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = tr`Fehler: ${e.message}`; }
+    ui.done(stopReason ? tr('abgebrochen') : tr('fertig'));
     const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
     const secs = ((performance.now() - ui.t0) / 1000).toFixed(1), tmo = timeouts ? tr` (${timeouts} nach Zug-/Zeitlimit gewertet)` : '';
     if (stopReason) ui.progress.textContent = tr`Abgebrochen (${stopReason}) – ${totalGames} von ${totalPlanned} Spielen (${pct(totalGames, totalPlanned)}) in ${secs}s${tmo}.`;
