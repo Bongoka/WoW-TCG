@@ -1316,6 +1316,7 @@ function checkGivenTargets(s, pid, f, card, a) {
         if (given.length < mn || given.length > mx) return tr`Ziel ${i + 1}: falsche Anzahl`;
         if (given.some(u => !sl.cands.includes(u))) return tr('Ungültiges Ziel');
         if (new Set(given).size !== given.length) return tr('Ziele müssen verschieden sein');
+        if (sl.budget !== undefined && slotWeight(s, sl, given) > sl.budget) return tr('Ungültiges Ziel');
     }
     // gleiche Karte nicht in zwei Slots, wenn verlangt
     if (f && f.distinct) { const flat = a.targets.flat(); if (new Set(flat).size !== flat.length) return tr('Ziele müssen verschieden sein'); }
@@ -1463,12 +1464,18 @@ function takeFirstTarget(it, cands) {
 // Lolly the Unsuspecting (Set drums): "All targets are chosen at random." – so viele Ziele wie nötig (mindestens eins), zufällig
 function lollyOn(s) { return [s.p1, s.p2].some(p => p.allies.some(a => a.id === 7134 && active(s, a))); }
 function lollyPick(st, cands) { const left = cands.filter(u => !st.picked.includes(u)); if (!left.length || st.picked.length >= Math.max(1, st.mn)) return '__done'; return left[Math.floor(Math.random() * left.length)]; }
+// Ziel-Slots mit Budget (Faces from the Past: "if their combined cost is less than or equal to …"):
+// sl.budget = Obergrenze, sl.weight(u) = Gewicht eines Ziels; nur Ziele wählbar, die noch hineinpassen
+function slotWeight(s, sl, list) { return sl.budget === undefined ? 0 : list.reduce((n, u) => n + (sl.weight(u) || 0), 0); }
+function slotFits(s, sl, picked, u) { return sl.budget === undefined || slotWeight(s, sl, picked) + (sl.weight(u) || 0) <= sl.budget; }
 function askTarget(s, pid, card, sl, cands, it) {
     const st = it._slot;
-    if (lollyOn(s)) { q(s, { op: 'call', k: 'E:prepTarget', a: {}, v: lollyPick(st, cands) }); return; }
+    cands = cands.filter(u => slotFits(s, sl, st.picked, u));
+    if (lollyOn(s)) { q(s, { op: 'call', k: 'E:prepTarget', a: {}, v: cands.length ? lollyPick(st, cands) : '__done' }); return; }
     const opts = cands.filter(u => !st.picked.includes(u)).map(u => ({ label: targetLabel(s, u, pid), v: u, ai: sl.ai ? sl.ai(u, s) : aiTargetValue(s, pid, u, sl.harm) }));
     if (st.picked.length >= st.mn) opts.push({ label: st.picked.length ? tr('Fertig') : tr('Kein Ziel'), v: '__done', ai: sl.stopAi !== undefined ? sl.stopAi : -0.5 });
-    ask(s, { pid, prompt: `${card.name}: ${sl.label}${st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : ''}`, src: card.name, opts, k: 'E:prepTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
+    const cnt = sl.budget !== undefined ? ` (${tr`Kosten ${slotWeight(s, sl, st.picked)}/${sl.budget}`})` : st.mx > 1 ? ` (${st.picked.length}/${st.mx})` : '';
+    ask(s, { pid, prompt: `${card.name}: ${sl.label}${cnt}`, src: card.name, opts, k: 'E:prepTarget', cancel: true, a: {}, keep: true, target: true, slot: sl.label });
 }
 EK.prepSet = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen')); s.chainPrep[a.key] = v; q(s, { op: 'call', k: 'E:prepItem', a: {} }); };
 EK.prepTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom Spieler abgebrochen'));
@@ -1480,7 +1487,7 @@ EK.prepTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr('vom
     const card = it.kind === 'card' ? it.card : findCharacter(s, it.src);
     const sl = targetSlots(s, p.id, f, card, it)[st.i];
     const used = it.targets.flat().concat(st.picked);
-    const cands = sl.cands.filter(u => !used.includes(u));
+    const cands = sl.cands.filter(u => !used.includes(u) && slotFits(s, sl, st.picked, u));
     if (!cands.length) { it.targets[st.i] = [...st.picked]; delete it._slot; q(s, { op: 'call', k: 'E:prepItem', a: {} }); return; }
     askTarget(s, p.id, card, sl, cands, it);
 };
@@ -1805,7 +1812,7 @@ EK.prepPowerTarget = (s, a, v) => { if (v === '__cancel') return abortPrep(s, tr
     if (v === '__done' || st.picked.length >= st.mx) { it.targets[st.i] = [...st.picked]; delete it._slot; q(s, { op: 'call', k: 'E:prepItemPower', a: {} }); return; }
     const sl = targetSlots(s, it.pl, pw, src, it)[st.i];
     const used = it.targets.flat().concat(st.picked);
-    const cands = sl.cands.filter(u => !used.includes(u));
+    const cands = sl.cands.filter(u => !used.includes(u) && slotFits(s, sl, st.picked, u));
     if (!cands.length) { it.targets[st.i] = [...st.picked]; delete it._slot; q(s, { op: 'call', k: 'E:prepItemPower', a: {} }); return; }
     askTargetPower(s, it.pl, src, sl, cands, it);
 };
@@ -2881,7 +2888,14 @@ function targetCombos(s, pid, slots, distinct) {
         cands.sort((a, b) => (sl.ai ? sl.ai(b, s) : aiTargetValue(s, pid, b, sl.harm)) - (sl.ai ? sl.ai(a, s) : aiTargetValue(s, pid, a, sl.harm)));
         const top = cands.slice(0, mx > 1 ? Math.max(4, mn) : 6);                       // Pflichtanzahl (X Ziele, The More, the Scarier) immer erreichbar
         const choices = [];
-        if (mx <= 0) choices.push([]);                                                     // "Destroy X target armor" mit X = 0
+        // Budget-Slots (Faces from the Past): gierig auffüllen – nach KI-Wert und nach Gewicht
+        if (sl.budget !== undefined) {
+            const fill = order => { const out = []; for (const u of order) if (out.length < mx && slotFits(s, sl, out, u)) out.push(u); return out; };
+            const a1 = fill(cands), a2 = fill(cands.slice().sort((a, b) => (sl.weight(b) || 0) - (sl.weight(a) || 0)));
+            choices.push(a1); if (a2.join() !== a1.join()) choices.push(a2);
+            if (mn === 0) choices.push([]);
+        }
+        else if (mx <= 0) choices.push([]);                                                    // "Destroy X target armor" mit X = 0
         else if (mx === 1) { top.forEach(u => choices.push([u])); if (mn === 0) choices.push([]); }
         else {
             const n = Math.min(mx, top.length);

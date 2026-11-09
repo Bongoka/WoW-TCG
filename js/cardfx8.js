@@ -231,7 +231,9 @@ FX[6066] = { powers: [{ key: 'divspirit', label: tr('Ziehe 1 oder mache bis zu d
 FX[6067] = { resolve: (s, it) => [s.activePlayer, s.activePlayer === 1 ? 2 : 1].forEach(pid => q(s, { op: 'call', k: '6067:ask', a: { pid } })),
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Equal Opportunity: Welchen deiner Allies auf die Hand nehmen?'), 'Equal Opportunity', alliesOf(me(s, a.pid)).map(c => c.uid), '6067:do', a, u => -cardValue(s, findCharacter(s, u))),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) leavePlay(s, c, 'hand'); } } };
-FX[6068] = { slots: (s, pid) => [{ label: tr('Allies in deinem Friedhof'), cands: gyCands(s, pid, c => isAllyCard(c)), harm: false, min: 0, max: 99 }],
+// Faces from the Past: Zielwahl nur bis zur Summe = eigene Ressourcen (Budget); geprüft wird noch einmal beim Auflösen
+FX[6068] = { slots: (s, pid) => [{ label: tr('Allies in deinem Friedhof'), cands: gyCands(s, pid, c => isAllyCard(c)), harm: false, min: 0, max: 99,
+        budget: me(s, pid).resources.length, weight: u => { const g = gyCard(s, u); return g ? g.c.cost || 0 : 0; } }],
     resolve: (s, it) => { const l = T(it).filter(u => gyCard(s, u)); const sum = l.reduce((n, u) => n + (gyCard(s, u).c.cost || 0), 0); if (sum <= me(s, it.pl).resources.length) l.forEach(u => fromGyToPlay(s, u, it.pl)); } };
 FX[6069] = { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heal(s, heroOf(s, it.pl).uid, t, 3); } };
 FX[6070] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid && alliesOf(me(s, d.pid)).length) trig(s, { id: 6070, k: 'ask', a: { pid: d.pid } }); } },

@@ -38,6 +38,14 @@
 .cfx-stat-badge.lean span { left: 42%; top: 58%; }
 .cfx-stat-badge.hp-badge span { left: 57%; }
 .cfx-stat-badge.hp-badge.overkill span { color: #ff5a5a; }
+/* Aktuelle Kosten auf der Hand (renderer.js opts.costNow): über dem gedruckten Kostensymbol */
+.cfx-cost-now { position: absolute; z-index: 5; left: 12.6%; top: 8.6%; width: 13cqw; height: 13cqw; transform: translate(-50%, -50%); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font: 900 9.5cqw/1 Impact, 'Arial Black', Georgia, sans-serif; color: #fff; text-shadow: 0 0.4cqw 0.8cqw #000; border: 0.9cqw solid #d6c08a; box-shadow: 0 0 3cqw 0.8cqw rgba(0,0,0,.6); }
+.cfx-cost-now.down { background: radial-gradient(circle at 40% 35%, #34d36b, #0f6b2e); box-shadow: 0 0 3.5cqw 1.2cqw rgba(74,222,128,.75); }
+.cfx-cost-now.up { background: radial-gradient(circle at 40% 35%, #f05252, #7f1d1d); }
+.card-visual.img-ea .cfx-cost-now { left: 10.6%; top: 74%; }
+.card-wrapper.cost-down.cost-down .card-visual { --bd: #4ade80; box-shadow: 0 0 0 0.9cqw #4ade80, 0 0 5cqw 1.4cqw rgba(74,222,128,.7); }
+.card-wrapper.cost-down.cost-down .card-visual.has-img::after { box-shadow: inset 0 0 0 0.9cqw #4ade80; }
 .cfx-stat-badge.def-badge { margin-left: auto; }
 .card-action-bar { position: absolute; left: 0; right: 0; bottom: -32px; z-index: 20; display: flex; gap: 4px; opacity: 0; transition: opacity .15s; pointer-events: auto; }
 .card-wrapper:hover .card-action-bar { opacity: 1; }

@@ -1341,6 +1341,25 @@ function runRuleTests() {
         discardHand(s2, P(s2, 1)); process(s2); autoResolve(s2);
         assert(P(s2, 1).hero.damage - d1 === 6, `Orlund nach discardHand: ${P(s2, 1).hero.damage - d1} statt 6 Schaden`);
     });
+    test(135, 'Faces from the Past: Ziele nur bis zur Kostensumme = eigene Ressourcen, KI-Vorschläge halten das Budget ein', () => {
+        const s = fresh(); const p = P(s, 1); p.resources = []; res(s, 1, 7);
+        const al = Object.values(CARDS).filter(c => c.type === 'Ally' && !c.isToken && !c.unique && c.cost >= 2 && c.cost <= 5).slice(0, 4);
+        const gy = al.map(c => { const x = makeCardInst(c.id, false, 1); p.graveyard.push(x); return x; });
+        const sl = FX[6068].slots(s, 1)[0];
+        assert(sl.budget === 7, `Budget ${sl.budget} statt 7`);
+        const sum = l => l.reduce((n, u) => n + gy.find(g => g.uid === u).cost, 0);
+        assert(gy.length && sum(gy.map(g => g.uid)) > 7, 'Testaufbau: Summe muss über 7 liegen');
+        const combos = targetCombos(s, 1, [sl], false);
+        assert(combos && combos.length && combos.every(c => sum(c[0]) <= 7), 'KI-Ziele überschreiten das Budget');
+        assert(checkGivenTargets(s, 1, FX[6068], CARDS[6068], { targets: [gy.map(g => g.uid)] }), 'Alle Allies (über Budget) als Ziele erlaubt');
+        // Mensch: nach den Wahlen nur noch passende Allies angeboten
+        const big = gy.slice().sort((a, b) => b.cost - a.cost)[0];
+        const it = { kind: 'card', card: makeCardInst(6068, false, 1), pl: 1, targets: [], _slot: { i: 0, mn: 0, mx: 99, picked: [big.uid] } };
+        s.humans = [1]; s.chainPrep = it; askTarget(s, 1, it.card, sl, sl.cands.filter(u => u !== big.uid), it); process(s);
+        assert(s.pending && s.pending.kind === 'choose', 'Keine Zielauswahl');
+        assert(s.pending.opts.filter(o => typeof o.v === 'string' && !o.v.startsWith('__')).every(o => big.cost + gy.find(g => g.uid === o.v).cost <= 7), 'Ally über Budget angeboten');
+        assert(s.pending.prompt.includes(`${big.cost}/7`), 'Kostenanzeige fehlt: ' + s.pending.prompt);
+    });
     LANG = prevLang;
     return results;
 }

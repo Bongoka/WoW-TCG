@@ -87,6 +87,14 @@
             img.src = cands[0];
         }
         face.appendChild(img);
+        // Aktuelle Kosten auf der Hand (opts.costNow): Plakette genau über dem gedruckten Kostensymbol
+        // (normale Karte oben links, Extended Art links an der Namensleiste: Klasse img-ea)
+        if (opts.costNow !== undefined && card.cost !== undefined && opts.costNow !== card.cost) {
+            const cb = el('div', 'cfx-cost-now ' + (opts.costNow < card.cost ? 'down' : 'up')); cb.textContent = opts.costNow;
+            face.appendChild(cb);
+            const markEa = () => face.classList.toggle('img-ea', /\(EA\)|%28EA%29/.test(img.src));
+            if (known) markEa(); else img.addEventListener('load', markEa);
+        }
         // Bekannte Abweichung vom Kartentext (CARD_ISSUES): Warnzeichen auf der Karte
         if (typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[card.id]) {
             const iss = el('div', 'cfx-issue'); iss.textContent = '⚠'; iss.title = tr('Nicht vollständig umgesetzt: ') + tr(CARD_ISSUES[card.id]);

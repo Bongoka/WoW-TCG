@@ -1085,7 +1085,10 @@ function renderPlayerHand(p) {
     const choices = choiceUids();
     p.hand.forEach((card, idx) => {
         const slot = document.createElement("div"); slot.className = "hand-card-slot";
-        const node = createCardDOM(card, false);
+        // Aktuelle Kosten (Rabatte wie Nature's Swiftness, Aufschläge): Plakette auf der Karte, günstigere Karten leuchten grün
+        const costNow = card.cost !== undefined && !card.xCost ? getPlayCost(G, p, card, 0) : undefined;
+        const node = createCardDOM(card, false, null, { costNow });
+        if (costNow !== undefined && costNow < card.cost) node.classList.add('cost-down');
         const offset = idx - mid;
         slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(${offset * 6}deg)`;
         if (choices.has(card.uid)) {

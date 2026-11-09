@@ -697,6 +697,7 @@ var I18N_EN = {
     'Kontrolle über gegnerischen Ally (Gegner ohne Handkarten)': 'Control an opposing ally (opponent has no cards in hand)',
     'Kontrolliere Ziel-Ally, solange erschöpft': 'Control target ally while it is exhausted',
     'Kosten {0}: {1} Karten': 'Cost {0}: {1} cards',
+    'Kosten {0}/{1}': 'cost {0}/{1}',
     'Kraft nicht verfügbar': 'Power not available',
     'Kralnor: Deck nach einem Stab durchsuchen und oben auflegen?': 'Kralnor: Search your deck for a staff and put it on top?',
     'Landro: Verloren. (2) bezahlen und neu werfen?': 'Landro: Lost. Pay (2) and flip again?',
