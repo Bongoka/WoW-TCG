@@ -172,7 +172,7 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .booster-pack-container:hover { scale: 1.04; }
 .booster-pack-container.enter { animation: bPackIn .9s cubic-bezier(.2,1.4,.4,1) both, bFloat 3.2s ease-in-out .9s infinite; }
 @keyframes bPackIn { 0% { scale: .4; rotate: -14deg; opacity: 0; translate: 0 120px; } 100% { scale: 1; rotate: 0deg; opacity: 1; translate: 0 0; } }
-.booster-pack-img { position: relative; max-width: 100%; max-height: 100%; border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,.85); user-select: none; }
+.booster-pack-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 10px;   /* füllt den Rahmen immer: alle Booster gleich groß, Glanz deckt genau das Bild */ box-shadow: 0 18px 40px rgba(0,0,0,.85); user-select: none; }
 .booster-pack-aura { position: absolute; inset: -18%; border-radius: 50%; background: radial-gradient(circle, rgba(251,191,36,.55) 0%, rgba(251,146,60,.18) 45%, transparent 70%);
     filter: blur(14px); animation: bAura 2.6s ease-in-out infinite; }
 @keyframes bAura { 0%, 100% { opacity: .55; scale: .95; } 50% { opacity: .9; scale: 1.06; } }
