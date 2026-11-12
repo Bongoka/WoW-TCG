@@ -17,8 +17,8 @@ const UI = {
 // ---------------------------------------------------------------- Spielfeld-Größe (Zoomstufe im Menü)
 // Skaliert alle Karten und Abstände des Spiels über --ui-scale; die Kartengrößen selbst stehen als px-Werte auf :root,
 // damit JS-Messungen (getComputedStyle) fertige Zahlen lesen. Menü und Fenster bleiben unverändert.
-const UI_ZOOM_KEY = 'wow_tcg_ui_zoom', UI_ZOOMS = [50, 75, 100, 125, 150];
-function uiZoom() { try { const v = +localStorage.getItem(UI_ZOOM_KEY); return UI_ZOOMS.includes(v) ? v : 100; } catch (e) { return 100; } }
+const UI_ZOOM_KEY = 'wow_tcg_ui_zoom', UI_ZOOM_MIN = 50, UI_ZOOM_MAX = 150;
+function uiZoom() { try { const v = +localStorage.getItem(UI_ZOOM_KEY); return v >= UI_ZOOM_MIN && v <= UI_ZOOM_MAX ? v : 100; } catch (e) { return 100; } }
 function applyUiZoom() {
     const s = uiZoom() / 100, st = document.documentElement.style;
     st.setProperty('--ui-scale', s);

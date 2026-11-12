@@ -541,11 +541,11 @@ function bootGame() {
     const side = document.getElementById("side-panel"), tab = document.getElementById("side-tab");
     let sideTimer = 0;
     const openSide = () => { clearTimeout(sideTimer); document.body.classList.add('side-open'); };
-    const closeSide = (delay = 350) => { clearTimeout(sideTimer); sideTimer = setTimeout(() => { if (side.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return; document.body.classList.remove('side-open'); }, delay); };
+    const closeSide = (delay = 350) => { clearTimeout(sideTimer); sideTimer = setTimeout(() => { if (side.contains(document.activeElement) && (document.activeElement.tagName === 'SELECT' || document.activeElement.type === 'range')) return; document.body.classList.remove('side-open'); }, delay); };
     tab.addEventListener('mouseenter', openSide); tab.onclick = openSide;
     side.addEventListener('mouseenter', openSide); side.addEventListener('mouseleave', () => closeSide());
     document.addEventListener('pointerdown', e => { if (document.body.classList.contains('side-open') && !side.contains(e.target) && e.target !== tab) closeSide(0); });
-    side.addEventListener('change', e => { if (e.target.tagName === 'SELECT') e.target.blur(); });
+    side.addEventListener('change', e => { if (e.target.tagName === 'SELECT' || e.target.type === 'range') e.target.blur(); });
     // Vollbild (ohne Browserleisten): Knopf im Menü; auf Touch-Geräten automatisch beim ersten Antippen, dazu Querformat
     const fsBtn = document.getElementById("btn-fullscreen");
     const fsEl = document.documentElement, fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -633,11 +633,16 @@ function bootGame() {
         s.value = imgQ(area);
         s.onchange = () => { try { localStorage.setItem(IMG_Q_KEYS[area], s.value); } catch (e) {} rerenderImgs(); };
     }
-    // Spielfeld-Größe (Zoomstufe): wirkt sofort, Layout wird neu gerechnet
-    const zoomSel = document.getElementById('cfg-ui-zoom');
-    zoomSel.innerHTML = UI_ZOOMS.map(z => `<option value="${z}">${z} %</option>`).join('');
-    zoomSel.value = uiZoom();
-    zoomSel.onchange = () => { try { localStorage.setItem(UI_ZOOM_KEY, zoomSel.value); } catch (e) {} applyUiZoom(); rerenderImgs(); };
+    // Spielfeld-Größe: Schieberegler 50–150 %. Beim Ziehen sofort neu anordnen (ohne Gleiten), beim Loslassen ganz neu zeichnen
+    const zoomSel = document.getElementById('cfg-ui-zoom'), zoomVal = document.getElementById('cfg-ui-zoom-val');
+    zoomSel.value = uiZoom(); zoomVal.textContent = uiZoom() + ' %';
+    let zoomRaf = 0;
+    zoomSel.oninput = () => {
+        try { localStorage.setItem(UI_ZOOM_KEY, zoomSel.value); } catch (e) {}
+        zoomVal.textContent = zoomSel.value + ' %'; applyUiZoom();
+        cancelAnimationFrame(zoomRaf); zoomRaf = requestAnimationFrame(() => { if (G) layoutBoard(false); });
+    };
+    zoomSel.onchange = () => { zoomSel.oninput(); rerenderImgs(); };
     probeImageDirs(updateImgStyleOptions);
     const styleSel = document.getElementById("cfg-img-style");
     styleSel.value = useScans() ? 'scans' : 'edited';

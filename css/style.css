@@ -1600,3 +1600,6 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 /* Lebensbalken: nur das Maximum (das aktuelle Leben steht groß auf der Heldenkarte) */
 .hp-num { display: flex; flex-direction: column; align-items: center; line-height: 1; font-family: Georgia, serif; }
 .hp-num span { font-size: 12px; font-weight: bold; color: #b8a78c; }
+/* Einstellungen: Schieberegler (Spielfeld-Größe) mit Wert daneben */
+.cfg-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
+.cfg-val { font-size: 11px; color: var(--text-main); min-width: 38px; text-align: right; }
