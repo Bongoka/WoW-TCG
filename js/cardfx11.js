@@ -376,7 +376,7 @@ FX[10138] = fxMix(onlyOneAttacks(10138), { powers: [{ key: 'nazguk', label: tr('
 FX[10138].k.pay = (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c, { cause: 'cost' }); finishPrep(s); };
 FX[10139] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 10139, k: 'less', a: { pid } }); } }, k: { less: (s, a) => addPE(s, a.pid, { k: 'questLess', v: 1 }) } };
 const sameName4 = (s, pid) => { const m = {}; ownCardsAndRes(s, pid).forEach(c => { const l = locate(s, c.uid); if (l && l.zone === 'resource' && !l.res.faceUp) return; m[c.name] = (m[c.name] || 0) + 1; }); return Object.values(m).some(n => n >= 4); };
-FX[10140] = { alt: { label: tr('Ohne Kosten spielen (vier gleichnamige Karten)'), ai: 5, can: (s, pid) => sameName4(s, pid), pay: (s, it) => altDone(s) } };
+FX[10140] = { alt: { label: tr('Ohne Kosten spielen (vier gleichnamige Karten)'), ai: 5,  free: true, can: (s, pid) => sameName4(s, pid), pay: (s, it) => altDone(s) } };
 FX[10141] = { on: { dmg: (s, c, d, pid) => { if (d.src === c.uid && d.amt > 0) trig(s, { id: 10141, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Rakasa Mournewind: Ziel kann nicht angreifen oder beschützen'), 'Rakasa Mournewind', targetCands(s, a.pid, { char: true, side: 'enemy' }), '10141:do', a), do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) { addTM(c, { k: 'cantAttack', turn: s.turn }); addTM(c, { k: 'cantProtect', turn: s.turn }); } } } };
 FX[10142] = {};

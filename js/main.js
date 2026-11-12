@@ -15,7 +15,7 @@ const useSmall = () => imgStyle() === 'small';                                  
 // Kartenname als Dateiname: Akzente weg, ’ → ', : → ' -', / → '-', "?*<>| weg, " . . ." → "...", Punkte/Leerzeichen am Ende weg
 const imgFileName = name => name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/’/g, "'").replace(/:/g, ' -').replace(/\//g, '-')
     .replace(/["?*<>|]/g, '').replace(/ \. \. \./g, '...').replace(/\s+/g, ' ').replace(/[. ]+$/, '').trim();
-const cardImgBase = cd => `${SET_IMG[cd.set || 1][1]}-${cd.set ? cd.num : cd.id} ${imgFileName(cd.name)}`;
+const cardImgBase = cd => `${SET_IMG[cd.set || 1][1]}-${cd.set ? cd.num : cd.id} ${imgFileName(cd.imgName || cd.name)}`;
 const IMG_SUF = { '': '', '-EA': ' (EA)', '-Back': ' (Back)' };
 // Optionale Ordner, die es nicht gibt (beim Start einmal geprüft): werden dann gar nicht erst angefragt
 const IMG_DIR_MISSING = new Set();
@@ -82,7 +82,7 @@ function imageCandidatesAll(id, mode = 'ea') {
     // Einstellung "Nur kleine Bilder": auch Zoom und Booster nehmen die kleinen Bilder
     const small = suf => ed(dir + ' small', suf), norm = suf => useSmall() ? small(suf) : ed(dir, suf), big = suf => useSmall() ? small(suf) : ed(dir + ' big', suf);
     const zoom = suf => useHQ() ? [...big(suf), ...norm(suf)] : [...norm(suf), ...big(suf)];
-    const old = SET_IMG_PREFIX[cd.set] ? [`cards/${SET_IMG_PREFIX[cd.set]}-${num}-EA.png`, `cards/${SET_IMG_PREFIX[cd.set]}-${num}.png`] : [_cfgImgPath.replace("{id}", id)];
+    const old = SET_IMG_PREFIX[cd.set] ? [`cards/${SET_IMG_PREFIX[cd.set]}-${num}-EA.png`, `cards/${SET_IMG_PREFIX[cd.set]}-${num}.png`] : [_cfgImgPath.replace("{id}", cd.imgId || cd.upgradedFrom || id)];
     // Modi: 'ea' Hand/Spielfeld (Extended Art bevorzugt), 'full' Zoom/Booster (normales Bild), 'back' Heldenrückseite,
     // 'eaCard' / 'eaBig' Extended-Art-Karte aus dem Booster – die gibt es nur bearbeitet, auch wenn Scans gewählt sind
     if (mode === 'eaBig') return [...zoom('-EA'), ...zoom(''), ...old];
@@ -431,6 +431,50 @@ function updateCpuStatus(active, text = "") {
     else box.style.display = "none";
 }
 
+// ---------------------------------------------------------------- Debug: Karte auf die Hand spawnen
+// Treffer für eine Kartensuche: ID, exakter Name, sonst eindeutiger Namensanfang, sonst Namensbestandteil.
+// Helden und Spielsteine (Token) werden nie angeboten.
+function debugCardMatches(query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return [];
+    if (/^\d+$/.test(q)) { const c = CARDS[+q]; return c && c.type !== 'Hero' && !c.isToken ? [+q] : []; }
+    const ids = Object.keys(CARDS).map(Number).filter(id => { const c = CARDS[id]; return c && c.type !== 'Hero' && !c.isToken; });
+    const low = id => String(CARDS[id].name).toLowerCase();
+    const exact = ids.filter(id => low(id) === q);
+    if (exact.length) return exact;
+    const prefix = ids.filter(id => low(id).startsWith(q));
+    if (prefix.length) return prefix;
+    return ids.filter(id => low(id).includes(q));
+}
+// Vorschlagsliste einmalig füllen (alphabetisch, ohne Doppelte)
+function debugFillSpawnList() {
+    const list = document.getElementById('dbg-spawn-list');
+    if (!list || list.dataset.filled) return;
+    const names = [...new Set(Object.values(CARDS).filter(c => c && c.type !== 'Hero' && !c.isToken).map(c => c.name))];
+    names.sort((a, b) => String(a).localeCompare(String(b), 'en'));
+    list.innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
+    list.dataset.filled = '1';
+}
+function debugSpawnCard() {
+    const input = document.getElementById('dbg-spawn-name');
+    if (!input) return;
+    const q = input.value.trim();
+    if (!G || G.gameOver) { showToast(tr('Kein laufendes Spiel.')); return; }
+    if (G.pending) { showToast(tr('Gerade läuft eine Entscheidung.')); return; }
+    const ids = debugCardMatches(q);
+    if (!ids.length) { showToast(tr`Karte nicht gefunden: ${q}`); return; }
+    // Mehrere Drucke desselben Namens: bevorzugt eine Karte mit eigenem Effekt (FX)
+    const id = ids.find(x => FX[x]) || ids[0];
+    const otherNames = [...new Set(ids.map(x => CARDS[x].name))];
+    if (otherNames.length > 1) showToast(tr`Mehrdeutig: ${otherNames.slice(0, 4).join(', ')}`, false);
+    const inst = makeCardInst(id, false, 1);
+    inst.debugSpawn = true;                                                             // wird am Spielende wieder entfernt
+    G.p1.hand.push(inst);
+    L(G, tr`🛠 Debug: ${CARDS[id].name} auf die Hand gelegt.`);
+    input.value = '';
+    process(G); refreshDisplay(G); render();
+}
+
 function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
     document.body.classList.add('dev');                                                // Tests und Debug (Menü rechts „Tests“) überall sichtbar – auf Wunsch auch auf GitHub Pages (Handy-Tests)
@@ -487,6 +531,10 @@ function bootGame() {
     document.getElementById("btn-run-tests").onclick = runAutomatedTests;
     document.getElementById("btn-auto-turn").onclick = autoPlayMyTurn;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
+    document.getElementById("btn-spawn-card").onclick = debugSpawnCard;
+    const spawnInput = document.getElementById("dbg-spawn-name");
+    spawnInput.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); debugSpawnCard(); } };
+    debugFillSpawnList();
     const popBtn = document.getElementById("btn-mp-popups");
     const updPop = () => { popBtn.textContent = netPopupsOn() ? tr("Lobby-Hinweise: An") : tr("Lobby-Hinweise: Aus"); };
     popBtn.onclick = () => { try { localStorage.setItem(NET_POPUP_KEY, netPopupsOn() ? "off" : "on"); } catch (e) {} updPop(); netBackground(); };

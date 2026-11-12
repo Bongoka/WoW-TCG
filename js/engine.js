@@ -116,7 +116,7 @@ function attachedTo(s, uid, id) {
     return out;
 }
 // Ressourcen pro Zug (CR 412.1): eine, Natural Genesis (Set 6) erlaubt jedem Spieler je eine zusätzliche
-function resAllowance(s) { return 1 + [s.p1, s.p2].reduce((n, p) => n + unattachedOngoing(p, 4026).length, 0) + auraSum(s, 'resAllow', s.activePlayer); }   // Call of the Grove (Set scourgewar)
+function resAllowance(s) { return 1 + [s.p1, s.p2].reduce((n, p) => n + unattachedOngoing(p, 4026).length, 0) + auraSum(s, 'resAllow', s.activePlayer) + ((s.rl && typeof RL !== 'undefined' && RL.extraResourceAllowance) ? (RL.extraResourceAllowance(s) || 0) : 0); }   // Call of the Grove (Set scourgewar); RL: Leylinien-Ader
 function unattachedOngoing(p, id) { return (p.ongoing || []).filter(o => !o.attachedTo && o.id === id); }
 // Set drums: Helden-Form "this turn" (Oakenclaw, Maleo: PE heroForm) und Master Instinct (Karte hat diesen Zug Cat statt Bear Form: o.catTurn)
 function heroFormOn(s, pid, form) { return pes(s, pid, 'heroForm').some(m => m.form === form && !m.ended); }

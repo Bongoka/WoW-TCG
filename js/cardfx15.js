@@ -26,7 +26,7 @@ FX[3654] = { on: { endOfTurn: (s, c) => trig(s, { k: 'destroyUid', a: { uid: c.u
 for (const id in CARDS) { const c = CARDS[id]; if (/^Preparation\b|<p> Preparation\b/.test(c.text || '')) c.preparation = true; }
 // s.firstTurnOf: Zugnummer des ersten Zuges je Spieler (engine.js, Zugbeginn); noch nicht gesetzt = Partie hat gerade erst begonnen (Zug 1 oder 2)
 const firstTurnOf = (s, pid) => s.activePlayer === pid && (s.firstTurnOf && s.firstTurnOf[pid] !== undefined ? s.firstTurnOf[pid] === s.turn : s.turn <= 2);
-GLOBAL_ALT.push({ label: tr('Ohne Kosten spielen (Preparation)'), ai: 5, can: (s, pid, card) => !!card.preparation && firstTurnOf(s, pid), pay: (s, it) => altDone(s) });
+GLOBAL_ALT.push({ label: tr('Ohne Kosten spielen (Preparation)'), ai: 5, free: true, can: (s, pid, card) => !!card.preparation && firstTurnOf(s, pid), pay: (s, it) => altDone(s) });
 
 // ---------------------------------------------------------------- Helfer
 const flipSelf15 = (id, name) => ({ powers: [{ key: 'flip15', label: tr`${name} umdrehen`, cost: 5, canUse: (s, pid, src) => !src.flipped || tr('Held wurde bereits umgedreht'),

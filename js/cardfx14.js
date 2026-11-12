@@ -224,7 +224,7 @@ FX[13063] = { resolve: (s, it) => opposingChars(s, it.pl).forEach(c => heroDmg(s
         payExtra: (s, it) => { const l = me(s, it.pl).hand.filter(c => c.type === 'Weapon'); ask(s, { pid: it.pl, prompt: tr('Fan of Knives: Waffe abwerfen'), src: 'Fan of Knives', opts: l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -cardHandValue(s, me(s, it.pl), c) })), k: 'E:discardCostDo', a: {} }); },
         resolve: (s, it) => { if (gyCard(s, it.src)) fromGyToHand(s, it.src); } }] };
 const heroHitOppHero = (s, pid) => pes(s, pid, 'heroCombatHero').length > 0;
-FX[13064] = { alt: { label: tr('Ohne Kosten spielen (Held hat gegnerischem Helden Kampfschaden zugefügt)'), ai: 5, can: (s, pid) => heroHitOppHero(s, pid), pay: (s, it) => altDone(s) },
+FX[13064] = { alt: { label: tr('Ohne Kosten spielen (Held hat gegnerischem Helden Kampfschaden zugefügt)'), ai: 5, free: true, can: (s, pid) => heroHitOppHero(s, pid), pay: (s, it) => altDone(s) },
     slots: (s, pid) => [{ label: tr('Gegnerischer Held'), cands: targetCands(s, pid, { hero: true, side: 'enemy' }), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) trig(s, { id: 13064, k: 'tick', a: { pid, uid: c.uid, h: c.attachedTo } }); } },
     k: { tick: (s, a) => heroDmg(s, a.pid, a.h, 1, 'Nature', { abilityId: 13064, abilityUid: a.uid }) } };

@@ -96,7 +96,7 @@ function renderResourceTray(player, containerId, isHuman) {
         if (r.faceUp) {
             const wrap = document.createElement("div");
             wrap.className = "quest-card-large" + (r.exhausted ? " exhausted" : "");
-            const cardNode = createCardDOM(r.card, false);
+            const cardNode = createCardDOM(r.card, false, null, shownCost(player, r.card) || {});   // offene Quest: aktuelle Abschlusskosten (Mounts u. a.)
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
             if (r.card.type === 'Location' && isHuman) decorateInPlay(cardNode, r.card);         // offene Location (Set drums): Kräfte per Klick
@@ -686,9 +686,27 @@ function showGameOver() {
     if (won) screenShake(0.6);
 }
 function hideGameOver() { const ov = document.getElementById('gameover'); if (ov) ov.style.display = 'none'; }
+// Debug-Spawn: am Spielende alle per Debug erzeugten Karten wieder aus dem Spiel entfernen
+// (Decks speichern nur Karten-IDs – dort landet durch das Spawnen ohnehin nichts)
+function removeDebugSpawnedCards(s) {
+    if (!s) return;
+    const gone = new Set();
+    const keep = c => { if (c && c.debugSpawn) { gone.add(c.uid); return false; } return true; };
+    for (const p of [s.p1, s.p2]) {
+        if (!p) continue;
+        ['hand', 'graveyard', 'allies', 'ongoing', 'removed'].forEach(z => { if (Array.isArray(p[z])) p[z] = p[z].filter(keep); });
+        if (Array.isArray(p.resources)) p.resources = p.resources.filter(r => !(r && r.card && r.card.debugSpawn));
+        if (p.hero) {
+            if (Array.isArray(p.hero.weapons)) p.hero.weapons = p.hero.weapons.filter(keep);
+            if (Array.isArray(p.hero.armors)) p.hero.armors = p.hero.armors.filter(keep);
+        }
+    }
+    if (gone.size && s.vals) for (const uid of gone) delete s.vals[uid];
+}
 function checkGameOverScreen() {
     if (!G || !G.gameOver || !G.real || UI.overFor === G) return;
     UI.overFor = G;
+    removeDebugSpawnedCards(G);
     setTimeout(showGameOver, 1500);
 }
 
@@ -1078,6 +1096,19 @@ function layoutEquipZone(row, zone, isOpponent) {
 }
 
 // ---------------------------------------------------------------- Hand
+// Angezeigte Kosten { costNow, costBase } für die Plakette über dem gedruckten Symbol, oder null wenn unverändert:
+// Quests = Abschlusskosten (Mounts, Aspect of the Cheetah …), sonst Spielkosten mit Rabatten/Aufschlägen;
+// eine Alternative "ohne Kosten" (alt.free: Preparation im ersten Zug u. a.) zeigt 0
+function shownCost(p, card) {
+    if (card.type === 'Quest') {
+        const base = card.questCost || 0, now = questCostOf(G, p, card);
+        return now !== base ? { costNow: now, costBase: base } : null;
+    }
+    if (card.cost === undefined || card.xCost || card.type === 'Location') return null;
+    const alt = altOf(G, p.id, card);
+    const now = alt && alt.free ? 0 : getPlayCost(G, p, card, 0);
+    return now !== card.cost ? { costNow: now, costBase: card.cost } : null;
+}
 function renderPlayerHand(p) {
     const box = document.getElementById("bot-hand"); box.innerHTML = "";
     if (p.hand.length === 0) { UI.handSeen = new Set(); UI.handFly.clear(); return; }
@@ -1086,9 +1117,9 @@ function renderPlayerHand(p) {
     p.hand.forEach((card, idx) => {
         const slot = document.createElement("div"); slot.className = "hand-card-slot";
         // Aktuelle Kosten (Rabatte wie Nature's Swiftness, Aufschläge): Plakette auf der Karte, günstigere Karten leuchten grün
-        const costNow = card.cost !== undefined && !card.xCost ? getPlayCost(G, p, card, 0) : undefined;
-        const node = createCardDOM(card, false, null, { costNow });
-        if (costNow !== undefined && costNow < card.cost) node.classList.add('cost-down');
+        const sc = shownCost(p, card);
+        const node = createCardDOM(card, false, null, sc || {});
+        if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down');
         const offset = idx - mid;
         slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(${offset * 6}deg)`;
         if (choices.has(card.uid)) {

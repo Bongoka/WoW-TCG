@@ -702,7 +702,7 @@ FX[11193] = fxMix(onEnter(11193, 'go'), { k: { go: (s, a) => mayPick(s, a.pid, t
 FX[11194] = fxMix(resist('Shadow'), { powers: [{ key: 'prot', label: tr('Ziel erhält Protector'), cost: 2, act: true, canUse: handN, payExtra: discardCost(11194), slots: slotChar(tr('Ziel'), false),
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'protector', turn: s.turn }); } }] });
 onEvt('dmg', (s, d) => { if (d.amt <= 0 || d.dt !== 'Shadow') return; const src = d.src && findCharacter(s, d.src), t = findCharacter(s, d.tgt); if (!src || !t || t.type !== 'Hero' || !isChar(src)) return; const sp = ctrlOf(s, src); if (sp && sp !== ctrlOf(s, t)) (s.shHero12 = s.shHero12 || {})[sp] = s.turn; });
-FX[11195] = fxMix(resist('Shadow'), { alt: { label: tr('Ohne Kosten spielen (Schattenschaden an gegnerischem Helden in diesem Zug)'), ai: 5, can: (s, pid) => (s.shHero12 || {})[pid] === s.turn, pay: (s, it) => altDone(s) } });
+FX[11195] = fxMix(resist('Shadow'), { alt: { label: tr('Ohne Kosten spielen (Schattenschaden an gegnerischem Helden in diesem Zug)'), ai: 5, free: true, can: (s, pid) => (s.shHero12 || {})[pid] === s.turn, pay: (s, it) => altDone(s) } });
 FX[11196] = { on: { damaged: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.src === c.uid && d.amt > 0 && t && isAllyLike(t) && t.exhausted) trig(s, { id: 11196, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => mayPick(s, a.pid, tr('Verzuk Bloodfist: Ziel-Ausrüstung zerstören?'), 'Verzuk Bloodfist', targetCands(s, a.pid, { equipment: true }), 'E:optDestroy', a) } };
 FX[11197] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 11197, k: 'go', a: { pid, uid: c.uid } }); } },
