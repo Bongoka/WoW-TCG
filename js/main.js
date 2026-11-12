@@ -8,10 +8,22 @@ const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENC
 // Einstellung Kartenbilder: 'edited' Normal, 'scans' Original-Scans, 'hq' Normal + High Resolution (Zoom aus "<set> big").
 // Nötig ist nur der Ordner "<set>" – alle anderen sind optional, fehlende Bilder fallen auf die vorhandenen zurück.
 const IMG_STYLE_KEY = 'wow_tcg_img_style';
+// Bildqualität je Bereich: Handkarten (auch Listen, Deck-Builder), Karten im Spiel, große Zoom-Karte (auch Booster).
+// 'small' = "<set> small" (358 px), 'norm' = "<set>" (716 px), 'big' = "<set> big" (1432 px; Scans: es gibt nur klein/normal)
+const IMG_Q_KEYS = { hand: 'wow_tcg_img_q_hand', field: 'wow_tcg_img_q_field', zoom: 'wow_tcg_img_q_zoom' };
+const IMG_Q_DEF = { hand: 'small', field: 'small', zoom: 'norm' };
+// Frühere Einstellung (ein Wert für alles) einmalig übernehmen: "hq" = große Zoom-Karte, "small" = überall kleine Bilder
+try {
+    const old = localStorage.getItem(IMG_STYLE_KEY);
+    if (old === 'hq') localStorage.setItem(IMG_Q_KEYS.zoom, 'big');
+    if (old === 'small') Object.values(IMG_Q_KEYS).forEach(k => localStorage.setItem(k, 'small'));
+    if (old === 'hq' || old === 'small') localStorage.setItem(IMG_STYLE_KEY, 'edited');
+} catch (e) {}
 const imgStyle = () => { try { return localStorage.getItem(IMG_STYLE_KEY) || 'edited'; } catch (e) { return 'edited'; } };
 const useScans = () => imgStyle() === 'scans';
-const useHQ = () => imgStyle() === 'hq';
-const useSmall = () => imgStyle() === 'small';                                       // überall nur "<set> small" (weniger Daten)
+function imgQ(area) {
+    try { const v = localStorage.getItem(IMG_Q_KEYS[area]); return ['small', 'norm', 'big'].includes(v) ? v : IMG_Q_DEF[area]; } catch (e) { return IMG_Q_DEF[area]; }
+}
 // Kartenname als Dateiname: Akzente weg, ’ → ', : → ' -', / → '-', "?*<>| weg, " . . ." → "...", Punkte/Leerzeichen am Ende weg
 const imgFileName = name => name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/’/g, "'").replace(/:/g, ' -').replace(/\//g, '-')
     .replace(/["?*<>|]/g, '').replace(/ \. \. \./g, '...').replace(/\s+/g, ' ').replace(/[. ]+$/, '').trim();
@@ -40,17 +52,18 @@ function updateImgStyleOptions() {
     const sel = document.getElementById("cfg-img-style"); if (!sel) return;
     const miss = f => IMG_DIR_MISSING.has(f);
     const edited = !(miss('azeroth') && miss('azeroth small'));
-    const avail = { edited, scans: !(miss('azeroth scans') && miss('azeroth scans small')), hq: edited && !miss('azeroth big'), small: !miss('azeroth small') };
-    for (const o of sel.options) {
-        if (!(o.value in avail)) continue;
-        o.disabled = !avail[o.value];
-        o.textContent = o.textContent.replace(/ \(nicht installiert\)$/, '') + (avail[o.value] ? '' : tr(' (nicht installiert)'));
-    }
+    const avail = { edited, scans: !(miss('azeroth scans') && miss('azeroth scans small')) };
+    const mark = (o, ok) => { if (!o.dataset.base) o.dataset.base = o.textContent; o.disabled = !ok; o.textContent = o.dataset.base + (ok ? '' : tr(' (nicht installiert)')); };
+    for (const o of sel.options) if (o.value in avail) mark(o, avail[o.value]);
     // Gewählte Option nicht installiert (z. B. Paket nur mit Scans): erste vorhandene nehmen
     if (avail[imgStyle()] === false) {
-        const pick = ['edited', 'scans', 'hq'].find(k => avail[k]); if (!pick) return;
-        try { localStorage.setItem(IMG_STYLE_KEY, pick); } catch (e) {} sel.value = pick; if (G) render();
+        const pick = ['edited', 'scans'].find(k => avail[k]);
+        if (pick) { try { localStorage.setItem(IMG_STYLE_KEY, pick); } catch (e) {} sel.value = pick; if (G) render(); }
     }
+    // Qualitätsstufen je Bereich: nur vorhandene Größen wählbar (fehlt die gewählte, nimmt das Spiel die nächstbeste)
+    const sc = useScans(), qa = sc ? { small: !miss('azeroth scans small'), norm: !miss('azeroth scans'), big: false }
+        : { small: !miss('azeroth small'), norm: !miss('azeroth'), big: !miss('azeroth big') };
+    document.querySelectorAll('.cfg-imgq').forEach(s => { for (const o of s.options) mark(o, qa[o.value]); });
 }
 // Token-Bilder: "Tokens small/<Name>.webp" (Hand/Spielfeld), "Tokens/<Name>.webp" (große Vorschau).
 // Auf GitHub liegen nur diese Tokens (Whitelist am Ende von .gitignore) – neue Einträge dort ergänzen.
@@ -66,39 +79,39 @@ const IMG_BAD = new Set();
 const imgKey404 = u => { try { return decodeURI(new URL(u, location.href).pathname); } catch (e) { return u; } };
 function imgFailed(url) { if (url) IMG_BAD.add(imgKey404(url)); }
 window.addEventListener('error', e => { const t = e.target; if (t && t.tagName === 'IMG' && t.src) imgFailed(t.src); }, true);
-function getImageCandidates(id, mode = 'ea') {
-    const all = imageCandidatesAll(id, mode), ok = all.filter(u => !IMG_BAD.has(imgKey404(u)));
+// q: Qualitätsstufe ('small' | 'norm' | 'big'); ohne Angabe die Einstellung des Bereichs (Zoom-Modi: Zoom, sonst Handkarten)
+function getImageCandidates(id, mode = 'ea', q) {
+    const all = imageCandidatesAll(id, mode, q), ok = all.filter(u => !IMG_BAD.has(imgKey404(u)));
     return ok.length ? ok : all.slice(-1);
 }
-function imageCandidatesAll(id, mode = 'ea') {
+function imageCandidatesAll(id, mode = 'ea', q) {
     const cd = CARDS[id];
+    if (!q) q = imgQ(mode === 'full' || mode === 'eaBig' ? 'zoom' : 'hand');
     if (TOKEN_IMG[id]) {
         const big = encodeURI(`Tokens/${TOKEN_IMG[id]}.webp`), small = encodeURI(`Tokens small/${TOKEN_IMG[id]}.webp`);
-        return mode === 'full' || mode === 'eaBig' ? [big, small] : [small, big];
+        return q === 'small' ? [small, big] : [big, small];
     }
     const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
     const [dir] = si, num = cd.set ? cd.num : id, base = cardImgBase(cd);
     const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${base}${IMG_SUF[suf]}.webp`)];
-    // Einstellung "Nur kleine Bilder": auch Zoom und Booster nehmen die kleinen Bilder
-    const small = suf => ed(dir + ' small', suf), norm = suf => useSmall() ? small(suf) : ed(dir, suf), big = suf => useSmall() ? small(suf) : ed(dir + ' big', suf);
-    const zoom = suf => useHQ() ? [...big(suf), ...norm(suf)] : [...norm(suf), ...big(suf)];
+    // Ordner in der Reihenfolge der gewählten Stufe; fehlt die Datei, die nächstbeste Größe
+    const order = { small: [' small', '', ' big'], norm: ['', ' big', ' small'], big: [' big', '', ' small'] }[q];
+    const at = sfx => order.flatMap(o => sfx.flatMap(s => ed(dir + o, s)));      // je Ordner: zuerst die erste Variante (z. B. EA)
     const old = SET_IMG_PREFIX[cd.set] ? [`cards/${SET_IMG_PREFIX[cd.set]}-${num}-EA.png`, `cards/${SET_IMG_PREFIX[cd.set]}-${num}.png`] : [_cfgImgPath.replace("{id}", cd.imgId || cd.upgradedFrom || id)];
     // Modi: 'ea' Hand/Spielfeld (Extended Art bevorzugt), 'full' Zoom/Booster (normales Bild), 'back' Heldenrückseite,
     // 'eaCard' / 'eaBig' Extended-Art-Karte aus dem Booster – die gibt es nur bearbeitet, auch wenn Scans gewählt sind
-    if (mode === 'eaBig') return [...zoom('-EA'), ...zoom(''), ...old];
+    if (mode === 'eaBig') return [...at(['-EA', '']), ...old];
     const sc = (folder, back) => IMG_DIR_MISSING.has(`${dir} ${folder}`) ? [] : [encodeURI(`cards/${dir} ${folder}/${base}${back ? IMG_SUF['-Back'] : ''}.webp`)];
-    const scans = back => [...sc('scans small', back), ...sc('scans', back)];                // letzter Rückfall, falls keine bearbeiteten Bilder da sind
-    if (mode === 'eaCard') return [...small('-EA'), ...norm('-EA'), ...small(''), ...norm(''), ...scans(false), ...old];
+    const scans = back => q === 'small' ? [...sc('scans small', back), ...sc('scans', back)] : [...sc('scans', back), ...sc('scans small', back)];   // Scans: nur klein und normal
+    if (mode === 'eaCard') return [...at(['-EA', '']), ...scans(false), ...old];
     if (useScans()) {
-        if (mode === 'full') return [...sc('scans', false), ...sc('scans small', false), ...zoom(''), ...small(''), ...old];
         const back = mode === 'back';                                                          // ohne Scan: bearbeitetes Bild
-        return [...scans(back), ...(back ? [...small('-Back'), ...norm('-Back')] : []), ...small(''), ...norm(''), ...old];
+        return [...scans(back), ...(back ? at(['-Back']) : []), ...at(['']), ...old];
     }
-    if (mode === 'back') return [...small('-Back'), ...norm('-Back'), ...scans(true), ...getImageCandidates(id, 'ea')];
+    if (mode === 'back') return [...at(['-Back']), ...scans(true), ...getImageCandidates(id, 'ea', q)];
     // Extended Art ist die vollständige Karte – die normale Fassung liegt nur für Karten ohne EA online (siehe .gitignore)
     const noEA = cd.type === 'Hero';                                                       // Helden haben keine Extended Art
-    if (mode === 'full') return [...(noEA ? [] : zoom('-EA')), ...zoom(''), ...(noEA ? [] : small('-EA')), ...small(''), ...sc('scans', false), ...sc('scans small', false), ...old];
-    return [...small('-EA'), ...small(''), ...norm('-EA'), ...norm(''), ...big(''), ...scans(false), ...old];
+    return [...at(noEA ? [''] : ['-EA', '']), ...scans(false), ...old];
 }
 function getCardColor(card) {
     if (card.type === 'Weapon' || card.type === 'Armor' || card.type === 'Item') return '#a89880';
@@ -475,6 +488,31 @@ function debugSpawnCard() {
     process(G); refreshDisplay(G); render();
 }
 
+// Debug: Größe der Zoom-Karte live einstellen. Das Feld bleibt offen, bis "Fertig" gedrückt wird; solange steht
+// immer eine Zoom-Karte in der Mitte (über einer Karte zeigt die echte Vorschau die neue Größe an ihrem Platz).
+function openZoomTune() {
+    document.body.classList.remove('side-open');
+    let box = document.getElementById('zoom-tune');
+    if (!box) {
+        box = document.createElement('div'); box.id = 'zoom-tune';
+        box.innerHTML = `<b>${esc(tr('Größe der Zoom-Karte'))}</b><input type="range" min="25" max="98" step="1"><span class="zt-val"></span>
+            <div class="zt-btns"><button type="button" class="zt-auto">${esc(tr('Automatisch'))}</button><button type="button" class="zt-done success">${esc(tr('Fertig'))}</button></div>`;
+        document.body.appendChild(box);
+        const range = box.querySelector('input'), val = box.querySelector('.zt-val');
+        const show = () => {
+            const pct = zoomCardPct(), W = zoomCardW(), H = Math.round(W * 1.4);
+            range.value = pct || Math.round(H / innerHeight * 100);
+            val.textContent = (pct ? tr`${pct} % der Bildschirmhöhe` : tr`Automatisch (${Math.round(H / innerHeight * 100)} %)`) + ` · ${W} × ${H} px`;
+            zoomDemo(true);
+        };
+        range.oninput = () => { try { localStorage.setItem(ZOOM_SIZE_KEY, range.value); } catch (e) {} show(); };
+        box.querySelector('.zt-auto').onclick = () => { try { localStorage.removeItem(ZOOM_SIZE_KEY); } catch (e) {} show(); };
+        box.querySelector('.zt-done').onclick = () => { zoomDemo(false); box.remove(); };
+        box._show = show;
+    }
+    box._show();
+}
+
 function bootGame() {
     translateDom();                                                                       // feste Texte der Seite (Englisch)
     document.body.classList.add('dev');                                                // Tests und Debug (Menü rechts „Tests“) überall sichtbar – auf Wunsch auch auf GitHub Pages (Handy-Tests)
@@ -532,6 +570,7 @@ function bootGame() {
     document.getElementById("btn-auto-turn").onclick = autoPlayMyTurn;
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
     document.getElementById("btn-spawn-card").onclick = debugSpawnCard;
+    document.getElementById("btn-zoom-tune").onclick = openZoomTune;
     const spawnInput = document.getElementById("dbg-spawn-name");
     spawnInput.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); debugSpawnCard(); } };
     debugFillSpawnList();
@@ -586,12 +625,23 @@ function bootGame() {
     const updPrio = () => { prioBtn.textContent = prioManual() ? tr("Priorität: Jedes Fenster") : tr("Priorität: Automatisch"); };
     prioBtn.onclick = () => { try { localStorage.setItem(PRIO_KEY, prioManual() ? "off" : "on"); } catch (e) {} updPrio(); if (G) G.stopAll = prioManual(); };
     updPrio();
-    probeImageDirs(updateImgStyleOptions);
-    // Kartenbilder: Normal, Original-Scans oder Normal + High Resolution
+    // Kartenbilder: Normal oder Original-Scans; Qualität (Klein/Normal/Hoch) getrennt für Handkarten, Spielfeld und Zoom-Karte
     const rerenderImgs = () => { if (G) render(); const db = document.getElementById("deck-builder-modal"); if (db && db.style.display === 'flex') renderDBAll(); };
+    for (const area of Object.keys(IMG_Q_KEYS)) {
+        const s = document.getElementById('cfg-imgq-' + area);
+        s.innerHTML = [['small', tr('Klein')], ['norm', tr('Normal')], ['big', tr('Hoch')]].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
+        s.value = imgQ(area);
+        s.onchange = () => { try { localStorage.setItem(IMG_Q_KEYS[area], s.value); } catch (e) {} rerenderImgs(); };
+    }
+    // Spielfeld-Größe (Zoomstufe): wirkt sofort, Layout wird neu gerechnet
+    const zoomSel = document.getElementById('cfg-ui-zoom');
+    zoomSel.innerHTML = UI_ZOOMS.map(z => `<option value="${z}">${z} %</option>`).join('');
+    zoomSel.value = uiZoom();
+    zoomSel.onchange = () => { try { localStorage.setItem(UI_ZOOM_KEY, zoomSel.value); } catch (e) {} applyUiZoom(); rerenderImgs(); };
+    probeImageDirs(updateImgStyleOptions);
     const styleSel = document.getElementById("cfg-img-style");
-    styleSel.value = useScans() ? 'scans' : useHQ() ? 'hq' : useSmall() ? 'small' : 'edited';
-    styleSel.onchange = () => { try { localStorage.setItem(IMG_STYLE_KEY, styleSel.value); } catch (e) {} rerenderImgs(); };
+    styleSel.value = useScans() ? 'scans' : 'edited';
+    styleSel.onchange = () => { try { localStorage.setItem(IMG_STYLE_KEY, styleSel.value); } catch (e) {} updateImgStyleOptions(); rerenderImgs(); };
     // Untermenü "Einstellungen & Tests"
     const more = document.getElementById("side-more");
     more.open = false;                                                                  // startet immer eingeklappt

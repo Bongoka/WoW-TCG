@@ -14,6 +14,19 @@ const UI = {
     reset() { this.attacker = null; this.drag = null; }
 };
 
+// ---------------------------------------------------------------- Spielfeld-Größe (Zoomstufe im Menü)
+// Skaliert alle Karten und Abstände des Spiels über --ui-scale; die Kartengrößen selbst stehen als px-Werte auf :root,
+// damit JS-Messungen (getComputedStyle) fertige Zahlen lesen. Menü und Fenster bleiben unverändert.
+const UI_ZOOM_KEY = 'wow_tcg_ui_zoom', UI_ZOOMS = [50, 75, 100, 125, 150];
+function uiZoom() { try { const v = +localStorage.getItem(UI_ZOOM_KEY); return UI_ZOOMS.includes(v) ? v : 100; } catch (e) { return 100; } }
+function applyUiZoom() {
+    const s = uiZoom() / 100, st = document.documentElement.style;
+    st.setProperty('--ui-scale', s);
+    st.setProperty('--field-w', 150 * s + 'px'); st.setProperty('--field-h', 210 * s + 'px');
+    st.setProperty('--hand-w', 140 * s + 'px'); st.setProperty('--hand-h', 196 * s + 'px');
+}
+applyUiZoom();                                                                            // vor dem ersten Zeichnen
+
 // ---------------------------------------------------------------- Hilfen
 function myPending(kind) { return G && G.pending && G.pending.pid === 1 && (!kind || G.pending.kind === kind) ? G.pending : null; }
 function canMain() { return !!G && !UI.busy && !G.gameOver && canActMain(G, 1); }
@@ -126,13 +139,7 @@ function renderResourceTray(player, containerId, isHuman) {
     if (miniRow.children.length > 0) box.appendChild(miniRow);
     if (activeRow.children.length > 0) box.appendChild(activeRow);
     box.appendChild(manaBadge(player));
-    // Quests: bis 3 nebeneinander, danach immer stärker überlappend (Gesamtbreite bleibt bei ~3 Karten)
-    const qs = [...activeRow.children], nq = qs.length;
-    if (nq) {
-        const w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
-        const step = nq <= 3 ? w + 6 : w * Math.min(1, 2.2 / (nq - 1));
-        qs.forEach((q, i) => { q.style.flex = `0 0 ${i === nq - 1 ? w : step}px`; });
-    }
+    // Quests nebeneinander bzw. überlappend: Breiten setzt layoutBar (nach dem Zeichnen der Hand)
     animateResources(player, shown);
     if (isHuman) {
         // Drop-Ziel: Karte als Ressource legen (Quest offen, sonst verdeckt)
@@ -192,43 +199,199 @@ function animateResources(player, shown) {
     UI.resPrev[player.id] = next;
 }
 
-// ---------------------------------------------------------------- Untere Reihe: Hand ein-/ausfahren
-// Das Brett ist symmetrisch: beide Spielerreihen liegen in den Ecken über dem Spielfeld (unten: Ressourcen links,
-// Friedhof + Held rechts; oben gespiegelt). Jede Ally-Reihe weicht seitlich den Blöcken aus, die in ihre Höhe ragen.
-function layoutRows() {
-    // Allies beginnen in der Mitte: eigene wachsen nach links, gegnerische nach rechts (gegenüber liegt jeweils die Ausrüstung
-    // des Helden, die vom Rand zur Mitte wächst). Seitlich weichen sie Ressourcen, Friedhof und Held aus; bei Platzmangel überlappen sie.
-    const fw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150, half = (fw + 16) / 2;
+// ---------------------------------------------------------------- Spielfeld-Layout
+// Das Brett ist symmetrisch: unten die eigene Hälfte, oben der Gegner um 180° gedreht.
+// Eine Reihe je Spieler (eigene Sicht): [Allies …] ‹Lücke G› [… Equipment/laufende Fähigkeiten]. Der erste Ally steht in der
+// Mitte und weitere wachsen nach links, Equipment wächst vom rechten Rand nach links. Wird es eng, nur so weit wie nötig:
+// (1) eine Gruppe wächst in den freien Platz der anderen, (3) Equipment überlappt bis 30 % Sichtbreite, (4) Allies ebenso,
+// (5) beide gleichmäßig enger. Die Lücke bleibt immer. Reicht die Höhe nicht (niedrige Bildschirme), weicht die Reihe
+// seitlich den Blöcken der unteren Leiste aus, die in ihre Höhe ragen. Erschöpfen ändert keine Abstände.
+const uiScale = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+const rowTop = () => Math.round(22 * uiScale());                                           // Abstand der Karten zur Mittellinie
+UI.slotX = new Map();                                                                     // letzte Position je Karte (gleitende Übergänge)
+const fieldW = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150;
+// Reine Berechnung: x-Positionen (links, in px ab Reihenanfang) in eigener Sicht – Allies von der Lücke nach links,
+// Equipment vom rechten Rand nach links. L/R = nutzbarer Bereich, mid = Bildmitte (alles relativ zur Reihe).
+function rowPositions(nA, nE, L, R, mid, w) {
+    const p = w + 16, G = Math.max(24, w * 0.2), minS = w * 0.3, T = R - L;
+    const width = (n, s) => n ? (n - 1) * s + w : 0;
+    let sA = p, sE = p;
+    const gap = nA && nE ? G : 0;
+    if (width(nA, sA) + gap + width(nE, sE) > T) {
+        const fit = (n, room) => n > 1 ? (room - w) / (n - 1) : p;                         // Schritt, mit dem n Karten in room passen
+        sE = Math.max(minS, Math.min(p, fit(nE, T - gap - width(nA, p))));                 // (3) Equipment überlappt
+        sA = Math.max(minS, Math.min(p, fit(nA, T - gap - width(nE, sE))));                // (4) Allies überlappen
+        if (width(nA, sA) + gap + width(nE, sE) > T) {                                      // (5) beide gleichmäßig enger
+            const k = Math.max(1, (nA > 1 ? nA - 1 : 0) + (nE > 1 ? nE - 1 : 0));
+            sA = sE = Math.max(4, (T - gap - (nA ? w : 0) - (nE ? w : 0)) / k);
+        }
+    }
+    const wA = width(nA, sA), wE = width(nE, sE);
+    // (1) Grenze: erster Ally mittig; reicht der Platz links nicht, rückt die Gruppe nach rechts, höchstens bis vor die Lücke
+    const right = Math.min(R - wE - gap, Math.max(mid + w / 2, L + wA));
+    const xa = [], xe = [];
+    for (let i = 0; i < nA; i++) xa.push(right - w - i * sA);                              // Index 0 = an der Lücke
+    for (let i = 0; i < nE; i++) xe.push(R - w - i * sE);                                  // Index 0 = am rechten Rand
+    return { xa, xe, sA, sE };
+}
+// ---------------------------------------------------------------- Gleiche Allies stapeln (nur bei Platzmangel, Stufe 2)
+// Gleich = gleiche Karte und Besitzer, gleicher Zustand: erschöpft, Schaden, Counter, Modifikatoren (auch die wirksamen Werte),
+// Angriffsstatus (seit Zugbeginn im Spiel, CR 302.2), keine Anhänge, nicht im Kampf. Ändert sich etwas, löst sich der Stapel.
+// Rein optische Felder (Foil, Schadensmaske) und die uid zählen nicht.
+const STACK_SKIP = new Set(['uid', 'isFoil', 'hasDamageMask', 'maskId', 'maskStyle', 'maskOpacity', 'joinedTurn']);
+const stableJson = v => v && typeof v === 'object' ? (Array.isArray(v) ? '[' + v.map(stableJson).join(',') + ']'
+    : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}') : JSON.stringify(v);
+function stackSig(c, pid, attached) {
+    if (attached.has(c.uid) || UI.attacker === c.uid || (G.battle && (G.battle.att === c.uid || G.battle.def === c.uid))) return null;
+    const o = {}; for (const k in c) if (!STACK_SKIP.has(k)) o[k] = c[k];
+    o._ready = c.joinedTurn !== undefined && c.joinedTurn < turnStartOf(G, pid);
+    try { o._atk = atkOf(G, c); o._hp = hpOf(G, c); } catch (e) {}
+    return stableJson(o);
+}
+// Slots der Ally-Zone → Einheiten (Liste von Slots, die erste liegt oben); Reihenfolge nach dem ersten Mitglied
+function stackUnits(aSlots, p) {
+    const attached = new Set();
+    for (const q of [G.p1, G.p2]) for (const c of [...q.hero.weapons, ...q.hero.armors, ...(q.ongoing || [])]) { const h = attachHost(c); if (h) attached.add(h.uid); }
+    const byUid = new Map(p.allies.map(c => [c.uid, c])), units = [], bySig = new Map();
+    for (const s of aSlots) {
+        const c = !s.dataset.gap && s.firstElementChild && byUid.get(s.firstElementChild.dataset.uid);
+        const sig = c ? stackSig(c, p.id, attached) : null;
+        if (sig && bySig.has(sig)) { bySig.get(sig).push(s); continue; }
+        const u = [s]; units.push(u); if (sig) bySig.set(sig, u);
+    }
+    return units;
+}
+// Messen → rechnen → schreiben (kein Wechsel zwischen Lesen und Schreiben). animate: Karten gleiten an neue Plätze.
+function layoutBoard(animate = true) {
+    layoutBar();                                                                           // zuerst die Leisten: ihre Breite bestimmt, wem die Reihe ausweicht
+    const w = fieldW(), h = w * 1.4, RT = rowTop();
     const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone', true], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone', false]];
+    const plans = [];
     for (const [rowId, ids, gySel, opp] of sides) {
         const row = document.getElementById(rowId); if (!row) continue;
-        row.style.paddingLeft = row.style.paddingRight = '0px';
-        const rr = row.getBoundingClientRect(), mid = rr.left + rr.width / 2;
-        const els = [...ids.map(id => document.getElementById(id)), document.querySelector(gySel)].filter(Boolean);
-        let padL = 0, padR = 0;
-        for (const e of els) {
+        const rr = row.getBoundingClientRect(); if (!rr.width) continue;
+        const band = opp ? [rr.bottom - RT - h, rr.bottom - RT] : [rr.top + RT, rr.top + RT + h];
+        const mid = rr.width / 2;
+        let L = 0, R = rr.width;
+        const gem = document.querySelector('#' + ids[0] + ' .mana-badge');                    // Mana-Juwel ragt über bzw. unter die Ablage
+        for (const e of [...ids.map(id => document.getElementById(id)), document.querySelector(gySel), gem].filter(Boolean)) {
             const r = e.getBoundingClientRect();
-            if (!r.width || r.bottom < rr.top + 10 || r.top > rr.bottom - 10) continue;   // ragt nicht in die Reihe
-            if (r.left + r.width / 2 < mid) padL = Math.max(padL, Math.round(r.right - rr.left + 12));
-            else padR = Math.max(padR, Math.round(rr.right - r.left + 12));
+            if (!r.width || r.bottom < band[0] + 10 || r.top > band[1] - 10) continue;     // ragt nicht in die Reihe
+            if (r.left + r.width / 2 < rr.left + mid) L = Math.max(L, r.right - rr.left + 12);
+            else R = Math.min(R, r.left - rr.left - 12);
         }
-        if (opp) { row.style.paddingLeft = Math.max(0, Math.round(mid - half - rr.left)) + 'px'; row.style.paddingRight = padR + 'px'; }
-        else { row.style.paddingLeft = padL + 'px'; row.style.paddingRight = Math.max(0, Math.round(rr.right - mid - half)) + 'px'; }
+        // Gegner: gespiegelt rechnen (seine Sicht), danach zurückspiegeln
+        const [l, r] = opp ? [rr.width - R, rr.width - L] : [L, R];
+        const az = row.querySelector('.bf-ally-zone'), ez = row.querySelector('.bf-equip-zone');
+        const aSlots = az ? [...az.children] : [], eSlots = ez ? [...ez.children] : [];
+        // (2) Passen nicht alle nebeneinander, liegen gleiche Allies auf einem Platz
+        const R2 = Math.max(l + w, r), gapW = aSlots.length && eSlots.length ? Math.max(24, w * 0.2) : 0;
+        const natural = n => n ? n * (w + 16) - 16 : 0;
+        const units = natural(aSlots.length) + gapW + natural(eSlots.length) > R2 - l ? stackUnits(aSlots, opp ? G.p2 : G.p1) : aSlots.map(s => [s]);
+        const pos = rowPositions(units.length, eSlots.length, l, R2, mid, w);
+        const flip = x => opp ? rr.width - x - w : x;
+        // Stapel: leicht versetzt (bis 2 Karten schauen oben zur Seite heraus), die erste liegt oben
+        const SDX = 6, slots = [];
+        units.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xa[i] + Math.min(k, 2) * (opp ? -SDX : SDX)), k, u.length, Math.min(k, 2) * SDX])));
+        eSlots.forEach((s, i) => slots.push([s, flip(pos.xe[i]), 0, 1, 0]));
+        plans.push({ rowId, opp, row, slots });
     }
-    // Viele Ressourcen: die Hand rückt nach rechts, solange sie nicht an Friedhof/Held stößt
-    const hand = document.getElementById('bot-hand'), tray = document.getElementById('bot-resource-tray');
-    if (hand && tray) {
-        hand.style.setProperty('--hand-shift', '0px');
-        const cards = [...hand.children].map(c => c.getBoundingClientRect()).filter(r => r.width);
-        if (cards.length) {
-            const left = Math.min(...cards.map(r => r.left)), right = Math.max(...cards.map(r => r.right));
-            const block = [document.querySelector('.bottom-row .deck-zone'), document.getElementById('bot-dock')].map(e => e && e.getBoundingClientRect()).filter(r => r && r.width);
-            const limit = block.length ? Math.min(...block.map(r => r.left)) - 12 : innerWidth;
-            const need = tray.getBoundingClientRect().right + 12 - left;
-            if (need > 0) hand.style.setProperty('--hand-shift', Math.max(0, Math.min(need, limit - right)) + 'px');
-        }
+    const next = new Map();
+    for (const { rowId, opp, row, slots } of plans) {
+        row.querySelectorAll('.stack-count').forEach(b => b.remove());
+        // Überlagerung: eigene Seite – die weiter links liegende Karte oben; Gegner – die weiter rechts liegende; im Stapel die erste
+        const base = i => slots[i][1] - slots[i][4];                                       // Platz ohne Stapel-Versatz (der zeigt immer nach rechts oben)
+        const rank = slots.map((_, i) => i).sort((a, b) => (opp ? base(b) - base(a) : base(a) - base(b)) || slots[a][2] - slots[b][2]);
+        rank.forEach((i, k) => {
+            const [s, x, layer, count, dy] = slots[i];
+            s.style.left = Math.round(x) + 'px';
+            s.style[opp ? 'bottom' : 'top'] = (RT + (opp ? dy : -dy)) + 'px';
+            s.style.zIndex = slots.length - k;
+            s.classList.toggle('stack-under', layer > 0);                                  // untere Karten: nur sichtbar, bedient wird die oberste
+            if (layer === 0 && count > 1) { const b = document.createElement('div'); b.className = 'stack-count'; b.textContent = '×' + count; s.appendChild(b); }
+            // Gleiten: Lücke eines sterbenden Allies trägt dessen uid, sein Platz springt also nicht
+            const key = rowId + '|' + (s.dataset.gap || (s.firstElementChild && s.firstElementChild.dataset.uid) || '');
+            const prev = UI.slotX.get(key);
+            if (animate && prev !== undefined && Math.abs(prev - x) > 1)
+                s.animate([{ transform: `translateX(${prev - x}px)` }, { transform: 'none' }], { duration: 380, easing: 'ease-in-out' });
+            next.set(key, x);
+        });
+    }
+    UI.slotX = next;
+}
+// ---------------------------------------------------------------- Untere Leiste (Gegner: obere, gespiegelt)
+// [verdeckte Ressourcen][offene Quests]  [Hand in der Mitte]  [Friedhof][Held]
+// Quests liegen nebeneinander, solange sie die Hand in der Mitte nicht berühren, sonst überlappen sie bis 30 % Sichtbreite
+// (die letzte ganz). Erst dann rückt die Hand nach rechts, danach wird der Fächer enger; sie verdeckt nie den Friedhof.
+// Fächer: Karte i ist um (i − Mitte)·ang gedreht (um ihre Unterkante) – ext() liefert die waagrechte Ausdehnung um die Mitte.
+function fanExtent(ws, ov, ang) {
+    const n = ws.length; if (!n) return [0, 0];
+    const M = ws.reduce((a, b) => a + b, 0) - 2 * ov * n, mid = (n - 1) / 2;
+    let x = -M / 2 - ov, lo = Infinity, hi = -Infinity;
+    ws.forEach((w, i) => {
+        const a = (i - mid) * ang * Math.PI / 180, c = x + w / 2, hw = w / 2 * Math.cos(a), top = w * 1.4 * Math.sin(a);
+        lo = Math.min(lo, c - hw, c - hw + top); hi = Math.max(hi, c + hw, c + hw + top);
+        x += w - 2 * ov;
+    });
+    return [lo, hi];
+}
+// Reine Berechnung in eigener Sicht (x ab Leistenanfang). Verdeckte Ressourcen und offene Quests bilden einen durchgehenden
+// Stapel: nr verdeckte als schmale Streifen (strip), die Quests liegen direkt darauf (die letzte ganz; ohne Quests ist die
+// letzte verdeckte ganz). nq Quests der Breite qw, X0 = Mitte, bound = rechte Grenze (Friedhof), hand = { ws, ov0, ovMax, ang }
+const RES_STRIP = 8;                                                                      // sichtbarer Streifen je verdeckter Ressource
+function barPlan({ start, nr, strip, nq, qw, minTray, X0, bound, hand }) {
+    const qNat = qw + 6, qMin = qw * 0.3;
+    const qStart = start + (nr ? (nq ? nr * strip : (nr - 1) * strip + qw) : 0);
+    const qWidth = s => nq ? (nq - 1) * s + qw : 0;
+    const handL = s => Math.max(start + minTray, qStart + qWidth(s)) + 12;            // linke Grenze der Hand
+    const fit = room => nq > 1 ? (room - qw) / (nq - 1) : qNat;
+    // Fächer enger: t = 0 … 1 – Karten rücken zusammen (ov) und der Fächer wird flacher (ang)
+    const fan = t => ({ ov: hand.ov0 + t * (hand.ovMax - hand.ov0), ang: hand.ang * (1 - 0.6 * t) });
+    const ext = f => hand.ws.length ? fanExtent(hand.ws, f.ov, f.ang) : [0, 0];
+    let f = fan(0), [lo, hi] = ext(f), qs = qNat;
+    if (handL(qNat) > X0 + lo) qs = Math.max(qMin, Math.min(qNat, fit(X0 + lo - 12 - qStart)));   // Quests überlappen
+    let L = handL(qs);
+    if (Math.max(X0, L - lo) + hi > bound && hand.ws.length > 1) {                       // Hand passt auch verschoben nicht: Fächer enger
+        let a = 0, b = 1;
+        for (let k = 0; k < 20; k++) { const m = (a + b) / 2, [l2, h2] = ext(fan(m)); if (h2 - l2 > bound - L) a = m; else b = m; }
+        f = fan(b); [lo, hi] = ext(f);
+        if (hi - lo > bound - L) { qs = Math.max(4, Math.min(qs, fit(bound - (hi - lo) - 12 - qStart))); L = handL(qs); }   // erst dann Quests unter 30 %
+    }
+    const cx = Math.min(Math.max(X0, L - lo), bound - hi);                                // nie über den Friedhof
+    return { qs, ov: f.ov, ang: f.ang, shift: cx - X0 };
+}
+function layoutBar() {
+    const hw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
+    const sides = [
+        { row: '.bottom-row', tray: 'bot-resource-tray', hand: 'bot-hand', blocks: ['.bottom-row .deck-zone', '#bot-dock'], opp: false },
+        { row: '.top-row', tray: 'top-resource-tray', hand: 'top-hand', blocks: ['.top-row .deck-zone', '#top-dock'], opp: true }];
+    const plans = [];
+    for (const sd of sides) {                                                              // messen
+        const row = document.querySelector(sd.row), tray = document.getElementById(sd.tray), hand = document.getElementById(sd.hand);
+        if (!row || !tray || !hand) continue;
+        const rr = row.getBoundingClientRect(), tr_ = tray.getBoundingClientRect(); if (!rr.width) continue;
+        const mx = x => sd.opp ? rr.width - x : x;                                          // Gegner: gespiegelt rechnen
+        const bl = sd.blocks.map(s => document.querySelector(s)).filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width);
+        const bound = bl.length ? Math.min(...bl.map(r => mx(sd.opp ? r.right - rr.left : r.left - rr.left))) - 12 : rr.width;
+        const stack = tray.querySelector('.res-stack'), quests = [...tray.querySelectorAll('.active-quests-row > .quest-card-large')];
+        const sc = uiScale(), ws = sd.opp ? [...hand.children].map(() => 160 * sc) : [...hand.children].map(c => c.classList.contains('playable') ? hw * 1.1 : hw);
+        const hand0 = sd.opp ? { ws, ov0: 45 * sc, ovMax: 65 * sc, ang: 5 } : { ws, ov0: 20 * sc, ovMax: Math.max(20 * sc, (hw - 30 * sc) / 2), ang: 6 };
+        const plan = barPlan({ start: mx(sd.opp ? tr_.right - rr.left : tr_.left - rr.left), nr: stack ? stack.children.length : 0, strip: RES_STRIP, nq: quests.length, qw: hw,
+            minTray: sd.opp ? 0 : hw, X0: rr.width / 2, bound, hand: hand0 });
+        plans.push({ sd, hand, tray, quests, plan });
+    }
+    for (const { sd, hand, tray, quests, plan } of plans) {                                // schreiben
+        tray.classList.toggle('pile', quests.length > 0);                                   // Quests liegen auf den verdeckten Ressourcen
+        quests.forEach((q, i) => { q.style.flex = `0 0 ${i === quests.length - 1 ? hw : plan.qs}px`; });
+        hand.style.setProperty(sd.opp ? '--opp-shift' : '--hand-shift', (sd.opp ? -plan.shift : plan.shift) + 'px');
+        hand.style.setProperty(sd.opp ? '--opp-ov' : '--hand-ov', plan.ov + 'px');
+        hand.style.setProperty(sd.opp ? '--opp-fan-ang' : '--fan-ang', plan.ang + 'deg');
+        UI[sd.opp ? 'oppFanAng' : 'fanAng'] = plan.ang;                                    // für das Heranfliegen neuer Handkarten
     }
 }
+// Größe/Drehung des Fensters: neu anordnen (ohne Gleiten)
+let _layoutRaf = 0;
+addEventListener('resize', () => { cancelAnimationFrame(_layoutRaf); _layoutRaf = requestAnimationFrame(() => { if (G) layoutBoard(false); }); });
 // Hand fährt hoch, wenn die Maus im unteren Viertel des Bildschirms ist
 document.addEventListener('mousemove', e => {
     const h = document.getElementById('bot-hand'); if (!h) return;
@@ -279,7 +442,7 @@ function render() {
         const offset = i - midOpp;
         const wrapper = document.createElement("div");
         wrapper.className = "opp-hand-card-wrapper";
-        wrapper.style.transform = `translateY(${Math.abs(offset) * 10}px) rotate(${offset * 5}deg)`;
+        wrapper.style.transform = `translateY(${Math.abs(offset) * 10}px) rotate(calc(${offset} * var(--opp-fan-ang, 5deg)))`;
         wrapper.style.zIndex = i;
         if (G.gameOver || (typeof handRevealed === 'function' && handRevealed(G, 2))) {   // Mind Vision: Hand offen; Spielende: Gegnerhand aufdecken
             const node = createCardDOM(G.p2.hand[i], false); node.classList.add('opp-hand-card-img'); wrapper.appendChild(node);
@@ -293,7 +456,7 @@ function render() {
     renderHeroCard(G.p1, "bot-hero-card-container");
     renderResourceTray(G.p1, "bot-resource-tray", true);
     renderPlayerHand(G.p1);
-    layoutRows();
+    layoutBoard();
     renderPendingPanel();
     playFxEvents(prevRects);
     syncAim();
@@ -930,34 +1093,43 @@ function attachHost(c) {
     const l = locate(G, c.attachedTo);
     return l && isInPlayZone(l.zone) ? l.c : null;
 }
-// Platz für einen Anhang: unter der oberen rechten Ecke, sonst oben links, darüber oder darunter – der erste Platz,
-// der im Bild liegt und weder Friedhof, Deck, Lebensbalken noch die Zug-Knöpfe überdeckt (Helden stehen am Rand)
-const ATTACH_SPOTS = ['', 'attach-left', 'attach-up', 'attach-down'];
-function attachSpot(node) {
-    const obst = [...document.querySelectorAll('#p1-deck-stack, #p2-deck-stack, .deck-zone, .hp-bar, #btn-end-turn, #btn-undo, #big-end-turn')]
-        .map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
-    for (const cls of ATTACH_SPOTS) {
-        node.classList.remove(...ATTACH_SPOTS.filter(Boolean)); if (cls) node.classList.add(cls);
-        const r = node.getBoundingClientRect();
-        const inView = r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight;
-        if (inView && !obst.some(o => o.right > r.left && o.left < r.right && o.bottom > r.top && o.top < r.bottom)) return;
-    }
-    node.classList.remove(...ATTACH_SPOTS.filter(Boolean));                                  // nirgends frei: Standardplatz
-}
-// Angelegte Karten klein unter die obere rechte Ecke ihrer Hauptkarte legen (mehrere leicht versetzt)
+// Angelegte Karten (CR 400): ca. 62 % der Hostbreite, am oberen Rand der Hostkarte, ragen 15 % der Kartenhöhe darüber hinaus
+// und lassen unten Leben und Schaden frei. Mehrere: gestaffelt und überlappend (die spätere liegt oben).
+// Ally: bündig links, nach rechts gestaffelt, höchstens Hostbreite. Held: bündig rechts, wächst nach links und darf über den
+// Friedhof reichen. Gegner seitlich gespiegelt, aber auch am oberen Rand: seine Karten stehen aufrecht, unten lägen Leben und Schaden;
+// am gegnerischen Helden (oberer Bildrand) bündig mit der Oberkante statt darüber hinaus. Die Slotbreite ändert sich nicht; ein erschöpfter
+// Host dreht sich, seine Anhänge nicht (sie hängen am Host, nicht an seiner drehenden Bildebene .cfx-rot).
+// Rand in der Farbe des Controllers (CR 400.7b: der Spieler, der den Anhang ins Spiel gebracht hat, nicht der des Hosts).
+const ATT_W = 0.62;
 function placeAttachments() {
-    const per = {};
+    const groups = new Map();                                                             // Host-uid → { host, list: [[Karte, Controller]] }
     for (const p of [G.p1, G.p2]) for (const c of [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])]) {
         const h = attachHost(c); if (!h) continue;
-        const host = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(h.uid)}"]`); if (!host) continue;
-        const i = per[h.uid] = (per[h.uid] || 0) + 1;
-        const node = createCardDOM(c, true);
-        node.classList.add('attached-card'); node.style.setProperty('--ai', i - 1);
-        decorateInPlay(node, c);
-        node.addEventListener('click', e => e.stopPropagation());                            // Klick gilt der angelegten Karte, nicht der Hauptkarte
-        host.classList.add('has-attach'); host.appendChild(node);
-        if (h.type === 'Hero') node.classList.add('on-hero');                                 // an Helden: genau auf dem Helden
-        else attachSpot(node);
+        if (!groups.has(h.uid)) {
+            const host = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(h.uid)}"]`); if (!host) continue;
+            groups.set(h.uid, { host, hero: h.type === 'Hero', list: [] });
+        }
+        groups.get(h.uid).list.push([c, p.id]);
+    }
+    const plans = [...groups.values()].map(g => {                                         // messen
+        const hw = g.host.offsetWidth, aw = hw * ATT_W, n = g.list.length;
+        // Held: über den Friedhof hinweg; erschöpfter Ally: nur bis vor die (nach links gedrehte) Statusleiste
+        const room = g.hero ? hw * 2.2 : g.host.classList.contains('is-exhausted') ? hw * 0.78 : hw;
+        return { ...g, opp: !!g.host.closest('#top-allies, .top-row'), dx: n > 1 ? Math.min(aw * 0.35, Math.max(0, room - aw) / (n - 1)) : 0 };
+    });
+    for (const { host, hero, list, opp, dx } of plans) {                                   // schreiben
+        // eigene Seite: oben; Allies links bündig, Held rechts bündig – Gegner gespiegelt
+        // erschöpfter Ally: die gedrehte Karte hat Leben und Schaden links – Anhänge dann rechts bündig
+        const side = (hero !== opp) || (!hero && host.classList.contains('is-exhausted')) ? 'r' : 'l';
+        list.forEach(([c, pid], i) => {
+            const node = createCardDOM(c, true);
+            node.classList.add('attached-card', opp && hero ? 'att-flush' : 'att-top', 'att-' + side, pid === 1 ? 'att-own' : 'att-opp');
+            node.style.setProperty('--ai', i); node.style.setProperty('--adx', dx + 'px');
+            decorateInPlay(node, c);
+            node.addEventListener('click', e => e.stopPropagation());                        // Klick gilt der angelegten Karte, nicht der Hauptkarte
+            host.appendChild(node);
+        });
+        host.classList.add('has-attach');
     }
 }
 
@@ -988,7 +1160,9 @@ function heroHpBar(p) {
     const fill = document.createElement('div'); fill.className = 'hp-fill';
     trail.style.height = fill.style.height = (prev * 100) + '%';
     track.append(trail, fill);
-    const txt = document.createElement('div'); txt.className = 'hp-num'; txt.innerHTML = `<b>${cur}</b><span>${max}</span>`;
+    // Aktuelles Leben steht groß auf der Heldenkarte (wie bei Allies, auch negativ bei Schaden über den Tod hinaus) –
+    // am Balken daher nur das Maximum, damit die Zahl nicht doppelt erscheint
+    const txt = document.createElement('div'); txt.className = 'hp-num'; txt.innerHTML = `<span>${max}</span>`;
     bar.append(track, txt);
     if (prev !== r) {
         requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1008,7 +1182,7 @@ function isAsleep(ally, pid) {
     return !(ally.joinedTurn !== undefined && ally.joinedTurn < turnStartOf(G, pid));
 }
 // Schlachtfeld-Reihe: Allies (inkl. Totems) und daneben Ausrüstung + laufende Fähigkeiten.
-// Eigene Reihe: Ausrüstung baut sich von rechts nach links auf; Gegner gespiegelt (von links).
+// Positionen, Überlappung und Reihenfolge rechnet layoutBoard (eigene Allies links, Equipment rechts; Gegner gespiegelt).
 // Zerstörter Ally: sein Platz in der Reihe bleibt frei, solange er dort zerfällt (deathAnim) – sonst rückten die
 // übrigen Allies sofort nach und lägen unter der sterbenden Karte. Danach schrumpft die Lücke, die anderen rücken sanft auf.
 const DYING_GAP_MS = 1750;
@@ -1034,11 +1208,9 @@ function insertDyingGaps(zone, cid) {
 }
 function closeDyingGap(uid) {
     UI.dying.delete(uid);
-    document.querySelectorAll(`[data-gap="${uid}"]`).forEach(g => {
-        const cs = getComputedStyle(g);
-        g.animate([{ flexBasis: cs.flexBasis, minWidth: cs.minWidth }, { flexBasis: '0px', minWidth: '0px' }], { duration: 380, easing: 'ease-in-out', fill: 'forwards' })
-            .finished.catch(() => {}).then(() => g.remove());
-    });
+    const gaps = document.querySelectorAll(`[data-gap="${uid}"]`); if (!gaps.length) return;
+    gaps.forEach(g => g.remove());
+    if (G) layoutBoard();                                                                 // die anderen gleiten auf (layoutBoard)
 }
 function renderBattlefield(p, containerId, isOpponent) {
     const row = document.getElementById(containerId); row.innerHTML = "";
@@ -1060,9 +1232,7 @@ function renderBattlefield(p, containerId, isOpponent) {
         decorateInPlay(node, c);
         slot.appendChild(node); equipZone.appendChild(slot);
     });
-    if (isOpponent) { if (equip.length) row.appendChild(equipZone); row.appendChild(allyZone); }
-    else { row.appendChild(allyZone); if (equip.length) row.appendChild(equipZone); }
-    layoutEquipZone(row, equipZone, isOpponent);
+    row.appendChild(allyZone); if (equip.length) row.appendChild(equipZone);             // Positionen setzt layoutBoard
     if (!isOpponent) {
         row.ondragover = (e) => { if (UI.drag && UI.drag.kind === 'hand' && handPlayable(UI.drag.card) && UI.drag.card.type !== 'Quest') e.preventDefault(); };
         row.ondrop = (e) => {
@@ -1071,28 +1241,6 @@ function renderBattlefield(p, containerId, isOpponent) {
             if (d && d.kind === 'hand' && d.card.type !== 'Quest') humanAct({ type: 'PLAY_CARD', handIdx: d.idx });
         };
     }
-}
-
-// Ausrüstung + laufende Fähigkeiten: eine Reihe beim Helden – eigene vom rechten Rand nach links, gegnerische vom
-// linken Rand nach rechts. Höchstens bis kurz vor die Mitte (dort beginnen die Allies); reicht der Platz nicht, überlappen sie.
-function layoutEquipZone(row, zone, isOpponent) {
-    const slots = [...zone.children]; if (!slots.length) return;
-    const fw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150;
-    const cardH = fw * 1.4, base = fw + 16, wide = fw * 1.4 + 16;
-    const maxW = Math.max(base, row.getBoundingClientRect().width / 2 - base / 2 - 24);    // bis vor die erste Ally-Karte in der Mitte
-    const widths = slots.map(s => s.classList.contains('ex') ? wide : base);
-    const total = widths.reduce((a, b) => a + b, 0);
-    const k = total > maxW && slots.length > 1 ? (maxW - widths[widths.length - 1]) / (total - widths[widths.length - 1]) : 1;   // Überlappung
-    let x = 0, w = 0;
-    slots.forEach((s, i) => {
-        s.style.position = 'absolute'; s.style.width = widths[i] + 'px';
-        s.style[isOpponent ? 'left' : 'right'] = x + 'px';
-        s.style[isOpponent ? 'top' : 'bottom'] = '0px';
-        s.style.zIndex = slots.length - i;                                                    // Karte am Rand liegt oben
-        w = x + widths[i]; x += widths[i] * k;
-    });
-    zone.style.width = w + 'px';
-    zone.style.height = cardH + 'px';
 }
 
 // ---------------------------------------------------------------- Hand
@@ -1121,7 +1269,7 @@ function renderPlayerHand(p) {
         const node = createCardDOM(card, false, null, sc || {});
         if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down');
         const offset = idx - mid;
-        slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(${offset * 6}deg)`;
+        slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(calc(${offset} * var(--fan-ang, 6deg)))`;
         if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
             node.classList.add('choice-target'); node.style.cursor = 'pointer';
@@ -1220,12 +1368,12 @@ function flyNewCards(hand, nodes, seenKey, flyKey, from, angleOf) {
 }
 function flyNewHandCards(p, box) {
     const mid = (p.hand.length - 1) / 2;
-    flyNewCards(p.hand, [...box.children].map(s => s.firstChild), 'handSeen', 'handFly', deckRect(), i => (i - mid) * 6);
+    flyNewCards(p.hand, [...box.children].map(s => s.firstChild), 'handSeen', 'handFly', deckRect(), i => (i - mid) * (UI.fanAng || 6));
 }
 // Gegner-Hand: Kartenrücken fliegen vom gegnerischen Deck heran (Container ist um 180° gedreht)
 function flyNewOppCards(p, box) {
     const mid = (p.hand.length - 1) / 2, from = oppDeckRect();
-    flyNewCards(p.hand, [...box.children].map(w => w.firstChild), 'oppSeen', 'oppFly', from, i => 180 + (i - mid) * 5);
+    flyNewCards(p.hand, [...box.children].map(w => w.firstChild), 'oppSeen', 'oppFly', from, i => 180 + (i - mid) * (UI.oppFanAng || 5));
 }
 
 // ---------------------------------------------------------------- Sprechblasen der CPU (nach Rasse des Helden)

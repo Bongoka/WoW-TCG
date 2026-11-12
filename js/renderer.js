@@ -67,7 +67,10 @@
         }
         
         // opts.imgSrc: fest vorgegebenes Bild (Bild-Test-Szene)
-        const cands = opts.imgSrc ? [opts.imgSrc] : (typeof getImageCandidates === 'function') ? getImageCandidates(card.id, opts.imageMode || 'ea') : [`AZEROTH-${card.id}-EA.png`];
+        // Bildqualität (Einstellung je Bereich): Karten im Spiel / Handkarten; Zoom- und Booster-Modi wählen selbst
+        const mode = opts.imageMode || 'ea';
+        const q = opts.imgQ || ((mode === 'ea' || mode === 'back') && typeof imgQ === 'function' ? imgQ(isField ? 'field' : 'hand') : undefined);
+        const cands = opts.imgSrc ? [opts.imgSrc] : (typeof getImageCandidates === 'function') ? getImageCandidates(card.id, mode, q) : [`AZEROTH-${card.id}-EA.png`];
         const imgKey = card.id + '|' + cands[0];
         const img = new Image();
         img.className = 'card-image-layer';
@@ -171,10 +174,45 @@
         S.pv = pv;
         return pv;
     }
+    // Breite der Zoom-Karte: Einstellung (Höhe in % der Bildschirmhöhe, Debug-Menü „Zoom-Karte: Größe einstellen“), sonst automatisch
+    const ZOOM_KEY = 'wow_tcg_zoom_h';
+    function zoomPct() { try { const v = parseFloat(localStorage.getItem(ZOOM_KEY)); return v >= 20 && v <= 100 ? v : null; } catch (e) { return null; } }
+    function zoomW() {
+        const pct = zoomPct();
+        if (pct) return Math.round(Math.min(window.innerHeight * pct / 100 / 1.4, window.innerWidth * 0.6));
+        return Math.round(Math.min(440, window.innerHeight * 0.86 / 1.4, window.innerWidth * 0.45));
+    }
+    window.zoomCardW = zoomW; window.zoomCardPct = zoomPct; window.ZOOM_SIZE_KEY = ZOOM_KEY;
+    // Einstellen der Größe: solange aktiv, steht eine Zoom-Karte in der Bildschirmmitte (eine echte Vorschau über einer Karte hat Vorrang)
+    const D = { on: false };
+    function demoCard() {
+        const g = typeof G !== 'undefined' && G;
+        if (g && g.p1) { const c = g.p1.hand.find(x => x.type !== 'Hero') || g.p1.allies[0] || g.p1.hero; if (c) return c; }
+        const id = Object.keys(CARDS).find(k => CARDS[k].type === 'Ally' && !CARDS[k].isToken);
+        return id ? { ...CARDS[id], id: +id } : null;
+    }
+    function showDemo() {
+        if (!D.on || S.live) return;
+        const c = demoCard(); if (!c) return;
+        const pv = ensurePreview();
+        const node = createCardDOM(c, false, null, { imageMode: c.type === 'Hero' ? 'full' : 'eaBig' });
+        pv.firstChild.replaceChildren(node.querySelector('.cfx-tilt'));
+        const W = zoomW(), H = Math.round(W * 1.4);
+        pv.style.setProperty('--cw', W + 'px');
+        pv.style.left = Math.round((window.innerWidth - W) / 2) + 'px';
+        pv.style.top = Math.max(0, Math.round((window.innerHeight - H) / 2)) + 'px';
+        hideKeywords();
+        pv.style.display = 'block'; pv.classList.add('show');
+    }
+    window.zoomDemo = (on) => {
+        D.on = !!on;
+        if (D.on) showDemo();
+        else if (!S.live && S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; }
+    };
     function placePreview(L) {
         const pv = S.pv;
         const r = L.wrap.querySelector('.cfx-rot').getBoundingClientRect();
-        const W = Math.round(Math.min(440, window.innerHeight * 0.86 / 1.4, window.innerWidth * 0.45));
+        const W = zoomW();
         const H = Math.round(W * 1.4);
         pv.style.setProperty('--cw', W + 'px');
         const roomR = window.innerWidth - r.right, roomL = r.left;
@@ -228,7 +266,7 @@
         s.setProperty('--h', L.h.toFixed(3));
     }
     function clearFx(node) { if (!node) return; node.classList.remove('cfx-live'); VARS.forEach(v => node.style.removeProperty(v)); }
-    function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; hideKeywords(); if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } } }
+    function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; hideKeywords(); if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } showDemo(); } }
     function tick(now) {
         const L = S.live;
         if (!L) { S.raf = 0; return; }
@@ -340,5 +378,5 @@
     document.addEventListener('contextmenu', (e) => { if (e.target && e.target.closest && e.target.closest('.card-wrapper')) e.preventDefault(); });
     document.documentElement.addEventListener('mouseleave', () => { if (!T.shown) release(); });
     window.addEventListener('blur', () => { if (!T.shown) release(); });
-    window.addEventListener('resize', () => { if (S.live) placePreview(S.live); });
+    window.addEventListener('resize', () => { if (S.live) placePreview(S.live); else showDemo(); });
 })();

@@ -269,17 +269,17 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .deck-zone { width: 58px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .deck-stack { width: 50px; height: 70px; background: linear-gradient(135deg, #3d3530, #1a1512); border: 2px solid var(--gold-dark); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; color: var(--gold); }
 .hand-arc-container { flex: 1; height: 240px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 10px; overflow: visible; position: relative; }
-.hand-card-slot { position: relative; width: var(--hand-w); height: var(--hand-h); margin: 0 -20px; transition: transform 0.22s; transform-origin: center bottom; z-index: 10; }
+.hand-card-slot { position: relative; width: var(--hand-w); height: var(--hand-h); margin: 0 calc(-1 * var(--hand-ov, 20px)); transition: transform 0.22s; transform-origin: center bottom; z-index: 10; }
 .hand-card-slot:hover { z-index: 2000; }
 
 /* Gegnerische Hand: normaler Fächer (wie die eigene Hand), der ganze Container um 180° gedreht.
    Nur der untere Teil ragt oben ins Spielfeld. */
 .opp-hand-tray {
     position: absolute;
-    top: -156px;
+    top: calc(-156px * var(--ui-scale, 1));
     left: 50%;
-    height: 224px;
-    transform: translateX(-50%) rotate(180deg);
+    height: calc(224px * var(--ui-scale, 1));
+    transform: translateX(calc(-50% + var(--opp-shift, 0px))) rotate(180deg);   /* --opp-shift: layoutBar */
     transform-origin: 50% 50%;
     display: flex;
     justify-content: center;
@@ -292,22 +292,19 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
     position: relative;
     transform-origin: center bottom;
     transition: transform 0.2s;
-    margin: 0 -45px; /* Überlappung für den Fächer-Effekt */
+    margin: 0 calc(-1 * var(--opp-ov, 45px)); /* Überlappung für den Fächer-Effekt */
     display: flex;
     justify-content: center;
 }
 
 .opp-hand-card-img {
-    width: 160px;
-    height: 224px;
+    width: calc(160px * var(--ui-scale, 1));
+    height: calc(224px * var(--ui-scale, 1));
     border-radius: 8px;
     border: 2px solid var(--gold-dark);
     box-shadow: 0 8px 20px rgba(0,0,0,0.8);
 }
 
-/* Obere Reihe: gegnerischer Held ganz links oben, Ressourcen direkt rechts daneben, dann Friedhof */
-.top-row .hero-dock { order: -2; }
-.top-row .resource-tray { order: -1; align-items: flex-start; }
 
 /* Spielbare Handkarten: gelber Rand und etwas größer */
 .hand-card-slot.playable { width: calc(var(--hand-w) * 1.1); height: calc(var(--hand-h) * 1.1); }
@@ -324,42 +321,15 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 
 /* Ongoing-Fähigkeiten neben der Ausrüstung */
 .ongoing-card .card-visual { box-shadow: 0 0 0 2px #7c3aed, 0 0.8cqw 2.4cqw rgba(0,0,0,.65); }
-/* Die Hand darf schmaler werden, statt den Helden aus dem Bild zu schieben */
-.hand-arc-container { min-width: 0; }
-.ongoing-tag { position: absolute; left: 0; top: -14px; z-index: 25; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    background: #2e1065; color: #ede9fe; border: 1px solid #7c3aed; border-radius: 3px; padding: 1px 5px; font-size: 9px; font-weight: bold; pointer-events: none; }
 
-.resource-tray { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; align-items: center; }
-.active-quests-row, .mini-resources-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .quest-card-large { position: relative; width: var(--hand-w); height: var(--hand-h); border-radius: 4px; transform-origin: center bottom; }
-/* Quests liegen nebeneinander und überlappen erst, wenn der Platz nicht mehr reicht */
-.resource-tray { flex: 0 1 auto; min-width: 0; }
-.bottom-row .resource-tray { max-width: 40%; }
-.active-quests-row { flex-wrap: nowrap; justify-content: flex-start; max-width: 100%; min-width: 0; }
-.active-quests-row .quest-card-large { flex: 0 1 var(--hand-w); min-width: 28px; }
 .quest-card-large.zone-quest { opacity: .72; } .quest-card-large.zone-quest:hover { opacity: 1; }   /* Set drums: Quest aus Friedhof/Deck abschließbar */
-.active-quests-row .quest-card-large:last-child { flex-shrink: 0; }
 .active-quests-row .quest-card-large:hover { z-index: 100; }
 .quest-card-large.quest-ready { cursor: pointer; }
-.res-mini { width: var(--res-w); height: var(--res-h); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); background: #1a1512; }
-.res-mini .card-back { width: 100%; height: 100%; box-shadow: none; }
-.res-mini.exhausted { transform: rotate(90deg); opacity: 0.7; }
 
 .hero-dock { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.equip-row { display: flex; gap: 8px; margin-top: 6px; justify-content: center; flex-wrap: wrap; max-width: 320px; }
-.equip-row .card-wrapper { width: 85px; flex-shrink: 0; }
-.equip-row .card-wrapper .cfx-text { font-size: 8px; padding: 4px; gap: 1px; }
-.equip-row .card-wrapper .cfx-top { font-size: 7px; }
-.equip-row .card-wrapper .cfx-cost { font-size: 7px; padding: 0.5px 3px; }
-.equip-row .card-wrapper .cfx-body { font-size: 6px; }
 
-/* Ausrüstung + Ongoing: über dem eigenen Helden, unter dem gegnerischen; Karten überlappen */
 .hero-dock > div { position: relative; }
-.equip-row { position: absolute; z-index: 60; flex-wrap: nowrap; gap: 0; margin: 0; max-width: none; width: max-content; }
-#top-equipment-container { top: calc(100% + 6px); left: 0; }
-#bot-equipment-container { bottom: calc(100% + 6px); right: 0; }
-.equip-row .card-wrapper + .card-wrapper { margin-left: -42px; }
-.equip-row .card-wrapper:hover { z-index: 100; }
 
 #battlefield-zone { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; gap: 10px; min-height: 500px; position: relative; }
 
@@ -368,7 +338,6 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 #arena { position: relative; }
 .bottom-row { position: absolute; left: 10px; right: 10px; width: auto; bottom: 0; min-height: 0; margin: 0; pointer-events: none; z-index: 800; }
 .bottom-row > * { pointer-events: auto; }
-.bottom-row #bot-resource-tray { margin-left: auto; }
 #battlefield-zone { padding-bottom: calc(var(--hand-h) * 0.42); }
 
 /* Lebensbalken rechts neben den Heldenkarten */
@@ -380,9 +349,6 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 .hp-trail { background: #fde68a; transition: height .7s ease-out; }
 .hp-fill { background: linear-gradient(90deg, color-mix(in srgb, var(--hpc) 70%, #000), var(--hpc), color-mix(in srgb, var(--hpc) 70%, #fff));
     transition: height .45s cubic-bezier(.3,.8,.3,1), background .3s; }
-.hp-num { display: flex; flex-direction: column; align-items: center; line-height: 1; font-family: Georgia, serif; }
-.hp-num b { font-size: 13px; color: var(--hpc); text-shadow: 0 0 4px #000; }
-.hp-num span { font-size: 9px; color: #8a7a65; border-top: 1px solid #4a3f35; padding-top: 1px; }
 .hp-bar.hit { animation: hpHit .45s ease-out; }
 .hp-bar.healed .hp-fill { animation: hpHeal .9s ease-out; }
 @keyframes hpHit { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-1px); } }
@@ -390,10 +356,8 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
 /* Wenig Leben: auffällig rot pulsierend, kritisch noch stärker */
 .hp-bar.low .hp-track { border-color: #ef4444; animation: hpLow 1.2s ease-in-out infinite; }
 .hp-bar.critical .hp-track { animation: hpCrit .6s ease-in-out infinite; }
-.hp-bar.critical .hp-num b { font-size: 16px; animation: hpCritNum .6s ease-in-out infinite; }
 @keyframes hpLow { 50% { box-shadow: 0 0 12px 3px rgba(239,68,68,.85); } }
 @keyframes hpCrit { 50% { box-shadow: 0 0 20px 7px rgba(239,68,68,1); border-color: #fecaca; } }
-@keyframes hpCritNum { 50% { transform: scale(1.25); color: #fecaca; } }
 #bot-hand { position: absolute; left: 50%; bottom: 0; width: min(64%, 1100px); flex: none;
     transform: translate(-50%, 64%); transition: transform .3s cubic-bezier(.2, .8, .2, 1); z-index: 900; }
 #bot-hand.hand-up { transform: translate(-50%, 0); }
@@ -416,8 +380,6 @@ code { background: #000; padding: 1px 4px; border-radius: 3px; color: var(--gold
     background: linear-gradient(180deg, #fde047, #ca8a04); box-shadow: 0 0 30px rgba(250,204,21,.8), 0 8px 20px rgba(0,0,0,.7); animation: endPulse 1.4s ease-in-out infinite; }
 #big-end-turn:hover { filter: brightness(1.12); }
 @keyframes endPulse { 50% { box-shadow: 0 0 50px rgba(250,204,21,1), 0 8px 20px rgba(0,0,0,.7); transform: translate(-50%, -50%) scale(1.05); } }
-.battlefield-row { width: 100%; height: 230px; display: flex; justify-content: center; align-items: center; gap: 16px; position: relative; overflow: visible; }
-.row-watermark { position: absolute; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; color: rgba(201,168,76,0.08); bottom: -15px; }
 
 #side-panel { width: 280px; flex-shrink: 0; background: linear-gradient(180deg, #1a1512 0%, #0a0705 100%); border-left: 2px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
 button { background: linear-gradient(180deg, #3d3530, #1a1512); color: var(--gold-light); border: 1px solid var(--gold-dark); padding: 7px 10px; border-radius: 3px; font-weight: bold; font-size: 12px; cursor: pointer; }
@@ -446,26 +408,12 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 #multi-target-ui .mt-info { font-size: 12px; color: var(--text-dim); }
 #multi-target-ui button { padding: 6px 20px; font-size: 14px; }
 /* ===== Game 3: Schlachtfeld mit Ausrüstungs-Zone, Entscheidungsfeld, Protector ===== */
-/* Allies links/mittig, Ausrüstung + laufende Fähigkeiten in voller Größe daneben.
-   Eigene Reihe: Ausrüstung baut sich von rechts nach links auf; Gegner gespiegelt (von links).
-   Wird es zu voll, schrumpft zuerst das Ally-Feld (Karten überlappen). */
-.battlefield-row { justify-content: space-between; gap: 18px; padding: 0 8px; box-sizing: border-box; }
-.bf-ally-zone { flex: 1 1 0; min-width: 0; display: flex; justify-content: center; align-items: center; height: 100%; }
-.bf-equip-zone { flex: 0 1 auto; min-width: 0; max-width: 62%; display: flex; align-items: center; height: 100%; }
-.bf-equip-zone.own { flex-direction: row-reverse; }
-.bf-slot { position: relative; flex: 0 1 calc(var(--field-w) + 16px); min-width: 34px; height: calc(var(--field-w) * 1.4); display: flex; align-items: center; }
-.bf-slot.ex { flex-basis: calc(var(--field-w) * 1.4 + 16px); }
-.bf-slot:last-child { flex-shrink: 0; }
-.bf-equip-zone.own .bf-slot { justify-content: flex-end; }
-.bf-slot:hover { z-index: 100; }
-.bf-equip-zone .card-wrapper .ongoing-tag { top: -14px; }
 .card-action-bar { flex-wrap: wrap; }
 .card-action-bar button { min-width: 48%; }
 
 /* Getappte (erschöpfte) Quests in der Ressourcenreihe */
 .quest-card-large.exhausted > .card-wrapper > .cfx-rot { transform: rotate(90deg); }
 .quest-card-large.exhausted { opacity: .8; }
-.resource-tray.dropzone-active { outline: 2px dashed #22c55e; outline-offset: 4px; border-radius: 6px; }
 
 /* Protector wählen */
 .card-wrapper.protect-pulsing .card-visual { box-shadow: 0 0 5cqw 1.5cqw #38bdf8 !important; animation: protPulse 1s ease-in-out infinite; }
@@ -571,10 +519,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 /* ===== Symmetrisches Brett =====
    Spielfeld über die volle Höhe, zwei gleich große Hälften, Zuglinie genau in der Mitte.
    Beide Spielerreihen liegen in den Ecken darüber: unten Ressourcen ab der linken Ecke, Friedhof + Held rechts;
-   oben gespiegelt (Held + Friedhof links, Ressourcen ab der rechten Ecke). Die Ally-Reihen weichen seitlich aus (layoutRows). */
+   oben gespiegelt (Held + Friedhof links, Ressourcen ab der rechten Ecke). Die Ally-Reihen weichen seitlich aus (js/ui.js layoutBoard). */
 #arena { position: relative; padding: 0; }
 #battlefield-zone { position: absolute; inset: 0; min-height: 0; padding: 0 10px !important; display: flex; flex-direction: column; justify-content: stretch; gap: 0; }
-#battlefield-zone .battlefield-row { flex: 1 1 0; height: auto; min-height: 0; }
 .player-row { position: absolute; left: 10px; right: 10px; width: auto; min-height: 0; margin: 0; pointer-events: none; z-index: 800; gap: 12px; }
 .player-row > * { pointer-events: auto; }
 .top-row { top: 8px; align-items: flex-start; }
@@ -587,19 +534,11 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .top-row .resource-tray { order: 2; margin: 0 0 0 auto; }
 
 /* Ressourcen: eine Reihe aus der Ecke heraus – verdeckte Karten (Kartenrücken, überlappend), daneben offene Quests */
-.resource-tray, .bottom-row .resource-tray { flex-direction: row; align-items: flex-end; gap: 10px; max-width: 32%; min-width: 0; }
-.top-row .resource-tray { flex-direction: row-reverse; align-items: flex-start; }
-.res-stack { display: flex; min-width: 0; flex: 0 1 auto; }
-.top-row .res-stack { flex-direction: row-reverse; }
-.res-card { position: relative; flex: 0 1 calc(var(--hand-w) * .26); min-width: 8px; height: var(--hand-h); }
-.res-card:last-child { flex: 0 0 var(--hand-w); }
 .res-card img { position: absolute; top: 0; left: 0; width: var(--hand-w); height: var(--hand-h); border-radius: 6px; border: 1px solid var(--gold-dark);
     box-shadow: 0 4px 12px rgba(0,0,0,.75); transition: transform .3s, filter .3s; user-select: none; }
 .top-row .res-card img { left: auto; right: 0; }
 .res-card.exhausted img { transform: rotate(90deg) scale(.82); filter: brightness(.55) saturate(.7); }
 .res-card:hover { z-index: 5; }
-.active-quests-row { flex: 0 1 auto; }
-.top-row .active-quests-row { flex-direction: row-reverse; }
 
 /* Friedhof: kartengroße Ablage neben dem Helden */
 .deck-zone { width: calc(var(--field-w) * .8); }
@@ -624,38 +563,20 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 #side-more > summary:hover { color: var(--gold); }
 .side-more-body { display: flex; flex-direction: column; gap: 6px; padding: 4px 8px 10px; max-height: 46vh; overflow-y: auto; }
 .side-more-head { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border); padding: 4px 0 2px; }
-/* Korrekturen: eigene Ressourcen wirklich ab der linken Ecke (die ältere ID-Regel schob sie nach rechts) */
-.bottom-row #bot-resource-tray { margin: 0 auto 0 0; }
 /* Ressourcen-Ablage auch leer als Dropzone (Karte als Ressource legen) */
 .bottom-row #bot-resource-tray { min-width: var(--hand-w); min-height: var(--hand-h); border-radius: 8px; }
-.bottom-row #bot-resource-tray.dropzone-active { outline: 2px dashed #22c55e; outline-offset: 4px; background: rgba(34,197,94,.08); }
 /* Friedhof erst sichtbar, wenn eine Karte drin liegt (Platz bleibt reserviert, damit der Held nicht springt) */
 .deck-stack.empty { visibility: hidden !important; }
-/* Allies liegen an der Mittellinie: eigene direkt darunter, gegnerische direkt darüber */
-#top-allies, #bot-allies { justify-content: center; }
-#top-allies { align-items: flex-end; padding-bottom: 22px !important; }
-#bot-allies { align-items: flex-start; padding-top: 22px !important; }
-#top-allies .bf-ally-zone, #top-allies .bf-equip-zone { align-items: flex-end; }
-#bot-allies .bf-ally-zone, #bot-allies .bf-equip-zone { align-items: flex-start; }
-/* Ausrüstung + laufende Fähigkeiten beim Helden: eigene über dem Helden ab dem rechten Rand,
-   gegnerische unter dem Helden ab dem linken Rand. Bei vielen Karten überlappen sie. */
-#bot-allies .bf-equip-zone, #top-allies .bf-equip-zone { position: absolute; z-index: 20; height: calc(var(--field-w) * 1.4); max-width: 46%; }
-#bot-allies .bf-equip-zone { right: 0; bottom: calc(var(--field-w) * 1.4 + 30px); flex-direction: row-reverse; }
-#top-allies .bf-equip-zone { left: 0; top: calc(var(--field-w) * 1.4 + 30px); flex-direction: row; }
-#top-allies .bf-equip-zone .bf-slot { justify-content: flex-start; }
-/* Mehrere Reihen (js/ui.js layoutEquipZone): Karten absolut gesetzt, Zone so groß wie ihr Inhalt */
-#bot-allies .bf-equip-zone, #top-allies .bf-equip-zone { display: block; max-width: none; }
-.bf-equip-zone .bf-slot:hover { z-index: 100 !important; }
 /* Mana-Juwel: verfügbare Ressourcen (eigenes über den Ressourcen, gegnerisches darunter) */
 .top-row .resource-tray { position: relative; }
 .mana-badge { position: absolute; left: 0; bottom: calc(100% + 10px); display: flex; align-items: center; gap: 8px; pointer-events: auto; z-index: 5; }
 .top-row .mana-badge { left: auto; right: 0; bottom: auto; top: calc(100% + 10px); flex-direction: row-reverse; }
-.mana-gem { position: relative; width: 52px; height: 52px; border-radius: 50%;
+.mana-gem { position: relative; width: calc(52px * var(--ui-scale, 1)); height: calc(52px * var(--ui-scale, 1)); border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #bfe4ff 0%, #4aa3ff 22%, #1957c9 55%, #0b2463 85%);
     box-shadow: 0 0 0 3px #c9a84c, 0 0 0 5px #3a2a10, 0 0 14px rgba(74,163,255,.8), inset 0 -6px 10px rgba(0,0,40,.6);
     display: flex; align-items: center; justify-content: center; transition: filter .3s; }
 .mana-gem::after { content: ''; position: absolute; left: 22%; top: 12%; width: 34%; height: 22%; border-radius: 50%; background: rgba(255,255,255,.45); filter: blur(2px); }
-.mana-gem span { position: relative; z-index: 1; font: 900 28px/1 Impact, 'Arial Black', Georgia, sans-serif; color: #fff;
+.mana-gem span { position: relative; z-index: 1; font: 900 calc(28px * var(--ui-scale, 1))/1 Impact, 'Arial Black', Georgia, sans-serif; color: #fff;
     -webkit-text-stroke: 4px #000; paint-order: stroke fill; text-shadow: 0 0 6px #000; }
 .mana-txt { display: flex; flex-direction: column; line-height: 1.05; text-shadow: 0 1px 3px #000; }
 .top-row .mana-txt { align-items: flex-end; }
@@ -667,7 +588,7 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .mana-gem.gain { animation: manaGain .7s ease-out; }
 @keyframes manaSpend { 0% { transform: scale(1); } 30% { transform: scale(1.25); box-shadow: 0 0 0 3px #c9a84c, 0 0 0 5px #3a2a10, 0 0 26px 6px rgba(239,68,68,.9); } 100% { transform: scale(1); } }
 @keyframes manaGain { 0% { transform: scale(1); } 35% { transform: scale(1.3) rotate(-8deg); box-shadow: 0 0 0 3px #fde68a, 0 0 0 5px #3a2a10, 0 0 30px 8px rgba(250,204,21,.9); } 100% { transform: scale(1); } }
-/* Hand rückt bei vielen Ressourcen nach rechts (--hand-shift setzt layoutRows) */
+/* Hand rückt bei vielen Ressourcen nach rechts (--hand-shift setzt layoutHand) */
 #bot-hand { transform: translate(calc(-50% + var(--hand-shift, 0px)), 64%); }
 #bot-hand.hand-up { transform: translate(calc(-50% + var(--hand-shift, 0px)), 0); }
 /* Deckübersicht: Kacheln wachsen mit dem Text, Icon ohne zusätzlichen Kreis, sauber zentriert */
@@ -1043,23 +964,9 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 /* Wenig Leben: ruhiger Hinweis statt Blinken (langsamer, schwacher Schein, Zahl hüpft nicht) */
 .hp-bar.low .hp-track { animation: hpLow 2.8s ease-in-out infinite; }
 .hp-bar.critical .hp-track { animation: hpCrit 1.8s ease-in-out infinite; }
-.hp-bar.critical .hp-num b { animation: none; color: #fca5a5; }
 @keyframes hpLow { 50% { box-shadow: 0 0 6px 1px rgba(239,68,68,.45); } }
 @keyframes hpCrit { 50% { box-shadow: 0 0 9px 2px rgba(239,68,68,.6); } }
-/* Angelegte Karten liegen klein unter der oberen rechten Ecke ihrer Hauptkarte (weitere leicht darunter versetzt) */
-.card-wrapper.has-attach { isolation: isolate; }
-.card-wrapper.attached-card { position: absolute; z-index: -1; width: 56%; --cw: auto; right: -42%; top: calc(-10% + var(--ai, 0) * 24%); transform: rotate(5deg); }
-/* Platz rechts neben einer Karte mit Anhang, damit die Nachbarkarte ihn nicht verdeckt */
-.bf-slot:has(> .card-wrapper.has-attach) { margin-right: calc(var(--field-w, 150px) * .45); }
-.card-wrapper.attached-card:hover { z-index: 5; }
-.row-watermark, .ongoing-tag { display: none; }
-/* Helden: rechts daneben liegt der Lebensbalken – Anhang rechts davon, etwas tiefer (oben ist der Bildschirmrand) */
-.hero-with-hp > .card-wrapper > .card-wrapper.attached-card { right: calc(-56% - 28px); top: calc(4% + var(--ai, 0) * 24%); }
-/* Kein Platz rechts (eigener Held am rechten Rand): Anhang gespiegelt unter der oberen linken Ecke */
-.card-wrapper.attached-card.attach-left, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-left { right: auto; left: -42%; top: calc(-10% + var(--ai, 0) * 24%); transform: rotate(-5deg); }
-/* Weitere Plätze, wenn neben der Karte kein Platz ist (attachSpot): darüber bzw. darunter herausragend */
-.card-wrapper.attached-card.attach-up, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-up { left: auto; right: 6%; top: calc(-50% - var(--ai, 0) * 16%); transform: rotate(4deg); }
-.card-wrapper.attached-card.attach-down, .hero-with-hp > .card-wrapper > .card-wrapper.attached-card.attach-down { left: auto; right: 6%; top: auto; bottom: calc(-50% - var(--ai, 0) * 16%); transform: rotate(-4deg); }
+.row-watermark { display: none; }
 /* Auto-Fill am Ende der Deckliste */
 .db-autofill { display: block; width: calc(100% - 10px); margin: 10px 0 6px 10px; padding: 8px 10px; font-size: 14px; font-weight: bold; border-radius: 6px;
     color: #1a1208; background: linear-gradient(180deg, #fde68a, #d4a017); border: 1px solid #fde68a; box-shadow: 0 2px 10px rgba(250,204,21,.35); cursor: pointer; }
@@ -1099,13 +1006,6 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #aim-banner .ab-btns:empty { display: none; }
 #aim-banner .ab-btns button { pointer-events: auto; }
 .card-wrapper.destroy-picked .card-visual { box-shadow: 0 0 0 0.9cqw #ef4444, 0 0 4cqw rgba(239,68,68,.85) !important; }
-/* Allies ab der Mitte: eigene nach links, gegnerische nach rechts (js/ui.js layoutRows setzt die Ränder) */
-#bot-allies .bf-ally-zone { flex-direction: row-reverse; justify-content: flex-start; }
-#bot-allies .bf-ally-zone .bf-slot { justify-content: flex-end; }                   /* bei Platzmangel überlappen die Karten nach links, nie zur Ausrüstung */
-#top-allies .bf-ally-zone { justify-content: flex-start; }
-/* Anhänge an Helden (Cyclone …) liegen genau auf dem Helden; der Held bleibt bedienbar, mit der Maus darüber blendet der Anhang aus */
-.hero-with-hp > .card-wrapper > .card-wrapper.attached-card.on-hero { inset: 0; left: 0; right: auto; top: calc(var(--ai, 0) * 7%); width: 100%; transform: none; z-index: 2; pointer-events: none; transition: opacity .15s; }
-.hero-with-hp > .card-wrapper:hover > .card-wrapper.attached-card.on-hero { opacity: .12; }
 /* Hand blockiert nur dort, wo Karten liegen (dahinter liegende Ressourcen bleiben anklickbar) */
 #bot-hand { pointer-events: none; }
 #bot-hand > * { pointer-events: auto; }
@@ -1501,7 +1401,7 @@ body:not(.dev) #side-more { display: none !important; }
 #decision-modal.peek { background: rgba(0,0,0,.18); backdrop-filter: none; align-items: flex-start; padding-top: 14vh; }
 #decision-modal.peek .modal-box { box-shadow: 0 18px 50px rgba(0,0,0,.85); }
 /* … und die Hand ist dabei ganz ausgefahren (wie beim Darüberfahren) */
-body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(-50%, 0); }
+body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(calc(-50% + var(--hand-shift, 0px)), 0); }
 #mp-chat .mp-warn { font-style: normal; font-size: 11px; color: #e8c97a; background: rgba(201,168,76,.08); border: 1px solid rgba(201,168,76,.25); border-radius: 4px; padding: 5px 8px; margin-bottom: 6px; }
 /* Hauptmenü auf niedrigen Bildschirmen (Handy quer): alles kompakter, damit Logo, alle Knöpfe und beide Objekte passen */
 @media (max-height: 520px) and (min-width: 561px) {
@@ -1580,7 +1480,7 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(-
 @media (min-width: 1000px) {
     body.res-drag #bot-hand { transform: translate(calc(-50% + var(--hand-shift, 0px) + min(170px, 11vw)), 64%); }
     body.res-drag #bot-hand.hand-up { transform: translate(calc(-50% + var(--hand-shift, 0px) + min(170px, 11vw)), 0); }
-    body.res-drag #bot-hand .hand-card-slot { margin: 0 -38px; transition: margin .25s, transform .22s; }
+    body.res-drag #bot-hand .hand-card-slot { margin: 0 calc(-1 * max(38px, var(--hand-ov, 20px))); transition: margin .25s, transform .22s; }
 }
 /* Fehlerbanner: Klicks gehen durch (nur der Schließen-Knopf ist bedienbar) */
 #error-banner { pointer-events: none; opacity: .92; font-size: 13px; }
@@ -1641,3 +1541,62 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(-
 #sim-badge.done { border-color: #4ade80; animation: sim-badge-pulse 1.6s ease-in-out infinite; }
 #sim-badge.done .sb-bar { display: none; }
 @keyframes sim-badge-pulse { 0%, 100% { box-shadow: 0 4px 14px rgba(0,0,0,.6); } 50% { box-shadow: 0 0 16px rgba(74,222,128,.55); } }
+/* Einstellungen: Zeile mit Beschriftung + Auswahl (Kartenbilder, Bildqualität je Bereich) */
+.cfg-row { display: flex; gap: 6px; align-items: center; }
+.cfg-row > label { font-size: 11px; color: var(--text-dim); min-width: 78px; }
+.cfg-sel { flex: 1; min-width: 0; background: #0a0705; border: 1px solid var(--border); color: var(--text-main); padding: 3px; border-radius: 3px; font-size: 11px; }
+/* Debug: Größe der Zoom-Karte einstellen – schwebendes Feld oben links, bleibt bis "Fertig" offen (über der Zoom-Karte) */
+#zoom-tune { position: fixed; left: 12px; top: 12px; z-index: 1000001; width: 260px; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+    background: rgba(10,7,5,.94); border: 1px solid var(--gold-dark); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.8); }
+#zoom-tune b { color: var(--gold-light); font-size: 14px; }
+#zoom-tune input[type=range] { width: 100%; accent-color: var(--gold); }
+#zoom-tune .zt-val { font-size: 12px; color: var(--text-main); }
+#zoom-tune .zt-btns { display: flex; gap: 6px; } #zoom-tune .zt-btns button { flex: 1; }
+/* ===== Spielfeld-Layout (js/ui.js: layoutBoard, layoutBar, placeAttachments) =====
+   Größen kommen aus --field-w / --hand-w und --ui-scale (Spielfeld-Größe im Menü, applyUiZoom). */
+
+/* Reihe je Spieler: eigene Allies links, Equipment/laufende Fähigkeiten rechts, dazwischen immer eine Lücke; der Gegner
+   gespiegelt. Jede Karte liegt in einem absolut gesetzten .bf-slot (Position, Überlappung, Stapel und Reihenfolge rechnet
+   layoutBoard). Erschöpfen dreht nur die Karte, der Platz bleibt gleich. */
+.battlefield-row { position: relative; display: block; width: 100%; flex: 1 1 0; min-height: 0; padding: 0; overflow: visible; }
+.bf-ally-zone, .bf-equip-zone { position: absolute; inset: 0; pointer-events: none; }
+.bf-slot { position: absolute; width: var(--field-w); height: calc(var(--field-w) * 1.4); pointer-events: auto; }
+.bf-slot > .card-wrapper.is-exhausted { margin-inline: 0; }
+.bf-slot:hover, .bf-slot:has(> .card-wrapper.touch-active) { z-index: 1000 !important; }
+/* Gleiche Allies gestapelt (Stufe 2): untere Karten schauen rechts oben heraus, bedient wird die oberste */
+.bf-slot.stack-under { pointer-events: none; }
+.stack-count { position: absolute; top: -10px; right: -10px; z-index: 50; padding: 2px 8px; border-radius: 999px; pointer-events: none;
+    background: #1a1512; border: 1px solid var(--gold); color: var(--gold-light); font: 900 14px/1 Georgia, serif; box-shadow: 0 2px 8px rgba(0,0,0,.8); }
+
+/* Untere Leiste (Gegner: obere, gespiegelt): verdeckte Ressourcen und offene Quests als ein durchgehender Stapel – je verdeckte
+   ein 8-px-Streifen (RES_STRIP), die Quests liegen ohne Lücke darauf; Quest-Breiten setzt layoutBar (mind. 30 %, die letzte ganz) */
+.resource-tray { display: flex; flex-direction: row; align-items: flex-end; gap: 0; flex: 0 1 auto; min-width: 0; }
+.top-row .resource-tray { flex-direction: row-reverse; align-items: flex-start; }
+.res-stack { display: flex; flex: 0 0 auto; min-width: 0; }
+.top-row .res-stack { flex-direction: row-reverse; }
+.res-card { position: relative; flex: 0 0 auto; width: 8px; height: var(--hand-h); }
+.res-card:last-child { width: var(--hand-w); }
+.resource-tray.pile .res-card:last-child { width: 8px; }
+.active-quests-row { display: flex; flex: 0 1 auto; flex-wrap: nowrap; justify-content: flex-start; gap: 0; max-width: 100%; min-width: 0; }
+.top-row .active-quests-row { flex-direction: row-reverse; }
+.active-quests-row .quest-card-large { flex: 0 0 auto; min-width: 0; }
+/* Hand: Container wächst mit der Spielfeld-Größe (sonst verschwände die eingefahrene Hand bei kleinen Stufen) */
+.hand-arc-container { min-width: 0; height: calc(240px * var(--ui-scale, 1)); padding-bottom: calc(10px * var(--ui-scale, 1)); }
+
+/* Angelegte Karten: am oberen Rand der Hostkarte (auch beim Gegner – seine Karten stehen aufrecht), 15 % darüber hinaus,
+   gestaffelt um --adx. att-l: bündig links, nach rechts (spätere oben); att-r: bündig rechts, nach links (frühere oben) –
+   so bleibt von jeder Karte die linke Ecke mit Name und Kosten sichtbar */
+.card-wrapper.attached-card { position: absolute; width: 62%; --cw: auto; margin: 0; z-index: calc(20 + var(--ai, 0)); }
+.card-wrapper.attached-card.att-top { top: -15%; }
+.card-wrapper.attached-card.att-flush { top: 0; }                 /* gegnerischer Held am oberen Bildrand */
+.card-wrapper.attached-card.att-l { left: calc(var(--ai, 0) * var(--adx, 0px)); }
+.card-wrapper.attached-card.att-r { right: calc(var(--ai, 0) * var(--adx, 0px)); z-index: calc(40 - var(--ai, 0)); }
+.card-wrapper.attached-card:hover { z-index: 60; }
+/* Controller dezent am Rand: blau = du, rot = Gegner (CR 400.7b) */
+.card-wrapper.attached-card .card-visual { outline: 2px solid var(--att-c); outline-offset: -1px; }
+.card-wrapper.attached-card.att-own { --att-c: rgba(96,165,250,.85); }
+.card-wrapper.attached-card.att-opp { --att-c: rgba(248,113,113,.85); }
+
+/* Lebensbalken: nur das Maximum (das aktuelle Leben steht groß auf der Heldenkarte) */
+.hp-num { display: flex; flex-direction: column; align-items: center; line-height: 1; font-family: Georgia, serif; }
+.hp-num span { font-size: 12px; font-weight: bold; color: #b8a78c; }
