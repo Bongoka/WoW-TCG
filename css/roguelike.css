@@ -229,7 +229,7 @@
 .rl-choice small { color: #a99d8c; }
 
 /* ---------------------------------------------------------------- Deck / Picker / Overlays */
-.rl-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, .78); backdrop-filter: blur(5px); }
+.rl-overlay { position: fixed; inset: 0; z-index: 99600;   /* über .rl-root (99500), unter Kartenvorschau und Meldungen */ display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, .78); backdrop-filter: blur(5px); }
 .rl-overlay-box { width: min(1120px, 96vw); max-height: 88vh; overflow: auto; padding: 20px 22px; border-radius: 18px;
     border: 1px solid rgba(201, 168, 76, .3); background: linear-gradient(170deg, #1c1510 0%, #0a0705 100%);
     box-shadow: 0 30px 80px rgba(0, 0, 0, .8); }
