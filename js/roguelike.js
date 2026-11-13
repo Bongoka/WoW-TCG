@@ -248,42 +248,53 @@
 
     // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
     // Held mit 3 passenden Karten → drei Karten mit gemeinsamem Thema → starke Einzelkarte … bis das Deck voll ist (R.DRAFT_STEPS).
+    // Darstellung: mittiger Titel, drei gleich breite Spalten, Kartengröße aus dem verfügbaren Platz, Fußleiste mit Fortschritt.
+    let draftRender = null;
+    window.addEventListener('resize', () => { clearTimeout(draftRender && draftRender.t); if (draftRender) draftRender.t = setTimeout(() => { if (mainEl && mainEl.querySelector('.rl-draft-screen')) draftRender(); }, 150); });
+    function draftSizes(kind) {
+        const vw = Math.min(window.innerWidth, 1840), vh = window.innerHeight;
+        const one = vw < 900;                                                          // schmal: eine Spalte untereinander
+        const colW = one ? vw - 32 : (vw - 64 - 2 * 28) / 3;
+        const availH = one ? 9999 : vh - 330;                                          // Kopf + Fußleiste + Ränder
+        const inner = colW - 48;
+        if (kind === 'hero') {
+            let small = Math.min((inner - 2 * 14) / 3, 190);
+            let big = Math.min(inner * 0.66, 300, (availH - 52 - small * 1.4 - 18) / 1.4);
+            if (big < small * 1.25) { small = Math.max(80, (availH - 52 - 18) / 1.4 / 2.25); big = Math.min(inner * 0.66, small * 1.25, 300); }
+            return { big: Math.max(120, big), small: Math.max(80, small) };
+        }
+        if (kind === 'pack') return { small: Math.max(90, Math.min(inner / 2.5, (availH - 90) / 1.4, 270)) };   // gefächert: Karten überlappen um ein Viertel
+        return { big: Math.max(150, Math.min(inner - 40, (availH - 20) / 1.4, 330)) };
+    }
     function openDraft(key, done) {
         const cls = R.classByKey(key); if (!cls) return;
         const draft = R.draftNew(key);
-        const STEP_TXT = {
-            hero: ['Wähle deinen Helden', 'Je Talentbaum ein Held – dazu eine seltene und zwei passende Karten.'],
-            pack: ['Wähle drei Karten', 'Drei Karten, die zusammen funktionieren.'],
-            rare: ['Wähle eine starke Karte', 'Eine seltene oder epische Einzelkarte.']
-        };
-        const render = () => {
+        const TITLE = { hero: 'Wähle deinen Helden', pack: 'Wähle drei Karten', rare: 'Wähle eine Karte' };
+        const render = draftRender = () => {
             ensureRoot(); showRoot(); applyBg();
             const kind = R.DRAFT_STEPS[draft.step];
-            const [title, hint] = STEP_TXT[kind];
-            const hero = draft.hero ? CARDS[draft.hero] : null;
-            const n = draft.deck.length, pct = Math.round(100 * n / R.DRAFT_SIZE);
-            // Deckliste: nach Kosten, gleiche Karten zusammengefasst
-            const counts = {}; draft.deck.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
-            const list = Object.keys(counts).map(id => CARDS[id]).filter(Boolean).sort((a, b) => (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name));
+            const n = draft.deck.length;
+            const sz = draftSizes(kind);
+            // Kostenkurve des bisherigen Decks (0 … 6+)
+            const curve = [0, 0, 0, 0, 0, 0, 0]; draft.deck.forEach(id => { curve[Math.min(6, (CARDS[id] && CARDS[id].cost) || 0)]++; });
+            const cmax = Math.max(3, ...curve);
+            const pips = R.DRAFT_STEPS.map((s, i) => `<i class="${i < draft.step ? 'done' : i === draft.step ? 'now' : ''}${s === 'rare' ? ' rare' : ''}"></i>`).join('');
             mainEl.innerHTML = `
-                <div class="rl-draft-screen" style="--cl:${cls.color}">
-                    <div class="rl-draft-head">
+                <div class="rl-draft-screen ${kind}" style="--cl:${cls.color}">
+                    <header class="rl-draft-head">
                         <img class="rl-draft-cls" src="${esc(cls.icon)}" alt="">
-                        <div class="rl-draft-title">
-                            <div class="rl-kicker">${tr`Deck-Draft · ${tr(cls.name)}`}${hero ? ' · ' + esc(hero.name) : ''}</div>
-                            <h2>${tr(title)}</h2>
-                            <p class="rl-lead">${tr(hint)}</p>
+                        <h1>${tr(TITLE[kind])}</h1>
+                        <div class="rl-draft-pips">${pips}</div>
+                    </header>
+                    <div class="rl-draft-options" id="rl-draft-options"></div>
+                    <footer class="rl-draft-foot">
+                        <button class="rl-btn ghost" id="rl-draft-back">${tr('← Klassenwahl')}</button>
+                        <div class="rl-draft-status">
+                            <div class="rl-draft-curve">${curve.map((c, i) => `<span><i style="height:${Math.round(100 * c / cmax)}%"></i><b>${i === 6 ? '6+' : i}</b></span>`).join('')}</div>
+                            <div class="rl-draft-count"><b>${n}</b> / ${R.DRAFT_SIZE}</div>
                         </div>
-                        <div class="rl-draft-progress"><b>${n}/${R.DRAFT_SIZE}</b><span>${tr('Karten')}</span><div class="rl-draft-bar"><i style="width:${pct}%"></i></div></div>
-                    </div>
-                    <div class="rl-draft-body">
-                        <div class="rl-draft-options" id="rl-draft-options"></div>
-                        <aside class="rl-draft-deck">
-                            ${hero ? `<div class="rl-draft-hero"><b>${esc(hero.name)}</b><small>${esc(hero.talent || '')} · ${esc(hero.faction)}</small></div>` : ''}
-                            ${list.map(cd => `<div class="rl-draft-line"><span class="rl-draft-cost">${cd.cost || 0}</span><span class="rl-draft-name">${esc(cd.name)}</span>${counts[cd.id] > 1 ? `<span class="rl-draft-n">×${counts[cd.id]}</span>` : ''}</div>`).join('')}
-                        </aside>
-                    </div>
-                    <div class="rl-menu-foot"><button class="rl-btn ghost" id="rl-draft-back">${tr('← Klassenwahl')}</button></div>
+                        <button class="rl-btn ghost" id="rl-draft-deck" ${n ? '' : 'disabled'}>${tr('Deck ansehen')}</button>
+                    </footer>
                 </div>`;
             const wrap = mainEl.querySelector('#rl-draft-options');
             draft.offers.forEach((o, i) => {
@@ -291,18 +302,27 @@
                 b.className = 'rl-draft-opt ' + o.kind;
                 const theme = o.kind === 'pack' ? R.draftThemeById(o.theme) : null;
                 const h = o.kind === 'hero' ? CARDS[o.hero] : null;
-                b.innerHTML = `<div class="rl-draft-opt-head">${h ? `<b>${esc(h.talent)}</b><small>${esc(h.faction)}</small>`
-                    : theme ? `<b>${esc(tr(theme.name))}</b><small>${esc(tr(theme.desc))}</small>` : `<b>${esc(tr(CARDS[o.cards[0]].rarity || ''))}</b>`}</div>
-                    <div class="rl-draft-cards"></div>`;
+                const label = h ? h.talent : theme ? tr(theme.name) : '';
+                b.innerHTML = `${label ? `<div class="rl-draft-label">${esc(label)}</div>` : ''}<div class="rl-draft-cards"></div>`;
                 const cardsEl = b.querySelector('.rl-draft-cards');
-                if (h) { const hc = cardNode(h.id, 150); hc.classList.add('rl-draft-herocard'); cardsEl.appendChild(hc); }
-                o.cards.forEach(id => cardsEl.appendChild(cardNode(id, o.kind === 'rare' ? 175 : 132)));
-                b.onclick = () => { if (R.draftChoose(draft, i)) done(draft); else render(); };
+                if (h) {
+                    const top = document.createElement('div'); top.className = 'rl-draft-herorow';
+                    top.appendChild(cardNode(h.id, sz.big));
+                    const row = document.createElement('div'); row.className = 'rl-draft-row';
+                    o.cards.forEach(id => row.appendChild(cardNode(id, sz.small)));
+                    cardsEl.append(top, row);
+                } else {
+                    const row = document.createElement('div'); row.className = 'rl-draft-row';
+                    o.cards.forEach(id => row.appendChild(cardNode(id, o.kind === 'rare' ? sz.big : sz.small)));
+                    cardsEl.appendChild(row);
+                }
+                b.onclick = () => { if (R.draftChoose(draft, i)) { draftRender = null; done(draft); } else render(); };
                 wrap.appendChild(b);
             });
+            on('#rl-draft-deck', 'click', () => { if (n && R.showCardList) R.showCardList(tr('Dein Deck'), draft.deck, null); });
             on('#rl-draft-back', 'click', () => {
-                try { uiConfirm(tr('Draft abbrechen?'), tr('Das bisher gewählte Deck geht verloren.'), tr('Abbrechen'), openClassSelect); }
-                catch (e) { openClassSelect(); }
+                try { uiConfirm(tr('Draft abbrechen?'), tr('Das bisher gewählte Deck geht verloren.'), tr('Abbrechen'), () => { draftRender = null; openClassSelect(); }); }
+                catch (e) { draftRender = null; openClassSelect(); }
             });
         };
         render();
