@@ -825,6 +825,12 @@ function applyOCR(map) {
             c.subtypes = rest.split(' ').filter(w => w && w !== 'Talent');
             if (rest.includes('Bear Form')) c.subtypes = c.subtypes.filter(w => w !== 'Bear' && w !== 'Form').concat(['Bear Form']);
             if (rest.includes('Cat Form')) c.subtypes = c.subtypes.filter(w => w !== 'Cat' && w !== 'Form').concat(['Cat Form']);
+            // Untertyp nach dem Komma: "Ability—Protection, Aura (1)", "Seal (1)", "Form (1)", "Earth Totem (1), 5 Health" …
+            // (Roshen the Oathsworn: Auras/Blessings/Seals, Set drums: Seals). "Unique" und "N Health" sind keine Untertypen.
+            for (const part of (tl.split('—')[1] || '').split(',').slice(1)) {
+                const t = part.replace(/\(\d+\)/, '').trim();
+                if (t && t !== 'Unique' && !/^\d+ Health$/.test(t) && !c.subtypes.includes(t)) c.subtypes.push(t);
+            }
         }
     }
 }

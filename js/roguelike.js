@@ -1173,29 +1173,43 @@
         ensureRoot(); showRoot();
         const picks = upgradeChoices(node);
         if (!picks.length) { toast('Keine aufwertbare Karte im Deck.'); cancelCb && cancelCb(); return; }
-        const overlay = document.createElement('div');
-        overlay.className = 'rl-overlay picker';
-        overlay.innerHTML = `<div class="rl-overlay-box">
-            <div class="rl-overlay-head"><h2>Karte aufwerten</h2><button class="rl-btn small danger" data-close>×</button></div>
-            <p class="rl-lead">Wähle eine von drei Karten. Die Aufwertung ist dauerhaft und verändert die Karte.</p>
-            <div class="rl-deck-grid" id="rl-pick-grid"></div>
-        </div>`;
-        document.body.appendChild(overlay);
-        const grid = overlay.querySelector('#rl-pick-grid');
-        picks.forEach(e => {
-            const cd = CARDS[e.id] || {};
-            const eff = R.effectForCard(CARDS[R.baseIdOf(e.id)] || cd);
-            const cell = document.createElement('button'); cell.className = 'rl-deck-cell';
-            cell.appendChild(cardNode(e.id, 150));
-            const label = document.createElement('div'); label.className = 'rl-deck-cell-name';
-            label.innerHTML = `<b>${esc(cd.name || '?')}</b><small>✦ ${esc(eff ? tr(eff.text) : '')}</small>`;
-            cell.appendChild(label);
-            cell.onclick = () => { overlay.remove(); cb(e); };
-            grid.appendChild(cell);
-        });
-        const close = () => { overlay.remove(); cancelCb && cancelCb(); };
-        overlay.querySelector('[data-close]').onclick = close;
-        overlay.addEventListener('click', ev => { if (ev.target === overlay) close(); });
+        // Wie der Draft: drei Spalten; je Spalte die Karte vorher → nachher und darunter groß die Aufwertung
+        const render = () => {
+            if (!mainEl) return;
+            const vw = Math.min(window.innerWidth, 1840), vh = window.innerHeight, one = vw < 900;
+            const inner = (one ? vw - 32 : (vw - 64 - 2 * 28) / 3) - 48;
+            const big = Math.max(130, Math.min((inner - 40) / 1.8, one ? 260 : (vh - 420) / 1.4, 290));
+            const small = Math.round(big * 0.8);
+            mainEl.innerHTML = `
+                <div class="rl-draft-screen upgrade">
+                    <header class="rl-draft-head"><h1>${tr('Karte aufwerten')}</h1></header>
+                    <div class="rl-draft-options" id="rl-up-options"></div>
+                    <footer class="rl-draft-foot">
+                        <button class="rl-btn ghost" id="rl-up-back">${tr('← Zurück')}</button>
+                        <div class="rl-up-note">${tr('Die Aufwertung ist dauerhaft.')}</div>
+                        <span></span>
+                    </footer>
+                </div>`;
+            const wrap = mainEl.querySelector('#rl-up-options');
+            picks.forEach(e => {
+                const base = R.baseIdOf(e.id), cd = CARDS[base] || {};
+                const upId = R.upgraded(base), eff = R.effectForCard(cd);
+                const b = document.createElement('button'); b.className = 'rl-draft-opt upgrade';
+                b.innerHTML = `<div class="rl-draft-label">${esc(cd.name || '?')}</div>
+                    <div class="rl-up-pair"><div class="rl-up-before"></div><span class="rl-up-arrow">➜</span><div class="rl-up-after"></div></div>
+                    <div class="rl-up-effect"><span>✦</span>${esc(eff ? tr(eff.text) : '')}</div>`;
+                b.querySelector('.rl-up-before').appendChild(cardNode(base, small));
+                b.querySelector('.rl-up-after').appendChild(cardNode(upId, big));
+                b.onclick = () => { window.removeEventListener('resize', onResize); cb(e); };
+                wrap.appendChild(b);
+            });
+            on('#rl-up-back', 'click', () => { window.removeEventListener('resize', onResize); cancelCb && cancelCb(); });
+        };
+        let rt = 0;
+        const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (mainEl && mainEl.querySelector('.rl-draft-screen.upgrade')) render(); else window.removeEventListener('resize', onResize); }, 150); };
+        window.addEventListener('resize', onResize);
+        ensureRoot(); showRoot(); applyBg();
+        render();
     }
     function openDeckPicker(mode, title, cb, cancelCb) {
         ensureRoot(); showRoot();
@@ -1356,6 +1370,7 @@
     // ---------------------------------------------------------------- Start
     R.cardNode = cardNode;
     R.openClassSelect = openClassSelect;
+    R.openUpgradeChoice = openUpgradeChoice;   // Debug-Galerie / Tests
     R.installHooks();
     R.openRunMenu = openRunMenu;
 })();

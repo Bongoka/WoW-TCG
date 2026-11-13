@@ -4188,6 +4188,8 @@ var I18N_EN = {
     'Kampf aufgeben': 'Concede the fight',
     'Kampf aufgeben?': 'Concede the fight?',
     'Karte aufwerten': 'Upgrade a card',
+    '← Zurück': '← Back',
+    'Die Aufwertung ist dauerhaft.': 'The upgrade is permanent.',
     'Karte entfernen (45 🪙)': 'Remove a card (45 🪙)',
     'Karte entfernt.': 'Card removed.',
     'Karten, Artefakte und Tränke kaufen, Karten entfernen.': 'Buy cards, artifacts and potions, remove cards.',

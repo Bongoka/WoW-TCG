@@ -1615,6 +1615,22 @@ function runRuleTests() {
         assert(first.length === 3 && first.includes('bloodpact'), 'Erste Artefaktwahl: ' + first.join(', '));
         for (let i = 0; i < 40; i++) assert(!RL.availableArtifacts(run, 3).some(id => { const a = RL.art(id); return a.cls && a.cls !== 'Warrior'; }), 'Fremdes Klassen-Artefakt angeboten');
     });
+    test(145, 'Untertypen nach dem Komma (Aura, Seal …), Roshen the Oathsworn verbilligt Auren/Segen/Siegel; Holy Shield beim Angriff', () => {
+        assert(CARDS[66].subtypes.includes('Aura') && CARDS[73].subtypes.includes('Seal') && CARDS[62].subtypes.includes('Blessing'), 'Untertypen fehlen: ' + JSON.stringify([CARDS[66].subtypes, CARDS[73].subtypes]));
+        assert(!CARDS[66].subtypes.some(t => /\(|Health|Unique/.test(t)), 'Falscher Untertyp: ' + CARDS[66].subtypes);
+        const s = fresh('alliance_paladin', 'horde_warrior'); P(s, 1).hand = [];
+        const cost = id => getPlayCost(s, P(s, 1), P(s, 1).hand[hand(s, 1, id)]);
+        const before = [66, 73, 62, 70].map(cost);
+        put(s, 1, 12145);
+        const after = [66, 73, 62, 70].map(cost);
+        assert(after[0] === before[0] - 1 && after[1] === before[1] - 1 && after[2] === before[2] - 1, `Roshen: ${before} → ${after}`);
+        assert(after[3] === before[3], 'Holy Shield (keine Aura) wurde verbilligt');
+        // Gegnerischer Angriff auf den Helden: der Mensch bekommt ein Fenster für Holy Shield (Protection-Held)
+        const t = fresh('alliance_paladin', 'horde_warrior', 2); t.humans = [1]; P(t, 1).hand = []; hand(t, 1, 70); res(t, 1, 4);
+        const at = put(t, 2, 262);
+        applyAction(t, { type: 'ATTACK', attackerUid: at.uid, defenderUid: P(t, 1).hero.uid, actorId: 2 }, true, 2); process(t);
+        assert(t.pending && t.pending.kind === 'priority' && t.pending.good.includes(P(t, 1).hand[0].uid), 'Kein Fenster für Holy Shield: ' + JSON.stringify(t.pending && t.pending.good));
+    });
     LANG = prevLang;
     return results;
 }
