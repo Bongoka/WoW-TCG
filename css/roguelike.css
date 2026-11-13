@@ -490,3 +490,47 @@
     .rl-root .rl-node.boss { width: 80px; height: 80px; }
     .rl-hud-arts { justify-content: flex-start; }
 }
+
+/* ---------------------------------------------------------------- Deck-Draft (Hearthstone-Arena-Prinzip) */
+.rl-draft-screen { max-width: 1500px; margin: 0 auto; }
+.rl-draft-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.rl-draft-cls { width: 56px; height: 56px; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .7)); }
+.rl-draft-title { flex: 1; min-width: 0; }
+.rl-draft-title h2 { margin: 2px 0 4px; color: #f6e7b8; }
+.rl-draft-title .rl-lead { margin: 0; }
+.rl-draft-progress { width: 150px; text-align: right; color: #f6e7b8; }
+.rl-draft-progress b { font-size: 26px; }
+.rl-draft-progress span { margin-left: 6px; font-size: 12px; color: #b9a77a; text-transform: uppercase; letter-spacing: .1em; }
+.rl-draft-bar { height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.rl-draft-bar i { display: block; height: 100%; background: var(--cl, #c9a84c); transition: width .3s; }
+.rl-draft-body { display: flex; gap: 16px; align-items: flex-start; }
+.rl-draft-options { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; }
+.rl-draft-opt {
+    display: flex; flex-direction: column; gap: 10px; padding: 14px; cursor: pointer; text-align: left; color: inherit;
+    border: 1px solid rgba(201, 168, 76, .22); border-radius: 16px;
+    background: linear-gradient(160deg, rgba(30, 22, 17, .95), rgba(12, 9, 7, .96));
+    transition: transform .18s, border-color .18s, box-shadow .18s;
+}
+.rl-draft-opt:hover { transform: translateY(-4px); border-color: var(--cl, #c9a84c); box-shadow: 0 18px 40px rgba(0, 0, 0, .55), 0 0 30px rgba(201, 168, 76, .12); }
+.rl-draft-opt-head b { display: block; font-size: 18px; color: #f6e7b8; }
+.rl-draft-opt-head small { color: #b9a77a; font-size: 12px; }
+.rl-draft-cards { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: flex-end; }
+.rl-draft-opt.rare .rl-draft-cards { min-height: 245px; align-items: center; }
+.rl-draft-herocard { margin-right: 6px; }
+.rl-draft-deck {
+    width: 230px; flex: none; max-height: calc(100vh - 220px); overflow-y: auto; padding: 10px;
+    border: 1px solid rgba(201, 168, 76, .18); border-radius: 12px; background: rgba(10, 7, 5, .82); font-size: 13px;
+}
+.rl-draft-hero { padding: 4px 4px 8px; margin-bottom: 6px; border-bottom: 1px solid rgba(201, 168, 76, .18); }
+.rl-draft-hero b { display: block; color: #f6e7b8; }
+.rl-draft-hero small { color: #b9a77a; }
+.rl-draft-line { display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 6px; }
+.rl-draft-line:nth-child(odd) { background: rgba(255, 255, 255, .03); }
+.rl-draft-cost { width: 20px; height: 20px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #1d3f73; color: #fff; font-size: 11px; font-weight: 700; }
+.rl-draft-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e8dcc0; }
+.rl-draft-n { color: #c9a84c; font-weight: 700; }
+@media (max-width: 900px) {
+    .rl-draft-body { flex-direction: column; }
+    .rl-draft-deck { width: 100%; max-height: 180px; }
+    .rl-draft-options { grid-template-columns: 1fr; }
+}

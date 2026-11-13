@@ -1565,11 +1565,48 @@ function runRuleTests() {
         RL.ARCHETYPES.forEach(a => { add(a.name); add(a.blurb); }); RL.CLASSES.forEach(c => { add(c.name); add(c.tag); add(c.blurb); });
         RL.BLOCKS.forEach(b => { [b.name, b.short, b.blurb, b.story, b.boss.name, b.boss.quote].forEach(add); [...(b.names || []), ...(b.eliteNames || []), ...(b.banter || [])].forEach(add); });
         RL.EVENTS.forEach(e => { add(e.title); add(e.text); (e.choices || []).forEach(c => { add(c.label); add(c.hint); }); });
+        RL.DRAFT_THEMES.forEach(t => { add(t.name); add(t.desc); });
         const german = /[äöüÄÖÜß]|\b(der|die|das|und|nicht|kein|mit|für|auf|ist|wird|Zug|Karte|Ziel|Wähle|Schaden|deine?[nm]?|haben|kosten|erhalte|ziehe)\b/;
         const miss = [...new Set(all)].filter(t => german.test(t) && i18nGet(t) === undefined);
         assert(!miss.length, `${miss.length} Roguelike-Texte ohne Übersetzung: ` + miss.slice(0, 4).join(' · '));
         const bad = all.filter(t => /\b(Eifer|Protektor|Beschützer)\b/.test(t));
         assert(!bad.length, 'Erfundene Keyword-Namen: ' + bad.slice(0, 3).join(' · '));
+    });
+    test(144, 'Roguelike-Draft: Held je Talentbaum, legale Karten, 26 Karten, kein Paket öfter als zweimal', () => {
+        if (typeof RL === 'undefined' || !RL.draftNew) return;
+        for (const cls of RL.CLASSES) {
+            const offers = RL.draftHeroOffers(cls.key);
+            assert(offers.length === 3, `${cls.name}: ${offers.length} Helden statt 3`);
+            assert(new Set(offers.map(o => CARDS[o.hero].talent)).size === 3, `${cls.name}: Talentbäume doppelt`);
+            for (const o of offers) {
+                const h = CARDS[o.hero];
+                assert(h.class === cls.en && o.cards.length === 3, `${cls.name}: Heldenangebot ${h.name} unvollständig`);
+                assert(o.cards.some(id => ['Rare', 'Epic', 'Legendary'].includes(CARDS[id].rarity)), `${h.name}: keine seltene Karte`);
+            }
+            const d = RL.autoDraft(cls.key), hero = CARDS[d.hero];
+            assert(d.deck.length === RL.DRAFT_SIZE, `${cls.name}: Deck hat ${d.deck.length} Karten`);
+            const fake = { hero: { id: hero.id, class: hero.class, faction: hero.faction, talent: hero.talent }, faction: hero.faction, className: hero.class };
+            const cnt = {};
+            for (const id of d.deck) {
+                cnt[id] = (cnt[id] || 0) + 1;
+                assert(cardMatchesPlayer(CARDS[id], fake) && talentReqOk(CARDS[id], fake.hero), `${cls.name}: ${CARDS[id].name} ist für ${hero.name} nicht legal`);
+            }
+            assert(Object.values(cnt).every(n => n <= 2), `${cls.name}: mehr als 2 Kopien einer Karte`);
+            assert(Object.values(d.offered).every(n => n <= 2), `${cls.name}: Paket öfter als zweimal angeboten`);
+        }
+        // Pakete: drei Karten, jede passt zum Thema (Hauptkarte oder Verstärker); Fraktions-Pakete nur für die eigene Fraktion
+        const d = RL.draftNew('warrior'); RL.draftChoose(d, 0);
+        for (const p of d.offers) {
+            const t = RL.draftThemeById(p.theme);
+            assert(p.cards.length === 3 && p.cards.every(id => t.core(CARDS[id]) || (t.support && t.support(CARDS[id]))), `Paket ${t.name} passt nicht zum Thema`);
+            assert(!t.fac || t.fac === CARDS[d.hero].faction, `Paket ${t.name} für die falsche Fraktion`);
+        }
+        // Klassenthemen nur für die eigene Klasse; erste Artefaktwahl: drei Artefakte, darunter das der Klasse, keine fremden Klassen-Artefakte
+        for (const p of d.offers) { const t = RL.draftThemeById(p.theme); assert(!t.cls || t.cls.includes(CARDS[d.hero].class), `Thema ${t.name} für die falsche Klasse`); }
+        const run = { act: 1, clsKey: 'warrior', clsEn: 'Warrior', hero: d.hero, artifacts: [], deck: d.deck.map((id, i) => ({ uid: 'd' + i, id })) };
+        const first = RL.firstArtifacts(run);
+        assert(first.length === 3 && first.includes('bloodpact'), 'Erste Artefaktwahl: ' + first.join(', '));
+        for (let i = 0; i < 40; i++) assert(!RL.availableArtifacts(run, 3).some(id => { const a = RL.art(id); return a.cls && a.cls !== 'Warrior'; }), 'Fremdes Klassen-Artefakt angeboten');
     });
     LANG = prevLang;
     return results;

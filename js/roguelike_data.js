@@ -16,28 +16,27 @@
     // ---------------------------------------------------------------- Klassen
     R.CLASSES = [
         { key: 'warrior', en: 'Warrior', name: 'Krieger', hero: 8, faction: 'Alliance', icon: 'Class Icons/Warrior.png', color: '#c2703a',
-          tag: 'Waffen & Zorn', blurb: 'Setzt auf Waffen, Angriffe und kontrollierte Gewalt. Artefakt: Deep Wounds.', art: 'bloodpact' },
+          tag: 'Waffen & Zorn', blurb: 'Setzt auf Waffen, Angriffe und kontrollierte Gewalt.', art: 'bloodpact' },
         { key: 'mage', en: 'Mage', name: 'Magier', hero: 5, faction: 'Alliance', icon: 'Class Icons/Mage.png', color: '#5bc8e8',
-          tag: 'Zauber & Überladung', blurb: 'Fähigkeiten sind deine Waffe – billig, häufig und gnadenlos. Artefakt: Arcane Potency.', art: 'overload_core' },
+          tag: 'Zauber & Überladung', blurb: 'Fähigkeiten sind deine Waffe – billig, häufig und gnadenlos.', art: 'overload_core' },
         { key: 'hunter', en: 'Hunter', name: 'Jäger', hero: 3, faction: 'Alliance', icon: 'Class Icons/Hunter.png', color: '#78c850',
-          tag: 'Rudel & Tempo', blurb: 'Viele Allies, früher Druck, tödliche Schwärme. Artefakt: Animal Handler.', art: 'beastbond' },
+          tag: 'Rudel & Tempo', blurb: 'Viele Allies, früher Druck, tödliche Schwärme.', art: 'beastbond' },
         { key: 'priest', en: 'Priest', name: 'Priester', hero: 1, faction: 'Alliance', icon: 'Class Icons/Priest.png', color: '#e7e2c8',
-          tag: 'Heilung & Standhaftigkeit', blurb: 'Überlebe, heile und drehe lange Kämpfe um. Artefakt: Guardian Spirit.', art: 'sanctuary' },
+          tag: 'Heilung & Standhaftigkeit', blurb: 'Überlebe, heile und drehe lange Kämpfe um.', art: 'sanctuary' },
         { key: 'rogue', en: 'Rogue', name: 'Schurke', hero: 7, faction: 'Alliance', icon: 'Class Icons/Rogue.png', color: '#b37ade',
-          tag: 'Echo & Kombos', blurb: 'Spiele viele Karten, wiederhole Effekte, exploite das Echo. Artefakt: Honor Among Thieves.', art: 'echo_sigil' }
+          tag: 'Klingen & Kombos', blurb: 'Stealth, Gifte und Kombos – viele billige Fähigkeiten in einem Zug.', art: 'echo_sigil' },
+        { key: 'paladin', en: 'Paladin', name: 'Paladin', hero: null, faction: null, icon: 'Class Icons/Paladin.png', color: '#f58cba',
+          tag: 'Licht & Schutz', blurb: 'Zähe Allies, Siegel und Segen halten jede Front.', art: 'kings_blessing' },
+        { key: 'shaman', en: 'Shaman', name: 'Schamane', hero: null, faction: null, icon: 'Class Icons/Shaman.png', color: '#0070de',
+          tag: 'Totems & Elemente', blurb: 'Totems wirken jeden Zug, Blitze treffen nebenbei.', art: 'lightning_overload' },
+        { key: 'warlock', en: 'Warlock', name: 'Hexenmeister', hero: null, faction: null, icon: 'Class Icons/Warlock.png', color: '#8787ed',
+          tag: 'Dämonen & Flüche', blurb: 'Leben gegen Karten: Wer früh zahlt, hat später mehr.', art: 'demonic_pact' },
+        { key: 'druid', en: 'Druid', name: 'Druide', hero: null, faction: null, icon: 'Class Icons/Druid.png', color: '#ff7d0a',
+          tag: 'Gestalt & Natur', blurb: 'Formen, große Allies und Natur.', art: 'natures_grace' },
+        { key: 'deathknight', en: 'Death Knight', name: 'Todesritter', hero: null, faction: null, icon: 'Class Icons/Death Knight.png', color: '#c41f3b',
+          tag: 'Runen & Seuchen', blurb: 'Jeder gefallene Gegner nährt den Todesritter.', art: 'rune_tap' }
     ];
     R.classByKey = k => R.CLASSES.find(c => c.key === k);
-    // Startdeck je Klasse: Kartenmix passend zum Start-Artefakt (Magier/Schurke leben von Fähigkeiten,
-    // Krieger/Jäger von Allies und Waffen). Werte aus der Balance-Simulation (Nov. 2026).
-    const STARTER_MIX = {
-        warrior: { ally: 0.50, ability: 0.86 }, hunter: { ally: 0.50, ability: 0.86 },
-        mage: { ally: 0.50, ability: 0.86 }, priest: { ally: 0.50, ability: 0.86 }, rogue: { ally: 0.50, ability: 0.86 }
-    };
-    R.starterDeck = function (clsKey) {
-        const cls = R.classByKey(clsKey); if (!cls) return [];
-        const hero = CARDS[cls.hero];
-        return R.buildDeck(cls.en, cls.faction, 30, { bias: 0, act: 1, heroId: cls.hero, talent: hero.talent, mix: STARTER_MIX[clsKey] });
-    };
 
     // ---------------------------------------------------------------- Akte / Set-Blöcke
     // Ein Akt = ein Set-Block. Die Kartenpools sind kumulativ: Akt 2 fügt seine Karten
@@ -194,7 +193,8 @@
             if (!Number.isFinite(id) || String(id) !== k) continue;             // keine synthetischen IDs
             const cd = CARDS[id];
             if (!R.isPoolCard(cd)) continue;
-            if (!sets.has(R.setOf(cd))) continue;
+            // Todesritter gibt es erst ab scourgewar: ihre Klassenkarten gehören von Anfang an zum Pool
+            if (!sets.has(R.setOf(cd)) && !(cls === 'Death Knight' && (cd.allowedClasses || []).includes(cls))) continue;
             let ok = false;
             try { ok = cardMatchesPlayer(cd, fake) && talentReqOk(cd, hero); } catch (e) { ok = false; }
             if (ok) out.push(cd);
@@ -339,6 +339,234 @@
         const rar = { Common: 0, Uncommon: 8, Rare: 18, Epic: 30, Legendary: 45 }[cd.rarity] || 6;
         const base = 26 + (cd.cost || 0) * 8 + rar;
         return Math.max(20, Math.round(base * (run && run.priceMod ? run.priceMod : 1)));
+    };
+
+    // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
+    // Ablauf: Held (je Talentbaum einer, mit 1 seltenen + 2 passenden Karten) → 3 Pakete → seltene Einzelkarte
+    // → 3 Pakete → seltene Einzelkarte → 1 Paket = 26 Karten. Jedes Paket wird höchstens zweimal angeboten.
+    R.DRAFT_STEPS = ['hero', 'pack', 'pack', 'pack', 'rare', 'pack', 'pack', 'pack', 'rare', 'pack'];
+    R.DRAFT_SIZE = 26;
+    const dTxt = cd => (cd && cd.text) || '';
+    const dHas = (cd, re) => re.test(dTxt(cd));
+    const dAlly = cd => cd.type === 'Ally';
+    const dKw = (cd, kw) => new RegExp('\\b' + kw + '\\b').test(dTxt(cd)) || !!cd[kw.toLowerCase()];
+    const dRace = r => cd => dAlly(cd) && (cd.race === r || (cd.allyTypes || []).includes(r));
+    const dSub = s => cd => (cd.subtypes || []).includes(s) || new RegExp('—[^,]*\\b' + s + '\\b').test(cd.typeLine || '');
+    const dDmg = school => cd => new RegExp('\\b' + school + ' damage', 'i').test(dTxt(cd)) || cd.atkType === school;
+    const dDraw = cd => /\bdraws? (a|an|one|two|three|\d+|X) cards?/i.test(dTxt(cd));
+    const dHeal = cd => /\bheals?\b/i.test(dTxt(cd));
+    const dCC = cd => /exhaust target|can['’]t attack|can['’]t ready|doesn['’]t ready|don['’]t ready|remove target .* from combat/i.test(dTxt(cd));
+    const dRemoval = cd => /destroy target|destroy all|destroy each/i.test(dTxt(cd));
+    const dBurn = cd => cd.type === 'Ability' && /deals? \d+ \w* ?damage to target/i.test(dTxt(cd));
+    const dAoe = cd => /(each|all) (opposing|other|enemy)? ?(hero(es)? and )?all(y|ies)|each opposing/i.test(dTxt(cd)) && /damage/i.test(dTxt(cd));
+    const dTrick = cd => cd.type === 'Ability' && cd.instant && /\+\d+ ATK|prevent/i.test(dTxt(cd));
+    const dTag = t => cd => !!(cd.limitTags && cd.limitTags[t] !== undefined);
+    const dPet = cd => dAlly(cd) && (cd.isPet || !!(cd.limitTags && cd.limitTags.Pet !== undefined));
+    const dDemon = cd => dAlly(cd) && (/\bDemon\b/.test(cd.race || '') || (cd.allyTypes || []).includes('Demon'));
+    // Pakete (intern; im Spiel "drei Karten"): ein globaler Pool für alle Helden. fac = gilt für alle Helden dieser Fraktion,
+    // cls = für alle Helden dieser Klassen, sonst für alle. Angeboten wird ein Paket nur, wenn der Pool des Helden mindestens
+    // 4 passende Karten hat. core = Hauptkarten, support (optional) = eine Karte, die das Thema verstärkt.
+    R.DRAFT_THEMES = [
+        // Horde
+        { id: 'ferocity', name: 'Ferocity', desc: 'Allies, die sofort angreifen.', fac: 'Horde', core: cd => dAlly(cd) && dKw(cd, 'Ferocity'), support: cd => !dAlly(cd) && dHas(cd, /Ferocity/) },
+        { id: 'berserking', name: 'Berserking', desc: 'Trolle, die mit jedem Schaden stärker werden.', fac: 'Horde', core: cd => dHas(cd, /\bBerserking\b/) },
+        { id: 'warstomp', name: 'War Stomp', desc: 'Tauren erschöpfen beim Angriff die Verteidiger.', fac: 'Horde', core: cd => dHas(cd, /\bWar Stomp\b/) },
+        { id: 'forsaken', name: 'Will of the Forsaken', desc: 'Untote, die sich nicht zurückschicken lassen.', fac: 'Horde', core: cd => dHas(cd, /Will of the Forsaken/) },
+        { id: 'orcs', name: 'Orc-Kriegsbande', desc: 'Orcs und alles, was sie stärker macht.', fac: 'Horde', core: dRace('Orc'), support: cd => !dAlly(cd) && dHas(cd, /\bOrcs?\b/) },
+        { id: 'trolls', name: 'Troll-Stamm', desc: 'Trolle mit Voodoo und Wut.', fac: 'Horde', core: dRace('Troll'), support: cd => !dAlly(cd) && dHas(cd, /\bTrolls?\b/) },
+        { id: 'tauren', name: 'Tauren-Herde', desc: 'Große, zähe Tauren.', fac: 'Horde', core: dRace('Tauren') },
+        { id: 'undead', name: 'Die Verlassenen', desc: 'Untote Diener der Dunklen Fürstin.', fac: 'Horde', core: dRace('Undead'), support: cd => !dAlly(cd) && dHas(cd, /\bUndead\b/) },
+        { id: 'bloodelves', name: 'Blutelfen', desc: 'Blutelfen und arkane Macht.', fac: 'Horde', core: dRace('Blood Elf'), support: cd => !dAlly(cd) && dHas(cd, /Blood Elf/) },
+        // Allianz
+        { id: 'elusive', name: 'Elusive', desc: 'Allies, die man nicht abfangen kann.', fac: 'Alliance', core: cd => dAlly(cd) && dKw(cd, 'Elusive'), support: cd => !dAlly(cd) && dHas(cd, /Elusive/) },
+        { id: 'shadowmeld', name: 'Shadowmeld', desc: 'Nachtelfen verschwinden aus dem Kampf.', fac: 'Alliance', core: cd => dHas(cd, /\bShadowmeld\b/) },
+        { id: 'diplomacy', name: 'Diplomacy', desc: 'Menschen ziehen Karten, wenn sie ins Spiel kommen.', fac: 'Alliance', core: cd => dHas(cd, /\bDiplomacy\b/) },
+        { id: 'humans', name: 'Sturmwinds Garde', desc: 'Menschen in Reih und Glied.', fac: 'Alliance', core: dRace('Human'), support: cd => !dAlly(cd) && dHas(cd, /\bHumans?\b/) },
+        { id: 'dwarves', name: 'Zwergen-Clan', desc: 'Zwerge, Rüstungen und Bier.', fac: 'Alliance', core: dRace('Dwarf'), support: cd => !dAlly(cd) && dHas(cd, /\bDwar(f|ves)\b/) },
+        { id: 'gnomes', name: 'Gnomen-Tüftler', desc: 'Gnome und ihre Erfindungen.', fac: 'Alliance', core: dRace('Gnome'), support: cd => cd.type === 'Item' },
+        { id: 'nightelves', name: 'Kaldorei', desc: 'Nachtelfen aus den Wäldern Teldrassils.', fac: 'Alliance', core: dRace('Night Elf'), support: cd => !dAlly(cd) && dHas(cd, /Night Elf/) },
+        { id: 'draenei', name: 'Draenei', desc: 'Draenei im Licht der Naaru.', fac: 'Alliance', core: dRace('Draenei'), support: cd => !dAlly(cd) && dHas(cd, /\bDraenei\b/) },
+        // Keywords
+        { id: 'protector', name: 'Protector', desc: 'Allies, die deinen Helden schützen.', core: cd => dAlly(cd) && dKw(cd, 'Protector'), support: cd => !dAlly(cd) && dHas(cd, /Protector/) },
+        { id: 'stealth', name: 'Stealth', desc: 'Unsichtbare Angreifer.', core: cd => dKw(cd, 'Stealth') },
+        { id: 'longrange', name: 'Long-Range', desc: 'Angriffe aus der Distanz.', core: cd => dKw(cd, 'Long-Range') },
+        { id: 'untargetable', name: 'Untargetable', desc: 'Karten, die man nicht als Ziel wählen kann.', core: cd => dKw(cd, 'Untargetable') },
+        { id: 'assault', name: 'Assault', desc: 'Stärker im eigenen Zug.', core: cd => dHas(cd, /\bAssault \d/) },
+        { id: 'mend', name: 'Mend', desc: 'Allies, die sich und andere heilen.', core: cd => dHas(cd, /\bMend \d/) },
+        { id: 'deathrattle', name: 'Death Rattle', desc: 'Karten, die beim Sterben noch einmal wirken.', core: cd => dHas(cd, /Death Rattle/) },
+        { id: 'inspire', name: 'Inspire', desc: 'Allies, die andere bereit machen.', core: cd => dHas(cd, /\bInspire\b|Inspiring Presence/) },
+        // Spielweisen
+        { id: 'draw', name: 'Kartenvorteil', desc: 'Karten, die Karten ziehen.', core: dDraw },
+        { id: 'heal', name: 'Heilung', desc: 'Heile deinen Helden und deine Allies.', core: dHeal },
+        { id: 'cc', name: 'Kontrolle', desc: 'Erschöpfen und festhalten.', core: dCC },
+        { id: 'removal', name: 'Vernichtung', desc: 'Zerstöre gegnerische Karten.', core: dRemoval },
+        { id: 'burn', name: 'Direktschaden', desc: 'Fähigkeiten, die gezielt Schaden zufügen.', core: dBurn },
+        { id: 'aoe', name: 'Flächenschaden', desc: 'Schaden an vielen Gegnern.', core: dAoe },
+        { id: 'tricks', name: 'Kampftricks', desc: 'Instants, die Kämpfe drehen.', core: dTrick },
+        { id: 'weapons', name: 'Waffenarsenal', desc: 'Waffen für deinen Helden.', core: cd => cd.type === 'Weapon', support: cd => cd.type !== 'Weapon' && dHas(cd, /\bweapons?\b/i) },
+        { id: 'armor', name: 'Rüstkammer', desc: 'Rüstungen, die Schaden verhindern.', core: cd => cd.type === 'Armor' },
+        { id: 'items', name: 'Kram & Tand', desc: 'Nützliche Items.', core: cd => cd.type === 'Item' },
+        { id: 'quests', name: 'Abenteuer', desc: 'Quests als Ressourcen mit Belohnung.', core: cd => cd.type === 'Quest' },
+        { id: 'locations', name: 'Orte der Macht', desc: 'Locations als Ressourcen.', core: cd => cd.type === 'Location' },
+        { id: 'tokens', name: 'Verstärkung', desc: 'Karten, die zusätzliche Allies bringen.', core: cd => dHas(cd, /\btokens?\b/i) },
+        { id: 'cheap', name: 'Frühe Angreifer', desc: 'Billige Allies für einen schnellen Start.', core: cd => dAlly(cd) && (cd.cost || 0) <= 2 && (cd.atk || 0) >= 2 },
+        { id: 'big', name: 'Schwere Geschütze', desc: 'Große Allies für das späte Spiel.', core: cd => dAlly(cd) && (cd.cost || 0) >= 5 },
+        { id: 'ongoing', name: 'Dauerhafte Magie', desc: 'Ongoing-Fähigkeiten, die das Spiel prägen.', core: cd => cd.type === 'Ability' && (cd.ongoing || /Ongoing:/.test(dTxt(cd))) },
+        { id: 'discard', name: 'Abwurf', desc: 'Der Gegner verliert Karten aus der Hand.', core: cd => dHas(cd, /discards?\b/i) },
+        { id: 'mounts', name: 'Reittiere', desc: 'Mounts für schnelle Helden.', core: dTag('Mount') },
+        // Schadensarten
+        { id: 'fire', name: 'Feuer', desc: 'Feuerschaden in allen Formen.', core: dDmg('fire') },
+        { id: 'frost', name: 'Frost', desc: 'Frostschaden, der den Gegner verlangsamt.', core: dDmg('frost') },
+        { id: 'shadow', name: 'Schatten', desc: 'Schattenschaden und dunkle Magie.', core: dDmg('shadow') },
+        { id: 'arcane', name: 'Arkan', desc: 'Arkane Geschosse und Magie.', core: dDmg('arcane') },
+        { id: 'nature', name: 'Natur', desc: 'Naturschaden und Gift.', core: dDmg('nature') },
+        { id: 'holy', name: 'Heiliges Licht', desc: 'Heiligschaden und Segen.', core: dDmg('holy') },
+        // Klassen
+        { id: 'pets', name: 'Tiergefährten', desc: 'Pets und alles, was sie stärkt.', cls: ['Hunter', 'Warlock'], core: dPet, support: cd => !dAlly(cd) && dHas(cd, /\bPets?\b/) },
+        { id: 'traps', name: 'Fallen', desc: 'Traps, die den Angreifer bestrafen.', cls: ['Hunter'], core: cd => !!cd.trap || dHas(cd, /^Trap\b/) },
+        { id: 'stings', name: 'Stiche', desc: 'Stings schwächen den Gegner.', cls: ['Hunter'], core: dSub('Sting') },
+        { id: 'totems', name: 'Totems', desc: 'Totems, die jeden Zug wirken.', cls: ['Shaman'], core: cd => !!cd.totem },
+        { id: 'demons', name: 'Dämonen', desc: 'Dämonen aus dem Wirbelnden Nether.', cls: ['Warlock'], core: dDemon, support: cd => !dAlly(cd) && dHas(cd, /\bDemons?\b/) },
+        { id: 'curses', name: 'Flüche', desc: 'Curses, die den Gegner zermürben.', cls: ['Warlock'], core: dSub('Curse') },
+        { id: 'forms', name: 'Gestaltwandel', desc: 'Bear Form, Cat Form und mehr.', cls: ['Druid'], core: dTag('Form'), support: cd => !dTag('Form')(cd) && dHas(cd, /\bForm\b/) },
+        { id: 'seals', name: 'Siegel', desc: 'Seals für den Paladin.', cls: ['Paladin'], core: dTag('Seal'), support: dSub('Judgement') },
+        { id: 'auras', name: 'Auren', desc: 'Auras, die alle Allies stärken.', cls: ['Paladin', 'Hunter'], core: dTag('Aura') },
+        { id: 'blessings', name: 'Segen', desc: 'Blessings auf deine Allies.', cls: ['Paladin'], core: dSub('Blessing') },
+        { id: 'combos', name: 'Kombos', desc: 'Combo-Karten und Finishing Moves.', cls: ['Rogue', 'Druid'], core: dSub('Combo'), support: cd => /Finishing Move/.test(dTxt(cd)) },
+        { id: 'poisons', name: 'Gifte', desc: 'Poisons für Klingen.', cls: ['Rogue'], core: dSub('Poison') },
+        { id: 'shouts', name: 'Schlachtrufe', desc: 'Shouts für die ganze Truppe.', cls: ['Warrior'], core: dSub('Shout') },
+        { id: 'diseases', name: 'Seuchen', desc: 'Diseases der Todesritter.', cls: ['Death Knight'], core: dSub('Disease') },
+        { id: 'presences', name: 'Präsenzen', desc: 'Presences und Runen.', cls: ['Death Knight'], core: cd => dTag('Presence')(cd) || dTag('Rune')(cd) }
+    ];
+    // Je Talentbaum ein Klassenthema (z. B. „Feral“ für alle Druiden): Fähigkeiten dieses Baums
+    {
+        const trees = {};
+        for (const h of Object.values(CARDS)) if (h.type === 'Hero' && h.class && h.talent && h.talent !== 'Traitor') (trees[h.class] = trees[h.class] || new Set()).add(h.talent);
+        for (const cls of Object.keys(trees)) for (const t of trees[cls])
+            R.DRAFT_THEMES.push({ id: 'tree_' + cls + '_' + t, name: t, desc: 'Karten aus diesem Talentbaum.', cls: [cls], core: cd => cd.school === t && (cd.allowedClasses || []).includes(cls) });
+    }
+    const DRAFT_GENERIC = new Set(['draw', 'heal', 'cc', 'removal', 'burn', 'aoe', 'tricks', 'weapons', 'armor', 'items', 'quests', 'cheap', 'big', 'ongoing', 'discard', 'tokens']);
+    const DRAFT_GEAR = new Set(['weapons', 'armor', 'items']);
+    R.draftThemeById = id => R.DRAFT_THEMES.find(t => t.id === id) || null;
+    // Pool des Draft-Helden (Akt 1; Todesritter mit ihren Klassenkarten, siehe poolFor)
+    R.draftPool = function (heroId) {
+        const h = CARDS[heroId]; if (!h) return [];
+        return R.poolFor(h.class, h.faction, 1, { heroId, talent: h.talent || null, scourge: !!h.scourge, traitorCards: !!h.traitorCards })
+            .filter(cd => cd.type !== 'Hero' && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]));
+    };
+    const dQual = { Common: 1, Uncommon: 1.2, Rare: 1.5, Epic: 1.6, Legendary: 1.6 };
+    const dCount = (deck, id) => deck.filter(x => x === id).length;
+    // n verschiedene Karten aus list, gewichtet (Klassenkarten und Seltenheit), höchstens 2 Kopien im Deck
+    function dPick(list, n, deck, cls, taken) {
+        const out = []; const avail = list.filter(cd => dCount(deck, cd.id) < 2 && !taken.has(cd.id));
+        while (out.length < n && avail.length) {
+            const w = avail.map(cd => (dQual[cd.rarity] || 1) * (R.classCards([cd], cls).length ? 2 : 1) * (out.some(o => (o.cost || 0) === (cd.cost || 0)) ? 0.5 : 1));
+            let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+            for (; i < avail.length - 1; i++) { r -= w[i]; if (r <= 0) break; }
+            const cd = avail.splice(i, 1)[0]; out.push(cd); taken.add(cd.id);
+        }
+        return out;
+    }
+    // Was passt zu einem Helden: Karten seines Talentbaums und Karten, die seine Flip-Kraft nutzen
+    const HERO_SYN = [
+        [/Ranged weapon/i, cd => cd.type === 'Weapon' && cd.slot === 'Ranged'],
+        [/Melee weapon|weapons? you control|with a weapon/i, cd => cd.type === 'Weapon' && cd.slot !== 'Ranged'],
+        [/\bheals?\b/i, dHeal], [/exhaust/i, cd => dHas(cd, /exhaust/i)], [/Protector/, cd => dKw(cd, 'Protector')],
+        [/can['’]t attack|can['’]t ready/i, dCC], [/\bdestroy\b/i, dRemoval], [/\bdraws?\b/i, dDraw],
+        [/fire damage/i, dDmg('fire')], [/frost damage/i, dDmg('frost')], [/shadow damage/i, dDmg('shadow')],
+        [/arcane damage/i, dDmg('arcane')], [/nature damage/i, dDmg('nature')], [/holy damage/i, dDmg('holy')],
+        [/\bPets?\b/, dPet], [/\bDemons?\b/, dDemon], [/\bTotems?\b/, cd => !!cd.totem], [/\bForm\b/, dTag('Form')],
+        [/\bSeal/, dTag('Seal')], [/\bAura\b/, dTag('Aura')], [/Combo|Finishing Move/, dSub('Combo')],
+        [/\barmor\b/i, cd => cd.type === 'Armor'], [/\bquests?\b/i, cd => cd.type === 'Quest'], [/Stealth/, cd => dKw(cd, 'Stealth')],
+        [/Elusive/, cd => dKw(cd, 'Elusive')], [/Ferocity/, cd => dKw(cd, 'Ferocity')], [/\bdamage\b/i, dBurn]
+    ];
+    R.heroFits = function (hero) {
+        const t = hero.talent, txt = hero.text || '';
+        const syn = HERO_SYN.filter(([re]) => re.test(txt)).map(([, f]) => f);
+        return cd => (t && (cd.school === t || cd.talentReq === t)) || syn.some(f => { try { return f(cd); } catch (e) { return false; } });
+    };
+    // Schritt 1: je Talentbaum ein Held (Allianz oder Horde zufällig), dazu 1 seltene + 2 passende Karten
+    R.draftHeroOffers = function (clsKey) {
+        const cls = R.classByKey(clsKey); if (!cls) return [];
+        const s1 = new Set(R.actSets(1));
+        const heroes = Object.values(CARDS).filter(h => h.type === 'Hero' && typeof h.id === 'number' && h.class === cls.en && h.talent && h.talent !== 'Traitor' && !h.isToken && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[h.id]));
+        const byTalent = {};
+        for (const h of heroes) (byTalent[h.talent] = byTalent[h.talent] || []).push(h);
+        return Object.keys(byTalent).sort().slice(0, 3).map(t => {
+            const early = byTalent[t].filter(h => s1.has(R.setOf(h)));                         // Helden aus Akt 1 bevorzugt
+            const hero = R.pick(early.length ? early : byTalent[t]);
+            const pool = R.draftPool(hero.id), fit = R.heroFits(hero), taken = new Set();
+            const fitting = pool.filter(fit);
+            let rare = dPick(fitting.filter(cd => ['Rare', 'Epic', 'Legendary'].includes(cd.rarity)), 1, [], cls.en, taken);
+            if (!rare.length) rare = dPick(R.classCards(pool, cls.en).filter(cd => ['Rare', 'Epic'].includes(cd.rarity)), 1, [], cls.en, taken);
+            let more = dPick(fitting, 2, [], cls.en, taken);
+            if (more.length < 2) more = more.concat(dPick(R.classCards(pool, cls.en), 2 - more.length, [], cls.en, taken));
+            return { kind: 'hero', hero: hero.id, cards: rare.concat(more).map(cd => cd.id) };
+        });
+    };
+    // Paket aus einem Thema: 2 Hauptkarten + 1 Verstärker (sonst 3 Hauptkarten)
+    function dPack(theme, pool, deck, cls) {
+        const taken = new Set();
+        const core = pool.filter(theme.core);
+        const sup = theme.support ? pool.filter(cd => theme.support(cd) && !theme.core(cd)) : [];
+        let cards = dPick(core, sup.length ? 2 : 3, deck, cls, taken);
+        if (sup.length) cards = cards.concat(dPick(sup, 1, deck, cls, taken));
+        if (cards.length < 3) cards = cards.concat(dPick(core, 3 - cards.length, deck, cls, taken));
+        return cards.length === 3 ? { kind: 'pack', theme: theme.id, cards: cards.map(cd => cd.id) } : null;
+    }
+    // 3 verschiedene Pakete; ein Thema wird im ganzen Draft höchstens zweimal angeboten (draft.offered)
+    R.draftPackOffers = function (draft) {
+        const hero = CARDS[draft.hero], pool = R.draftPool(draft.hero), cls = hero.class;
+        const offered = draft.offered || {};
+        const cands = R.shuffle(R.DRAFT_THEMES.filter(t => (!t.fac || t.fac === hero.faction) && (!t.cls || t.cls.includes(cls)) && (offered[t.id] || 0) < 2));
+        // Themen mit vielen passenden Klassenkarten zuerst (so passen die Pakete zur Klasse)
+        // Thematische Pakete (Fraktion, Rasse, Keyword, Klassenmechanik) häufiger als allgemeine; höchstens ein Ausrüstungspaket je Angebot
+        const score = t => {
+            const core = pool.filter(t.core); if (core.length < 4) return -1;
+            const w = DRAFT_GENERIC.has(t.id) ? 1 : t.id.indexOf('tree_') === 0 ? 1.3 : 1.8;   // Talentbaum-Themen gibt es viele – etwas seltener
+            return Math.random() * w + Math.min(0.6, R.classCards(core, cls).length / 10);
+        };
+        const ranked = cands.map(t => ({ t, s: score(t) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
+        const out = [];
+        for (const { t } of ranked) {
+            if (out.length >= 3) break;
+            if (DRAFT_GEAR.has(t.id) && out.some(p => DRAFT_GEAR.has(p.theme))) continue;
+            const p = dPack(t, pool, draft.deck, cls);
+            if (p) out.push(p);
+        }
+        out.forEach(p => { offered[p.theme] = (offered[p.theme] || 0) + 1; });
+        draft.offered = offered;
+        return out;
+    };
+    // 3 starke einzelne Karten (selten oder episch), möglichst verschiedene Kartentypen
+    R.draftRareOffers = function (draft) {
+        const hero = CARDS[draft.hero], pool = R.draftPool(draft.hero), cls = hero.class, taken = new Set(), out = [];
+        const strong = pool.filter(cd => ['Rare', 'Epic', 'Legendary'].includes(cd.rarity) && cd.type !== 'Quest' && cd.type !== 'Location' && (cd.cost || 0) >= 2);
+        for (const type of R.shuffle(['Ally', 'Ability', 'Ally', 'Weapon', 'Armor', 'Ability'])) {
+            if (out.length >= 3) break;
+            const c = dPick(strong.filter(cd => cd.type === type), 1, draft.deck, cls, taken);
+            out.push(...c);
+        }
+        if (out.length < 3) out.push(...dPick(strong, 3 - out.length, draft.deck, cls, taken));
+        return out.map(cd => ({ kind: 'rare', cards: [cd.id] }));
+    };
+    R.draftNew = clsKey => ({ cls: clsKey, step: 0, hero: null, deck: [], offered: {}, offers: R.draftHeroOffers(clsKey) });
+    // Wahl übernehmen und das nächste Angebot erzeugen; liefert true, wenn das Deck fertig ist
+    R.draftChoose = function (draft, i) {
+        const o = draft.offers[i]; if (!o) return false;
+        if (o.kind === 'hero') draft.hero = o.hero;
+        draft.deck.push(...o.cards);
+        draft.step++;
+        const next = R.DRAFT_STEPS[draft.step];
+        draft.offers = !next ? [] : next === 'pack' ? R.draftPackOffers(draft) : R.draftRareOffers(draft);
+        if (next && !draft.offers.length) draft.offers = R.draftRareOffers(draft);                 // Rückfall, falls kein Paket passt
+        return !next;
+    };
+    // Automatisch draften (Tests, Simulation): wählt zufällig
+    R.autoDraft = function (clsKey) {
+        const d = R.draftNew(clsKey);
+        while (!R.draftChoose(d, Math.floor(Math.random() * d.offers.length))) { }
+        return d;
     };
 
     // ---------------------------------------------------------------- Aufwertungen
@@ -1214,13 +1442,13 @@
     R.ARTIFACTS = [
         // ---- Startartefakte (eine pro Klasse)
         {
-            id: 'bloodpact', name: 'Blutpakt', cls: 'Warrior', rarity: 'starter', price: 0,
+            id: 'bloodpact', name: 'Blutpakt', cls: 'Warrior', rarity: 'common', price: 110,
             text: 'Dein Held hat +2 Angriff. Wenn dein Held Schaden erleidet, ziehe einmal pro Zug eine Karte.',
             stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Hero' && ctrlOf(s, c) === 1) ? 1 : 0,   // Balance-Simulation: +2 ATK war das mit Abstand stärkste Start-Artefakt
             damaged: (s, d) => { if (d.tpid === 1 && d.amt > 0 && isHero(s, d.tgt) && !flag(s, 't:bloodpact')) { setFlag(s, 't:bloodpact'); trig(s, { k: 'draw', a: { pid: 1, n: 1 } }); } }
         },
         {
-            id: 'overload_core', name: 'Überladungskern', cls: 'Mage', rarity: 'starter', price: 0,
+            id: 'overload_core', name: 'Überladungskern', cls: 'Mage', rarity: 'common', price: 110,
             text: 'Die erste Fähigkeit, die du in einem Zug spielst, kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.',
             cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -2 : 0,
             cardPlayed: (s, p, card) => {
@@ -1230,7 +1458,7 @@
             }
         },
         {
-            id: 'beastbond', name: 'Rudelbande', cls: 'Hunter', rarity: 'starter', price: 0,
+            id: 'beastbond', name: 'Rudelbande', cls: 'Hunter', rarity: 'common', price: 110,
             text: 'Der erste Ally, den du in einem Zug spielst, kommt mit +1/+1 ins Spiel.',
             // Balance-Simulation: mit Kostensenkung war der Jäger die stärkste Klasse (100 % gegen normale Gegner)
             allyEnters: (s, p, uid) => {
@@ -1242,7 +1470,7 @@
             }
         },
         {
-            id: 'sanctuary', name: 'Zuflucht', cls: 'Priest', rarity: 'starter', price: 0,
+            id: 'sanctuary', name: 'Zuflucht', cls: 'Priest', rarity: 'common', price: 110,
             text: 'Am Ende deines Zuges heilt dein Held 2 Schaden. Einmal pro Kampf: Wenn dein Held tödlichen Schaden erleiden würde, überlebt er mit 1 Gesundheit und heilt danach 8.',
             endTurn: (s, p) => { if (p === 1) { trig(s, { k: 'healHero', a: { pid: 1, amt: 2 } }); q(s, { op: 'call', k: 'E:rlpingHero', a: { pid: 1, amt: 1, dt: 'Holy' } }); } },
             dmgPre: (s, o) => {
@@ -1258,7 +1486,7 @@
             }
         },
         {
-            id: 'echo_sigil', name: 'Echosiegel', cls: 'Rogue', rarity: 'starter', price: 0,
+            id: 'echo_sigil', name: 'Echosiegel', cls: 'Rogue', rarity: 'common', price: 110,
             text: 'Die erste Fähigkeit, die du in einem Zug spielst, erhältst du am Ende des Zuges als Kopie auf die Hand.',
             cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:echo_sigil')) ? -1 : 0,
             cardPlayed: (s, p, card) => {
@@ -1268,6 +1496,45 @@
                 q(s, { op: 'call', k: 'E:rladdCard', a: { pid: 1, id: base } });
                 L(s, tr`✦ Honor Among Thieves: ${CARDS[base] ? CARDS[base].name : tr('Fähigkeit')} wird kopiert.`, '', 1);
             }
+        },
+        // Start-Artefakte der übrigen Klassen (Deck-Draft: alle zehn Klassen spielbar)
+        {
+            id: 'kings_blessing', name: 'Blessing of Kings', icon: 'Spells/GreaterBlessingofKings.png', cls: 'Paladin', rarity: 'common', price: 110,
+            text: 'Der erste Ally, den du in einem Zug spielst, kommt mit +2 Gesundheit ins Spiel.',
+            allyEnters: (s, p, uid) => {
+                if (p !== 1 || flag(s, 't:kings')) return;
+                const c = findCharacter(s, uid); if (!c || c.type !== 'Ally') return;
+                setFlag(s, 't:kings'); addTM(c, { k: 'hp', v: 2 });
+            }
+        },
+        {
+            id: 'lightning_overload', name: 'Lightning Overload', icon: 'Spells/LightningOverload.png', cls: 'Shaman', rarity: 'common', price: 110,
+            text: 'Die erste Fähigkeit, die du in einem Zug spielst, fügt einem zufälligen Gegner 2 Naturschaden zu.',
+            cardPlayed: (s, p, card) => {
+                if (p !== 1 || card.type !== 'Ability' || flag(s, 't:lightning')) return;
+                setFlag(s, 't:lightning'); q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } });
+            }
+        },
+        {
+            id: 'demonic_pact', name: 'Demonic Pact', icon: 'Spells/DemonicPact.png', cls: 'Warlock', rarity: 'common', price: 110,
+            text: 'Zu Beginn deines Zuges: Wenn dein Held mindestens 10 Leben hat, erleidet er 2 Schaden und du ziehst 1 Karte.',
+            startTurn: (s, p) => {
+                if (p !== 1) return;
+                const h = s.p1.hero; if (hpOf(s, h) - (h.damage || 0) < 10) return;
+                dealDamage(s, { src: h.uid, tgt: h.uid, amt: 2, sp: 1 }); drawFor(s, 1, 1);
+            }
+        },
+        {
+            id: 'natures_grace', name: "Nature's Grace", icon: 'Abilities/ImprovedMoonkinForm.png', cls: 'Druid', rarity: 'common', price: 110,
+            text: 'Die erste Karte mit Kosten (4) oder mehr, die du in einem Zug spielst, kostet (2) weniger.',
+            cost: (s, p, card) => ((card.cost || 0) >= 4 && !flag(s, 't:grace')) ? -2 : 0,
+            cardPlayed: (s, p, card) => { if (p === 1 && (CARDS[R.baseIdOf(card.id)] || card).cost >= 4) setFlag(s, 't:grace'); }
+        },
+        {
+            id: 'rune_tap', name: 'Rune Tap', icon: 'Spells/RuneTap.png', cls: 'Death Knight', rarity: 'common', price: 110,
+            text: 'Dein Held hat +1 Angriff. Einmal pro Zug: Wenn ein gegnerischer Ally stirbt, heile 2 Schaden von deinem Helden.',
+            stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Hero' && ctrlOf(s, c) === 1) ? 1 : 0,
+            died: (s, snap) => { if (!snap || snap.wasCtrl !== 2 || !isAllyLike(snap) || flag(s, 't:runetap')) return; setFlag(s, 't:runetap'); healHeroFor(s, 1, 2); }
         },
         // ---- Handelbare Artefakte
         {
@@ -2443,6 +2710,8 @@
         art_combo: 2, art_shatter: 2, art_flurry: 2, art_hoj: 2, art_potency: 2, art_throwing: 2, art_contagion: 2,
         art_worms: 2, art_bloodcraze: 2, art_devast: 2, art_soulstone: 2, art_valor: 2, art_citrine: 2, art_vigil: 2,
         gold_attack: 2, resonance: 2,
+        // Klassen-Artefakte (früher Start-Artefakte): nur für die eigene Klasse, eins davon in der ersten Artefaktwahl
+        bloodpact: 2, overload_core: 2, beastbond: 2, sanctuary: 2, echo_sigil: 2, kings_blessing: 2, lightning_overload: 2, demonic_pact: 2, natures_grace: 2, rune_tap: 2,
         // 1 – gewöhnlich, Nische
         goldgier: 1, atlas: 1, loc_compass: 1, phantom: 1, mirror_dance: 1, shieldwall: 1, ghostwalk: 1, charge: 1,
         martyrium: 1, swarm: 1, waste: 1, library: 1, idol: 1, gold_start: 1, gold_resource: 1, gold_death: 1,
@@ -2457,7 +2726,7 @@
     tune('goldgier', 'Alle Shop-Preise sind 15 % günstiger.', { runAcquire: run => { run.priceMod = Math.round((run.priceMod || 1) * 0.85 * 100) / 100; } });
     R.ARTIFACTS.forEach(a => {
         const t = ART_TIER[a.id];
-        if (!t || a.rarity === 'starter') return;
+        if (!t) return;
         a.tier = t; a.rarity = TIER_RARITY[t]; a.price = TIER_PRICE[t];
         if (R.EFFECTS[a.id] && R.EFFECTS[a.id].kind === 'art') Object.assign(R.EFFECTS[a.id], { tier: t, rarity: a.rarity, price: a.price, text: a.text });
     });
@@ -2473,7 +2742,7 @@
         const owned = new Set(run.artifacts || []);
         const act = (run && run.act) || 1;
         // Artefakte mit acts-Liste erscheinen nur in ihrem Akt; ältere Artefakte bleiben überall möglich.
-        const list = R.ARTIFACTS.filter(a => a.rarity !== 'starter' && !owned.has(a.id) && (!a.acts || a.acts.includes(act)));
+        const list = R.ARTIFACTS.filter(a => (!a.cls || a.cls === R.heroClassOf(run)) && !owned.has(a.id) && (!a.acts || a.acts.includes(act)));
         // Artefakte für bestimmte Karten (Rasse, Klasse, Pets, Totems …) nur, wenn das Deck mindestens 2 davon hat;
         // reicht die Auswahl nicht, wird mit den übrigen aufgefüllt.
         const deck = (run.deck || []).map(e => CARDS[R.baseIdOf(e.id)]).filter(Boolean);
@@ -2509,6 +2778,12 @@
     };
     R.ART_NEED = ART_NEED;
     R.starterArt = clsKey => { const c = R.classByKey(clsKey); return c ? c.art : null; };
+    // Erste Artefaktwahl im Run (nach dem ersten Sieg): das Klassen-Artefakt und zwei weitere
+    R.firstArtifacts = function (run) {
+        const own = R.starterArt(run.clsKey);
+        const rest = R.availableArtifacts(run, 4).filter(id => id !== own).slice(0, own && !(run.artifacts || []).includes(own) ? 2 : 3);
+        return R.shuffle((own && !(run.artifacts || []).includes(own) ? [own] : []).concat(rest));
+    };
     R.maxHpBonus = () => 0;
 
     // ---------------------------------------------------------------- Engine-Hooks

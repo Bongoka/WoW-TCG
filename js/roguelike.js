@@ -163,8 +163,8 @@
         const saved = loadSavedRun();
         const classes = R.CLASSES.map(c => {
             const art = R.art(c.art);
-            const pool = R.poolFor(c.en, c.faction);
-            return { c, art, poolN: pool.length };
+            const trees = [...new Set(Object.values(CARDS).filter(h => h.type === 'Hero' && h.class === c.en && h.talent && h.talent !== 'Traitor').map(h => h.talent))].sort();
+            return { c, art, trees };
         });
         const savedAct = saved ? R.block(saved.act) : null;
         mainEl.innerHTML = `
@@ -180,17 +180,16 @@
                     <button class="rl-btn danger" id="rl-abandon-btn">Verwerfen</button>
                 </div>` : ''}
                 <div class="rl-class-grid">
-                    ${classes.map(({ c, art, poolN }) => `
+                    ${classes.map(({ c, art, trees }) => `
                         <button class="rl-class-card" data-cls="${c.key}" style="--cl:${c.color}">
                             <img class="rl-class-icon" src="${esc(c.icon)}" alt="">
                             <div class="rl-class-body">
                                 <div class="rl-class-name">${esc(c.name)}</div>
                                 <div class="rl-class-tag">${esc(c.tag)}</div>
                                 <p>${esc(c.blurb)}</p>
-                                <div class="rl-class-meta"><span>Startartefakt</span><b>${esc(art ? art.name : '—')}</b></div>
-                                <div class="rl-class-meta"><span>Kartenpool</span><b>${poolN}</b></div>
+                                <div class="rl-class-meta"><span>Talentbäume</span><b>${esc(trees.join(' · '))}</b></div>
                             </div>
-                            <span class="rl-go">Run starten →</span>
+                            <span class="rl-go">Deck draften →</span>
                         </button>`).join('')}
                 </div>
                 <div class="rl-menu-foot">
@@ -227,24 +226,86 @@
     function startRun(key) {
         const cls = R.classByKey(key);
         if (!cls) return;
-        const begin = () => {
-            const hero = CARDS[cls.hero];
+        // Das Startdeck wird gedraftet (openDraft); danach beginnt der Run mit dem gewählten Helden
+        const begin = () => openDraft(key, draft => {
+            const hero = CARDS[draft.hero];
             const maxHp = hero.hp || 28;
-            const deck = R.starterDeck(key).map(id => ({ uid: uid(), id }));   // Kartenmix je Klasse (roguelike_data.js)
             run = {
-                v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: cls.hero, faction: cls.faction,
-                deck, maxHp, hp: maxHp, gold: 55, artifacts: cls.art ? [cls.art] : [], potions: [R.randomPotion()],
+                v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: draft.hero, faction: hero.faction,
+                deck: draft.deck.map(id => ({ uid: uid(), id })), maxHp, hp: maxHp, gold: 55, artifacts: [], potions: [R.randomPotion()],
                 priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [],
                 battles: 0, elites: 0, boss: false, createdAt: Date.now(), goldEarnedTotal: 0
             };
             saveRun();
             openActIntro(() => openMap());
-        };
+        });
         if (G && !G.gameOver && !G.rl) {
             try { uiConfirm(tr('Laufende Partie beenden?'), tr('Für den Roguelike-Run wird das aktuelle Spiel gegen die CPU beendet.'), tr('Run starten'), begin); return; }
             catch (e) { }
         }
         begin();
+    }
+
+    // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
+    // Held mit 3 passenden Karten → drei Karten mit gemeinsamem Thema → starke Einzelkarte … bis das Deck voll ist (R.DRAFT_STEPS).
+    function openDraft(key, done) {
+        const cls = R.classByKey(key); if (!cls) return;
+        const draft = R.draftNew(key);
+        const STEP_TXT = {
+            hero: ['Wähle deinen Helden', 'Je Talentbaum ein Held – dazu eine seltene und zwei passende Karten.'],
+            pack: ['Wähle drei Karten', 'Drei Karten, die zusammen funktionieren.'],
+            rare: ['Wähle eine starke Karte', 'Eine seltene oder epische Einzelkarte.']
+        };
+        const render = () => {
+            ensureRoot(); showRoot(); applyBg();
+            const kind = R.DRAFT_STEPS[draft.step];
+            const [title, hint] = STEP_TXT[kind];
+            const hero = draft.hero ? CARDS[draft.hero] : null;
+            const n = draft.deck.length, pct = Math.round(100 * n / R.DRAFT_SIZE);
+            // Deckliste: nach Kosten, gleiche Karten zusammengefasst
+            const counts = {}; draft.deck.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+            const list = Object.keys(counts).map(id => CARDS[id]).filter(Boolean).sort((a, b) => (a.cost || 0) - (b.cost || 0) || a.name.localeCompare(b.name));
+            mainEl.innerHTML = `
+                <div class="rl-draft-screen" style="--cl:${cls.color}">
+                    <div class="rl-draft-head">
+                        <img class="rl-draft-cls" src="${esc(cls.icon)}" alt="">
+                        <div class="rl-draft-title">
+                            <div class="rl-kicker">${tr`Deck-Draft · ${tr(cls.name)}`}${hero ? ' · ' + esc(hero.name) : ''}</div>
+                            <h2>${tr(title)}</h2>
+                            <p class="rl-lead">${tr(hint)}</p>
+                        </div>
+                        <div class="rl-draft-progress"><b>${n}/${R.DRAFT_SIZE}</b><span>${tr('Karten')}</span><div class="rl-draft-bar"><i style="width:${pct}%"></i></div></div>
+                    </div>
+                    <div class="rl-draft-body">
+                        <div class="rl-draft-options" id="rl-draft-options"></div>
+                        <aside class="rl-draft-deck">
+                            ${hero ? `<div class="rl-draft-hero"><b>${esc(hero.name)}</b><small>${esc(hero.talent || '')} · ${esc(hero.faction)}</small></div>` : ''}
+                            ${list.map(cd => `<div class="rl-draft-line"><span class="rl-draft-cost">${cd.cost || 0}</span><span class="rl-draft-name">${esc(cd.name)}</span>${counts[cd.id] > 1 ? `<span class="rl-draft-n">×${counts[cd.id]}</span>` : ''}</div>`).join('')}
+                        </aside>
+                    </div>
+                    <div class="rl-menu-foot"><button class="rl-btn ghost" id="rl-draft-back">${tr('← Klassenwahl')}</button></div>
+                </div>`;
+            const wrap = mainEl.querySelector('#rl-draft-options');
+            draft.offers.forEach((o, i) => {
+                const b = document.createElement('button');
+                b.className = 'rl-draft-opt ' + o.kind;
+                const theme = o.kind === 'pack' ? R.draftThemeById(o.theme) : null;
+                const h = o.kind === 'hero' ? CARDS[o.hero] : null;
+                b.innerHTML = `<div class="rl-draft-opt-head">${h ? `<b>${esc(h.talent)}</b><small>${esc(h.faction)}</small>`
+                    : theme ? `<b>${esc(tr(theme.name))}</b><small>${esc(tr(theme.desc))}</small>` : `<b>${esc(tr(CARDS[o.cards[0]].rarity || ''))}</b>`}</div>
+                    <div class="rl-draft-cards"></div>`;
+                const cardsEl = b.querySelector('.rl-draft-cards');
+                if (h) { const hc = cardNode(h.id, 150); hc.classList.add('rl-draft-herocard'); cardsEl.appendChild(hc); }
+                o.cards.forEach(id => cardsEl.appendChild(cardNode(id, o.kind === 'rare' ? 175 : 132)));
+                b.onclick = () => { if (R.draftChoose(draft, i)) done(draft); else render(); };
+                wrap.appendChild(b);
+            });
+            on('#rl-draft-back', 'click', () => {
+                try { uiConfirm(tr('Draft abbrechen?'), tr('Das bisher gewählte Deck geht verloren.'), tr('Abbrechen'), openClassSelect); }
+                catch (e) { openClassSelect(); }
+            });
+        };
+        render();
     }
 
     // ---------------------------------------------------------------- Karte
@@ -554,8 +615,11 @@
         let potion = null;
         if (ctx.node.type === 'elite' || Math.random() < 0.4) { potion = R.randomPotion(); if ((run.potions || []).length < R.POTION_SLOTS) { run.potions.push(potion); saveRun(); } else potion = null; }
         const cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8 });
-        const arts = ctx.node.type === 'elite' ? R.availableArtifacts(run, 3) : null;
-        openReward({ node: ctx.node, cards, gold, arts, elite: ctx.node.type === 'elite', potion });
+        // Artefakte: Elites immer; nach dem ersten Sieg des Runs eine Wahl aus drei (darunter das Klassen-Artefakt)
+        const first = !run.firstArt && ctx.node.type !== 'elite';
+        if (!run.firstArt) { run.firstArt = true; saveRun(); }
+        const arts = ctx.node.type === 'elite' ? R.availableArtifacts(run, 3) : first ? R.firstArtifacts(run) : null;
+        openReward({ node: ctx.node, cards, gold, arts, first, elite: ctx.node.type === 'elite', potion });
     }
 
     // ---------------------------------------------------------------- Aktwechsel
@@ -665,16 +729,16 @@
         on('#rl-skip', 'click', () => { run.gold += 8; saveRun(); afterCardReward(r); });
     }
     function afterCardReward(r) {
-        if (r.arts && r.arts.length) { openArtifactChoice(r.arts, () => finishNode(r.node)); }
+        if (r.arts && r.arts.length) { openArtifactChoice(r.arts, () => finishNode(r.node), r.first); }
         else finishNode(r.node);
     }
-    function openArtifactChoice(ids, cb) {
+    function openArtifactChoice(ids, cb, first) {
         ensureRoot(); showRoot();
         setMain(`
             <div class="rl-modal-screen">
                 ${hudHtml()}
                 <div class="rl-panel wide">
-                    <div class="rl-panel-head"><div><div class="rl-kicker">Elite-Beute</div><h2>Wähle ein Artefakt</h2></div></div>
+                    <div class="rl-panel-head"><div><div class="rl-kicker">${tr(first ? 'Dein erstes Artefakt' : 'Elite-Beute')}</div><h2>${tr('Wähle ein Artefakt')}</h2></div></div>
                     <p class="rl-lead">Artefakte gelten für den gesamten Run und verändern die Regeln dauerhaft.</p>
                     <div class="rl-artifact-row" id="rl-art-row"></div>
                 </div>
