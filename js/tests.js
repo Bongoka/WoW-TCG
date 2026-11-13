@@ -1604,12 +1604,12 @@ function runRuleTests() {
         // Klassenthemen nur für die eigene Klasse; erste Artefaktwahl: drei Artefakte, darunter das der Klasse, keine fremden Klassen-Artefakte
         for (const p of d.offers) { const t = RL.draftThemeById(p.theme); assert(!t.cls || t.cls.includes(CARDS[d.hero].class), `Thema ${t.name} für die falsche Klasse`); }
         const run = { act: 1, clsKey: 'warrior', clsEn: 'Warrior', hero: d.hero, artifacts: [], deck: d.deck.map((id, i) => ({ uid: 'd' + i, id })) };
-        // Quests: am Ende immer 2–4 im Deck, egal ob man Quests meidet oder sucht
+        // Quests: zwei Quest-Runden – immer genau 6 im Deck, egal wie man wählt
         const nq = ids => ids.filter(id => CARDS[id].type === 'Quest').length;
         for (const k of ['warrior', 'mage', 'druid']) for (const mode of ['avoid', 'seek']) {
             const dq = RL.draftNew(k); let fin = false;
             while (!fin) { const s = dq.offers.map(o => nq(o.cards)); fin = RL.draftChoose(dq, s.indexOf(mode === 'seek' ? Math.max(...s) : Math.min(...s))); }
-            assert(nq(dq.deck) >= 2 && nq(dq.deck) <= 4, `${k}/${mode}: ${nq(dq.deck)} Quests im Deck`);
+            assert(nq(dq.deck) === 6, `${k}/${mode}: ${nq(dq.deck)} Quests im Deck`);
         }
         const first = RL.firstArtifacts(run);
         assert(first.length === 3 && first.includes('bloodpact'), 'Erste Artefaktwahl: ' + first.join(', '));

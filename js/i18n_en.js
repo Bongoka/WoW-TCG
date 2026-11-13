@@ -4286,6 +4286,7 @@ var I18N_EN = {
     'Wähle deinen Helden': 'Choose your hero',
     'Je Talentbaum ein Held – dazu eine seltene und zwei passende Karten.': 'One hero per talent tree – plus one rare and two matching cards.',
     'Wähle drei Karten': 'Choose three cards',
+    'Wähle drei Quests': 'Choose three quests',
     'Gelehrte Aufträge': 'Scholarly Errands',
     'Quests, die Karten ziehen.': 'Quests that draw cards.',
     'Kopfgelder': 'Bounties',

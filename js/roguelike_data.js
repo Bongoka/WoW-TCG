@@ -342,9 +342,9 @@
     };
 
     // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
-    // Ablauf: Held (je Talentbaum einer, mit 1 seltenen + 2 passenden Karten) → 3 Pakete → seltene Einzelkarte
-    // → 3 Pakete → seltene Einzelkarte → 1 Paket = 26 Karten. Jedes Paket wird höchstens zweimal angeboten.
-    R.DRAFT_STEPS = ['hero', 'pack', 'pack', 'pack', 'rare', 'pack', 'pack', 'pack', 'rare', 'pack'];
+    // Ablauf: Held (je Talentbaum einer, mit 1 seltenen + 2 passenden Karten) → Paket → Quest-Runde (3 Quests) → Paket → seltene Einzelkarte
+    // → Paket → Quest-Runde → Paket → seltene Einzelkarte → Paket = 26 Karten, davon genau 6 Quests. Jedes Paket höchstens zweimal angeboten.
+    R.DRAFT_STEPS = ['hero', 'pack', 'quest', 'pack', 'rare', 'pack', 'quest', 'pack', 'rare', 'pack'];   // 2 Quest-Runden = 6 Quests
     R.DRAFT_SIZE = 26;
     const dTxt = cd => (cd && cd.text) || '';
     const dHas = (cd, re) => re.test(dTxt(cd));
@@ -499,8 +499,8 @@
         return Object.keys(byTalent).sort().slice(0, 3).map(t => {
             const early = byTalent[t].filter(h => s1.has(R.setOf(h)));                         // Helden aus Akt 1 bevorzugt
             const hero = R.pick(early.length ? early : byTalent[t]);
-            const pool = R.draftPool(hero.id), fit = R.heroFits(hero), taken = new Set();
-            const fitting = pool.filter(fit);
+            const pool = R.draftPool(hero.id).filter(cd => cd.type !== 'Quest'), fit = R.heroFits(hero), taken = new Set();   // Quests nur in den Quest-Runden
+            const fitting = pool.filter(cd => cd.type !== 'Quest' && fit(cd));               // Quests nur in den Quest-Runden
             let rare = dPick(fitting.filter(cd => ['Rare', 'Epic', 'Legendary'].includes(cd.rarity)), 1, [], cls.en, taken);
             if (!rare.length) rare = dPick(R.classCards(pool, cls.en).filter(cd => ['Rare', 'Epic'].includes(cd.rarity)), 1, [], cls.en, taken);
             let more = dPick(fitting, 2, [], cls.en, taken);
@@ -541,35 +541,29 @@
             return Math.random() * w + Math.min(0.6, R.classCards(core, cls).length / 10);
         };
         const ranked = cands.map(t => ({ t, s: score(t) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
-        // Quests (Ressourcen mit Belohnung): am Ende 2–4 im Deck. Unter 3 Quests ist in jedem Angebot genau eine Quest-Auswahl
-        // (2 Quests); ab 3 keine mehr. Fehlen in den letzten zwei Wahlen noch Quests, enthält jede Auswahl eine.
-        const nQ = draft.deck.filter(id => CARDS[id] && CARDS[id].type === 'Quest').length;
-        const packsLeft = R.DRAFT_STEPS.slice(draft.step).filter(s => s === 'pack').length;
         const out = [];
-        if (nQ < 3) {
-            for (const { t } of ranked) {
-                if (!t.quest) continue;
-                const p = dPack(t, pool, draft.deck, cls);
-                if (p) { out.push(p); break; }
-            }
-        }
         for (const { t } of ranked) {
             if (out.length >= 3) break;
-            if (t.quest) continue;
+            if (t.quest) continue;                                                           // Quests nur in den Quest-Runden
             if (DRAFT_GEAR.has(t.id) && out.some(p => DRAFT_GEAR.has(p.theme))) continue;
             const p = dPack(t, pool, draft.deck, cls);
             if (p) out.push(p);
         }
-        if (nQ < 2 && packsLeft <= 2) {
-            const quests = pool.filter(cd => cd.type === 'Quest');
-            for (const p of out) {
-                if (p.cards.some(id => CARDS[id].type === 'Quest')) continue;
-                const q = dPick(quests, 1, draft.deck, cls, new Set(p.cards));
-                if (q.length) p.cards[2] = q[0].id;
-            }
-        }
         out.forEach(p => { offered[p.theme] = (offered[p.theme] || 0) + 1; });
         draft.offered = offered;
+        return out;
+    };
+    // Quest-Runde: drei Angebote mit je 3 Quests (verschiedene Quest-Themen, sonst allgemeine Quests); zwei Runden = 6 Quests
+    R.draftQuestOffers = function (draft) {
+        const hero = CARDS[draft.hero], pool = R.draftPool(draft.hero), cls = hero.class, taken = new Set(), out = [];
+        const themes = R.shuffle(R.DRAFT_THEMES.filter(t => t.quest && t.id !== 'quests'));
+        for (const t of themes.concat([R.draftThemeById('quests'), R.draftThemeById('quests'), R.draftThemeById('quests')])) {
+            if (out.length >= 3) break;
+            if (out.some(p => p.theme === t.id) && t.id !== 'quests') continue;
+            const q = dPick(pool.filter(t.core), 3, draft.deck, cls, taken);
+            if (q.length === 3) out.push({ kind: 'pack', theme: t.id, cards: q.map(cd => cd.id) });
+            else q.forEach(cd => taken.delete(cd.id));
+        }
         return out;
     };
     // 3 starke einzelne Karten (selten oder episch), möglichst verschiedene Kartentypen
@@ -592,7 +586,7 @@
         draft.deck.push(...o.cards);
         draft.step++;
         const next = R.DRAFT_STEPS[draft.step];
-        draft.offers = !next ? [] : next === 'pack' ? R.draftPackOffers(draft) : R.draftRareOffers(draft);
+        draft.offers = !next ? [] : next === 'pack' ? R.draftPackOffers(draft) : next === 'quest' ? R.draftQuestOffers(draft) : R.draftRareOffers(draft);
         if (next && !draft.offers.length) draft.offers = R.draftRareOffers(draft);                 // Rückfall, falls kein Paket passt
         return !next;
     };

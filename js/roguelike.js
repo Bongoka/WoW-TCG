@@ -247,13 +247,13 @@
             if (big < small * 1.25) { small = Math.max(80, (availH - 52 - 18) / 1.4 / 2.25); big = Math.min(inner * 0.66, small * 1.25, 300); }
             return { big: Math.max(120, big), small: Math.max(80, small) };
         }
-        if (kind === 'pack') return { small: Math.max(90, Math.min(inner / 2.5, (availH - 90) / 1.4, 270)) };   // gefächert: Karten überlappen um ein Viertel
+        if (kind === 'pack' || kind === 'quest') return { small: Math.max(90, Math.min(inner / 2.5, (availH - 90) / 1.4, 270)) };   // gefächert: Karten überlappen um ein Viertel
         return { big: Math.max(150, Math.min(inner - 40, (availH - 20) / 1.4, 330)) };
     }
     function openDraft(key, done) {
         const cls = R.classByKey(key); if (!cls) return;
         const draft = R.draftNew(key);
-        const TITLE = { hero: 'Wähle deinen Helden', pack: 'Wähle drei Karten', rare: 'Wähle eine Karte' };
+        const TITLE = { hero: 'Wähle deinen Helden', pack: 'Wähle drei Karten', quest: 'Wähle drei Quests', rare: 'Wähle eine Karte' };
         const render = draftRender = () => {
             ensureRoot(); showRoot(); applyBg();
             const kind = R.DRAFT_STEPS[draft.step];
@@ -262,7 +262,7 @@
             // Kostenkurve des bisherigen Decks (0 … 6+)
             const curve = [0, 0, 0, 0, 0, 0, 0]; draft.deck.forEach(id => { curve[Math.min(6, (CARDS[id] && CARDS[id].cost) || 0)]++; });
             const cmax = Math.max(3, ...curve);
-            const pips = R.DRAFT_STEPS.map((s, i) => `<i class="${i < draft.step ? 'done' : i === draft.step ? 'now' : ''}${s === 'rare' ? ' rare' : ''}"></i>`).join('');
+            const pips = R.DRAFT_STEPS.map((s, i) => `<i class="${i < draft.step ? 'done' : i === draft.step ? 'now' : ''}${s === 'rare' || s === 'quest' ? ' ' + s : ''}"></i>`).join('');
             mainEl.innerHTML = `
                 <div class="rl-draft-screen ${kind}" style="--cl:${cls.color}">
                     <header class="rl-draft-head">
