@@ -1630,6 +1630,7 @@ function resolveCard(s, it) {
     if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.joinedTurn = s.turn; c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     // Fähigkeit
     it.dest = c.ongoing ? 'play' : 'graveyard';
+    fxEvent(s, { t: 'spell', id: c.id, uid: c.uid, src: p.hero.uid, tg: it.targets ? it.targets.flat() : [] });   // Zauber-Effekt (spellfx.js), nur Anzeige
     if (f.resolve) f.resolve(s, it);
     // Platzierung nach der Auflösung (Fortsetzungen der Fähigkeit laufen danach weiter)
     q(s, { op: 'call', k: 'E:placeAbility', a: { it } });

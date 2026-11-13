@@ -973,8 +973,10 @@ function heroFlipAnim(node, r, e) {
 function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
     G.fxq = [];
-    let k = 0;
-    for (const e of evs) {
+    let k = 0, spellAt = null;                                                           // spellAt: Zahlen erst beim Einschlag des Zaubers (spellfx.js)
+    for (let i = 0; i < evs.length; i++) {
+        const e = evs[i];
+        if (e.t === 'spell') { spellAt = typeof playSpellFx === 'function' ? playSpellFx(e, evs.slice(i), prevRects) : null; k = 0; continue; }
         if (e.t === 'play') {
             if (e.pid === 1 && e.cost >= 7) screenShake(1.2);                                   // CPU-Karten wackeln beim Landen (landShowcase)
             else if (e.pid === 2 && !SHOWCASED.has(e.uid)) showcasePlayed(e.uid, e.cost);       // Online-Gegner, CPU-Reaktionen im eigenen Zug
@@ -983,7 +985,7 @@ function playFxEvents(prevRects) {
         const node = document.querySelector(`#arena [data-uid="${e.uid}"]`);
         const r = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
         if (!r || !r.width) continue;
-        const delay = Math.min(k++, 6) * 90;
+        const delay = spellAt ? spellAt(e.uid, k++) : Math.min(k++, 6) * 90;
         if (e.t === 'dmg') {
             const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
             burstParticles(r, st.c, 18, delay);
