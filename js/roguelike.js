@@ -79,11 +79,6 @@
         catch (e) { const d = document.createElement('div'); d.className = 'rl-card-fallback'; d.textContent = cd.name; return d; }
         n.classList.add('rl-card');
         n.style.setProperty('--cw', (width || 150) + 'px');
-        const up = R.archOfCard(cd.id);
-        if (up) {
-            const b = document.createElement('div'); b.className = 'rl-up-badge'; b.textContent = '✦ Aufwertung'; b.title = up.text || '';
-            n.appendChild(b);
-        }
         return n;
     }
     function cardById(id) { return CARDS[id] || CARDS[1]; }
@@ -999,6 +994,35 @@
         overlay.querySelector('[data-close]').onclick = () => overlay.remove();
         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     }
+    // Beliebige Kartenliste als Raster (z. B. Gegner-Decks in der Debug-Galerie); gleiche Karten zusammengefasst mit Anzahl
+    function showCardList(title, ids, onBack) {
+        const order = { Ally: 0, Ability: 1, Weapon: 2, Armor: 3, Item: 4, Quest: 5, Location: 6 };
+        const counts = {}; ids.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+        const list = Object.keys(counts).map(k => CARDS[k] ? CARDS[k] : null).filter(Boolean)
+            .sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9) || (a.cost || 0) - (b.cost || 0) || String(a.name).localeCompare(String(b.name)));
+        const overlay = document.createElement('div');
+        overlay.className = 'rl-overlay';
+        overlay.style.zIndex = '99850';
+        overlay.innerHTML = `<div class="rl-overlay-box">
+            <div class="rl-overlay-head"><h2>${esc(title)} <small>${ids.length} Karten</small></h2>
+                <div>${onBack ? '<button class="rl-btn small" data-back>‹ Zurück</button> ' : ''}<button class="rl-btn small danger" data-close>×</button></div></div>
+            <div class="rl-deck-grid"></div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const grid = overlay.querySelector('.rl-deck-grid');
+        for (const cd of list) {
+            const cell = document.createElement('div'); cell.className = 'rl-deck-cell';
+            cell.appendChild(cardNode(cd.id, 135));
+            const label = document.createElement('div'); label.className = 'rl-deck-cell-name';
+            label.innerHTML = `<b>${counts[cd.id] > 1 ? counts[cd.id] + '× ' : ''}${esc(cd.name)}</b><small>${esc(cd.type)} · ${cd.cost || 0}</small>`;
+            cell.appendChild(label); grid.appendChild(cell);
+        }
+        const close = () => overlay.remove();
+        overlay.querySelector('[data-close]').onclick = close;
+        const back = overlay.querySelector('[data-back]'); if (back) back.onclick = () => { close(); onBack(); };
+        overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    }
+    R.showCardList = showCardList;
     function openArtsView() {
         ensureRoot(); showRoot();
         const arts = (run.artifacts || []).map(id => R.art(id)).filter(Boolean);

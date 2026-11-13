@@ -108,8 +108,9 @@
             decks.push({ id: 'rl_dbg_boss' + act, name: 'Boss: ' + b.boss.name.split(',')[0], hero: bh.id, class: boss.cls, faction: boss.faction, cards: boss.deck });
             list.push({ head: `Akt ${act} · ${b.name}`, decks });
         }
-        openDeckOverview({ title: 'Gegner-Decks (Debug, bei jedem Öffnen neu gebaut)', list, zIndex: 99800,
-            pick: d => { try { showToast(`${d.name}: ${d.cards.length} Karten`, false, 2000); } catch (e) { } } });
+        const show = () => openDeckOverview({ title: "Gegner-Decks (Debug, bei jedem Öffnen neu gebaut)", list, zIndex: 99800,
+            pick: d => { if (R.showCardList) R.showCardList(d.name, d.cards, show); } });   // Klick: Karten des Decks, „Zurück“ zur Übersicht (gleiche Decks)
+        show();
     }
     R.openEnemyDecks = openEnemyDecks;
 

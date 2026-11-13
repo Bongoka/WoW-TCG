@@ -141,6 +141,21 @@
             face.appendChild(mask);
         }
 
+        // Roguelike-Aufwertung: violetter Rahmen und der Effekt als eingedrucktes Feld, ohne den Originaltext zu verdecken:
+        // leerer Textkasten → oben hinein; kurzer Regeltext → unten über Flavor/Set-Zeile; sonst über den unteren Bildrand.
+        const upEff = card.upgradeEffect && typeof RL !== 'undefined' && RL.EFFECTS && RL.EFFECTS[card.upgradeEffect];
+        if (upEff) {
+            face.classList.add('rl-up');
+            const orig = CARDS[card.upgradedFrom || baseCardId(card.id)] || card;   // card.text enthält schon die Aufwertung
+            const ot = (orig.text || '').trim();
+            // Allies bis gladiator sind Vollbild (Text unten im Bild), erst ab honor mit eigenem Textkasten
+            const boxed = orig.type !== 'Ally' || +orig.set >= 11;
+            const pos = !ot ? (boxed ? ' in-box' : '') : (boxed && ot.length <= 140 && upEff.text.length <= 75 ? ' at-bottom' : ' over-art');
+            const up = el('div', 'card-up-text' + pos);
+            up.textContent = upEff.text;
+            face.appendChild(up);
+        }
+
         wrap.addEventListener('wheel', (e) => {
             if (!card.hasDamageMask) return;
             const maskEl = wrap.querySelector('.damage-mask');

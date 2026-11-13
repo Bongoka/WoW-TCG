@@ -122,3 +122,18 @@
 /* Touch-Geräte: eingebautes Ziehen des Browsers aus (startet sonst beim langen Drücken und bricht den Zoom ab).
    Das Ziehen mit dem Finger übernimmt ui.js (TOUCH_DRAG). */
 @media (hover: none) { [draggable="true"], .card-wrapper, .card-wrapper img { -webkit-user-drag: none; } }
+
+/* Roguelike-Aufwertung: violetter Rahmen mit Schimmer und der Effekt als eingedrucktes Pergamentfeld im Textkasten */
+.card-visual.rl-up { --bd: #a77bff; box-shadow: 0 0 0 0.5cqw rgba(167, 123, 255, .55), 0 0 4cqw rgba(167, 123, 255, .55), 0 0.8cqw 2.4cqw rgba(0,0,0,.65); }
+.card-visual.rl-up.has-img::after { box-shadow: inset 0 0 0 0.9cqw #a77bff; }
+.card-up-text { position: absolute; left: 8cqw; right: 8cqw; bottom: 15cqw; z-index: 11; pointer-events: none;
+    padding: 1.4cqw 2.6cqw; border-radius: 1.6cqw; font: 600 3.4cqw/1.18 Georgia, 'Times New Roman', serif; color: #2b1640;
+    background: linear-gradient(180deg, rgba(246, 236, 255, .96), rgba(225, 208, 250, .96)); border: 0.5cqw solid #8a5cf0;
+    box-shadow: 0 0.6cqw 2cqw rgba(0, 0, 0, .55); max-height: 30cqw; overflow: hidden; }
+/* Karte mit Regeltext: Feld endet knapp über der Typzeile und wächst nach oben ins Bild */
+.card-up-text.over-art { bottom: 67cqw; }
+.card-up-text.in-box { top: 100cqw; bottom: auto; }
+/* Unten zwischen Angriff und Leben – Flavor-Text, Set-Zeile und Artist dürfen verdeckt werden */
+.card-up-text.at-bottom { left: 17cqw; right: 17cqw; bottom: 3cqw; }
+/* Ohne Kartenbild steht die Aufwertung schon in [Klammern] im Ersatztext */
+.card-visual:not(.has-img) > .card-up-text { display: none; }
