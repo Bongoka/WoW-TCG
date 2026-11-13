@@ -159,43 +159,27 @@
 
     // ---------------------------------------------------------------- Klassenwahl
     function openClassSelect() {
-        ensureRoot(); showRoot();
+        ensureRoot(); showRoot(); applyBg();
         const saved = loadSavedRun();
-        const classes = R.CLASSES.map(c => {
-            const art = R.art(c.art);
-            const trees = [...new Set(Object.values(CARDS).filter(h => h.type === 'Hero' && h.class === c.en && h.talent && h.talent !== 'Traitor').map(h => h.talent))].sort();
-            return { c, art, trees };
-        });
-        const savedAct = saved ? R.block(saved.act) : null;
+        // Schlicht: Titel und Klassensymbole; ein laufender Run als eine Zeile zum Fortsetzen
         mainEl.innerHTML = `
-            <div class="rl-menu-screen">
-                <div class="rl-title-wrap">
-                    <div class="rl-kicker">World of Warcraft · Roguelike</div>
-                    <h1>Schatten von Azeroth</h1>
-                    <p class="rl-sub">Vier Akte. Vier Set-Blöcke. Ein Run ohne Zurück. Wähle deine Klasse und baue aus dem gesamten Kartenpool ein Deck, das die Regeln bricht.</p>
-                </div>
-                ${saved ? `<div class="rl-resume">
-                    <div class="rl-resume-info"><b>Laufender Run</b><small>${esc(tr(saved.cls))} · ${tr`Akt ${saved.act}/4`} (${esc(tr(savedAct ? savedAct.short : "?"))}) · ${tr`${saved.maxHp} Leben`} · ${saved.gold} Gold · ${tr`Ebene ${Math.max(1, saved.row + 1)}/${(saved.map && saved.map.length) || 9}`} · ${tr`${saved.deck.length} Karten`}</small></div>
-                    <button class="rl-btn primary" id="rl-resume-btn">Run fortsetzen</button>
-                    <button class="rl-btn danger" id="rl-abandon-btn">Verwerfen</button>
+            <div class="rl-pick-screen">
+                <h1 class="rl-pick-title">${tr('Wähle deine Klasse')}</h1>
+                ${saved ? `<div class="rl-pick-resume">
+                    <span>${esc(tr(saved.cls))} · ${tr`Akt ${saved.act}/4`}</span>
+                    <button class="rl-btn primary" id="rl-resume-btn">${tr('Run fortsetzen')}</button>
+                    <button class="rl-btn ghost" id="rl-abandon-btn">${tr('Verwerfen')}</button>
                 </div>` : ''}
-                <div class="rl-class-grid">
-                    ${classes.map(({ c, art, trees }) => `
-                        <button class="rl-class-card" data-cls="${c.key}" style="--cl:${c.color}">
-                            <img class="rl-class-icon" src="${esc(c.icon)}" alt="">
-                            <div class="rl-class-body">
-                                <div class="rl-class-name">${esc(c.name)}</div>
-                                <div class="rl-class-tag">${esc(c.tag)}</div>
-                                <p>${esc(c.blurb)}</p>
-                                <div class="rl-class-meta"><span>Talentbäume</span><b>${esc(trees.join(' · '))}</b></div>
-                            </div>
-                            <span class="rl-go">Deck draften →</span>
+                <div class="rl-pick-grid">
+                    ${R.CLASSES.map(c => `
+                        <button class="rl-pick-cls" data-cls="${c.key}" style="--cl:${c.color}">
+                            <span class="rl-pick-ring"><img src="${esc(c.icon)}" alt=""></span>
+                            <span class="rl-pick-name">${esc(tr(c.name))}</span>
                         </button>`).join('')}
                 </div>
-                <div class="rl-menu-foot">
-                    <button class="rl-btn ghost" id="rl-back-menu">← Hauptmenü</button>
-                    <button class="rl-btn ghost" id="rl-open-debug">Debug-Galerie</button>
-                    <span class="rl-hint">Tipp: Artefakte verändern die Regeln dauerhaft. Aufwertungen verändern einzelne Karten radikal.</span>
+                <div class="rl-pick-foot">
+                    <button class="rl-btn ghost" id="rl-back-menu">${tr('← Hauptmenü')}</button>
+                    <button class="rl-btn ghost" id="rl-open-debug">${tr('Debug-Galerie')}</button>
                 </div>
             </div>`;
         on('#rl-back-menu', 'click', () => { hideRoot(); if (typeof openMainMenu === 'function') openMainMenu(); });
@@ -211,7 +195,7 @@
                 catch (e) { clearRun(); openClassSelect(); }
             });
         }
-        onAll('.rl-class-card', 'click', e => {
+        onAll('.rl-pick-cls', 'click', e => {
             const key = e.currentTarget.dataset.cls;
             const cls = R.classByKey(key);
             const start = () => startRun(key);

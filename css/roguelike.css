@@ -563,3 +563,25 @@
 .rl-draft-opt.pack:hover .rl-draft-row > :nth-child(3) { transform: rotate(8deg) translate(8px, 8px); }
 .rl-draft-screen.pack .rl-draft-options, .rl-draft-screen.rare .rl-draft-options { align-items: center; }
 .rl-draft-screen.pack .rl-draft-opt { padding: 26px 24px 40px; }
+
+/* ---------------------------------------------------------------- Klassenwahl (schlicht: Titel + Klassensymbole) */
+.rl-pick-screen { min-height: calc(100vh - 82px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; }
+.rl-pick-screen::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background: radial-gradient(ellipse 55% 50% at 50% 50%, rgba(6, 4, 3, .55), rgba(6, 4, 3, .15) 70%, transparent); }
+.rl-pick-title { margin: 0; font-size: clamp(30px, 3vw, 52px); font-weight: 400; letter-spacing: .05em; color: #f3dfa2;
+    text-shadow: 0 2px 0 #000, 0 0 30px rgba(201, 168, 76, .35); }
+.rl-pick-resume { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 20px; border-radius: 999px;
+    border: 1px solid rgba(201, 168, 76, .35); background: rgba(12, 9, 6, .85); color: #d9c9a3; }
+.rl-pick-grid { display: grid; grid-template-columns: repeat(5, auto); gap: 34px 46px; justify-content: center; }
+.rl-pick-cls { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0; border: 0; background: none; cursor: pointer; }
+.rl-pick-ring { width: clamp(92px, 8vw, 132px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 50% 40%, rgba(40, 30, 20, .9), rgba(8, 6, 4, .95));
+    box-shadow: 0 0 0 2px rgba(201, 168, 76, .55), 0 0 0 6px rgba(0, 0, 0, .55), 0 14px 30px rgba(0, 0, 0, .6);
+    transition: transform .2s ease, box-shadow .2s; }
+.rl-pick-ring img { width: 86%; height: 86%; border-radius: 50%; }
+.rl-pick-name { font-size: clamp(15px, 1.1vw, 19px); letter-spacing: .06em; color: #e8dcc0; text-shadow: 0 2px 0 #000; transition: color .2s; }
+.rl-pick-cls:hover .rl-pick-ring { transform: translateY(-6px) scale(1.06);
+    box-shadow: 0 0 0 2px var(--cl, #c9a84c), 0 0 0 6px rgba(0, 0, 0, .55), 0 18px 36px rgba(0, 0, 0, .65), 0 0 34px var(--cl, #c9a84c); }
+.rl-pick-cls:hover .rl-pick-name { color: var(--cl, #f3dfa2); }
+.rl-pick-foot { display: flex; gap: 14px; }
+@media (max-width: 760px) { .rl-pick-grid { grid-template-columns: repeat(3, auto); gap: 24px 28px; } }
