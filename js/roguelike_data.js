@@ -662,6 +662,23 @@
         id: 'up_combo_point', text: 'Beim Ausspielen: Wenn bereits eine andere Combo in deinem Friedhof liegt, ziehe 1 Karte.', types: ['Ability'],
         play: (s, it, p) => { if (p.id === 1 && p.graveyard.some(c => c.uid !== it.card.uid && (c.subtypes || []).indexOf('Combo') >= 0)) drawFor(s, 1, 1); }
     });
+    // Pets, Totems, Auren: zusätzliche Plätze für Tags mit Zahl (CR 414.3b, wie Goldenmoon/Deuce) und Synergien.
+    // tagLimit(s, karte, Tag) wirkt, solange die Karte im Spiel ist (R.tagLimitExtra).
+    const isTotemTag = t => / Totem$/.test(t);
+    defCard({ id: 'up_pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', types: ['Ally'], tagLimit: (s, c, t) => t === 'Pet' ? 1 : 0 });
+    defCard({
+        id: 'up_pet_aura', text: 'Deine anderen Pets haben +1/+1.', types: ['Ally'],
+        aura: (s, self, other, kind) => (other.isPet && (kind === 'atk' || kind === 'hp')) ? 1 : 0
+    });
+    defCard({
+        id: 'up_totem_slot', text: 'Du kannst 1 zusätzliches Totem dieses Elements kontrollieren.', types: ['Ability'],
+        tagLimit: (s, c, t) => (isTotemTag(t) && c.limitTags && c.limitTags[t] !== undefined) ? 1 : 0
+    });
+    defCard({
+        id: 'up_totem_aura', text: 'Deine anderen Totems haben +2 Gesundheit.', types: ['Ability'],
+        aura: (s, self, other, kind) => (self.isTotem && other.isTotem && kind === 'hp') ? 2 : 0
+    });
+    defCard({ id: 'up_aura_slot', text: 'Du kannst 1 zusätzliche Aura kontrollieren.', types: ['Ability'], tagLimit: (s, c, t) => t === 'Aura' ? 1 : 0 });
 
     // ---- Passung: Welche Aufwertung passt zu welcher Karte? -----------------
     // fit(cd) liefert 0 (passt nicht) bis 5 (passt sehr gut). Gewählt wird unter den
@@ -741,7 +758,12 @@
         up_ephemeral: cd => (isOngoing(cd) || typeof cd.cost !== 'number') ? 0 : (cd.cost >= 2 && cd.cost <= 4) ? 3 : 0,
         up_patience: cd => (cd.cost || 0) >= 5 ? 3 : 0,
         up_bloodthirst: cd => (cd.type === 'Weapon' || (cd.atk || 0) >= 3) ? 3 : 1,
-        up_combo_point: cd => (cd.subtypes || []).indexOf('Combo') >= 0 ? 5 : 0
+        up_combo_point: cd => (cd.subtypes || []).indexOf('Combo') >= 0 ? 5 : 0,
+        up_pet_slot: cd => cd.isPet ? 4 : 0,
+        up_pet_aura: cd => cd.isPet ? 4 : clsIs(cd, 'Hunter') ? 3 : 0,
+        up_totem_slot: cd => cd.totem ? 4 : 0,
+        up_totem_aura: cd => cd.totem ? 4 : 0,
+        up_aura_slot: cd => (cd.limitTags && cd.limitTags.Aura !== undefined) ? 5 : 0
     };
     R.FIT = FIT;
     // ---- Neue Artefakt-Effekte: Gold, Rassen, Klassen ----------------------
@@ -813,6 +835,24 @@
     defArt({
         id: 'priest_heal', text: 'Wenn du Leben heilst: heile 1 zusätzlich (1x/Zug).',
         healed: (s, d) => { if (!d || d.hpid !== 1 || !(d.amt > 0) || flag(s, 't:priest_heal')) return; setFlag(s, 't:priest_heal'); healHeroFor(s, 1, 1); }
+    });
+    // Pets, Totems, Auren
+    const isPetCard = c => !!c && (c.isPet || !!(c.limitTags && c.limitTags.Pet !== undefined));
+    defArt({ id: 'pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', tagLimit: (s, t) => t === 'Pet' ? 1 : 0 });
+    defArt({
+        id: 'pet_bond', text: 'Deine Pets haben +1/+1.',
+        stat: (s, c, kind) => ((kind === 'atk' || kind === 'hp') && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isPetCard(c)) ? 1 : 0
+    });
+    defArt({
+        id: 'pet_call', text: 'Wenn eines deiner Pets zerstört wird: ziehe 1 Karte (1x/Zug).',
+        died: (s, snap) => { if (!snap || snap.wasCtrl !== 1 || !isPetCard(CARDS[snap.id]) || flag(s, 't:pet_call')) return; setFlag(s, 't:pet_call'); drawFor(s, 1, 1); }
+    });
+    defArt({ id: 'totem_cost', text: 'Deine Totems kosten (1) weniger.', cost: (s, p, card) => card.totem ? -1 : 0 });
+    defArt({ id: 'totem_slot', text: 'Du kannst von jedem Totem-Element 1 zusätzliches Totem kontrollieren.', tagLimit: (s, t) => / Totem$/.test(t) ? 1 : 0 });
+    defArt({
+        id: 'aura_slot', text: 'Du kannst 1 zusätzliche Aura kontrollieren. Deine Auren kosten (1) weniger.',
+        tagLimit: (s, t) => t === 'Aura' ? 1 : 0,
+        cost: (s, p, card) => (card.limitTags && card.limitTags.Aura !== undefined) ? -1 : 0
     });
     defArt({
         id: 'rogue_stealth', text: 'Schurken-Allies haben Stealth.',
@@ -1001,7 +1041,7 @@
     R.cardStat = function (s, c, kind) {
         const e = R.effectOf(c);
         let v = (e && e.stat) ? (e.stat(s, c, kind) || 0) : 0;
-        if (c && c.type === 'Ally' && ctrlOf(s, c) === 1) {
+        if (c && isAllyLike(c) && ctrlOf(s, c) === 1) {   // Totems zählen wie Allies (Totem-Auren)
             for (const a of getPlayer(s, 1).allies) {
                 if (a.uid === c.uid) continue;
                 const ae = R.effectOf(a);
@@ -1024,6 +1064,22 @@
         }
         return v;
     };
+
+    // Zusätzliche Plätze für Tags mit Zahl (Pet (1), Aura (1), Earth Totem (1) …, CR 414.3b): Artefakte und
+    // aufgewertete Karten im Spiel. Die Engine liest das in findLimitViolation über TAG_LIMIT_EXTRA.
+    R.tagLimitExtra = function (s, pid, t) {
+        if (!s || !s.rl || pid !== 1) return 0;
+        let n = 0;
+        for (const a of artList(s)) if (a.tagLimit) n += (a.tagLimit(s, t) || 0);
+        const p = getPlayer(s, 1);
+        const seen = new Set();   // Totems können zugleich Ally und Ongoing sein
+        for (const c of [...p.allies, ...(p.ongoing || []), ...p.hero.weapons, ...p.hero.armors]) {
+            if (seen.has(c.uid)) continue; seen.add(c.uid);
+            const e = R.effectOf(c); if (e && e.tagLimit) n += (e.tagLimit(s, c, t) || 0);
+        }
+        return n;
+    };
+    if (typeof TAG_LIMIT_EXTRA !== 'undefined') TAG_LIMIT_EXTRA.push((s, pid, t) => R.tagLimitExtra(s, pid, t));
 
     // ---------------------------------------------------------------- Artefakte
     // Helfer für Artefakt-Hooks
@@ -2001,7 +2057,13 @@
         newArtifact('gold_resource', 'Mithril Deposit', 'Trade/Mithril_01.png', 'Ökonomie', 'common', 95, 'gold_resource'),
         newArtifact('gold_attack', 'Bloodsail Booty', 'Miscellaneous/Coin_07.png', 'Ökonomie', 'rare', 110, 'gold_attack'),
         newArtifact('gold_death', 'Scourge Bounty', 'Miscellaneous/Bone_Skull_02.png', 'Ökonomie', 'common', 100, 'gold_death'),
-        newArtifact('gold_weapon', 'Trade Prince', 'Trade/Papyrus.png', 'Ökonomie', 'rare', 115, 'gold_weapon')
+        newArtifact('gold_weapon', 'Trade Prince', 'Trade/Papyrus.png', 'Ökonomie', 'rare', 115, 'gold_weapon'),
+        newArtifact('pet_slot', 'Stable Master', 'Abilities/BeastTaming.png', 'Pets', 'rare', 120, 'pet_slot'),
+        newArtifact('pet_bond', 'Beast Mastery', 'Abilities/BeastMastery.png', 'Pets', 'rare', 115, 'pet_bond'),
+        newArtifact('pet_call', 'Call Pet', 'Abilities/BeastCall.png', 'Pets', 'common', 95, 'pet_call'),
+        newArtifact('totem_cost', 'Totemic Focus', 'Spells/Elemental_Totem.png', 'Totems', 'rare', 115, 'totem_cost'),
+        newArtifact('totem_slot', 'Totemic Mastery', 'Miscellaneous/TotemofRage.png', 'Totems', 'rare', 125, 'totem_slot'),
+        newArtifact('aura_slot', 'Improved Devotion Aura', 'Spells/DEVOTIONAURA.png', 'Auren', 'rare', 120, 'aura_slot')
     );
     // ---- Artefakte: Kette, Zonen, Erschöpfen, Rüstung (Namen aus Vanilla / TBC / WotLK) ----
     const myHero = s => s.p1.hero;

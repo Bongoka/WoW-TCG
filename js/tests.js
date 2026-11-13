@@ -1437,6 +1437,59 @@ function runRuleTests() {
         p.graveyard = [];
         assert(comboPoints(s, 1) === 0, 'Anzeige bei leerem Friedhof');
     });
+    test(140, 'Roguelike: zusätzliche Pets/Totems/Auren (CR 414.3b), Pet- und Totem-Synergien', () => {
+        if (typeof RL === 'undefined') return;
+        const mk = () => { const s = fresh(); s.rl = { arts: [], f: {}, act: 1, pid: 1 }; const p = P(s, 1); p.allies = []; p.ongoing = []; return s; };
+        const viol = (s, tag) => { const v = findLimitViolation(s, P(s, 1)); return !!(v && v.label.indexOf(tag) === 0); };
+        const pets = Object.values(CARDS).filter(c => c.type === 'Ally' && c.isPet && !c.unique && c.limitTags && c.limitTags.Pet === 1 && !(FX[c.id] || {}).aura);
+        const plain = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isPet && !c.unique && !c.limitTags && !(FX[c.id] || {}).aura);
+        // Pets: zwei sind ein Verstoß; aufgewertetes Pet oder Stable Master erlauben ein zweites, nicht ein drittes
+        let s = mk(); P(s, 1).allies.push(makeCardInst(pets[0].id, false, 1), makeCardInst(pets[1].id, false, 1));
+        assert(viol(s, 'Pet'), 'zwei Pets ohne Extra erlaubt');
+        s = mk(); P(s, 1).allies.push(makeCardInst(RL.upgraded(pets[0].id, 'up_pet_slot'), false, 1), makeCardInst(pets[1].id, false, 1));
+        assert(!viol(s, 'Pet'), 'up_pet_slot: zweites Pet nicht erlaubt');
+        s = mk(); s.rl.arts = ['pet_slot']; P(s, 1).allies.push(makeCardInst(pets[0].id, false, 1), makeCardInst(pets[1].id, false, 1));
+        assert(!viol(s, 'Pet'), 'Stable Master: zweites Pet nicht erlaubt');
+        P(s, 1).allies.push(makeCardInst(pets[2].id, false, 1));
+        assert(viol(s, 'Pet'), 'Stable Master: drittes Pet erlaubt');
+        // Beast Mastery: Pets +1/+1, andere Allies nicht
+        s = mk(); const pt = makeCardInst(pets[0].id, false, 1), pl = makeCardInst(plain.id, false, 1); P(s, 1).allies.push(pt, pl);
+        const base = [atkOf(s, pt), hpOf(s, pt), atkOf(s, pl), hpOf(s, pl)];
+        s.rl.arts = ['pet_bond'];
+        assert(JSON.stringify([atkOf(s, pt), hpOf(s, pt), atkOf(s, pl), hpOf(s, pl)]) === JSON.stringify([base[0] + 1, base[1] + 1, base[2], base[3]]), 'Beast Mastery wirkt falsch');
+        // up_pet_aura: andere Pets +1/+1, nicht sich selbst
+        s = mk(); const lead = makeCardInst(RL.upgraded(pets[0].id, 'up_pet_aura'), false, 1), pt2 = makeCardInst(pets[1].id, false, 1);
+        s.rl.arts = ['pet_slot']; P(s, 1).allies.push(lead, pt2);
+        assert(atkOf(s, pt2) === (pets[1].atk || 0) + 1 && hpOf(s, pt2) === pets[1].hp + 1 && hpOf(s, lead) === pets[0].hp, 'up_pet_aura wirkt falsch');
+        // Call Pet: zerstörtes Pet zieht 1 Karte (1x/Zug)
+        s = mk(); s.rl.arts = ['pet_call']; const cp = makeCardInst(pets[0].id, false, 1); P(s, 1).allies.push(cp);
+        const h0 = P(s, 1).hand.length; destroy(s, cp); process(s);
+        assert(P(s, 1).hand.length === h0 + 1, 'Call Pet: keine Karte gezogen');
+        // Auren: zwei Aura (1) sind ein Verstoß, Improved Devotion Aura erlaubt eine zweite und senkt die Kosten
+        const auras = Object.values(CARDS).filter(c => c.limitTags && c.limitTags.Aura === 1 && !c.instant);
+        s = mk(); P(s, 1).ongoing.push(makeCardInst(auras[0].id, false, 1), makeCardInst(auras[1].id, false, 1));
+        assert(viol(s, 'Aura'), 'zwei Auren ohne Extra erlaubt');
+        s.rl.arts = ['aura_slot'];
+        assert(!viol(s, 'Aura'), 'Improved Devotion Aura: zweite Aura nicht erlaubt');
+        assert(getPlayCost(s, P(s, 1), CARDS[auras[2].id]) === auras[2].cost - 1, 'Improved Devotion Aura: Aura nicht günstiger');
+        s = mk(); P(s, 1).ongoing.push(makeCardInst(RL.upgraded(auras[0].id, 'up_aura_slot'), false, 1), makeCardInst(auras[1].id, false, 1));
+        assert(!viol(s, 'Aura'), 'up_aura_slot: zweite Aura nicht erlaubt');
+        // Totems: zwei Earth Totems sind ein Verstoß, Totemic Mastery erlaubt ein zweites; Totemic Focus senkt die Kosten
+        const earth = Object.values(CARDS).filter(c => c.totem && c.limitTags && c.limitTags['Earth Totem'] === 1);
+        const tot = id => { const c = makeCardInst(id, false, 1); c.isTotem = true; return c; };
+        s = mk(); P(s, 1).allies.push(tot(earth[0].id), tot(earth[1].id));
+        assert(viol(s, 'Earth Totem'), 'zwei Earth Totems ohne Extra erlaubt');
+        s.rl.arts = ['totem_slot'];
+        assert(!viol(s, 'Earth Totem'), 'Totemic Mastery: zweites Totem nicht erlaubt');
+        s = mk(); P(s, 1).allies.push(tot(RL.upgraded(earth[0].id, 'up_totem_slot')), tot(earth[1].id));
+        assert(!viol(s, 'Earth Totem'), 'up_totem_slot: zweites Totem desselben Elements nicht erlaubt');
+        s = mk(); s.rl.arts = ['totem_cost'];
+        assert(getPlayCost(s, P(s, 1), CARDS[earth[0].id]) === Math.max(0, earth[0].cost - 1), 'Totemic Focus: Totem nicht günstiger');
+        // up_totem_aura: andere Totems +2 Gesundheit
+        s = mk(); const ta = tot(RL.upgraded(earth[0].id, 'up_totem_aura')), tb = tot(earth[1].id); P(s, 1).allies.push(tb);
+        const hb = hpOf(s, tb); P(s, 1).allies.push(ta);
+        assert(hpOf(s, tb) === hb + 2, `up_totem_aura: ${hpOf(s, tb)} statt ${hb + 2}`);
+    });
     LANG = prevLang;
     return results;
 }
