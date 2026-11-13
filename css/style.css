@@ -1607,3 +1607,35 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 /* Einstellungen: Schieberegler (Spielfeld-Größe) mit Wert daneben */
 .cfg-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--gold); }
 .cfg-val { font-size: 11px; color: var(--text-main); min-width: 38px; text-align: right; }
+/* Deck-Builder „Anzahlen optimieren“: Panel oben in der Liste (bleibt beim Scrollen stehen), je Zeile Mini-Balken je Anzahl 0–4
+   und die beste Anzahl (Balken unten = Sicherheit); − / + sind während des Tests aus */
+.db-opt-start { background: linear-gradient(180deg, #c4b5fd, #7c3aed); border-color: #c4b5fd; color: #12081f; box-shadow: 0 2px 10px rgba(139,92,246,.35); }
+.db-opt-start:hover { box-shadow: 0 2px 14px rgba(139,92,246,.6); }
+#db-opt-panel { position: sticky; top: 0; z-index: 6; margin: 0 0 8px; padding: 8px 10px; border-radius: 7px; background: linear-gradient(180deg, #1e1530, #120d1c);
+    border: 1px solid #7c3aed; box-shadow: 0 4px 14px rgba(0,0,0,.7), 0 0 12px rgba(124,58,237,.25); font-size: 12px; color: #e8dcc6; }
+#db-opt-panel.stable { border-color: #4ade80; box-shadow: 0 4px 14px rgba(0,0,0,.7), 0 0 14px rgba(74,222,128,.3); }
+#db-opt-panel .dop-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #ddd6fe; }
+#db-opt-panel .dop-status { font-size: 11px; color: #c4b5fd; }
+#db-opt-panel.stable .dop-status { color: #4ade80; font-weight: bold; }
+#db-opt-panel .dop-bar { height: 5px; margin: 6px 0; border-radius: 3px; background: #2a2140; overflow: hidden; }
+#db-opt-panel .dop-bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #7c3aed, #4ade80); transition: width .4s ease; }
+#db-opt-panel .dop-info { line-height: 1.55; color: #cfc4b0; }
+#db-opt-panel .dop-info b { color: #fde68a; }
+#db-opt-panel .dop-info b.up { color: #4ade80; } #db-opt-panel .dop-info b.down { color: #f87171; }
+#db-opt-panel .dop-info .ok { color: #4ade80; font-weight: bold; } #db-opt-panel .dop-info .bad { color: #f87171; font-weight: bold; }
+#db-opt-panel .dop-btns { display: flex; gap: 8px; margin-top: 7px; }
+#db-opt-panel .dop-btns button { flex: 1; padding: 6px 8px; font-weight: bold; border-radius: 5px; }
+#db-opt-panel.stable .dop-apply { animation: dopPulse 1.6s ease-in-out infinite; }
+@keyframes dopPulse { 50% { box-shadow: 0 0 0 3px rgba(74,222,128,.45); } }
+#db-deck-cards.opt .db-row { grid-template-columns: 30px 1fr auto 22px 44px; }
+#db-deck-cards.opt .db-row-btn { display: none; }
+.dop-spark { display: flex; align-items: flex-end; gap: 2px; height: 20px; padding: 0 3px; border-radius: 3px; background: rgba(8,6,4,.6); cursor: help; }
+.dop-spark i { display: block; width: 5px; border-radius: 1px; background: #6b5d4a; transition: height .4s ease; }
+.dop-spark i.best { background: #facc15; }
+.dop-spark i.cur { outline: 1px solid #fff; }
+.dop-rec { position: relative; overflow: hidden; justify-self: end; min-width: 38px; padding: 2px 4px 4px; border-radius: 4px; text-align: center; cursor: help;
+    font: 900 14px/1 Georgia, serif; background: rgba(8,6,4,.8); border: 1px solid #4b3f30; color: #cfc4b0; }
+.dop-rec::after { content: ''; position: absolute; left: 0; bottom: 0; height: 2px; width: var(--conf, 0%); background: currentColor; opacity: .85; transition: width .4s ease; }
+.dop-rec.up { color: #4ade80; border-color: #166534; } .dop-rec.down { color: #fbbf24; border-color: #92400e; } .dop-rec.zero { color: #f87171; border-color: #991b1b; }
+.db-row.dop-chg .dop-rec { animation: dopChg 1.2s ease; }
+@keyframes dopChg { 0% { transform: scale(1.45); box-shadow: 0 0 10px #facc15; } 100% { transform: scale(1); box-shadow: none; } }

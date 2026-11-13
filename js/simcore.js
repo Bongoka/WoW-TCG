@@ -118,6 +118,149 @@ function randomLegalDeck(heroId, size = 60) {
 }
 
 // ============================================================================
+// ANZAHLEN-OPTIMIERER (Deck-Builder „Anzahlen optimieren“): nur die Karten des Decks, je Karte 0–4 Kopien, Summe 60.
+// Varianten des Decks spielen gegeneinander. Modell (lineares Bradley-Terry): P(A gewinnt) = ½ + s + Σ_i (v[i][a_i] − v[i][b_i]),
+// v[i][k] = Wert von k Kopien der Karte i, s = Vorteil des Startspielers. Geschätzt als Bayes-Regression über alle Partien
+// gemeinsam (Vorwissen: Werte klein, benachbarte Anzahlen ähnlich) – viel weniger Rauschen als eine Winrate je Karte und
+// Anzahl für sich, weil die übrigen Karten herausgerechnet werden. Verglichen werden nur Deck-Zusammensetzungen (vor dem
+// Mischen festgelegt), nie „gespielt“. Die beste Anzahl je Karte: Rucksack-DP über alle Karten mit Summe genau 60.
+// Nächste Partien: Thompson-Sampling (Stichprobe aus der Unsicherheit → bestes Deck dazu, plus ein paar Zufallstausche),
+// so landen die Partien dort, wo die Entscheidung noch offen ist.
+// ============================================================================
+var OPT_SIGMA2 = 0.25, OPT_TAU = 0.05, OPT_TAU_S = 0.03, OPT_TAU_2 = 0.002, OPT_TAU_SEAT = 0.5, OPT_ANCHOR = 0.004;
+var OPT_TAU_OPP = 0.3, OPT_EXPLORE = 0.3, OPT_MOVES = 4;
+// ids: Karten-IDs, cur: aktuelle Anzahlen, max: Höchstanzahl je Karte (4, Unlimited mehr), nOpp: Zahl fester Gegnerdecks
+// (Turnier-Decks; je eins ein eigener Stärke-Parameter, P(Variante schlägt Gegner j) = ½ ± s + Σ v[i][a_i] − θ_j)
+function optCreate(ids, cur, max, size = 60, nOpp = 0) {
+    const n = ids.length, off = [];
+    let P = 1;                                                       // Parameter 0 = Vorteil des Startspielers
+    for (let i = 0; i < n; i++) { off.push(P); P += max[i] + 1; }
+    const oppOff = P; P += nOpp;
+    const Q = new Float64Array(P * P), r = new Float64Array(P);
+    Q[0] = 1 / (OPT_TAU_SEAT * OPT_TAU_SEAT);
+    for (let j = 0; j < nOpp; j++) Q[(oppOff + j) * (P + 1)] = 1 / (OPT_TAU_OPP * OPT_TAU_OPP);
+    const lr = 1 / (OPT_TAU * OPT_TAU), ls = 1 / (OPT_TAU_S * OPT_TAU_S), l2 = 1 / (OPT_TAU_2 * OPT_TAU_2);
+    const pen = (ps, ws, l) => { for (let u = 0; u < ps.length; u++) for (let w = 0; w < ps.length; w++) Q[ps[u] * P + ps[w]] += l * ws[u] * ws[w]; };
+    for (let i = 0; i < n; i++) for (let k = 0; k <= max[i]; k++) {
+        const p = off[i] + k; Q[p * P + p] += lr;
+        if (k < max[i]) pen([p, p + 1], [1, -1], ls);                                    // benachbarte Anzahlen ähnlich
+        if (k > 0 && k < max[i]) pen([p - 1, p, p + 1], [1, -2, 1], l2);                  // Verlauf je Karte möglichst gleichmäßig
+    }
+    // Vorwissen „die gewählten Anzahlen sind vernünftig“: jede Kopie Abstand zur aktuellen Anzahl kostet anfangs OPT_ANCHOR.
+    // Ohne diesen Anker optimiert die DP bei schwachen Effekten über Rauschen (Empfehlung schlechter als das Deck selbst).
+    const mu0 = new Float64Array(P);
+    for (let i = 0; i < n; i++) for (let k = 0; k <= max[i]; k++) mu0[off[i] + k] = -OPT_ANCHOR * Math.abs(k - cur[i]);
+    for (let p = 0; p < P; p++) { let s = 0; for (let q = 0; q < P; q++) s += Q[p * P + q] * mu0[q]; r[p] = s; }
+    return { ids, n, cur: cur.slice(), max: max.slice(), size, off, oppOff, nOpp, P, Q, r, games: 0, obs: ids.map((_, i) => new Array(max[i] + 1).fill(0)), L: null, mean: new Float64Array(P) };
+}
+// Eine Partie: a = Spieler 1 (beginnt), b = Spieler 2 – je Anzahlen einer Variante oder die Nummer eines Gegnerdecks; aWon
+function optAddGame(m, a, b, aWon) {
+    const x = new Map([[0, 1]]), add = (p, d) => { const v = (x.get(p) || 0) + d; if (v) x.set(p, v); else x.delete(p); };
+    for (const [c, sg] of [[a, 1], [b, -1]]) {
+        if (typeof c === 'number') { add(m.oppOff + c, sg); continue; }
+        for (let i = 0; i < m.n; i++) { m.obs[i][c[i]]++; add(m.off[i] + c[i], sg); }
+    }
+    const y = aWon ? 0.5 : -0.5, idx = [...x.keys()], val = idx.map(k => x.get(k)), P = m.P;
+    for (let u = 0; u < idx.length; u++) {
+        m.r[idx[u]] += val[u] * y / OPT_SIGMA2;
+        for (let w = 0; w < idx.length; w++) m.Q[idx[u] * P + idx[w]] += val[u] * val[w] / OPT_SIGMA2;
+    }
+    m.games++; m.L = null;
+}
+// Cholesky der Präzisionsmatrix (Q = L·Lᵀ) und Schätzwerte mean = Q⁻¹·r
+function optRefresh(m) {
+    if (m.L) return m;
+    const P = m.P, L = new Float64Array(m.Q);
+    for (let j = 0; j < P; j++) {
+        let d = L[j * P + j];
+        for (let k = 0; k < j; k++) d -= L[j * P + k] * L[j * P + k];
+        d = Math.sqrt(Math.max(d, 1e-12)); L[j * P + j] = d;
+        for (let i = j + 1; i < P; i++) {
+            let s = L[i * P + j];
+            for (let k = 0; k < j; k++) s -= L[i * P + k] * L[j * P + k];
+            L[i * P + j] = s / d;
+        }
+        for (let k = j + 1; k < P; k++) L[j * P + k] = 0;
+    }
+    m.L = L; m.mean = optBack(m, optFwd(m, m.r));
+    return m;
+}
+const optFwd = (m, b) => { const P = m.P, L = m.L, y = new Float64Array(P); for (let i = 0; i < P; i++) { let s = b[i]; for (let k = 0; k < i; k++) s -= L[i * P + k] * y[k]; y[i] = s / L[i * P + i]; } return y; };    // L·y = b
+const optBack = (m, y) => { const P = m.P, L = m.L, x = new Float64Array(P); for (let i = P - 1; i >= 0; i--) { let s = y[i]; for (let k = i + 1; k < P; k++) s -= L[k * P + i] * x[k]; x[i] = s / L[i * P + i]; } return x; };   // Lᵀ·x = y
+// Gaußsche Zufallszahl (Box-Muller)
+function optGauss(rnd) { let u = 0; while (!u) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
+// Stichprobe der Werte aus der Unsicherheit (Posterior): mean + L⁻ᵀ·z
+function optSample(m, rnd = Math.random) {
+    optRefresh(m);
+    const z = new Float64Array(m.P); for (let i = 0; i < m.P; i++) z[i] = optGauss(rnd);
+    const d = optBack(m, z), v = new Float64Array(m.P); for (let i = 0; i < m.P; i++) v[i] = m.mean[i] + d[i];
+    return v;
+}
+// Beste Anzahlen zu Werten v mit Summe genau m.size (DP); bei Gleichstand die aktuelle Anzahl
+function optBest(m, v) {
+    const S = m.size, n = m.n, NEG = -Infinity;
+    let dp = new Float64Array(S + 1).fill(NEG); dp[0] = 0;
+    const pick = [];
+    for (let i = 0; i < n; i++) {
+        const nd = new Float64Array(S + 1).fill(NEG), ch = new Int8Array(S + 1).fill(-1);
+        for (let s = 0; s <= S; s++) {
+            if (dp[s] === NEG) continue;
+            for (let k = 0; k <= m.max[i] && s + k <= S; k++) {
+                const val = dp[s] + v[m.off[i] + k] + (k === m.cur[i] ? 1e-9 : 0);
+                if (val > nd[s + k]) { nd[s + k] = val; ch[s + k] = k; }
+            }
+        }
+        pick.push(ch); dp = nd;
+    }
+    if (dp[S] === NEG) return null;                                  // weniger als 60 Kopien möglich
+    const out = new Array(n); let s = S;
+    for (let i = n - 1; i >= 0; i--) { out[i] = pick[i][s]; s -= out[i]; }
+    return out;
+}
+// Zufallstausch: eine Kopie von Karte a zu Karte b (Summe bleibt)
+function optMove(m, c, rnd) {
+    for (let t = 0; t < 50; t++) {
+        const a = Math.floor(rnd() * m.n), b = Math.floor(rnd() * m.n);
+        if (a !== b && c[a] > 0 && c[b] < m.max[b]) { c[a]--; c[b]++; return; }
+    }
+}
+// Anzahlen für die nächste Partie: meist Thompson (beste Anzahlen zu einer Stichprobe) plus wenige Tausche,
+// jede fünfte Partie ganz zufällig (jede Anzahl 0–4 gleich wahrscheinlich, dann auf 60 gebracht) – so bekommt jede Stufe Daten
+function optVariant(m, rnd = Math.random) {
+    let c;
+    if (rnd() < OPT_EXPLORE) {
+        // halb: jede Anzahl gleich wahrscheinlich, dann auf 60 aufgefüllt; halb: alle voll, dann zufällig Kopien heraus
+        c = rnd() < 0.5 ? m.max.map(x => Math.floor(rnd() * (x + 1))) : m.max.slice();
+        let sum = c.reduce((x, y) => x + y, 0), g = 0;
+        while (sum !== m.size && g++ < 5000) { const i = Math.floor(rnd() * m.n); if (sum < m.size && c[i] < m.max[i]) { c[i]++; sum++; } else if (sum > m.size && c[i] > 0) { c[i]--; sum--; } }
+    } else {
+        c = optBest(m, optSample(m, rnd));
+        const moves = Math.floor(rnd() * (1 + Math.max(OPT_MOVES, 10 - Math.floor(m.games / 100))));
+        for (let i = 0; i < moves; i++) optMove(m, c, rnd);
+    }
+    return c;
+}
+// Stand der Auswertung: Empfehlung (beste Anzahlen zu den Schätzwerten), Sicherheit je Karte (Anteil der Stichproben,
+// in denen dieselbe Anzahl gewinnt), Werte je Anzahl (Winrate-Anteil), erwartete Winrate der
+// Empfehlung gegen das aktuelle Deck
+function optSummary(m, K = 48, rnd = Math.random) {
+    optRefresh(m);
+    const rec = optBest(m, m.mean), freq = m.ids.map((_, i) => new Array(m.max[i] + 1).fill(0));
+    for (let s = 0; s < K; s++) { const c = optBest(m, optSample(m, rnd)); c.forEach((k, i) => freq[i][k]++); }
+    const P = m.P, val = m.ids.map((_, i) => Array.from({ length: m.max[i] + 1 }, (_, k) => m.mean[m.off[i] + k]));
+    const w = new Float64Array(P);
+    m.ids.forEach((_, i) => { w[m.off[i] + rec[i]] += 1; w[m.off[i] + Math.min(m.cur[i], m.max[i])] -= 1; });
+    let gain = 0; for (let p = 0; p < P; p++) gain += w[p] * m.mean[p];
+    let gse = 0; for (const t of optFwd(m, w)) gse += t * t;
+    return { rec, conf: rec.map((k, i) => freq[i][k] / K), freq, val, gain, gainSe: Math.sqrt(gse), seat: m.mean[0], games: m.games };
+}
+// Deck-Objekt für die Simulation
+function optDeck(m, counts, heroId) {
+    const cards = []; m.ids.forEach((id, i) => { for (let k = 0; k < counts[i]; k++) cards.push(id); });
+    return { hero: heroId, cards, name: 'opt', _c: counts };
+}
+
+// ============================================================================
 // TEST-SETUP: extremes Late-Game (viele Ressourcen, Handkarten, Ausrüstung,
 // laufende Fähigkeiten, Allies, Totems, Friedhof). Alles regelkonform aufgebaut:
 // Limits (Unique, Slots, Pet (1) …) werden geprüft, Anhänge wählen echte Ziele.

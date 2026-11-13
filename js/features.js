@@ -214,9 +214,14 @@ function renderDBDeck(highlightId) {
         w.querySelector('button').onclick = () => { currentDeckBuilder.cards = currentDeckBuilder.cards.filter(id => dbLegal(CARDS[id])); renderDBAll(); }; }
     // Deckliste: nach Typ gruppiert, kompakte Zeilen mit − / +
     const box = document.getElementById("db-deck-cards"); box.innerHTML = "";
+    // Anzahlen-Optimierer: jede Änderung am Deck (Karten, Held, anderes Deck geladen) verwirft den laufenden Test
+    if (OPT.on && optSig() !== OPT.sig) { optStop(); dbFlash(tr('Optimierung verworfen – das Deck wurde geändert.')); }
+    box.classList.toggle('opt', OPT.on);
     if (!n) { box.innerHTML = tr('<div class="db-empty">Klicke links auf Karten, um sie hinzuzufügen,<br>oder füge mit <b>Import</b> eine Kartenliste ein.</div>'); return; }
+    if (OPT.on) box.appendChild(optPanel());
     dbRenderRows(box, cards, hero, { edit: true, highlightId });
     dbAfterRows(box, n, hero);
+    if (OPT.on) optDecorate();
 }
 // Manakurve (ohne Quests, gestapelt nach Typ) und Typverteilung – auch für die Deck-Vorschau der Übersicht
 function dbRenderStats(cards, curve, tb, tl) {
@@ -253,7 +258,7 @@ function dbRenderRows(box, cards, hero, o = {}) {
         box.insertAdjacentHTML('beforeend', `<div class="db-group" style="--tc:${t.color}">${t.label}<span>${tot}</span></div>`);
         ids.forEach(id => {
             const c = CARDS[id]; const row = document.createElement('div');
-            row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === o.highlightId ? ' pulse' : '');
+            row.className = 'db-row' + (!hero || dbLegal(c, hero) ? '' : ' illegal') + (id === o.highlightId ? ' pulse' : ''); row.dataset.id = id;
             row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : c.type === 'Location' ? 'L' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + (o.edit ? `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>` : `<span></span><span class="db-row-n">${counts[id]}</span><span></span>`);
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
@@ -291,6 +296,133 @@ function dbAfterRows(box, n, hero) {
         };
         box.appendChild(b);
     }
+    if (!OPT.on && hero && new Set(cards).size >= OPT_MIN_CARDS) {
+        const b = document.createElement('button'); b.className = 'db-autofill db-opt-start'; b.textContent = tr('⚗ Anzahlen optimieren');
+        b.title = tr('Varianten dieses Decks (nur seine Karten, je 0–4 Kopien, 60 Karten) spielen im Hintergrund gegeneinander und gegen die Turnier-Decks. Die beste Anzahl je Karte erscheint live in der Liste.');
+        b.onclick = optStart;
+        box.appendChild(b);
+    }
+}
+
+// --- ANZAHLEN OPTIMIEREN (Modell und Auswahl der Varianten: optCreate … in simcore.js) ---
+// Ab OPT_MIN_CARDS verschiedenen Karten (15 × 4 = 60). Varianten des Decks – nur seine Karten, je 0–4 Kopien, genau 60 –
+// spielen über runSimulation (Web Worker) gegeneinander; nach jeder Partie wird neu geschätzt. Die beste Anzahl je Karte
+// steht live in der Zeile (mit Sicherheit), Übernehmen/Verwerfen beendet den Test. Jede Änderung am Deck verwirft ihn.
+const OPT_MIN_CARDS = 15, OPT_MAX_GAMES = 10000;
+const OPT = { on: false, m: null, sum: null, sig: '', token: 0, t0: 0, lastChange: 0, cardChange: [], prevRec: null, timer: null, finished: false, hist: [] };
+const optSig = () => currentDeckBuilder.heroId + '|' + [...currentDeckBuilder.cards].sort((a, b) => a - b).join();
+async function optStart() {
+    const hero = dbHero(); if (!hero || OPT.on) return;
+    // Ein eben verworfener Test spielt noch seine letzten Partien zu Ende – kurz warten
+    for (let t = 0; SIM_STOP.running && SIM_STOP.quiet && SIM_STOP.req && t < 100; t++) await new Promise(r => setTimeout(r, 100));
+    if (SIM_STOP.running) { showToast(tr('Es läuft schon eine Simulation.'), false, 3000); return; }
+    const counts = {}; currentDeckBuilder.cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
+    const ids = Object.keys(counts).map(Number);
+    const max = ids.map(id => CARDS[id].unlimited ? Math.max(4, counts[id]) : 4);    // höchstens 4 Kopien, Unlimited wie bisher oder 4
+    // Gegner: Varianten untereinander und – jede zweite Partie – die Turnier-Decks (nicht nur auf Spiegelmatches optimieren)
+    const opps = (typeof TOURNEY_DECKS !== 'undefined' ? tourneySimDecks() : []).map((d, j) => ({ ...d, _o: j }));
+    const m = optCreate(ids, ids.map(id => counts[id]), max, 60, opps.length);
+    Object.assign(OPT, { on: true, m, sig: optSig(), token: OPT.token + 1, t0: performance.now(), lastChange: 0, cardChange: ids.map(() => 0), prevRec: null, finished: false, hist: [], opps: opps.length, gOpp: 0 });
+    OPT.sum = optSummary(m, 24);
+    const token = OPT.token, hid = hero.id;
+    const pair = () => {
+        const a = optDeck(m, optVariant(m), hid);
+        if (!opps.length || Math.random() < 0.5) return [a, optDeck(m, optVariant(m), hid)];
+        const o = opps[Math.floor(Math.random() * opps.length)];
+        return Math.random() < 0.5 ? [a, o] : [o, a];                                  // Sitzplatz zufällig (Startspieler)
+    };
+    renderDBDeck();
+    const ok = await runSimulation(OPT_MAX_GAMES, [], tr('Anzahlen optimieren'), [pair], { quiet: true, onGame: (a, b, res) => {
+        if (OPT.token !== token) return;
+        optAddGame(m, a._c || a._o, b._c || b._o, res.winner === 1);
+        if (a._o !== undefined || b._o !== undefined) OPT.gOpp++;
+        if (!OPT.timer) OPT.timer = setTimeout(() => { OPT.timer = null; if (OPT.token === token) optUpdate(); }, 350);
+    } });
+    if (OPT.token !== token) return;
+    if (ok === false) { OPT.on = false; renderDBDeck(); return; }
+    OPT.finished = true; optUpdate();
+}
+function optStop() {
+    if (!OPT.on) return;
+    OPT.on = false; OPT.token++; clearTimeout(OPT.timer); OPT.timer = null;
+    if (SIM_STOP.running && SIM_STOP.quiet) SIM_STOP.req = true;
+    const box = document.getElementById('db-deck-cards'); if (box) box.classList.remove('opt');
+}
+// Neu auswerten: Empfehlung, Sicherheit, Änderungen merken (Markierung in der Zeile)
+function optUpdate() {
+    if (!OPT.on) return;
+    if (document.getElementById('deck-builder-modal').style.display === 'none') { optStop(); return; }   // Deck-Builder geschlossen
+    const m = OPT.m, s = OPT.sum = optSummary(m, 48), changed = [];
+    if (OPT.prevRec) s.rec.forEach((k, i) => { if (k !== OPT.prevRec[i]) { changed.push(i); OPT.cardChange[i] = m.games; } });
+    if (changed.length) OPT.lastChange = m.games;
+    OPT.prevRec = s.rec;
+    OPT.hist.push([performance.now(), m.games]); if (OPT.hist.length > 30) OPT.hist.shift();
+    optDecorate(changed);
+}
+// Stabil: Empfehlung seit vielen Partien (mind. 400 bzw. 35 %) unverändert. Abgestimmt an Testdaten mit bekannten Kartenwerten:
+// nach ~5000 Partien rund drei Viertel des möglichen Gewinns, bei kleinen Effekten nie schlechter als das Ausgangsdeck
+function optState() {
+    const s = OPT.sum, g = OPT.m.games, stable = g - OPT.lastChange;
+    const conf = s.conf.reduce((x, y) => x + y, 0) / s.conf.length;
+    return { g, stable, conf, done: g >= 1000 && stable >= Math.max(400, g * 0.35) };
+}
+function optPanel() {
+    const p = document.createElement('div'); p.id = 'db-opt-panel';
+    p.innerHTML = `<div class="dop-head"><b>${tr('⚗ Anzahlen optimieren')}</b><span class="dop-status"></span></div>
+        <div class="dop-bar" title="${tr('Sicherheit: wie oft die Empfehlung auch unter der verbleibenden Unsicherheit die beste ist (Mittel über alle Karten)')}"><div></div></div>
+        <div class="dop-info"></div>
+        <div class="dop-btns"><button class="dop-apply success">${tr('Übernehmen')}</button><button class="dop-discard">${tr('Verwerfen')}</button></div>`;
+    p.querySelector('.dop-apply').onclick = optApply;
+    p.querySelector('.dop-discard').onclick = () => { optStop(); renderDBDeck(); dbFlash(tr('Optimierung verworfen – das Deck bleibt unverändert.')); };
+    return p;
+}
+function optApply() {
+    if (!OPT.on || !OPT.sum) return;
+    const m = OPT.m, rec = OPT.sum.rec, cur = currentDeckBuilder.cards, out = [];
+    let diff = 0; m.ids.forEach((id, i) => diff += Math.abs(rec[i] - m.cur[i]));
+    // Reihenfolge wie bisher (erste Kopie jeder Karte), Karten mit 0 fallen weg
+    [...new Set(cur)].forEach(id => { const i = m.ids.indexOf(id); for (let k = 0; k < rec[i]; k++) out.push(id); });
+    optStop();
+    currentDeckBuilder.cards = out;
+    renderDBAll();
+    dbFlash(tr`Anzahlen übernommen: ${out.length} Karten, ${diff} Kopien geändert.`);
+}
+// Panel und Zeilen aktualisieren, ohne die Liste neu zu zeichnen
+function optDecorate(changed = []) {
+    const box = document.getElementById('db-deck-cards'), panel = document.getElementById('db-opt-panel');
+    if (!OPT.on || !box || !panel) return;
+    const m = OPT.m, s = OPT.sum, st = optState(), pct = x => (x * 100).toFixed(1);
+    const h = OPT.hist, rate = h.length > 1 ? (h[h.length - 1][1] - h[0][1]) / Math.max(0.001, (h[h.length - 1][0] - h[0][0]) / 1000) : 0;
+    const cores = SIM_POOL.list ? SIM_POOL.list.length : 1, total = s.rec.reduce((x, y) => x + y, 0);
+    const nDiff = s.rec.filter((k, i) => k !== m.cur[i]).length;
+    panel.classList.toggle('stable', st.done || OPT.finished);
+    panel.querySelector('.dop-status').textContent = OPT.finished ? tr('fertig') : st.done ? tr('✓ stabil') : st.g ? tr('läuft …') : tr('startet …');
+    panel.querySelector('.dop-bar > div').style.width = (st.conf * 100).toFixed(0) + '%';
+    const gainCls = s.gain > s.gainSe ? 'up' : s.gain < -s.gainSe ? 'down' : '';
+    panel.querySelector('.dop-info').innerHTML =
+        `<div>${tr`<b>${st.g}</b> Partien`} · ${tr`${rate.toFixed(1)}/s`} · ${tr`${cores} Kerne`}</div>`
+        + (OPT.opps ? `<div>${tr`davon ${OPT.gOpp} gegen ${OPT.opps} Turnier-Decks, der Rest Varianten untereinander`}</div>` : '')
+        + `<div>${tr`Sicherheit Ø <b>${(st.conf * 100).toFixed(0)} %</b>`} · ${tr`stabil seit <b>${st.stable}</b> Partien`}</div>`
+        + `<div title="${tr('Geschätzte Winrate der empfohlenen Anzahlen gegen dein aktuelles Deck (± Standardfehler)')}">${tr`Empfehlung gegen dein Deck: <b class="${gainCls}">${pct(0.5 + s.gain)} %</b> (±${pct(s.gainSe)})`}</div>`
+        + `<div>${tr`${nDiff} Karten anders`} · <span class="${total === 60 ? 'ok' : 'bad'}">Σ ${total}</span></div>`;
+    box.querySelectorAll('.db-row[data-id]').forEach(row => {
+        const i = m.ids.indexOf(+row.dataset.id); if (i < 0) return;
+        const rec = s.rec[i], cur = m.cur[i], vals = s.val[i], lo = Math.min(...vals), hi = Math.max(...vals);
+        let spark = row.querySelector('.dop-spark'), chip = row.querySelector('.dop-rec');
+        if (!spark) {
+            spark = document.createElement('span'); spark.className = 'dop-spark'; row.querySelector('.db-row-name').after(spark);
+            chip = document.createElement('span'); chip.className = 'dop-rec'; row.appendChild(chip);
+        }
+        // Mini-Balken je Anzahl 0–4: Höhe = geschätzter Wert, gold = Empfehlung, weiß umrandet = aktuelle Anzahl
+        spark.innerHTML = vals.map((v, k) => `<i class="${k === rec ? 'best' : ''}${k === cur ? ' cur' : ''}" style="height:${(3 + (hi > lo ? (v - lo) / (hi - lo) : 0.5) * 15).toFixed(1)}px"></i>`).join('');
+        chip.textContent = rec === cur ? `= ${rec}` : `→ ${rec}`;
+        chip.className = 'dop-rec ' + (rec > cur ? 'up' : rec < cur ? (rec ? 'down' : 'zero') : 'same');
+        chip.style.setProperty('--conf', (s.conf[i] * 100).toFixed(0) + '%');
+        const tip = vals.map((v, k) => tr`${k}×: ${(v - vals[Math.min(cur, vals.length - 1)]) * 100 >= 0 ? '+' : ''}${((v - vals[Math.min(cur, vals.length - 1)]) * 100).toFixed(1)} pp · beste in ${Math.round(s.freq[i][k] / s.freq[i].reduce((x, y) => x + y, 0) * 100)} % · ${m.obs[i][k]} Decks`
+            + (k === cur ? tr(' · aktuell') : '') + (k === rec ? ' ★' : '')).join('\n');
+        chip.title = spark.title = tr`${CARDS[m.ids[i]].name}: beste Anzahl ${rec} (Sicherheit ${(s.conf[i] * 100).toFixed(0)} %, unverändert seit ${m.games - OPT.cardChange[i]} Partien)` + '\n' + tip;
+        if (changed.includes(i)) { row.classList.remove('dop-chg'); void row.offsetWidth; row.classList.add('dop-chg'); }
+    });
 }
 // Vorschau beim Überfahren einer Deck-Zeile (links neben der Liste)
 function dbHoverShow(id, row) {
@@ -1031,7 +1163,7 @@ function simYield() {
 }
 // Abbruch einer laufenden Simulation (Knopf „Abbrechen & auswerten“ oder Schließen): wird zwischen zwei Spielen geprüft.
 // running: es läuft gerade eine Simulation (nur eine gleichzeitig)
-const SIM_STOP = { req: false, running: false };
+const SIM_STOP = { req: false, running: false, quiet: false };
 
 // Web Worker für die Simulation (js/simworker.js): je Kern eine Partie gleichzeitig, zwei Kerne bleiben für Seite
 // und CPU-Gegner frei. Geht kein Worker (z. B. Chrome mit file://), spielt runSimulation wie früher im Haupt-Thread.
@@ -1127,13 +1259,19 @@ function simProgressUI(title) {
 // Alle Simulations-Tests laufen über diese Funktion – nur die Paarungen wechseln.
 // pairs (optional): Liste von [deckA, deckB] oder Funktionen, die bei jedem Spiel ein neues Paar liefern
 // (All-Cards-Test: Zufallsdecks). Ohne pairs: jedes Deck aus decks gegen jedes.
-async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = tr("CPU vs CPU – Deck-Simulation"), pairs = null) {
-    if (SIM_STOP.running) { simBadge().onclick(); showToast(tr('Es läuft schon eine Simulation.'), false, 3000); return; }
-    SIM_STOP.running = true;
-    try { await runSimulationInner(gamesPerMatchup, decks, title, pairs); } finally { SIM_STOP.running = false; }
+// opts.onGame(deckA, deckB, res): nach jeder Partie (Live-Auswertung, z. B. Anzahlen-Optimierer im Deck-Builder);
+// opts.quiet: ohne Simulationsfenster und Auswertung – Fortschritt und Abbruch (SIM_STOP.req) regelt der Aufrufer.
+// Rückgabe: false, wenn schon eine Simulation läuft
+async function runSimulation(gamesPerMatchup, decks = GAME_DECKS, title = tr("CPU vs CPU – Deck-Simulation"), pairs = null, opts = {}) {
+    if (SIM_STOP.running) { if (!SIM_STOP.quiet) simBadge().onclick(); showToast(tr('Es läuft schon eine Simulation.'), false, 3000); return false; }
+    SIM_STOP.running = true; SIM_STOP.quiet = !!opts.quiet;
+    try { await runSimulationInner(gamesPerMatchup, decks, title, pairs, opts); } finally { SIM_STOP.running = false; SIM_STOP.quiet = false; }
+    return true;
 }
-async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
-    const ui = simProgressUI(title);
+async function runSimulationInner(gamesPerMatchup, decks, title, pairs, opts = {}) {
+    const nop = () => {};
+    const ui = opts.quiet ? { step: nop, done: nop, t0: performance.now(), content: {}, progress: {}, eta: {}, bar: { style: {} } } : simProgressUI(title);
+    if (opts.quiet) SIM_STOP.req = false;
     const cardStats = {}; let firstWins = 0, secondWins = 0, totalGames = 0, timeouts = 0;
     const factionStats = {}, classStats = {}, deckStats = {};
     const matchups = pairs ? pairs.slice() : [];
@@ -1161,6 +1299,7 @@ async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
         bump(deckStats, deckA.name, res.winner === 1); bump(deckStats, deckB.name, res.winner === 2);
         recordCardStats(cardStats, deckA, 1, res); recordCardStats(cardStats, deckB, 2, res);
         ui.step(totalGames, totalPlanned);
+        if (opts.onGame) try { opts.onGame(deckA, deckB, res); } catch (e) { console.error('onGame:', e); }
     };
     try {
         const pool = simPool();
@@ -1191,6 +1330,7 @@ async function runSimulationInner(gamesPerMatchup, decks, title, pairs) {
             await simYield();
         }
     } catch (e) { console.error("Simulation abgebrochen:", e); stopReason = tr`Fehler: ${e.message}`; }
+    if (opts.quiet) return;
     ui.done(stopReason ? tr('abgebrochen') : tr('fertig'));
     const pct = (n, d) => d > 0 ? ((100 * n) / d).toFixed(1) + "%" : "–";
     const secs = ((performance.now() - ui.t0) / 1000).toFixed(1), tmo = timeouts ? tr` (${timeouts} nach Zug-/Zeitlimit gewertet)` : '';

@@ -1639,6 +1639,24 @@ function runRuleTests() {
         applyAction(t, { type: 'ATTACK', attackerUid: at.uid, defenderUid: P(t, 1).hero.uid, actorId: 2 }, true, 2); process(t);
         assert(t.pending && t.pending.kind === 'priority' && t.pending.good.includes(P(t, 1).hand[0].uid), 'Kein Fenster für Holy Shield: ' + JSON.stringify(t.pending && t.pending.good));
     });
+    test(146, 'Anzahlen-Optimierer: Summe genau 60, 0–4 Kopien, erkennt starke und schwache Karten (auch gegen feste Gegnerdecks)', () => {
+        const ids = Array.from({ length: 20 }, (_, i) => i), cur = ids.map(() => 3);                // 20 × 3 = 60
+        const truth = i => i === 0 ? 0.02 : i === 1 ? -0.02 : 0;                           // Karte 0 stark (+2 pp je Kopie), Karte 1 schwach
+        for (const [label, eff] of [['Effekt', truth], ['Null', () => 0]]) {
+            const rnd = seededRandom(3), m = optCreate(ids, cur, ids.map(() => 4), 60, 2);
+            const V = c => c.reduce((s, k, i) => s + eff(i) * k, 0);
+            for (let g = 0; g < 1500; g++) {
+                const a = optVariant(m, rnd), b = optVariant(m, rnd);
+                assert(a.length === 20 && a.reduce((x, y) => x + y, 0) === 60 && a.every(k => k >= 0 && k <= 4), 'Variante ungültig: ' + a);
+                if (g % 2) optAddGame(m, a, b, rnd() < 0.55 + V(a) - V(b));                   // Varianten untereinander
+                else optAddGame(m, a, g % 4 ? 0 : 1, rnd() < 0.5 + V(a) - (g % 4 ? 0.1 : -0.1));   // gegen Gegnerdeck 0 (stark) bzw. 1 (schwach)
+            }
+            const s = optSummary(m, 32, rnd);
+            assert(s.rec.reduce((x, y) => x + y, 0) === 60 && s.rec.every(k => k >= 0 && k <= 4), `${label}: Empfehlung ungültig ${s.rec}`);
+            if (label === 'Effekt') assert(s.rec[0] === 4 && s.rec[1] <= 1 && s.gain > 0, `starke/schwache Karte nicht erkannt: ${s.rec} (Gewinn ${s.gain})`);
+            else assert(Math.abs(s.gain) < 0.05, `ohne Effekte zu großer Gewinn geschätzt: ${s.gain}`);
+        }
+    });
     LANG = prevLang;
     return results;
 }
