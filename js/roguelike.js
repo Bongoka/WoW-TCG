@@ -88,7 +88,7 @@
         if (!cd) return document.createElement('div');
         const inst = { ...cd, uid: 'rlv_' + Math.random().toString(36).slice(2, 9), damage: 0, exhausted: false, b: { atk: cd.atk || 0, hp: cd.hp || 0, def: cd.def || 0, strike: cd.strike || 0 } };
         let n;
-        try { n = createCardDOM(inst, false, null, { stats: true }); }
+        try { n = createCardDOM(inst, false, null, { stats: false }); }   // keine Stat-Plaketten: die sind nur für kleine Karten auf dem Spielfeld
         catch (e) { const d = document.createElement('div'); d.className = 'rl-card-fallback'; d.textContent = cd.name; return d; }
         n.classList.add('rl-card');
         n.style.setProperty('--cw', (width || 150) + 'px');
