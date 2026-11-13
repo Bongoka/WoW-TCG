@@ -233,7 +233,7 @@ FX[8073] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = 
 FX[8074] = { powers: [{ key: 'ritual', label: tr('Held und zwei Allies erschöpfen: Ally aus deiner Sammlung ins Spiel'), myTurn: true,
     canUse: (s, pid) => (!heroOf(s, pid).exhausted || tr('Held ist erschöpft')) === true && (alliesOf(me(s, pid)).filter(a => !a.exhausted && !cantExhaust(s, a)).length >= 2 || tr('Du brauchst zwei bereite Allies')),
     payExtra: (s, it) => { exhaust(s, heroOf(s, it.pl)); pickN(s, it.pl, tr('Ritual of Summoning: zwei eigene Allies erschöpfen'), 'Ritual of Summoning', alliesOf(me(s, it.pl)).filter(a => !a.exhausted && !cantExhaust(s, a)).map(a => a.uid), 2, '8074:pay', {}); },
-    resolve: (s, it) => { const p = me(s, it.pl); const l = Object.values(CARDS).filter(c => isAllyCard(c) && !c.isToken && !CARD_ISSUES[c.id] && cardMatchesPlayer(c, p)).sort((a, b) => (b.cost || 0) - (a.cost || 0));
+    resolve: (s, it) => { const p = me(s, it.pl); const l = collectionOf(s, it.pl, Object.values(CARDS).filter(c => isAllyCard(c) && !c.isToken && !CARD_ISSUES[c.id] && cardMatchesPlayer(c, p)).map(c => c.id)).map(id => CARDS[id]).sort((a, b) => (b.cost || 0) - (a.cost || 0));
         ask(s, { pid: it.pl, prompt: tr('Ritual of Summoning: Welcher Ally aus deiner Sammlung?'), src: 'Ritual of Summoning', opts: l.map(c => ({ label: `${c.name} (${c.cost || 0})`, v: c.id, card: c.id, ai: c.cost || 0 })), k: '8074:put', a: { pid: it.pl } }); } }],
     k: { pay: (s, a, list) => { if ((list || []).length < 2) return abortPrep(s, tr('Zu wenige Allies')); list.forEach(u => { const c = findCharacter(s, u); if (c) exhaust(s, c); }); finishPrep(s); },
         put: (s, a, id) => { if (id) putIntoPlay(s, makeCardInst(id, false, a.pid), a.pid); } } };

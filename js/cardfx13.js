@@ -154,7 +154,7 @@ FX[12044] = { powers: [actPow('flames', tr('1 Feuerschaden an jeden Gegner'), { 
 // "search your collection": alle Karten des Spiels zählen als Sammlung
 FX[12045] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 12045, k: 'ask', a: { pid, uid: c.uid } }); } },
     k: { ask: (s, a) => yesNo(s, a.pid, tr('Flash of Brilliance: zerstören und eine Ongoing-Magier-Fähigkeit aus deiner Sammlung holen?'), 'Flash of Brilliance', '12045:go', a, true),
-        go: (s, a, v) => { const c = findCharacter(s, a.uid); if (!v || !c || !destroy(s, c)) return; const l = Object.values(CARDS).filter(x => x.type === 'Ability' && x.ongoing && !x.isToken && (x.allowedClasses || []).includes('Mage') && !CARD_ISSUES[x.id]);
+        go: (s, a, v) => { const c = findCharacter(s, a.uid); if (!v || !c || !destroy(s, c)) return; const l = collectionOf(s, a.pid, Object.values(CARDS).filter(x => x.type === 'Ability' && x.ongoing && !x.isToken && (x.allowedClasses || []).includes('Mage') && !CARD_ISSUES[x.id]).map(x => x.id)).map(id => CARDS[id]);
             ask(s, { pid: a.pid, prompt: tr('Flash of Brilliance: Welche Ongoing-Magier-Fähigkeit?'), src: 'Flash of Brilliance', opts: l.map(x => ({ label: x.name, v: x.id, card: x.id, ai: (x.cost || 0) })), k: '12045:take', a }); },
         take: (s, a, id) => { if (!id) return; me(s, a.pid).hand.push(makeCardInst(id, false, a.pid)); L(s, tr`Flash of Brilliance: ${CARDS[id].name} kommt auf die Hand.`, '', a.pid); } } };
 FX[12046] = { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }], resolve: (s, it) => addPE(s, it.pl, { k: 'frozen13', opp: it.mode }) };

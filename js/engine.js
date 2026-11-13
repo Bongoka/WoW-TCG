@@ -42,6 +42,12 @@ function fx(c) { return c ? (FX[c.id] || {}) : {}; }
 // wer eine Karte ins Deck zurücklegt, nimmt deckId(c), sonst ginge die Aufwertung verloren.
 function deckId(c) { return (c && c.rlUp) || (c && c.id); }
 function baseCardId(id) { const d = CARDS[id]; return (d && d.upgradedFrom) || id; }   // Deck-ID → ID der Originalkarte
+// "from your collection" (CR-Glossar: Karten, die der Spieler besitzt): sonst alle Karten des Spiels;
+// ein Roguelike-Gegner besitzt nur die Karten, die er mitbringt (seine Deckliste, s.rl.foeOwn)
+function collectionOf(s, pid, ids) {
+    if (s && s.rl && pid === 2 && Array.isArray(s.rl.foeOwn)) { const own = new Set(s.rl.foeOwn); return ids.filter(id => own.has(id)); }
+    return ids;
+}
 function deckKey(str) { return /^\d+$/.test(str) ? +str : str; }                      // Deck-ID aus einem Auswahlwert (Zahl oder Aufwertungs-ID)
 function newUid(p) { return (p || 'c_') + Math.random().toString(36).substr(2, 9); }
 function turnPl(s) { return s.activePlayer; }

@@ -46,5 +46,5 @@ function translateDom(root = document.body) {
         const t = n.nodeValue.trim(); if (!t) continue;
         const en = i18nGet(t); if (en !== undefined) n.nodeValue = n.nodeValue.replace(t, en); else if (/[äöüÄÖÜß]|\b(der|die|das|und|nicht|Spiel|Karte)\b/.test(t)) I18N_MISS.add(t);
     }
-    root.querySelectorAll('[title],[placeholder]').forEach(e => ['title', 'placeholder'].forEach(a => { const t = e.getAttribute(a); const en = t && i18nGet(t.trim()); if (en !== undefined) e.setAttribute(a, en); }));
+    root.querySelectorAll('[title],[placeholder]').forEach(e => ['title', 'placeholder'].forEach(a => { const t = e.getAttribute(a); const en = t ? i18nGet(t.trim()) : undefined; if (en !== undefined) e.setAttribute(a, en); }));   // fehlendes Attribut nicht als "null" setzen
 }

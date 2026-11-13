@@ -152,7 +152,7 @@
             const boxed = orig.type !== 'Ally' || +orig.set >= 11;
             const pos = !ot ? (boxed ? ' in-box' : '') : (boxed && ot.length <= 140 && upEff.text.length <= 75 ? ' at-bottom' : ' over-art');
             const up = el('div', 'card-up-text' + pos);
-            up.textContent = upEff.text;
+            up.textContent = tr(upEff.text);
             face.appendChild(up);
         }
 

@@ -23,7 +23,20 @@
     const uid = () => 'rd_' + Math.random().toString(36).slice(2, 9);
     const esc = s => (typeof window.esc === 'function' ? window.esc(s) : String(s == null ? '' : s)
         .replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
-    function toast(msg) { try { showToast(msg, false, 2600); } catch (e) { } }
+    function toast(msg) { try { showToast(tr(msg), false, 2600); } catch (e) { } }   // feste Texte übersetzen; Texte mit Werten kommen schon als tr`…`
+    // Englisch: Roguelike-Fenster beim Anzeigen übersetzen (translateDom, i18n.js). Erfasst feste Texte und ganze Datentexte
+    // (Artefakte, Aufwertungen, Tränke, Ereignisse, Akte …); Texte mit Werten laufen im Code über tr`…`. Schlüssel: i18n_en.js.
+    const RL_SCOPE = '#rl-root, .rl-overlay, #rl-battle-hud';
+    function rlTranslateWatch() {
+        if (typeof LANG === 'undefined' || LANG === 'de' || typeof translateDom !== 'function' || typeof MutationObserver === 'undefined' || !document.body) return;
+        new MutationObserver(list => {
+            for (const m of list) for (const n of m.addedNodes) {
+                const el = n.nodeType === 1 ? n : n.parentElement;
+                if (el && el.closest && el.closest(RL_SCOPE)) translateDom(el);
+            }
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.body) rlTranslateWatch(); else document.addEventListener('DOMContentLoaded', rlTranslateWatch);
 
     const NODE_INFO = {
         fight:    { img: 'Weapons/PVP320_C_01.png',        label: 'Kampf',      hint: 'Ein Gegner mit einem Themen-Deck. Sieg: Gold und eine Karte.' },
@@ -114,8 +127,8 @@
         let h = '';
         for (let i = 0; i < R.POTION_SLOTS; i++) {
             const p = R.potById(pots[i]);
-            h += p ? `<button class="rl-pot${clickable ? ' use' : ''}" data-pot="${i}" title="${esc(p.name + ' – ' + p.text + (clickable ? ' (Klicken zum Benutzen)' : ''))}"><img src="${ICON(p.icon)}" alt=""></button>`
-                   : `<span class="rl-pot empty" title="Leerer Trankplatz"></span>`;
+            h += p ? `<button class="rl-pot${clickable ? ' use' : ''}" data-pot="${i}" title="${esc(tr(p.name) + ' – ' + tr(p.text) + (clickable ? ' ' + tr('(Klicken zum Benutzen)') : ''))}"><img src="${ICON(p.icon)}" alt=""></button>`
+                   : `<span class="rl-pot empty" title="${tr('Leerer Trankplatz')}"></span>`;
         }
         return `<div class="rl-pots">${h}</div>`;
     }
@@ -126,12 +139,12 @@
         const arts = (run.artifacts || []).map(id => R.art(id)).filter(Boolean);
         return `<div class="rl-hud">
             <div class="rl-hud-left">
-                <div class="rl-class"><img src="${esc(cls ? cls.icon : '')}" alt=""><div><b>${esc(cls ? cls.name : '')}</b><small>Akt ${run.act}/4 · ${esc(block.short)}</small></div></div>
-                <div class="rl-stat life" title="Maximales Leben – vor jedem Kampf ist dein Held voll geheilt"><span>❤</span><b>${run.maxHp}</b></div>
+                <div class="rl-class"><img src="${esc(cls ? cls.icon : '')}" alt=""><div><b>${esc(cls ? cls.name : '')}</b><small>${tr`Akt ${run.act}/4`} · ${esc(tr(block.short))}</small></div></div>
+                <div class="rl-stat life" title="${tr('Maximales Leben – vor jedem Kampf ist dein Held voll geheilt')}"><span>❤</span><b>${run.maxHp}</b></div>
                 <div class="rl-stat gold" title="Gold"><img src="${ICON('Miscellaneous/Coin_02.png')}" alt=""><b>${run.gold}</b></div>
                 ${potionSlotsHtml(false)}
             </div>
-            <div class="rl-hud-arts" title="Artefakte">${arts.map(a => `<button class="rl-art-ico rarity-${a.rarity}" data-rl="arts" title="${esc(a.name + ' – ' + a.text)}">${R.artIconHtml(a)}</button>`).join('')}</div>
+            <div class="rl-hud-arts" title="Artefakte">${arts.map(a => `<button class="rl-art-ico rarity-${a.rarity}" data-rl="arts" title="${esc(a.name + ' – ' + tr(a.text))}">${R.artIconHtml(a)}</button>`).join('')}</div>
             <div class="rl-hud-right">
                 <button class="rl-btn small" data-rl="deck">Deck <b>${run.deck.length}</b></button>
                 <button class="rl-btn small danger" data-rl="menu">Menü</button>
@@ -162,7 +175,7 @@
                     <p class="rl-sub">Vier Akte. Vier Set-Blöcke. Ein Run ohne Zurück. Wähle deine Klasse und baue aus dem gesamten Kartenpool ein Deck, das die Regeln bricht.</p>
                 </div>
                 ${saved ? `<div class="rl-resume">
-                    <div class="rl-resume-info"><b>Laufender Run</b><small>${esc(saved.cls)} · Akt ${saved.act}/4 (${esc(savedAct ? savedAct.short : '?')}) · ${saved.hp}/${saved.maxHp} Leben · ${saved.gold} Gold · Ebene ${Math.max(1, saved.row + 1)}/${(saved.map && saved.map.length) || 9} · ${saved.deck.length} Karten</small></div>
+                    <div class="rl-resume-info"><b>Laufender Run</b><small>${esc(tr(saved.cls))} · ${tr`Akt ${saved.act}/4`} (${esc(tr(savedAct ? savedAct.short : "?"))}) · ${tr`${saved.maxHp} Leben`} · ${saved.gold} Gold · ${tr`Ebene ${Math.max(1, saved.row + 1)}/${(saved.map && saved.map.length) || 9}`} · ${tr`${saved.deck.length} Karten`}</small></div>
                     <button class="rl-btn primary" id="rl-resume-btn">Run fortsetzen</button>
                     <button class="rl-btn danger" id="rl-abandon-btn">Verwerfen</button>
                 </div>` : ''}
@@ -195,7 +208,7 @@
                 else openMap();
             });
             on('#rl-abandon-btn', 'click', () => {
-                try { uiConfirm('Run verwerfen?', 'Der gespeicherte Run wird gelöscht. Das kann nicht rückgängig gemacht werden.', 'Verwerfen', () => { clearRun(); openClassSelect(); }); }
+                try { uiConfirm(tr('Run verwerfen?'), tr('Der gespeicherte Run wird gelöscht. Das kann nicht rückgängig gemacht werden.'), tr('Verwerfen'), () => { clearRun(); openClassSelect(); }); }
                 catch (e) { clearRun(); openClassSelect(); }
             });
         }
@@ -204,7 +217,7 @@
             const cls = R.classByKey(key);
             const start = () => startRun(key);
             if (saved) {
-                try { uiConfirm('Neuen Run starten?', 'Der gespeicherte Run wird dabei überschrieben.', 'Neuen Run starten', start); return; }
+                try { uiConfirm(tr('Neuen Run starten?'), tr('Der gespeicherte Run wird dabei überschrieben.'), tr('Neuen Run starten'), start); return; }
                 catch (e) { }
             }
             start();
@@ -217,9 +230,7 @@
         const begin = () => {
             const hero = CARDS[cls.hero];
             const maxHp = hero.hp || 28;
-            const deck = R.buildDeck(cls.en, cls.faction, 30, {
-                bias: 0, act: 1, heroId: cls.hero, talent: hero.talent
-            }).map(id => ({ uid: uid(), id }));
+            const deck = R.starterDeck(key).map(id => ({ uid: uid(), id }));   // Kartenmix je Klasse (roguelike_data.js)
             run = {
                 v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: cls.hero, faction: cls.faction,
                 deck, maxHp, hp: maxHp, gold: 55, artifacts: cls.art ? [cls.art] : [], potions: [R.randomPotion()],
@@ -230,7 +241,7 @@
             openActIntro(() => openMap());
         };
         if (G && !G.gameOver && !G.rl) {
-            try { uiConfirm('Laufende Partie beenden?', 'Für den Roguelike-Run wird das aktuelle Spiel gegen die CPU beendet.', 'Run starten', begin); return; }
+            try { uiConfirm(tr('Laufende Partie beenden?'), tr('Für den Roguelike-Run wird das aktuelle Spiel gegen die CPU beendet.'), tr('Run starten'), begin); return; }
             catch (e) { }
         }
         begin();
@@ -318,10 +329,10 @@
             const p = pos(n), info = NODE_INFO[n.type] || NODE_INFO.fight;
             const isCur = run.node === n.id, isNext = avail.has(n.id), done = !!run.visited[n.id] && !isCur;
             const st = (isCur ? ' current' : '') + (isNext ? ' next' : '') + (done ? ' done' : '') + (!isCur && !isNext && !done ? ' locked' : '');
-            const label = n.type === 'boss' ? boss.name.split(',')[0] : info.label;
+            const label = n.type === 'boss' ? tr(boss.name.split(',')[0]) : tr(info.label);
             const img = n.type === 'boss' && bossImg ? `<img class="rl-node-card" src="${bossImg}" alt="">` : `<img src="${ICON(info.img)}" alt="">`;
             return `<div class="rl-node-wrap${st}" style="left:${p.x}%;top:${p.y}%">
-                <button class="rl-node ${n.type}${st}" data-node="${n.id}" title="${esc(info.label + ' – ' + info.hint)}">${img}</button>
+                <button class="rl-node ${n.type}${st}" data-node="${n.id}" title="${esc(tr(info.label) + ' – ' + tr(info.hint))}">${img}</button>
                 <span class="rl-node-label">${esc(label)}</span>
             </div>`;
         }).join('');
@@ -331,13 +342,13 @@
                 ${hudHtml()}
                 <div class="rl-map-body">
                     <aside class="rl-map-side">
-                        <div class="rl-kicker">Akt ${run.act} von ${R.BLOCKS.length}</div>
+                        <div class="rl-kicker">${tr`Akt ${run.act} von ${R.BLOCKS.length}`}</div>
                         <h2 class="rl-map-title">${esc(block.name)}</h2>
                         <div class="rl-map-sets">${block.setNames.map(esc).join(' · ')}</div>
                         <p class="rl-map-blurb">${esc(block.blurb)}</p>
                         <div class="rl-boss-preview">
                             ${bossImg ? `<img src="${bossImg}" alt="">` : ''}
-                            <div><small>Wächter des Akts</small><b>${esc(boss.name)}</b><i>„${esc(boss.quote || '')}"</i></div>
+                            <div><small>Wächter des Akts</small><b>${esc(boss.name)}</b><i>„${esc(tr(boss.quote || ''))}"</i></div>
                         </div>
                         <div class="rl-legend">${legend}</div>
                     </aside>
@@ -404,7 +415,8 @@
         G.rl = {
             arts: (run.artifacts || []).slice(), f: {}, kind: node.type, pid: 1,
             boss: !!enemy.isBoss, act: run.act || 1, goldEarned: 0, played: 0,
-            souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, elite: enemy.trait || null
+            souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, elite: enemy.trait || null,
+            foeOwn: [...new Set(enemy.deck)]                  // Sammlung des Gegners = seine Deckliste ("from your collection", engine.js collectionOf)
         };
         UI.reset();
         UI.overFor = G;                                         // Standard-Siegbildschirm unterdrücken
@@ -414,7 +426,7 @@
         G.p1.hero.damage = 0;
         // Gegner
         G.p2.hero.b.hp = enemy.hp; G.p2.hero.hp = enemy.hp;
-        G.p2.hero.name = enemy.name;
+        G.p2.hero.name = / \(Elite\)$/.test(enemy.name) ? tr(enemy.name.replace(/ \(Elite\)$/, '')) + ' (Elite)' : tr(enemy.name);
         // Boss: im Spiel die ID des Originalhelden, damit seine Kartenregeln greifen (z. B. Lich King: "Allies you control are Scourge")
         if (enemy.isBoss) { const bh = R.block(run.act).boss.hero; if (CARDS[bh]) G.p2.hero.id = bh; }
         // Originalgetreu: Beide Spieler beginnen ohne Ressourcen und legen pro Zug eine.
@@ -434,11 +446,11 @@
         try {
             openHsMulligan(() => {
                 if (!G || !G.rl) return;
-                if (typeof showTurnBanner === 'function') showTurnBanner('Dein Zug!');
+                if (typeof showTurnBanner === 'function') showTurnBanner(tr('Dein Zug!'));
                 try { render(); } catch (e) { }
             });
         } catch (e) {
-            if (typeof showTurnBanner === 'function') showTurnBanner('Dein Zug!');
+            if (typeof showTurnBanner === 'function') showTurnBanner(tr('Dein Zug!'));
         }
     }
     // Kampf-HUD: nur Gold, Tränke (zum Benutzen) und Aufgeben. Alles andere zeigt das Spielfeld selbst.
@@ -452,7 +464,7 @@
         // Vor dem Kampf: Deck-Idee des Gegners (und Elite-Eigenschaft) einmal ansagen
         if (enemy) {
             const tr0 = enemy.trait ? R.ELITE_TRAITS.find(t => t.id === enemy.trait) : null;
-            const msg = (enemy.deckName ? `Gegner: ${enemy.deckName}${enemy.title ? ' (' + enemy.title + ')' : ''}. ${enemy.deckIdea || ''}` : `Gegner: ${enemy.name}.`) + (tr0 ? ` Elite – ${tr0.name}: ${tr0.text}` : '');
+            const msg = (enemy.deckName ? tr`Gegner: ${tr(enemy.deckName) + (enemy.title ? ' (' + enemy.title + ')' : '')}.` + ' ' + tr(enemy.deckIdea || '') : tr`Gegner: ${tr(enemy.name)}.`) + (tr0 ? ` Elite – ${tr(tr0.name)}: ${tr(tr0.text)}` : '');
             try { showToast(msg, false, 9000); } catch (e) { }
         }
     }
@@ -463,14 +475,14 @@
         battleHud.innerHTML = `<div class="rl-bh-main">
             <span class="rl-bh-gold" title="Gold"><img src="${ICON('Miscellaneous/Coin_02.png')}" alt=""><b>${gold}</b></span>
             ${potionSlotsHtml(true)}
-            ${pv > 0 ? `<span class="rl-bh-prevent" title="Dein Held verhindert in diesem Zug noch ${pv} Schaden.">🛡 ${pv}</span>` : ''}
-            <button class="rl-bh-flag" id="rl-bh-concede" title="Kampf aufgeben">🏳</button>
+            ${pv > 0 ? `<span class="rl-bh-prevent" title="${tr`Dein Held verhindert in diesem Zug noch ${pv} Schaden.`}">🛡 ${pv}</span>` : ''}
+            <button class="rl-bh-flag" id="rl-bh-concede" title="${tr('Kampf aufgeben')}">🏳</button>
         </div>`;
         battleHud.querySelectorAll('.rl-pot.use').forEach(b => b.onclick = () => usePotionAt(+b.dataset.pot));
         const c = battleHud.querySelector('#rl-bh-concede');
         if (c) c.onclick = () => {
             try {
-                uiConfirm('Kampf aufgeben?', 'Der Run endet mit einer Niederlage.', 'Aufgeben', () => {
+                uiConfirm(tr('Kampf aufgeben?'), tr('Der Run endet mit einer Niederlage.'), tr('Aufgeben'), () => {
                     if (G && !G.gameOver) { G.gameOver = true; G.winner = 2; try { render(); } catch (e) { } }
                 });
             } catch (e) { if (G && !G.gameOver) { G.gameOver = true; G.winner = 2; } }
@@ -481,7 +493,7 @@
         const id = (run.potions || [])[i]; const p = R.potById(id);
         if (!p || !G || !G.rl) return;
         if (!R.canUsePotion(G)) return toast('Tränke kannst du nur in deinem Zug benutzen, wenn nichts auf der Kette liegt.');
-        if (!R.usePotion(G, id)) return toast(`${p.name} hätte jetzt keine Wirkung.`);
+        if (!R.usePotion(G, id)) return toast(tr`${tr(p.name)} hätte jetzt keine Wirkung.`);
         run.potions.splice(i, 1); saveRun();
         try { process(G); } catch (e) { }
         try { render(); } catch (e) { }
@@ -565,7 +577,7 @@
         setMain(`
             <div class="rl-act-screen">
                 <div class="rl-act-head">
-                    <div class="rl-kicker">Akt ${b.n} von ${R.BLOCKS.length}</div>
+                    <div class="rl-kicker">${tr`Akt ${b.n} von ${R.BLOCKS.length}`}</div>
                     <h1>${esc(b.name)}</h1>
                     <p class="rl-act-sets">${b.setNames.map(esc).join(' · ')}</p>
                 </div>
@@ -573,9 +585,9 @@
                     <p class="rl-lead">${esc(b.story)}</p>
                     <div class="rl-act-boss">
                         <div class="rl-act-boss-icon">👑</div>
-                        <div><small>Boss dieses Akts</small><b>${esc(boss.name)}</b><p>„${esc(boss.quote || '')}"</p></div>
+                        <div><small>Boss dieses Akts</small><b>${esc(boss.name)}</b><p>„${esc(tr(boss.quote || ''))}"</p></div>
                     </div>
-                    ${healed ? `<div class="rl-act-heal">Der Übergang stärkt dich: <b>+${healed} maximales Leben</b>.</div>` : ''}
+                    ${healed ? `<div class="rl-act-heal">Der Übergang stärkt dich: <b>${tr`+${healed} maximales Leben`}</b>.</div>` : ''}
                     <div class="rl-act-rules">
                         <span>Neue Karten im Pool: <b>${b.sets.map(s => 'Set ' + s).join(', ')}</b></span>
                         <span>Dein Deck bleibt erhalten. Gegner nutzen alle bisherigen Set-Blöcke.</span>
@@ -609,7 +621,7 @@
             slot.className = 'rl-reward-card';
             slot.dataset.card = id;
             slot.appendChild(cardNode(id, 175));
-            slot.onclick = () => { addCardToRun(id); toast(`${CARDS[id] ? CARDS[id].name : 'Karte'} wurde dem Deck hinzugefügt.`); openMap(); };
+            slot.onclick = () => { addCardToRun(id); toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`); openMap(); };
             row.appendChild(slot);
         });
         on('#rl-act-skip', 'click', () => { run.gold += 25; saveRun(); openMap(); });
@@ -646,7 +658,7 @@
             slot.appendChild(cardNode(id, 175));
             slot.onclick = () => {
                 addCardToRun(id);
-                toast(`${CARDS[id] ? CARDS[id].name : 'Karte'} wurde dem Deck hinzugefügt.`);
+                toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`);
                 afterCardReward(r);
             };
         });
@@ -674,7 +686,7 @@
             const b = document.createElement('button');
             b.className = 'rl-artifact-card rarity-' + a.rarity;
             b.innerHTML = `<div class="rl-artifact-icon">${R.artIconHtml(a)}</div><div class="rl-artifact-name">${esc(a.name)}</div><div class="rl-artifact-text">${esc(a.text)}</div><div class="rl-artifact-take">Nehmen →</div>`;
-            b.onclick = () => { grantArtifact(id); toast(`${a.name} erhalten.`); cb && cb(); };
+            b.onclick = () => { grantArtifact(id); toast(tr`${a.name} erhalten.`); cb && cb(); };
             row.appendChild(b);
         });
     }
@@ -721,11 +733,11 @@
                     </div>
                     <div class="rl-shop-section"><h3>Karten</h3><div class="rl-shop-cards" id="rl-shop-cards"></div></div>
                     <div class="rl-shop-section"><h3>Artefakte</h3><div class="rl-artifact-row small" id="rl-shop-arts"></div></div>
-                    <div class="rl-shop-section"><h3>Tränke <small>(${(run.potions || []).length}/${R.POTION_SLOTS} Plätze)</small></h3><div class="rl-shop-pots" id="rl-shop-pots"></div></div>
+                    <div class="rl-shop-section"><h3>Tränke <small>${tr`(${(run.potions || []).length}/${R.POTION_SLOTS} Plätze)`}</small></h3><div class="rl-shop-pots" id="rl-shop-pots"></div></div>
                     <div class="rl-shop-section rl-shop-services">
                         <h3>Dienste</h3>
                         <button class="rl-service" id="rl-remove" ${!stock.removal || run.gold < 45 ? 'disabled' : ''}>
-                            <span>🪓 Karte entfernen</span><small>45 🪙 · ${stock.removal ? 'verfügbar' : 'verkauft'}</small>
+                            <span>🪓 Karte entfernen</span><small>45 🪙 · ${stock.removal ? tr('verfügbar') : tr('verkauft')}</small>
                         </button>
                         <button class="rl-service" id="rl-reroll"><span>🔄 Sortiment neu</span><small>25 🪙</small></button>
                     </div>
@@ -753,14 +765,15 @@
         const awrap = mainEl.querySelector('#rl-shop-arts');
         stock.arts.forEach(id => {
             const a = R.art(id); if (!a) return;
+            const price = Math.round(a.price * (run.priceMod || 1));   // Shop-Rabatte gelten auch für Artefakte
             const b = document.createElement('button');
-            b.className = 'rl-artifact-card rarity-' + a.rarity + (run.gold < a.price ? ' cant' : '');
-            b.innerHTML = `<div class="rl-artifact-icon">${R.artIconHtml(a)}</div><div class="rl-artifact-name">${esc(a.name)}</div><div class="rl-artifact-text">${esc(a.text)}</div><div class="rl-artifact-price">${a.price} 🪙</div>`;
+            b.className = 'rl-artifact-card rarity-' + a.rarity + (run.gold < price ? ' cant' : '');
+            b.innerHTML = `<div class="rl-artifact-icon">${R.artIconHtml(a)}</div><div class="rl-artifact-name">${esc(a.name)}</div><div class="rl-artifact-text">${esc(a.text)}</div><div class="rl-artifact-price">${price} 🪙</div>`;
             b.onclick = () => {
-                if (run.gold < a.price) return toast('Nicht genug Gold.');
-                run.gold -= a.price; grantArtifact(id);
+                if (run.gold < price) return toast('Nicht genug Gold.');
+                run.gold -= price; grantArtifact(id);
                 stock.arts.splice(stock.arts.indexOf(id), 1);
-                saveRun(); toast(`${a.name} gekauft.`); openShop(node);
+                saveRun(); toast(tr`${a.name} gekauft.`); openShop(node);
             };
             awrap.appendChild(b);
         });
@@ -777,7 +790,7 @@
                 if (full) return toast('Alle Trankplätze sind belegt.');
                 if (run.gold < price) return toast('Nicht genug Gold.');
                 run.gold -= price; run.potions.push(id); stock.pots.splice(i, 1);
-                saveRun(); toast(`${p.name} gekauft.`); openShop(node);
+                saveRun(); toast(tr`${tr(p.name)} gekauft.`); openShop(node);
             };
             pwrap.appendChild(b);
         });
@@ -893,7 +906,7 @@
         }
         if (ch.kind === 'maxhp') {
             run.maxHp += ch.value || 0; run.hp = run.maxHp;
-            saveRun(); toast(`Maximales Leben: ${run.maxHp}.`); return done();
+            saveRun(); toast(tr`Maximales Leben: ${run.maxHp}.`); return done();
         }
         if (ch.kind === 'artifact') {
             if (ch.value && run.gold < ch.value) return toast('Nicht genug Gold.');
@@ -909,7 +922,7 @@
         if (ch.kind === 'remove') {
             const cost = (ch.value === undefined || ch.value === null) ? 35 : ch.value;
             if (run.gold < cost) return toast('Nicht genug Gold.');
-            openDeckPicker('remove', 'Karte entfernen' + (cost ? ' (' + cost + ' 🪙)' : ' (kostenlos)'), e => {
+            openDeckPicker('remove', tr('Karte entfernen') + (cost ? ' (' + cost + ' 🪙)' : ' ' + tr('(kostenlos)')), e => {
                 run.gold -= cost; removeDeckEntry(e.uid); saveRun(); toast('Karte entfernt.'); done();
             }, () => openEvent(node));
             return;
@@ -923,7 +936,7 @@
             const ids = R.rewardCards(run, n, { maxCost: 8 });
             ids.forEach(id => addCardToRun(id));
             if (ch.hp) { run.maxHp = Math.max(12, run.maxHp - ch.hp); run.hp = run.maxHp; }
-            saveRun(); toast(`${ids.length} Karte(n) erhalten.`); return done();
+            saveRun(); toast(tr`${ids.length} Karte(n) erhalten.`); return done();
         }
         if (ch.kind === 'chest') {
             if (Math.random() < 0.5) { run.gold += 70; saveRun(); toast('Die Truhe enthält 70 Gold!'); }
@@ -958,7 +971,7 @@
             const b = document.createElement('button');
             b.className = 'rl-artifact-card rarity-' + a.rarity;
             b.innerHTML = `<div class="rl-artifact-icon">${R.artIconHtml(a)}</div><div class="rl-artifact-name">${esc(a.name)}</div><div class="rl-artifact-text">${esc(a.text)}</div><div class="rl-artifact-take">Nehmen →</div>`;
-            b.onclick = () => { grantArtifact(id); toast(`${a.name} erhalten.`); finishNode(node); };
+            b.onclick = () => { grantArtifact(id); toast(tr`${a.name} erhalten.`); finishNode(node); };
             row.appendChild(b);
         });
     }
@@ -976,7 +989,7 @@
         const overlay = document.createElement('div');
         overlay.className = 'rl-overlay';
         overlay.innerHTML = `<div class="rl-overlay-box">
-            <div class="rl-overlay-head"><h2>Deck <small>${run.deck.length} Karten</small></h2><button class="rl-btn small danger" data-close>×</button></div>
+            <div class="rl-overlay-head"><h2>Deck <small>${tr`${run.deck.length} Karten`}</small></h2><button class="rl-btn small danger" data-close>×</button></div>
             <div class="rl-deck-grid" id="rl-deck-grid"></div>
         </div>`;
         document.body.appendChild(overlay);
@@ -987,7 +1000,7 @@
             const cd = CARDS[e.id] || {};
             const label = document.createElement('div'); label.className = 'rl-deck-cell-name';
             const up = R.archOfCard(e.id);
-            label.innerHTML = `<b>${esc(cd.name || '?')}</b>${up ? `<small>✦ ${esc(up.text)}</small>` : ''}`;
+            label.innerHTML = `<b>${esc(cd.name || '?')}</b>${up ? `<small>✦ ${esc(tr(up.text))}</small>` : ''}`;
             cell.appendChild(label);
             grid.appendChild(cell);
         });
@@ -1004,7 +1017,7 @@
         overlay.className = 'rl-overlay';
         overlay.style.zIndex = '99850';
         overlay.innerHTML = `<div class="rl-overlay-box">
-            <div class="rl-overlay-head"><h2>${esc(title)} <small>${ids.length} Karten</small></h2>
+            <div class="rl-overlay-head"><h2>${esc(tr(title))} <small>${tr`${ids.length} Karten`}</small></h2>
                 <div>${onBack ? '<button class="rl-btn small" data-back>‹ Zurück</button> ' : ''}<button class="rl-btn small danger" data-close>×</button></div></div>
             <div class="rl-deck-grid"></div>
         </div>`;
@@ -1058,7 +1071,7 @@
         e.id = up; e.upgradedFrom = base;
         saveRun();
         const upCd = CARDS[up] || {};
-        toast(`${upCd.name || 'Karte'} wurde aufgewertet.`);
+        toast(tr`${upCd.name || tr("Karte")} wurde aufgewertet.`);
         return true;
     }
     function canUpgradeEntry(e) {
@@ -1098,7 +1111,7 @@
             const cell = document.createElement('button'); cell.className = 'rl-deck-cell';
             cell.appendChild(cardNode(e.id, 150));
             const label = document.createElement('div'); label.className = 'rl-deck-cell-name';
-            label.innerHTML = `<b>${esc(cd.name || '?')}</b><small>✦ ${esc(eff ? eff.text : '')}</small>`;
+            label.innerHTML = `<b>${esc(cd.name || '?')}</b><small>✦ ${esc(eff ? tr(eff.text) : '')}</small>`;
             cell.appendChild(label);
             cell.onclick = () => { overlay.remove(); cb(e); };
             grid.appendChild(cell);
@@ -1112,7 +1125,7 @@
         const overlay = document.createElement('div');
         overlay.className = 'rl-overlay picker';
         overlay.innerHTML = `<div class="rl-overlay-box">
-            <div class="rl-overlay-head"><h2>${esc(title)}</h2><button class="rl-btn small danger" data-close>×</button></div>
+            <div class="rl-overlay-head"><h2>${esc(tr(title))}</h2><button class="rl-btn small danger" data-close>×</button></div>
             <p class="rl-lead" id="rl-pick-info">${mode === 'upgrade' ? 'Wähle eine nicht aufgewertete Karte. Aufwertungen sind dauerhaft und verändern die Karte grundlegend.' : 'Wähle eine Karte, die du aus dem Deck entfernen möchtest.'}</p>
             <div class="rl-deck-grid" id="rl-pick-grid"></div>
         </div>`;
@@ -1129,16 +1142,16 @@
             const cell = document.createElement('button'); cell.className = 'rl-deck-cell';
             cell.appendChild(cardNode(e.id, 135));
             const label = document.createElement('div'); label.className = 'rl-deck-cell-name';
-            label.innerHTML = `<b>${esc(cd.name || '?')}</b>${up ? `<small>✦ ${esc(up.text)}</small>` : ''}`;
+            label.innerHTML = `<b>${esc(cd.name || '?')}</b>${up ? `<small>✦ ${esc(tr(up.text))}</small>` : ''}`;
             cell.appendChild(label);
             if (mode === 'upgrade' && (up || !upgradable(e.id))) { cell.classList.add('cant'); }
             cell.onmouseenter = () => {
                 if (mode === 'upgrade') {
                     const base = R.baseIdOf(e.id);
                     const arch = R.archOfCard(e.id);
-                    info.innerHTML = arch ? `<b>Bereits aufgewertet:</b> ${esc(arch.text)}`
-                        : upgradable(e.id) ? `<b>Vorschau:</b> ${esc(R.upgradeText(base))}`
-                            : `<b>Nicht aufwertbar:</b> Quests und Locations sind Ressourcen-Karten.`;
+                    info.innerHTML = arch ? `<b>${tr("Bereits aufgewertet:")}</b> ${esc(tr(arch.text))}`
+                        : upgradable(e.id) ? `<b>${tr("Vorschau:")}</b> [${esc(tr(R.effectForCard(CARDS[base]).text))}]`
+                            : `<b>${tr("Nicht aufwertbar:")}</b> ${tr("Quests und Locations sind Ressourcen-Karten.")}`;
                 }
             };
             cell.onclick = () => {
@@ -1176,7 +1189,7 @@
         overlay.querySelector('[data-act="menu"]').onclick = () => { close(); hideRoot(); hideBattleHud(); if (watcher) { clearInterval(watcher); watcher = 0; } if (typeof openMainMenu === 'function') openMainMenu(); };
         overlay.querySelector('[data-act="abandon"]').onclick = () => {
             try {
-                uiConfirm('Run aufgeben?', 'Der gesamte Fortschritt dieses Runs wird gelöscht.', 'Run aufgeben', () => {
+                uiConfirm(tr('Run aufgeben?'), tr('Der gesamte Fortschritt dieses Runs wird gelöscht.'), tr('Run aufgeben'), () => {
                     close(); clearRun(); hideRoot(); if (typeof openMainMenu === 'function') openMainMenu();
                 });
             } catch (e) { close(); clearRun(); hideRoot(); }
@@ -1190,7 +1203,7 @@
             <div class="rl-end-screen lose">
                 <div class="rl-end-icon">☠</div>
                 <h1>Der Run endet hier</h1>
-                <p class="rl-lead">Akt ${run.act} · ${esc(b.name)}. Deine Reise durch die Schatten von Azeroth ist vorbei – aber jeder Run lehrt dich etwas.</p>
+                <p class="rl-lead">${tr`Akt ${run.act} · ${esc(tr(b.name))}. Deine Reise durch die Schatten von Azeroth ist vorbei – aber jeder Run lehrt dich etwas.`}</p>
                 <div class="rl-stats">
                     <div><b>${run.battles}</b><span>Kämpfe</span></div>
                     <div><b>${run.elites}</b><span>Elites</span></div>
@@ -1240,7 +1253,7 @@
         if (!nav || nav.querySelector('.mm-rl')) return;
         const b = document.createElement('button');
         b.className = 'mm-btn mm-rl';
-        b.innerHTML = `<span>Roguelike: Schatten von Azeroth</span><small>4 Akte · Klassen · Artefakte · Aufwertungen</small>`;
+        b.innerHTML = `<span>${tr("Roguelike: Schatten von Azeroth")}</span><small>${tr("4 Akte · Klassen · Artefakte · Aufwertungen")}</small>`;
         b.addEventListener('click', e => {
             e.preventDefault(); e.stopPropagation();
             try { if (typeof sfx !== 'undefined') sfx.play('draw'); } catch (err) { }

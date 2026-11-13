@@ -164,7 +164,7 @@ EK.pickN15Add = (s, a, v) => q(s, { op: 'call', k: 'E:pickN15', a: { ...a, list:
 // Sammlung = alle Karten des Spiels (wie Ritual of Summoning, Set gladiator)
 const traitorAllies15 = () => Object.values(CARDS).filter(c => !c.isToken && c.type === 'Ally' && c.talentReq === 'Traitor').map(c => c.id);
 FX[3301] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.type === 'Hero' && c.uid === heroOf(s, pid).uid) trig(s, { id: 3301, k: 'ask', a: { pid } }); } },
-    k: { ask: (s, a) => { const ids = traitorAllies15(); if (!ids.length) return;
+    k: { ask: (s, a) => { const ids = collectionOf(s, a.pid, traitorAllies15()); if (!ids.length) return;
             ask(s, { pid: a.pid, prompt: tr('Illidan Stormrage: Traitor-Ally aus deiner Sammlung ins Spiel bringen?'), src: 'Illidan Stormrage',
                 opts: [{ label: tr('Nein'), v: 0, ai: 0 }, ...ids.map(id => ({ label: CARDS[id].name, v: id, card: id, ai: 1 + (CARDS[id].cost || 0) }))], k: '3301:go', a }); },
         go: (s, a, id) => { if (!id) return; putIntoPlay(s, makeCardInst(id, false, a.pid), a.pid); } } };

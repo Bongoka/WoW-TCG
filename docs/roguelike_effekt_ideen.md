@@ -27,7 +27,7 @@ Stand 12.11.2026 · reine Analyse, kein Spielcode geändert.
 
 | Kategorie | Effekte |
 |---|---|
-| Werte/Keywords | +2 ATK & Eifer · +3 HP & Protektor · +2 Waffen-ATK · +2 DEF · Held +3 HP · Held −1 Schaden |
+| Werte/Keywords | +2 ATK & Ferocity · +3 HP & Protector · +2 Waffen-ATK · +2 DEF · Held +3 HP · Held −1 Schaden |
 | Beim Ins-Spiel-Kommen | ziehen · Gold · heilen · 1 Schaden am Helden · Gegner-Ally erschöpfen · 1/1-Kopie |
 | Beim Tod | ziehen · 1/1-Schlange · Gold |
 | Beim Angriff | +1 ATK · Gold · heilen · 1 Schaden |
@@ -566,3 +566,12 @@ Vorgabe des Nutzers: Slay the Spire nur als Ideenquelle, das Spiel soll sich wie
 - **Tag-Plätze und Synergien (CR 414.3b):** Aufwertungen und Artefakte für zusätzliche Pets, Totems (je Element), Auren und Siegel (`R.tagLimitExtra` über `TAG_LIMIT_EXTRA`). Synergien: Pets +1/+1 (Beast Mastery, auch Warlock-Dämonen mit Tag Pet), Call Pet, Totemic Focus, Totem-Aura, Demonic Empowerment, Fel Domination, Master Shapeshifter (Formen).
 - **Passende Artefakt-Angebote:** Rassen-, Klassen-, Pet-, Totem-, Aura-, Siegel-, Dämonen- und Form-Artefakte erscheinen nur, wenn das Deck mindestens 2 passende Karten hat (`R.ART_NEED`); sonst wird mit den übrigen aufgefüllt.
 - **Offen:** Balance (Gegnerleben, Gold) und ein kompletter Run sind nicht getestet. Nicht umgesetzt: Sly, Nachhall, Warp, Uralte, Flüche, Wachs-Artefakte, Mythic+-Affixe.
+
+## 13. Balance-Testlauf (13.11.2026)
+
+Simulation im Browser (CPU gegen CPU, 18 Web Worker, je Klasse × Akt × Gegnerart 12–24 Kämpfe; Skript nicht im Repo). Der Spieler-Run wird je Akt um ~5 Karten, 2 Artefakte, 2 Aufwertungen und +5 Leben ergänzt.
+- **Bosse:** Illidan (Akt 2) gewann 82–100 %, weil er jeden Zug einen beliebigen Traitor-Ally „aus seiner Sammlung“ holte (die CPU nahm Lady Vashj / Kael'thas, 9 Kosten). Jetzt besitzt ein Roguelike-Gegner nur seine Deckliste (`collectionOf`, engine.js) → 44–81 % Spielersiege. Lichkönig (Akt 4): 78 → 58 Leben, Kurve 1.6 → 1.2, Deck 40 → 36.
+- **Start-Artefakte** (Wert gemessen als Siegquote mit/ohne): Deep Wounds +34/+63 Punkte (zu stark) → +1 statt +2 ATK; Honor Among Thieves ±0 → erste Fähigkeit kostet zusätzlich (1) weniger; Animal Handler ohne Kostensenkung; Arcane Potency: jede Fähigkeit 1 Arkanschaden; Guardian Spirit: zusätzlich 1 Heiligschaden pro Zug. Klassen-Mittel Akt 1 vorher 40–94 %, nachher 42–76 %.
+- **Artefakte:** Stärkestufen 1–4 (`ART_TIER`) bestimmen Seltenheit und Preis (85 / 110 / 160 / 240 Gold); Angebote gewichtet (≈ 60 % gewöhnlich, 33 % selten, 5 % legendär). Shop-Rabatte gelten jetzt auch für Artefakte. Buried Treasure (+12 Gold je Sieg) und Goblin Ledger (−15 %) umgebaut.
+- **Aufwertungen:** Schadens- und Angriffs-Aufwertungen nur noch auf Karten, die Schaden machen bzw. angreifen können (`R.effectFits`); alte, unpassende Zuteilungen in Spielständen werden beim Laden ersetzt.
+- **Offen:** Die Simulations-CPU spielt Fähigkeiten schwächer als ein Mensch; Magier/Priester/Schurke wirken hier eher zu schwach. Ein echter Run von Hand steht aus.

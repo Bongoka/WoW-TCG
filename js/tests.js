@@ -1525,6 +1525,52 @@ function runRuleTests() {
         let seen = false; for (let i = 0; i < 200 && !seen; i++) seen = RL.availableArtifacts(run, 3).indexOf('pet_bond') >= 0;
         assert(seen, 'Beast Mastery trotz Pets nie angeboten');
     });
+    test(142, 'Roguelike: Aufwertungen nur, wenn sie auslösen können; Artefakt-Stufen bestimmen Seltenheit und Preis', () => {
+        if (typeof RL === 'undefined') return;
+        // Schadens-/Angriffs-Aufwertungen nie auf Karten, die keinen Schaden machen bzw. nicht angreifen können
+        const dmgUps = ['up_vamp', 'up_dmg1', 'up_gold_dmg'], atkUps = ['up_fero', 'up_rage_atk', 'up_attack_gold', 'up_attack_heal', 'up_attack_ping', 'up_bloodthirst'];
+        for (const cd of Object.values(CARDS)) {
+            if (String(cd.id).indexOf('RL') === 0 || cd.isToken || ['Ally', 'Ability', 'Weapon', 'Armor', 'Item'].indexOf(cd.type) < 0) continue;
+            const e = RL.effectForCard(cd).id, t = cd.text || '';
+            const canAtk = cd.type === 'Weapon' || (cd.type === 'Ally' && !cd.cantAttack && !cd.totem && (cd.atk || 0) > 0 && !/can[’']t attack/i.test(t));
+            if (dmgUps.indexOf(e) >= 0) assert(canAtk || /\bdeals?\b[^.]*\bdamage\b/i.test(t), `${cd.name}: ${e} ohne Schaden`);
+            if (atkUps.indexOf(e) >= 0) assert(canAtk, `${cd.name}: ${e}, kann nicht angreifen`);
+        }
+        // Frost Trap (macht keinen Schaden): eine alte, gespeicherte Schadens-Aufwertung wird beim Laden ersetzt
+        const ft = RL.upgraded(1033, 'up_vamp');
+        assert(CARDS[ft].upgradeEffect !== 'up_vamp', 'Frost Trap behält eine Aufwertung, die nie auslöst');
+        // Stufen: jedes Artefakt (außer Start) hat eine; Seltenheit und Preis steigen mit der Stufe
+        const order = { common: 0, rare: 1, legendary: 2 };
+        for (const a of RL.ARTIFACTS) {
+            if (a.rarity === 'starter') continue;
+            assert(a.tier >= 1 && a.tier <= 4, `${a.name}: keine Stufe`);
+            for (const b of RL.ARTIFACTS) if (b.tier && b.tier > a.tier) assert(b.price > a.price && order[b.rarity] >= order[a.rarity], `${b.name} (Stufe ${b.tier}) nicht teurer/seltener als ${a.name}`);
+        }
+        assert(RL.art('archive').rarity === 'legendary' && RL.art('emberheart').rarity === 'common', 'Einstufung falsch');
+        // Buried Treasure: Gold nach jedem gewonnenen Kampf statt Gold gegen Gold
+        const run = { gold: 0 }; RL.art('gold_start').runWin(run, null);
+        assert(run.gold === 12, 'Buried Treasure: kein Gold nach dem Kampf');
+        // "from your collection": ein Roguelike-Gegner besitzt nur seine Deckliste (Illidan bringt sonst jeden Zug einen 9-Kosten-Ally)
+        const s = fresh(); const traitors = Object.values(CARDS).filter(c => !c.isToken && c.type === 'Ally' && c.talentReq === 'Traitor').map(c => c.id);
+        assert(collectionOf(s, 2, traitors).length === traitors.length, 'Normale Partie: Sammlung eingeschränkt');
+        s.rl = { arts: [], f: {}, foeOwn: [traitors[0], 1] };
+        assert(JSON.stringify(collectionOf(s, 2, traitors)) === JSON.stringify([traitors[0]]), 'Roguelike-Gegner: Sammlung nicht auf die Deckliste beschränkt');
+        assert(collectionOf(s, 1, traitors).length === traitors.length, 'Roguelike-Spieler: Sammlung eingeschränkt');
+    });
+    test(143, 'Roguelike Englisch: alle Datentexte übersetzt, Keywords wie auf den Karten (Ferocity, Protector)', () => {
+        if (typeof RL === 'undefined') return;
+        const all = [], add = v => { if (typeof v === 'string' && v.trim()) all.push(v.trim()); };
+        RL.CARD_EFFECTS.forEach(e => add(e.text)); RL.ARTIFACTS.forEach(a => { add(a.text); add(a.name); });
+        RL.POTIONS.forEach(p => { add(p.name); add(p.text); }); RL.ELITE_TRAITS.forEach(p => { add(p.name); add(p.text); });
+        RL.ARCHETYPES.forEach(a => { add(a.name); add(a.blurb); }); RL.CLASSES.forEach(c => { add(c.name); add(c.tag); add(c.blurb); });
+        RL.BLOCKS.forEach(b => { [b.name, b.short, b.blurb, b.story, b.boss.name, b.boss.quote].forEach(add); [...(b.names || []), ...(b.eliteNames || []), ...(b.banter || [])].forEach(add); });
+        RL.EVENTS.forEach(e => { add(e.title); add(e.text); (e.choices || []).forEach(c => { add(c.label); add(c.hint); }); });
+        const german = /[äöüÄÖÜß]|\b(der|die|das|und|nicht|kein|mit|für|auf|ist|wird|Zug|Karte|Ziel|Wähle|Schaden|deine?[nm]?|haben|kosten|erhalte|ziehe)\b/;
+        const miss = [...new Set(all)].filter(t => german.test(t) && i18nGet(t) === undefined);
+        assert(!miss.length, `${miss.length} Roguelike-Texte ohne Übersetzung: ` + miss.slice(0, 4).join(' · '));
+        const bad = all.filter(t => /\b(Eifer|Protektor|Beschützer)\b/.test(t));
+        assert(!bad.length, 'Erfundene Keyword-Namen: ' + bad.slice(0, 3).join(' · '));
+    });
     LANG = prevLang;
     return results;
 }

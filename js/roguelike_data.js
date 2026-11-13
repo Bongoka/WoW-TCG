@@ -27,6 +27,17 @@
           tag: 'Echo & Kombos', blurb: 'Spiele viele Karten, wiederhole Effekte, exploite das Echo. Artefakt: Honor Among Thieves.', art: 'echo_sigil' }
     ];
     R.classByKey = k => R.CLASSES.find(c => c.key === k);
+    // Startdeck je Klasse: Kartenmix passend zum Start-Artefakt (Magier/Schurke leben von Fähigkeiten,
+    // Krieger/Jäger von Allies und Waffen). Werte aus der Balance-Simulation (Nov. 2026).
+    const STARTER_MIX = {
+        warrior: { ally: 0.50, ability: 0.86 }, hunter: { ally: 0.50, ability: 0.86 },
+        mage: { ally: 0.50, ability: 0.86 }, priest: { ally: 0.50, ability: 0.86 }, rogue: { ally: 0.50, ability: 0.86 }
+    };
+    R.starterDeck = function (clsKey) {
+        const cls = R.classByKey(clsKey); if (!cls) return [];
+        const hero = CARDS[cls.hero];
+        return R.buildDeck(cls.en, cls.faction, 30, { bias: 0, act: 1, heroId: cls.hero, talent: hero.talent, mix: STARTER_MIX[clsKey] });
+    };
 
     // ---------------------------------------------------------------- Akte / Set-Blöcke
     // Ein Akt = ein Set-Block. Die Kartenpools sind kumulativ: Akt 2 fügt seine Karten
@@ -100,7 +111,7 @@
             story: 'Der Himmel über Nordend ist eine einzige graue Klinge. Die Geißel hat die Wrathgate überrannt, und aus den Feldern von Scourgewar steigen die Toten mit deinen Gesichtern. Vor dir liegt Eiskrone: eine Zitadelle aus schwarzem Eis, in der der Lichkönig sitzt und jeden deiner Schritte bereits gesehen hat. Dies ist der letzte Akt. Diesmal gibt es keinen Ort, an den du zurückkehren kannst.',
             boss: {
                 hero: 13016, name: 'Der Lichkönig', cls: 'Death Knight', faction: 'Neutral', talent: null, scourge: true,
-                hp: 78, deckSize: 40, bias: 1.6, startRes: 5, gold: 260, arch: 'scourge_plague',
+                hp: 58, deckSize: 36, bias: 1.2, startRes: 5, gold: 260, arch: 'scourge_plague',   // Balance-Simulation: mit 78 Leben / Kurve 1.6 gewann der Lichkönig 70–100 %
                 quote: 'Ich habe dich bereits sterben sehen. Es war ... befriedigend.'
             },
             enemies: [
@@ -137,7 +148,7 @@
         if (!CARDS[id]) {
             const base = CARDS[spec.hero] || CARDS[8];
             CARDS[id] = {
-                ...base, id, type: 'Hero', name: spec.name,
+                ...base, id, type: 'Hero', name: tr(spec.name),
                 class: spec.cls || base.class, faction: spec.faction || base.faction,
                 talent: spec.talent === undefined ? base.talent : spec.talent,
                 hp: spec.hp || base.hp, scourge: !!spec.scourge, traitorCards: !!spec.traitorCards, isRlBoss: true
@@ -254,8 +265,9 @@
             const target = R.clamp(curve[i % curve.length] + bias, 0, 8);
             let poolPick, classPick;
             const r = Math.random();
-            if (r < 0.50) { poolPick = allies; classPick = classAllies; }
-            else if (r < 0.86) { poolPick = abilities; classPick = classAbilities; }
+            const mx = opts.mix || { ally: 0.50, ability: 0.86 };   // Anteil Allies / (Allies + Fähigkeiten), Rest Ausrüstung
+            if (r < mx.ally) { poolPick = allies; classPick = classAllies; }
+            else if (r < mx.ability) { poolPick = abilities; classPick = classAbilities; }
             else { poolPick = equips; classPick = classEquips; }
             // früh im Deck mehr Klassenkarten (Identität), später mehr Vielfalt
             const preferClass = Math.random() < (i < size * 0.55 ? 0.72 : 0.38);
@@ -397,8 +409,8 @@
 
     // ---- Kartenaufwertungen: kurze, anonyme Effekte -------------------------
     // Ally
-    defCard({ id: 'up_fero', text: '+2 Angriff und Eifer.', types: ['Ally'], mod: { atk: 2, kw: { ferocity: true } } });
-    defCard({ id: 'up_guard_ally', text: '+3 Gesundheit und Protektor.', types: ['Ally'], mod: { hp: 3, kw: { protector: true } } });
+    defCard({ id: 'up_fero', text: '+2 Angriff und Ferocity.', types: ['Ally'], mod: { atk: 2, kw: { ferocity: true } } });
+    defCard({ id: 'up_guard_ally', text: '+3 Gesundheit und Protector.', types: ['Ally'], mod: { hp: 3, kw: { protector: true } } });
     defCard({
         id: 'up_twin', text: 'Beim Ins-Spiel-Kommen: beschwöre eine 1/1 Kopie.', types: ['Ally'],
         enter: (s, c, pid, baseId) => { if (pid === 1) makeToken(s, twinToken(baseId), pid, {}); }
@@ -502,7 +514,7 @@
         enter: (s, c, pid) => { if (pid === 1 && ctrlRace(s, 1, 'Tauren')) addTM(c, { k: 'hp', v: 2 }); }
     });
     defCard({
-        id: 'up_dwarf_guard', text: 'Wenn du einen Zwerg kontrollierst: Protektor.', types: ['Ally'],
+        id: 'up_dwarf_guard', text: 'Wenn du einen Zwerg kontrollierst: Protector.', types: ['Ally'],
         enter: (s, c, pid) => { if (pid === 1 && ctrlRace(s, 1, 'Dwarf')) addTM(c, { k: 'protector' }); }
     });
     defCard({
@@ -775,6 +787,19 @@
         up_demon_aura: cd => isDemon(cd) ? 4 : 0
     };
     R.FIT = FIT;
+    // ---- Voraussetzungen: Aufwertungen, die auf dieser Karte nie auslösen können, werden nie zugeteilt ----
+    // (z. B. „Wenn diese Karte Schaden zufügt“ auf Frost Trap, „Wenn diese Karte angreift“ auf einem Ally, der nicht angreifen kann)
+    const canAttackCd = cd => cd.type === 'Weapon' || (cd.type === 'Ally' && !cd.cantAttack && !cd.totem && (cd.atk || 0) > 0 && !/can[’']t attack/i.test(txt(cd)));
+    const dealsDmgCd = cd => canAttackCd(cd) || /\bdeals?\b[^.]*\bdamage\b/i.test(txt(cd));
+    const NEED = {
+        up_vamp: dealsDmgCd, up_dmg1: dealsDmgCd, up_gold_dmg: dealsDmgCd,
+        up_fero: canAttackCd, up_rage_atk: canAttackCd, up_attack_gold: canAttackCd, up_attack_heal: canAttackCd,
+        up_attack_ping: canAttackCd, up_bloodthirst: canAttackCd,
+        up_hurt_thorns: cd => cd.type === 'Ally' && !cd.totem,
+        up_echo: cd => !isOngoing(cd), up_ephemeral: cd => !isOngoing(cd),
+        up_sentinel: cd => cd.type !== 'Ally' || has(cd, /Protector/) || canAttackCd(cd)
+    };
+    R.effectFits = (e, cd) => { const f = e && NEED[e.id]; try { return !f || !!f(cd); } catch (err) { return true; } };
     // ---- Neue Artefakt-Effekte: Gold, Rassen, Klassen ----------------------
     // Gold
     defArt({ id: 'gold_start', text: 'Du erhältst sofort 25 Gold.', runAcquire: run => { run.gold += 25; } });
@@ -816,7 +841,7 @@
     defArt({ id: 'undead_cost', text: 'Untote kosten (1) weniger.', cost: (s, p, card) => (card.type === 'Ally' && isRace(card, 'Undead')) ? -1 : 0 });
     defArt({ id: 'human_hp', text: 'Menschen haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Human')) ? 1 : 0 });
     defArt({
-        id: 'dwarf_protector', text: 'Zwerge haben Protektor.',
+        id: 'dwarf_protector', text: 'Zwerge haben Protector.',
         allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Dwarf')) addTM(c, { k: 'protector' }); },
         battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isRace(c, 'Dwarf')) addTM(c, { k: 'protector' }); }
     });
@@ -883,12 +908,12 @@
         battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); }
     });
     defArt({
-        id: 'shaman_ferocity', text: 'Schamanen-Allies haben Eifer.',
+        id: 'shaman_ferocity', text: 'Schamanen-Allies haben Ferocity.',
         allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); },
         battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); }
     });
     defArt({
-        id: 'paladin_protector', text: 'Paladin-Allies haben Protektor.',
+        id: 'paladin_protector', text: 'Paladin-Allies haben Protector.',
         allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); },
         battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); }
     });
@@ -907,7 +932,7 @@
         return cd && cd.upgradeEffect ? (R.EFFECTS[cd.upgradeEffect] || null) : null;
     };
     R.effectForCard = function (cd) {
-        const pool = R.CARD_EFFECTS.filter(e => !e.types || e.types.indexOf(cd.type) >= 0);
+        const pool = R.CARD_EFFECTS.filter(e => (!e.types || e.types.indexOf(cd.type) >= 0) && R.effectFits(e, cd));
         if (!pool.length) return R.CARD_EFFECTS[0];
         // Passung bewerten (FIT); unter den bestpassenden Effekten entscheidet der Hash.
         const scored = pool.map(e => { let v = 1; try { v = FIT[e.id] ? FIT[e.id](cd) : 1; } catch (err) { v = 1; } return { e, v: v || 0 }; }).filter(x => x.v > 0);
@@ -927,7 +952,7 @@
         const base = CARDS[baseId];
         if (!base) return baseId;
         if (['Quest', 'Location', 'Hero'].includes(base.type)) return baseId;
-        const eff = (effId && R.EFFECTS[effId] && R.EFFECTS[effId].kind === 'card') ? R.EFFECTS[effId] : R.effectForCard(base);
+        const eff = (effId && R.EFFECTS[effId] && R.EFFECTS[effId].kind === 'card' && R.effectFits(R.EFFECTS[effId], base)) ? R.EFFECTS[effId] : R.effectForCard(base);   // alte Zuteilung, die nie wirken kann, wird ersetzt
         const key = 'RLUP_' + baseId + '_' + eff.id;
         if (CARDS[key]) return key;
         const m = eff.mod || {};
@@ -1183,7 +1208,7 @@
             kind: 'reward', id: 'rd_rw_' + Math.random().toString(36).slice(2, 8), pl: d.pid,
             src: r.card.uid, srcId: r.card.id, srcName: r.card.name, label: tr('Belohnung (verdoppelt)')
         });
-        L(s, tr`✦ Zwiefaches Edikt: Die Belohnung von ${r.card.name} wird ein zweites Mal ausgelöst.`, '', d.pid);
+        L(s, tr`✦ Argent Decree: Die Belohnung von ${r.card.name} wird ein zweites Mal ausgelöst.`, '', d.pid);
     }
 
     R.ARTIFACTS = [
@@ -1191,23 +1216,23 @@
         {
             id: 'bloodpact', name: 'Blutpakt', cls: 'Warrior', rarity: 'starter', price: 0,
             text: 'Dein Held hat +2 Angriff. Wenn dein Held Schaden erleidet, ziehe einmal pro Zug eine Karte.',
-            stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Hero' && ctrlOf(s, c) === 1) ? 2 : 0,
+            stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Hero' && ctrlOf(s, c) === 1) ? 1 : 0,   // Balance-Simulation: +2 ATK war das mit Abstand stärkste Start-Artefakt
             damaged: (s, d) => { if (d.tpid === 1 && d.amt > 0 && isHero(s, d.tgt) && !flag(s, 't:bloodpact')) { setFlag(s, 't:bloodpact'); trig(s, { k: 'draw', a: { pid: 1, n: 1 } }); } }
         },
         {
             id: 'overload_core', name: 'Überladungskern', cls: 'Mage', rarity: 'starter', price: 0,
-            text: 'Die erste Fähigkeit, die du in einem Zug spielst, kostet (2) weniger. Wenn du sie spielst, fügt dein Held dem gegnerischen Helden 1 Arkanschaden zu.',
+            text: 'Die erste Fähigkeit, die du in einem Zug spielst, kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.',
             cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -2 : 0,
             cardPlayed: (s, p, card) => {
-                if (p !== 1 || card.type !== 'Ability' || flag(s, 't:overload_core')) return;
+                if (p !== 1 || card.type !== 'Ability') return;
                 setFlag(s, 't:overload_core');
-                q(s, { op: 'call', k: 'E:rlpingHero', a: { pid: 1, amt: 1, dt: 'Arcane' } });
+                q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Arcane' } });   // Balance-Simulation: Magier war zu schwach
             }
         },
         {
             id: 'beastbond', name: 'Rudelbande', cls: 'Hunter', rarity: 'starter', price: 0,
-            text: 'Der erste Ally, den du in einem Zug spielst, kostet (1) weniger und kommt mit +1/+1 ins Spiel.',
-            cost: (s, p, card) => (card.type === 'Ally' && !flag(s, 't:beastbond')) ? -1 : 0,
+            text: 'Der erste Ally, den du in einem Zug spielst, kommt mit +1/+1 ins Spiel.',
+            // Balance-Simulation: mit Kostensenkung war der Jäger die stärkste Klasse (100 % gegen normale Gegner)
             allyEnters: (s, p, uid) => {
                 if (p !== 1 || flag(s, 't:beastbond')) return;
                 const c = findCharacter(s, uid);
@@ -1219,7 +1244,7 @@
         {
             id: 'sanctuary', name: 'Zuflucht', cls: 'Priest', rarity: 'starter', price: 0,
             text: 'Am Ende deines Zuges heilt dein Held 2 Schaden. Einmal pro Kampf: Wenn dein Held tödlichen Schaden erleiden würde, überlebt er mit 1 Gesundheit und heilt danach 8.',
-            endTurn: (s, p) => { if (p === 1) trig(s, { k: 'healHero', a: { pid: 1, amt: 2 } }); },
+            endTurn: (s, p) => { if (p === 1) { trig(s, { k: 'healHero', a: { pid: 1, amt: 2 } }); q(s, { op: 'call', k: 'E:rlpingHero', a: { pid: 1, amt: 1, dt: 'Holy' } }); } },
             dmgPre: (s, o) => {
                 const h = s.p1.hero;
                 if (o.tgt !== h.uid || o.amt <= 0 || flag(s, 'b:sanctuary')) return;
@@ -1228,19 +1253,20 @@
                     o.amt = Math.max(0, left - 1);
                     setFlag(s, 'b:sanctuary');
                     q(s, { op: 'call', k: 'E:rlhealHero', a: { pid: 1, amt: 8 } });
-                    L(s, tr`✧ Zuflucht: Dein Held überlebt mit 1 Gesundheit.`, '', 1);
+                    L(s, tr`✧ Guardian Spirit: Dein Held überlebt mit 1 Gesundheit.`, '', 1);
                 }
             }
         },
         {
             id: 'echo_sigil', name: 'Echosiegel', cls: 'Rogue', rarity: 'starter', price: 0,
             text: 'Die erste Fähigkeit, die du in einem Zug spielst, erhältst du am Ende des Zuges als Kopie auf die Hand.',
+            cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:echo_sigil')) ? -1 : 0,
             cardPlayed: (s, p, card) => {
                 if (p !== 1 || card.type !== 'Ability' || flag(s, 't:echo_sigil')) return;
                 setFlag(s, 't:echo_sigil');
                 const base = R.baseIdOf(card.id);
                 q(s, { op: 'call', k: 'E:rladdCard', a: { pid: 1, id: base } });
-                L(s, tr`✦ Echosiegel: ${CARDS[base] ? CARDS[base].name : 'Fähigkeit'} wird kopiert.`, '', 1);
+                L(s, tr`✦ Honor Among Thieves: ${CARDS[base] ? CARDS[base].name : tr('Fähigkeit')} wird kopiert.`, '', 1);
             }
         },
         // ---- Handelbare Artefakte
@@ -1394,7 +1420,7 @@
                 if (!allies.length) return;
                 const c = R.pick(allies);
                 addTM(c, { k: 'atk', v: 1 });
-                L(s, tr`⚒ Seelenamboss: ${c.name} erhält +1 Angriff.`, '', 1);
+                L(s, tr`⚒ Soulforge: ${c.name} erhält +1 Angriff.`, '', 1);
             }
         },
         {
@@ -1405,7 +1431,7 @@
                 if (!isAllyLike({ type: snap.type, isToken: snap.isToken })) return;
                 setFlag(s, 't:deathlord');
                 q(s, { op: 'call', k: 'E:rlmakeToken', a: { pid: 1, id: 11501 } });
-                L(s, tr`☠ Todeslord: Ein Ghul erhebt sich.`, '', 1);
+                L(s, tr`☠ Naxxramas: Ein Ghul erhebt sich.`, '', 1);
             }
         },
         {
@@ -1531,12 +1557,12 @@
         },
         {
             id: 'bastion', name: 'Bastion', cat: 'Protector', rarity: 'rare', price: 115,
-            text: 'Allies mit Protektor haben +3 Gesundheit.',
+            text: 'Allies mit Protector haben +3 Gesundheit.',
             stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && inPlayKw(s, c, 'protector')) ? 3 : 0
         },
         {
             id: 'shieldwall', name: 'Schildwall', cat: 'Protector', rarity: 'common', price: 90,
-            text: 'Wenn ein Ally mit Protektor ins Spiel kommt, heile 2 Schaden von deinem Helden.',
+            text: 'Wenn ein Ally mit Protector ins Spiel kommt, heile 2 Schaden von deinem Helden.',
             allyEnters: (s, p, uid) => {
                 if (p !== 1) return;
                 const c = findCharacter(s, uid);
@@ -1545,7 +1571,7 @@
         },
         {
             id: 'guardianangel', name: 'Schutzengel', cat: 'Protector', rarity: 'rare', price: 120,
-            text: 'Einmal pro Zug: Wenn ein befreundeter Ally mit Protektor Kampfschaden erleidet, füge dem Angreifer 1 Schaden zu.',
+            text: 'Einmal pro Zug: Wenn ein befreundeter Ally mit Protector Kampfschaden erleidet, füge dem Angreifer 1 Schaden zu.',
             damaged: (s, d) => {
                 if (!d || d.tpid !== 1 || !d.combat || !d.src || d.amt <= 0 || flag(s, 't:gangel')) return;
                 const t = findCharacter(s, d.tgt);
@@ -1950,11 +1976,11 @@
     // ---- Namen & Icons: Begriffe aus Vanilla / TBC / WotLK -----------------
     // ids bleiben stabil (Saves/Tests), nur Name, Icon und Text ändern sich.
     const ART_META = {
-        bloodpact: ['Deep Wounds', 'Abilities/BloodRage.png', 'Dein Held hat +2 Angriff. Wenn er Schaden erleidet, ziehe 1 Karte (1x/Zug).'],
-        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (2) weniger und fügt dem gegnerischen Helden 1 Arkanschaden zu.'],
-        beastbond: ['Animal Handler', 'Abilities/AnimalHandler.png', 'Der erste Ally pro Zug kostet (1) weniger und kommt mit +1/+1.'],
-        sanctuary: ['Guardian Spirit', 'Spells/GuardianSpirit.png', 'Ende des Zuges: heile 2. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.'],
-        echo_sigil: ['Honor Among Thieves', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kommt am Zugende als Kopie auf die Hand.'],
+        bloodpact: ['Deep Wounds', 'Abilities/BloodRage.png', 'Dein Held hat +1 Angriff. Wenn er Schaden erleidet, ziehe 1 Karte (1x/Zug).'],
+        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.'],
+        beastbond: ['Animal Handler', 'Abilities/AnimalHandler.png', 'Der erste Ally pro Zug kommt mit +1/+1 ins Spiel.'],
+        sanctuary: ['Guardian Spirit', 'Spells/GuardianSpirit.png', 'Ende deines Zuges: heile 2 und füge dem gegnerischen Helden 1 Heiligschaden zu. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.'],
+        echo_sigil: ['Honor Among Thieves', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kostet (1) weniger und kommt als Kopie auf die Hand.'],
         emberheart: ['Fiery Weapon', 'Spells/EnchantWeapon.png', 'Die erste Fähigkeit pro Zug fügt einem zufälligen Gegner 1 Feuerschaden zu.'],
         wardrum: ['Warsong Banner', 'Spells/WarsongBrutal.png'],
         gravecaller: ['Animate Dead', 'Spells/AnimateDead.png'],
@@ -1996,7 +2022,7 @@
         mirror_dance: ['Prismatic Cloak', 'Spells/PrismaticCloak.png'],
         bastion: ['Bastion of Defense', 'Abilities/ShieldGuard.png'],
         shieldwall: ['Shield Mastery', 'Abilities/ShieldMastery.png'],
-        guardianangel: ['Guardian Ward', 'Spells/GuardianWard.png', 'Einmal pro Zug: Ein Protektor-Ally, der Kampfschaden erleidet, fügt dem Angreifer 1 Schaden zu.'],
+        guardianangel: ['Guardian Ward', 'Spells/GuardianWard.png', 'Einmal pro Zug: Ein Protector-Ally, der Kampfschaden erleidet, fügt dem Angreifer 1 Schaden zu.'],
         nightveil: ['Shadow Dance', 'Abilities/ShadowDance.png'],
         assassin: ['Opportunity', 'Abilities/Assassinate.png'],
         smoke: ['Smoke Bomb', 'Miscellaneous/Bomb_03.png'],
@@ -2352,7 +2378,7 @@
     R.usePotion = function (s, id) {
         const p = R.potById(id); if (!p || !R.canUsePotion(s)) return false;
         let ok = false; try { ok = !!p.use(s); } catch (e) { ok = false; }
-        if (ok) L(s, tr`🧪 ${p.name}: ${p.text}`, '', 1);
+        if (ok) L(s, tr`🧪 ${p.name}: ${tr(p.text)}`, '', 1);
         return ok;
     };
 
@@ -2393,6 +2419,49 @@
         return n;
     };
 
+    // ---- Balance: Stärkestufe je Artefakt → Seltenheit, Preis und Angebotshäufigkeit ----
+    // 1 = Nische/schwach, 2 = solide oder an Bedingungen geknüpft, 3 = stark und allgemein, 4 = prägt jeden Kampf.
+    // Einkommen pro Akt ≈ 300–450 Gold (Kampf 40–70, Elite 80–140, Boss 130–260): ein seltenes Artefakt ist ein großer Kauf.
+    const ART_TIER = {
+        // 4 – legendär
+        archive: 4, oracle: 4, spellweaver: 4, leyline: 4, wardrum: 4, double_edict: 4, art_void: 4,
+        // 3 – selten
+        vampiric: 3, bulwark: 3, titanheart: 3, plague: 3, insight: 3, ritual_circle: 3, phoenix: 3, legion: 3,
+        soulharvest: 3, timewarp: 3, deathlord: 3, warlord: 3, gravelord: 3, combo: 3, bloodmagic: 3, frontier: 3,
+        warbanner: 3, soulforge: 3, bladedance: 3, art_necropolis: 3, art_ghouls: 3, art_drums: 3, gold_shop: 3,
+        prism: 3, armsmaster: 3, open_veins: 3, art_knell: 3, auraweaver: 3,
+        troll_cost: 3, undead_cost: 3, hunter_cost: 3, demon_cost: 3, totem_cost: 3, rogue_stealth: 3, shaman_ferocity: 3,
+        pet_slot: 3, totem_slot: 3, aura_slot: 3, seal_slot: 3, nightveil: 3, warpath: 3, frenzy: 3,
+        // 2 – gewöhnlich, solide
+        thorns: 2, gravecaller: 2, momentum: 2, claim: 2, oath_archive: 2, tithe: 2, resource_pyre: 2, bloodrush: 2,
+        veil: 2, bastion: 2, guardianangel: 2, assassin: 2, smoke: 2, sniper: 2, quiver: 2, warbringer: 2, spring: 2,
+        bloodbloom: 2, spiked: 2, hive: 2, soultax: 2, recycle: 2, echoes: 2, spellbook: 2, frostbite: 2, toxic: 2,
+        shadowlink: 2, holylight: 2, veteran: 2, tribal: 2, alliances: 2, wither: 2, duelist: 2, ironhide: 2, aegis: 2,
+        eternalflame: 2, inferno: 2, emberheart: 2, troll_atk: 2, orc_berserk: 2, draenei_inspire: 2, dwarf_protector: 2,
+        nightelf_elusive: 2, tauren_atk: 2, gnome_draw: 2, warrior_atk: 2, priest_heal: 2, paladin_protector: 2,
+        warlock_draw: 2, dk_atk: 2, pet_bond: 2, demon_bond: 2, art_totems: 2, art_ironwall: 2, art_swordboard: 2,
+        art_combo: 2, art_shatter: 2, art_flurry: 2, art_hoj: 2, art_potency: 2, art_throwing: 2, art_contagion: 2,
+        art_worms: 2, art_bloodcraze: 2, art_devast: 2, art_soulstone: 2, art_valor: 2, art_citrine: 2, art_vigil: 2,
+        gold_attack: 2, resonance: 2,
+        // 1 – gewöhnlich, Nische
+        goldgier: 1, atlas: 1, loc_compass: 1, phantom: 1, mirror_dance: 1, shieldwall: 1, ghostwalk: 1, charge: 1,
+        martyrium: 1, swarm: 1, waste: 1, library: 1, idol: 1, gold_start: 1, gold_resource: 1, gold_death: 1,
+        gold_weapon: 1, art_counter: 1, art_orb: 1, art_soulfrag: 1, art_static: 1, art_soulwell: 1, mage_hp: 1,
+        druid_hp: 1, human_hp: 1, troll_hp: 1, bloodelf_ping: 1, pet_call: 1, form_draw: 1
+    };
+    const TIER_RARITY = { 1: 'common', 2: 'common', 3: 'rare', 4: 'legendary' };
+    const TIER_PRICE = { 1: 85, 2: 110, 3: 160, 4: 240 };
+    // Ökonomie-Artefakte, die sich im Shop sonst nicht lohnen (Gold gegen Gold): umgebaut
+    const tune = (id, text, hooks) => { const a = R.ARTIFACTS.find(x => x.id === id); if (a) Object.assign(a, { text }, hooks); };
+    tune('gold_start', 'Nach jedem gewonnenen Kampf: erhalte 12 Gold.', { runAcquire: undefined, runWin: run => { run.gold += 12; } });
+    tune('goldgier', 'Alle Shop-Preise sind 15 % günstiger.', { runAcquire: run => { run.priceMod = Math.round((run.priceMod || 1) * 0.85 * 100) / 100; } });
+    R.ARTIFACTS.forEach(a => {
+        const t = ART_TIER[a.id];
+        if (!t || a.rarity === 'starter') return;
+        a.tier = t; a.rarity = TIER_RARITY[t]; a.price = TIER_PRICE[t];
+        if (R.EFFECTS[a.id] && R.EFFECTS[a.id].kind === 'art') Object.assign(R.EFFECTS[a.id], { tier: t, rarity: a.rarity, price: a.price, text: a.text });
+    });
+    R.ART_TIER = ART_TIER;
     R.artById = {};
     R.ARTIFACTS.forEach(a => { R.artById[a.id] = a; });
     R.art = id => R.artById[id] || null;
@@ -2409,7 +2478,19 @@
         // reicht die Auswahl nicht, wird mit den übrigen aufgefüllt.
         const deck = (run.deck || []).map(e => CARDS[R.baseIdOf(e.id)]).filter(Boolean);
         const fits = a => { const f = ART_NEED[a.id]; return !f || deck.filter(cd => { try { return f(cd); } catch (e) { return false; } }).length >= 2; };
-        const good = R.shuffle(list.filter(fits)), rest = R.shuffle(list.filter(a => !fits(a)));
+        // Gewichtet nach Seltenheit (gewöhnlich häufig, legendär selten; im 1. Akt noch seltener)
+        const wOf = a => a.rarity === 'legendary' ? (act <= 1 ? 1 : 3) : a.rarity === 'rare' ? 4 : 3;   // ≈ 60 % gewöhnlich, 33 % selten, 5 % legendär
+        const draw = arr => {
+            const pool = arr.slice(), out = [];
+            while (pool.length && out.length < n) {
+                const tot = pool.reduce((x, a) => x + wOf(a), 0);
+                let r = Math.random() * tot, i = 0;
+                for (; i < pool.length - 1; i++) { r -= wOf(pool[i]); if (r <= 0) break; }
+                out.push(pool.splice(i, 1)[0]);
+            }
+            return out;
+        };
+        const good = draw(list.filter(fits)), rest = good.length < n ? draw(list.filter(a => !fits(a))) : [];
         return good.concat(rest).slice(0, n).map(a => a.id);
     };
     const tagIs = t => cd => !!(cd.limitTags && cd.limitTags[t] !== undefined);
