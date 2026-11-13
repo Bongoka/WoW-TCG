@@ -135,5 +135,7 @@
 .card-up-text.in-box { top: 100cqw; bottom: auto; }
 /* Unten zwischen Angriff und Leben – Flavor-Text, Set-Zeile und Artist dürfen verdeckt werden */
 .card-up-text.at-bottom { left: 17cqw; right: 17cqw; bottom: 3cqw; }
-/* Ohne Kartenbild steht die Aufwertung schon in [Klammern] im Ersatztext */
-.card-visual:not(.has-img) > .card-up-text { display: none; }
+/* Effekttext nur in der Hover-Vergrößerung – auf kleinen Karten (Hand, Spielfeld) unlesbar; dort zeigt nur der Rahmen die Aufwertung.
+   Ohne Kartenbild steht die Aufwertung schon in [Klammern] im Ersatztext */
+.card-up-text { display: none; }
+#cfx-preview .card-visual.has-img > .card-up-text { display: block; }
