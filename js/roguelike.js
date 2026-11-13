@@ -26,12 +26,12 @@
     function toast(msg) { try { showToast(msg, false, 2600); } catch (e) { } }
 
     const NODE_INFO = {
-        fight:    { icon: '⚔',  label: 'Kampf' },
-        elite:    { icon: '💀', label: 'Elite' },
-        event:    { icon: '❓', label: 'Ereignis' },
-        shop:     { icon: '🛒', label: 'Shop' },
-        campfire: { icon: '🔥', label: 'Lagerfeuer' },
-        boss:     { icon: '👑', label: 'Boss' }
+        fight:    { img: 'Weapons/PVP320_C_01.png',        label: 'Kampf',      hint: 'Ein Gegner mit einem Themen-Deck. Sieg: Gold und eine Karte.' },
+        elite:    { img: 'Abilities/Rampage.png',          label: 'Elite',      hint: 'Stärkeres Deck und eine Elite-Eigenschaft. Sieg: Artefakt, Trank und mehr Gold.' },
+        event:    { img: 'Miscellaneous/QuestionMark.png', label: 'Ereignis',   hint: 'Eine Begegnung mit einer Entscheidung.' },
+        shop:     { img: 'Miscellaneous/Bag_10.png',       label: 'Händler',    hint: 'Karten, Artefakte und Tränke kaufen, Karten entfernen.' },
+        campfire: { img: 'Spells/Immolation.png',          label: 'Lagerfeuer', hint: 'Trainieren, eine Karte aufwerten oder entfernen.' },
+        boss:     { img: 'Miscellaneous/Bone_Skull_02.png', label: 'Boss',      hint: 'Der Wächter dieses Akts.' }
     };
 
     // ---------------------------------------------------------------- Run-Speicher
@@ -53,12 +53,14 @@
                 r.map = genMap(1); r.row = -1; r.node = null; r.visited = {}; r.pending = null;
             }
             if (!r.act) r.act = 1;
+            if (!Array.isArray(r.potions)) r.potions = [];
             if (!r.clsEn) r.clsEn = (CARDS[r.hero] && CARDS[r.hero].class) || 'Warrior';
             // Synthetische Aufwertungs-IDs gehen beim Neuladen verloren – neu erzeugen.
             if (r.deck && R.upgraded) {
                 for (const e of r.deck) {
                     if (e && e.upgradedFrom && !CARDS[e.id]) {
-                        try { e.id = R.upgraded(e.upgradedFrom); } catch (err) { }
+                        const m = /^RLUP_\d+_(.+)$/.exec(String(e.id));   // Effekt der gespeicherten Aufwertung
+                        try { e.id = R.upgraded(e.upgradedFrom, m ? m[1] : null); } catch (err) { }
                     }
                 }
             }
@@ -99,35 +101,51 @@
     }
     function showRoot() { ensureRoot(); root.classList.add('on'); root.style.display = 'block'; }
     function hideRoot() { if (root) { root.classList.remove('on'); root.style.display = 'none'; } }
-    function setMain(html) { ensureRoot(); showRoot(); mainEl.innerHTML = html; }
+    function setMain(html) { ensureRoot(); showRoot(); applyBg(); mainEl.innerHTML = html; }
     function on(sel, ev, fn) { const n = mainEl.querySelector(sel); if (n) n.addEventListener(ev, fn); }
     function onAll(sel, ev, fn) { mainEl.querySelectorAll(sel).forEach(n => n.addEventListener(ev, fn)); }
 
     // ---------------------------------------------------------------- Run-HUD
+    const ICON = p => 'WoW Icon Pack/' + encodeURI(p);
+    // Hintergrund je Akt (Spielmatten aus backgrounds/), außerhalb eines Runs die Azeroth-Matte
+    const ACT_BG = { 1: 'Through the Dark Portal.webp', 2: 'Darkmoon Faire Illidan 2009.webp', 3: 'Fields of Honor Sneak Preview.webp', 4: 'Darkmoon Faire Lich King.webp' };
+    function applyBg() {
+        if (!root) return;
+        const f = run ? (ACT_BG[run.act] || ACT_BG[1]) : 'Heroes of Azeroth.webp';
+        root.style.setProperty("--rl-bg", `url("${new URL("backgrounds/" + encodeURIComponent(f), location.href).href}")`);   // absolut: var() löst relative URLs sonst vom CSS-Ordner aus auf
+    }
+    function potionSlotsHtml(clickable) {
+        const pots = (run && run.potions) || [];
+        let h = '';
+        for (let i = 0; i < R.POTION_SLOTS; i++) {
+            const p = R.potById(pots[i]);
+            h += p ? `<button class="rl-pot${clickable ? ' use' : ''}" data-pot="${i}" title="${esc(p.name + ' – ' + p.text + (clickable ? ' (Klicken zum Benutzen)' : ''))}"><img src="${ICON(p.icon)}" alt=""></button>`
+                   : `<span class="rl-pot empty" title="Leerer Trankplatz"></span>`;
+        }
+        return `<div class="rl-pots">${h}</div>`;
+    }
     function hudHtml() {
         if (!run) return '';
         const cls = R.classByKey(run.clsKey);
         const block = R.block(run.act);
         const arts = (run.artifacts || []).map(id => R.art(id)).filter(Boolean);
-        const rowNow = Math.max(1, run.row + 1), rowMax = (run.map && run.map.length) || 9;
         return `<div class="rl-hud">
             <div class="rl-hud-left">
-                <div class="rl-class"><img src="${esc(cls ? cls.icon : '')}" alt=""><div><b>${esc(cls ? cls.name : '')}</b><small>Akt ${run.act}/4 · ${esc(block.short)} · Ebene ${rowNow}/${rowMax}</small></div></div>
-                <div class="rl-hpbar" title="Leben"><span>❤</span><div class="rl-hpbar-track"><i style="width:${Math.round(100 * run.hp / Math.max(1, run.maxHp))}%"></i></div><b>${run.hp} / ${run.maxHp}</b></div>
-                <div class="rl-gold" title="Gold">🪙 <b>${run.gold}</b></div>
+                <div class="rl-class"><img src="${esc(cls ? cls.icon : '')}" alt=""><div><b>${esc(cls ? cls.name : '')}</b><small>Akt ${run.act}/4 · ${esc(block.short)}</small></div></div>
+                <div class="rl-stat life" title="Maximales Leben – vor jedem Kampf ist dein Held voll geheilt"><span>❤</span><b>${run.maxHp}</b></div>
+                <div class="rl-stat gold" title="Gold"><img src="${ICON('Miscellaneous/Coin_02.png')}" alt=""><b>${run.gold}</b></div>
+                ${potionSlotsHtml(false)}
             </div>
+            <div class="rl-hud-arts" title="Artefakte">${arts.map(a => `<button class="rl-art-ico rarity-${a.rarity}" data-rl="arts" title="${esc(a.name + ' – ' + a.text)}">${R.artIconHtml(a)}</button>`).join('')}</div>
             <div class="rl-hud-right">
                 <button class="rl-btn small" data-rl="deck">Deck <b>${run.deck.length}</b></button>
-                <button class="rl-btn small" data-rl="arts">Artefakte <b>${arts.length}</b></button>
                 <button class="rl-btn small danger" data-rl="menu">Menü</button>
             </div>
-        </div>
-        <div class="rl-act-bar"><span class="rl-act-name">${esc(block.name)}</span><span class="rl-act-sets">${block.setNames.map(esc).join(' · ')}</span></div>
-        <div class="rl-art-chips">${arts.map(a => `<span class="rl-art-chip" title="${esc(a.text)}">${esc(a.name)}</span>`).join('')}</div>`;
+        </div>`;
     }
     function wireHud() {
         on('[data-rl="deck"]', 'click', openDeckView);
-        on('[data-rl="arts"]', 'click', openArtsView);
+        onAll('[data-rl="arts"]', 'click', openArtsView);
         on('[data-rl="menu"]', 'click', openRunMenu);
     }
 
@@ -209,7 +227,7 @@
             }).map(id => ({ uid: uid(), id }));
             run = {
                 v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: cls.hero, faction: cls.faction,
-                deck, maxHp, hp: maxHp, gold: 55, artifacts: cls.art ? [cls.art] : [],
+                deck, maxHp, hp: maxHp, gold: 55, artifacts: cls.art ? [cls.art] : [], potions: [R.randomPotion()],
                 priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [],
                 battles: 0, elites: 0, boss: false, createdAt: Date.now(), goldEarnedTotal: 0
             };
@@ -226,24 +244,18 @@
     // ---------------------------------------------------------------- Karte
     function genMap(act) {
         act = act || 1;
-        const ROWS = 9, rows = [];
-        const counts = [2, 2, 3, 2, 3, 2, 3, 2, 1];
+        // Kurze Akte: WoW-TCG-Duelle dauern länger als StS-Kämpfe. Pro Akt 2–4 Kämpfe (Start, ggf. Kampf/Elite, Boss),
+        // dazwischen Ereignisse, Shop und Lagerfeuer. Ein ganzer Run hat damit etwa 10–15 Duelle.
+        const ROWS = 6, rows = [];
+        const counts = [2, 3, 2, 3, 2, 1];
         const typeFor = r => {
             if (r === ROWS - 1) return 'boss';
             if (r === ROWS - 2) return 'campfire';
             if (r === 0) return 'fight';
-            if (r === 2) return Math.random() < 0.55 ? 'event' : 'fight';
-            if (r === 3) return Math.random() < 0.5 ? 'shop' : 'event';
-            if (r === 5) { const x = Math.random(); return x < 0.45 ? 'elite' : x < 0.75 ? 'campfire' : 'fight'; }
-            if (r >= 4) {
-                const x = Math.random();
-                if (x < 0.24) return 'elite';
-                if (x < 0.46) return 'event';
-                if (x < 0.54) return 'shop';
-                if (x < 0.64) return 'campfire';
-                return 'fight';
-            }
-            return Math.random() < 0.72 ? 'fight' : 'event';
+            if (r === 1) return Math.random() < 0.6 ? 'event' : 'fight';
+            if (r === 2) return Math.random() < 0.5 ? 'shop' : 'event';
+            const x = Math.random();                                                         // Reihe 3
+            return x < 0.4 ? 'elite' : x < 0.7 ? 'fight' : 'event';
         };
         for (let r = 0; r < ROWS; r++) {
             const n = counts[r], nodes = [];
@@ -282,54 +294,63 @@
     }
 
     // ---------------------------------------------------------------- Karte zeichnen
+    function cardImg(id) {
+        try { return (typeof imageCandidatesAll === 'function' && imageCandidatesAll(id, 'ea', 'norm')[0]) || ''; } catch (e) { return ''; }
+    }
     function openMap() {
         if (!run) return;
         ensureRoot(); showRoot();
         const avail = availableIds();
-        const nodeW = 64;
         const rows = run.map, ROWS = rows.length;
-        const mapH = 900;
         const block = R.block(run.act);
-        const bossName = block.boss.name;
+        const boss = block.boss;
+        const bossImg = cardImg(boss.hero);
+        // Position in Prozent der Kartenfläche: Start unten, Boss oben
         const pos = (n) => {
             const row = rows[n.row] || [n];
-            const x = (row.length === 1) ? 50 : ((n.col + 0.5) / row.length) * 100;
-            const y = (1 - (n.row + 0.62) / ROWS) * 100;
+            const x = (row.length === 1) ? 50 : 14 + (n.col / (row.length - 1)) * 72;
+            const y = 92 - (n.row / Math.max(1, ROWS - 1)) * 82;
             return { x, y };
         };
         const edges = [];
         for (const row of rows) for (const n of row) for (const nx of n.next) {
             const t = findNode(nx); if (!t) continue;
             const a = pos(n), b = pos(t);
-            const cls = (run.node === n.id ? ' hot' : '') + (run.visited[n.id] && run.visited[nx] ? ' done' : '') + (avail.has(nx) && (run.node === n.id || (!run.node && n.row === 0)) ? ' next' : '');
+            const cls = (run.visited[n.id] && run.visited[nx] ? ' done' : '') + (avail.has(nx) && (run.node === n.id || (!run.node && n.row === 0)) ? ' next' : '');
             edges.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="rl-edge${cls}"/>`);
         }
         const nodeHtml = rows.flat().map(n => {
             const p = pos(n), info = NODE_INFO[n.type] || NODE_INFO.fight;
-            const isCur = run.node === n.id;
-            const isNext = avail.has(n.id);
-            const done = !!run.visited[n.id] && !isCur;
-            const locked = !isCur && !isNext && !done;
-            const label = n.type === 'boss' ? 'Boss' : info.label;
-            return `<button class="rl-node ${n.type}${isCur ? ' current' : ''}${isNext ? ' next' : ''}${done ? ' done' : ''}${locked ? ' locked' : ''}"
-                style="left:${p.x}%;top:${p.y}%;--w:${nodeW}px" data-node="${n.id}" title="${esc(label)}">
-                <span class="rl-node-icon">${info.icon}</span>
+            const isCur = run.node === n.id, isNext = avail.has(n.id), done = !!run.visited[n.id] && !isCur;
+            const st = (isCur ? ' current' : '') + (isNext ? ' next' : '') + (done ? ' done' : '') + (!isCur && !isNext && !done ? ' locked' : '');
+            const label = n.type === 'boss' ? boss.name.split(',')[0] : info.label;
+            const img = n.type === 'boss' && bossImg ? `<img class="rl-node-card" src="${bossImg}" alt="">` : `<img src="${ICON(info.img)}" alt="">`;
+            return `<div class="rl-node-wrap${st}" style="left:${p.x}%;top:${p.y}%">
+                <button class="rl-node ${n.type}${st}" data-node="${n.id}" title="${esc(info.label + ' – ' + info.hint)}">${img}</button>
                 <span class="rl-node-label">${esc(label)}</span>
-            </button>`;
+            </div>`;
         }).join('');
+        const legend = ['fight', 'elite', 'event', 'shop', 'campfire'].map(k => `<div class="rl-legend-item" title="${esc(NODE_INFO[k].hint)}"><img src="${ICON(NODE_INFO[k].img)}" alt=""><span>${esc(NODE_INFO[k].label)}</span></div>`).join('');
         setMain(`
             <div class="rl-map-screen">
                 ${hudHtml()}
-                <div class="rl-map-intro">
-                    <span class="rl-map-act">Akt ${run.act} · ${esc(block.name)}</span>
-                    <span class="rl-map-story">${esc(block.blurb)}</span>
-                </div>
-                <div class="rl-map-scroll">
-                    <div class="rl-map" style="height:${mapH}px">
-                        <svg class="rl-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none">${edges.join('')}</svg>
-                        ${nodeHtml}
-                        <div class="rl-map-caption top">👑 ${esc(bossName)}</div>
-                        <div class="rl-map-caption bottom">Start · Akt ${run.act}</div>
+                <div class="rl-map-body">
+                    <aside class="rl-map-side">
+                        <div class="rl-kicker">Akt ${run.act} von ${R.BLOCKS.length}</div>
+                        <h2 class="rl-map-title">${esc(block.name)}</h2>
+                        <div class="rl-map-sets">${block.setNames.map(esc).join(' · ')}</div>
+                        <p class="rl-map-blurb">${esc(block.blurb)}</p>
+                        <div class="rl-boss-preview">
+                            ${bossImg ? `<img src="${bossImg}" alt="">` : ''}
+                            <div><small>Wächter des Akts</small><b>${esc(boss.name)}</b><i>„${esc(boss.quote || '')}"</i></div>
+                        </div>
+                        <div class="rl-legend">${legend}</div>
+                    </aside>
+                    <div class="rl-map-board">
+                        <div class="rl-map">
+                            <svg class="rl-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none">${edges.join('')}</svg>
+                            ${nodeHtml}
+                        </div>
                     </div>
                 </div>
             </div>`);
@@ -341,8 +362,6 @@
             if (!availableIds().has(n.id)) { toast('Dieser Weg ist nicht erreichbar.'); return; }
             enterNode(n);
         });
-        const sc = mainEl.querySelector('.rl-map-scroll');
-        if (sc) sc.scrollTop = sc.scrollHeight;
     }
 
     function enterNode(n) {
@@ -389,17 +408,20 @@
         G.real = true; G.humans = [1];
         G.rl = {
             arts: (run.artifacts || []).slice(), f: {}, kind: node.type, pid: 1,
-            boss: !!enemy.isBoss, act: run.act || 1, goldEarned: 0, played: 0
+            boss: !!enemy.isBoss, act: run.act || 1, goldEarned: 0, played: 0,
+            souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, elite: enemy.trait || null
         };
         UI.reset();
         UI.overFor = G;                                         // Standard-Siegbildschirm unterdrücken
         // Lebensstand aus dem Run übernehmen
-        run.hp = clamp(run.hp, 1, run.maxHp);
+        run.hp = run.maxHp;                                     // Jeder Kampf ist fair: volles Leben (kein Lebensverlust zwischen den Kämpfen)
         G.p1.hero.b.hp = run.maxHp; G.p1.hero.hp = run.maxHp;
-        G.p1.hero.damage = Math.max(0, run.maxHp - run.hp);
+        G.p1.hero.damage = 0;
         // Gegner
         G.p2.hero.b.hp = enemy.hp; G.p2.hero.hp = enemy.hp;
         G.p2.hero.name = enemy.name;
+        // Boss: im Spiel die ID des Originalhelden, damit seine Kartenregeln greifen (z. B. Lich King: "Allies you control are Scourge")
+        if (enemy.isBoss) { const bh = R.block(run.act).boss.hero; if (CARDS[bh]) G.p2.hero.id = bh; }
         // Originalgetreu: Beide Spieler beginnen ohne Ressourcen und legen pro Zug eine.
         // Dadurch sind Quests/Locations echte Ressourcen-Karten im Deck.
         // Starthände
@@ -424,23 +446,32 @@
             if (typeof showTurnBanner === 'function') showTurnBanner('Dein Zug!');
         }
     }
+    // Kampf-HUD: nur Gold, Tränke (zum Benutzen) und Aufgeben. Alles andere zeigt das Spielfeld selbst.
     function showBattleHud(enemy) {
         hideBattleHud();
         battleHud = document.createElement('div');
         battleHud.id = 'rl-battle-hud';
         battleHud.className = 'rl-battle-hud';
-        const block = R.block(run.act);
-        const arts = (run.artifacts || []).map(id => R.art(id)).filter(Boolean);
-        const quote = enemy && enemy.quote ? `„${esc(enemy.quote)}"` : '';
-        battleHud.innerHTML = `<div class="rl-bh-main">
-            <span class="rl-bh-act">Akt ${run.act}/4 · ${esc(block.short)}</span>
-            <span class="rl-bh-hp">❤ ${run.hp}/${run.maxHp}</span>
-            <span class="rl-bh-gold">🪙 ${run.gold}</span>
-            <span class="rl-bh-sep"></span>
-            <span class="rl-bh-arts">${arts.map(a => `<span title="${esc(a.text)}">${esc(a.name)}</span>`).join('')}</span>
-            <button class="rl-btn tiny danger" id="rl-bh-concede">Aufgeben</button>
-        </div>${enemy ? `<div class="rl-bh-enemy"><b>${esc(enemy.name)}</b>${enemy.isBoss ? ' <span class="rl-bh-boss">Boss</span>' : ''}${quote ? `<span class="rl-bh-quote">${quote}</span>` : ''}</div>` : ''}`;
         document.body.appendChild(battleHud);
+        renderBattleHud();
+        // Vor dem Kampf: Deck-Idee des Gegners (und Elite-Eigenschaft) einmal ansagen
+        if (enemy) {
+            const tr0 = enemy.trait ? R.ELITE_TRAITS.find(t => t.id === enemy.trait) : null;
+            const msg = (enemy.deckName ? `Gegner: ${enemy.deckName}${enemy.title ? ' (' + enemy.title + ')' : ''}. ${enemy.deckIdea || ''}` : `Gegner: ${enemy.name}.`) + (tr0 ? ` Elite – ${tr0.name}: ${tr0.text}` : '');
+            try { showToast(msg, false, 9000); } catch (e) { }
+        }
+    }
+    function renderBattleHud() {
+        if (!battleHud || !run) return;
+        const gold = run.gold + ((G && G.rl && G.rl.goldEarned) || 0);
+        const pv = (G && R.preventOf) ? R.preventOf(G) : 0;
+        battleHud.innerHTML = `<div class="rl-bh-main">
+            <span class="rl-bh-gold" title="Gold"><img src="${ICON('Miscellaneous/Coin_02.png')}" alt=""><b>${gold}</b></span>
+            ${potionSlotsHtml(true)}
+            ${pv > 0 ? `<span class="rl-bh-prevent" title="Dein Held verhindert in diesem Zug noch ${pv} Schaden.">🛡 ${pv}</span>` : ''}
+            <button class="rl-bh-flag" id="rl-bh-concede" title="Kampf aufgeben">🏳</button>
+        </div>`;
+        battleHud.querySelectorAll('.rl-pot.use').forEach(b => b.onclick = () => usePotionAt(+b.dataset.pot));
         const c = battleHud.querySelector('#rl-bh-concede');
         if (c) c.onclick = () => {
             try {
@@ -449,14 +480,26 @@
                 });
             } catch (e) { if (G && !G.gameOver) { G.gameOver = true; G.winner = 2; } }
         };
+        battleHud.dataset.sig = gold + '|' + pv + '|' + (run.potions || []).join(',');
+    }
+    function usePotionAt(i) {
+        const id = (run.potions || [])[i]; const p = R.potById(id);
+        if (!p || !G || !G.rl) return;
+        if (!R.canUsePotion(G)) return toast('Tränke kannst du nur in deinem Zug benutzen, wenn nichts auf der Kette liegt.');
+        if (!R.usePotion(G, id)) return toast(`${p.name} hätte jetzt keine Wirkung.`);
+        run.potions.splice(i, 1); saveRun();
+        try { process(G); } catch (e) { }
+        try { render(); } catch (e) { }
+        try { if (typeof playEventAnimations === 'function') playEventAnimations(); } catch (e) { }
+        renderBattleHud();
     }
     function hideBattleHud() { if (battleHud && battleHud.parentNode) battleHud.parentNode.removeChild(battleHud); battleHud = null; }
     function checkBattleEnd() {
         if (!G || !G.rl || !battleCtx || battleCtx.finished) return;
         if (!G.gameOver) {
             if (battleHud) {
-                const hp = Math.max(0, hpOf(G, G.p1.hero) - (G.p1.hero.damage || 0));
-                const h = battleHud.querySelector('.rl-bh-hp'); if (h) h.textContent = '❤ ' + hp + '/' + run.maxHp;
+                const sig = (run.gold + (G.rl.goldEarned || 0)) + '|' + (R.preventOf ? R.preventOf(G) : 0) + '|' + (run.potions || []).join(',');
+                if (battleHud.dataset.sig !== sig) renderBattleHud();
             }
             return;
         }
@@ -466,6 +509,8 @@
         const won = G.winner === 1;
         const hpLeft = Math.max(0, hpOf(G, G.p1.hero) - (G.p1.hero.damage || 0));
         const goldEarned = (G.rl.goldEarned || 0);
+        // Werte, die den Kampf überdauern (Soulwell, Aufwertung "Blutdurst", Tome of Valor)
+        ctx.rl = { souls: G.rl.souls || 0, cardAtk: G.rl.cardAtk || {}, plays: G.rl.plays || 0, activePl: G.activePlayer };
         setTimeout(() => finishBattle(won, hpLeft, goldEarned, ctx), 700);
     }
     function finishBattle(won, hpLeft, goldEarned, ctx) {
@@ -477,14 +522,15 @@
             openDefeat();
             return;
         }
-        run.hp = clamp(hpLeft, 1, run.maxHp);
+        run.hp = run.maxHp;
         const enemy = ctx.enemy;
         const gold = (enemy.gold || 15) + goldEarned;
         run.gold += gold;
         run.battles++;
         if (ctx.node.type === 'elite') run.elites++;
         // Artefakt "Momentum"
-        for (const id of (run.artifacts || [])) { const a = R.art(id); if (a && a.runWin) { try { a.runWin(run); } catch (e) { } } }
+        if (ctx.rl) { run.cardAtk = ctx.rl.cardAtk; run.souls = ctx.rl.souls; }
+        for (const id of (run.artifacts || [])) { const a = R.art(id); if (a && a.runWin) { try { a.runWin(run, ctx.rl || null); } catch (e) { } } }
         run.node = ctx.node.id; run.row = ctx.node.row; run.visited[ctx.node.id] = true;
         run.pending = null;
         saveRun();
@@ -497,9 +543,12 @@
             }
             return;
         }
+        // Trank als Beute: Elites immer, normale Kämpfe mit 40 %
+        let potion = null;
+        if (ctx.node.type === 'elite' || Math.random() < 0.4) { potion = R.randomPotion(); if ((run.potions || []).length < R.POTION_SLOTS) { run.potions.push(potion); saveRun(); } else potion = null; }
         const cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8 });
         const arts = ctx.node.type === 'elite' ? R.availableArtifacts(run, 3) : null;
-        openReward({ node: ctx.node, cards, gold, arts, elite: ctx.node.type === 'elite' });
+        openReward({ node: ctx.node, cards, gold, arts, elite: ctx.node.type === 'elite', potion });
     }
 
     // ---------------------------------------------------------------- Aktwechsel
@@ -509,10 +558,9 @@
         run.row = -1; run.node = null; run.visited = {}; run.pending = null;
         run.map = genMap(run.act);
         run.maxHp += 6;
-        const healAmt = Math.round(run.maxHp * 0.30) + 6;
-        run.hp = clamp(run.hp + healAmt, 1, run.maxHp);
+        run.hp = run.maxHp;
         saveRun();
-        openActIntro(() => openActReward(), healAmt);
+        openActIntro(() => openActReward(), 6);
     }
     function openActIntro(cb, healed) {
         if (!run) return;
@@ -532,7 +580,7 @@
                         <div class="rl-act-boss-icon">👑</div>
                         <div><small>Boss dieses Akts</small><b>${esc(boss.name)}</b><p>„${esc(boss.quote || '')}"</p></div>
                     </div>
-                    ${healed ? `<div class="rl-act-heal">Der Übergang stärkt dich: <b>+6 maximales Leben</b> und <b>+${healed} Leben</b> geheilt.</div>` : ''}
+                    ${healed ? `<div class="rl-act-heal">Der Übergang stärkt dich: <b>+${healed} maximales Leben</b>.</div>` : ''}
                     <div class="rl-act-rules">
                         <span>Neue Karten im Pool: <b>${b.sets.map(s => 'Set ' + s).join(', ')}</b></span>
                         <span>Dein Deck bleibt erhalten. Gegner nutzen alle bisherigen Set-Blöcke.</span>
@@ -587,6 +635,7 @@
                         <div><div class="rl-kicker">Sieg</div><h2>Beute aus dem Kampf</h2></div>
                         <div class="rl-gold-big">+${r.gold} 🪙</div>
                     </div>
+                    ${r.potion && R.potById(r.potion) ? `<div class="rl-loot-potion"><img src="${ICON(R.potById(r.potion).icon)}" alt=""><div><small>Trank erbeutet</small><b>${esc(R.potById(r.potion).name)}</b><span>${esc(R.potById(r.potion).text)}</span></div></div>` : ""}
                     <p class="rl-lead">Wähle eine Karte für dein Deck. Du kannst auch überspringen – dann erhältst du 8 Gold.</p>
                     <div class="rl-reward-row" id="rl-reward-row">${rows}</div>
                     <div class="rl-panel-actions">
@@ -652,6 +701,7 @@
         node.stock = {
             cards: R.rewardCards(run, 3, { minCost: 0, maxCost: 8 }),
             arts: R.availableArtifacts(run, 2),
+            pots: [R.randomPotion(), R.randomPotion()],
             removal: true,
             rerolls: 0
         };
@@ -676,6 +726,7 @@
                     </div>
                     <div class="rl-shop-section"><h3>Karten</h3><div class="rl-shop-cards" id="rl-shop-cards"></div></div>
                     <div class="rl-shop-section"><h3>Artefakte</h3><div class="rl-artifact-row small" id="rl-shop-arts"></div></div>
+                    <div class="rl-shop-section"><h3>Tränke <small>(${(run.potions || []).length}/${R.POTION_SLOTS} Plätze)</small></h3><div class="rl-shop-pots" id="rl-shop-pots"></div></div>
                     <div class="rl-shop-section rl-shop-services">
                         <h3>Dienste</h3>
                         <button class="rl-service" id="rl-remove" ${!stock.removal || run.gold < 45 ? 'disabled' : ''}>
@@ -718,6 +769,23 @@
             };
             awrap.appendChild(b);
         });
+        const pwrap = mainEl.querySelector('#rl-shop-pots');
+        if (!stock.pots) stock.pots = [R.randomPotion(), R.randomPotion()];
+        stock.pots.forEach((id, i) => {
+            const p = R.potById(id); if (!p || !pwrap) return;
+            const price = Math.round(p.price * (run.priceMod || 1));
+            const full = (run.potions || []).length >= R.POTION_SLOTS;
+            const b = document.createElement('button');
+            b.className = 'rl-shop-pot' + (run.gold < price || full ? ' cant' : '');
+            b.innerHTML = `<img src="${ICON(p.icon)}" alt=""><div><b>${esc(p.name)}</b><span>${esc(p.text)}</span></div><em>${price} 🪙</em>`;
+            b.onclick = () => {
+                if (full) return toast('Alle Trankplätze sind belegt.');
+                if (run.gold < price) return toast('Nicht genug Gold.');
+                run.gold -= price; run.potions.push(id); stock.pots.splice(i, 1);
+                saveRun(); toast(`${p.name} gekauft.`); openShop(node);
+            };
+            pwrap.appendChild(b);
+        });
         on('#rl-remove', 'click', () => {
             if (!stock.removal) return;
             if (run.gold < 45) return toast('Nicht genug Gold.');
@@ -731,6 +799,7 @@
             run.gold -= 25;
             stock.cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8 });
             stock.arts = R.availableArtifacts(run, 2);
+            stock.pots = [R.randomPotion(), R.randomPotion()];
             saveRun(); openShop(node);
         });
         on('#rl-leave-shop', 'click', () => finishNode(node));
@@ -742,23 +811,21 @@
 
     // ---------------------------------------------------------------- Lagerfeuer
     function openCampfire(node) {
-        const heal = Math.max(7, Math.round(run.maxHp * 0.32));
-        const canRest = run.hp < run.maxHp;
         setMain(`
             <div class="rl-modal-screen">
                 ${hudHtml()}
                 <div class="rl-panel">
-                    <div class="rl-panel-head"><div><div class="rl-kicker">Lagerfeuer</div><h2>Rast und Schmiede</h2></div></div>
+                    <div class="rl-panel-head"><div><div class="rl-kicker">Lagerfeuer</div><h2>Training und Schmiede</h2></div></div>
                     <p class="rl-lead">Die Flammen knistern. Ein Moment der Ruhe – oder der Vorbereitung.</p>
                     <div class="rl-campfire">
-                        <button class="rl-camp-opt" id="rl-rest" ${canRest ? '' : 'disabled'}>
-                            <span class="rl-camp-icon">🌙</span><b>Rasten</b><small>Heile ${heal} Leben.</small>
+                        <button class="rl-camp-opt" id="rl-rest">
+                            <span class="rl-camp-icon">💪</span><b>Trainieren</b><small>+5 maximales Leben.</small>
                         </button>
                         <button class="rl-camp-opt" id="rl-smith">
                             <span class="rl-camp-icon">⚒️</span><b>Schmieden</b><small>Werte eine Karte dauerhaft auf.</small>
                         </button>
-                        <button class="rl-camp-opt" id="rl-remove2" ${run.gold < 40 ? 'disabled' : ''}>
-                            <span class="rl-camp-icon">🪓</span><b>Karte entfernen</b><small>40 🪙 · Entferne eine Karte.</small>
+                        <button class="rl-camp-opt" id="rl-remove2">
+                            <span class="rl-camp-icon">🪓</span><b>Karte entfernen</b><small>Entferne eine Karte aus deinem Deck.</small>
                         </button>
                     </div>
                     <div class="rl-panel-actions"><button class="rl-btn ghost" id="rl-camp-leave">Weiter →</button></div>
@@ -766,15 +833,14 @@
             </div>`);
         wireHud();
         on('#rl-rest', 'click', () => {
-            run.hp = clamp(run.hp + heal, 0, run.maxHp); saveRun(); toast(`+${heal} Leben.`); finishNode(node);
+            run.maxHp += 5; run.hp = run.maxHp; saveRun(); toast('+5 maximales Leben.'); finishNode(node);
         });
         on('#rl-smith', 'click', () => {
             openUpgradeChoice(node, e => { upgradeEntry(e); finishNode(node); }, () => openCampfire(node));
         });
         on('#rl-remove2', 'click', () => {
-            if (run.gold < 40) return;
-            openDeckPicker('remove', 'Karte entfernen (40 🪙)', e => {
-                run.gold -= 40; removeDeckEntry(e.uid); saveRun(); toast('Karte entfernt.'); finishNode(node);
+            openDeckPicker('remove', 'Karte entfernen', e => {
+                removeDeckEntry(e.uid); saveRun(); toast('Karte entfernt.'); finishNode(node);
             }, () => openCampfire(node));
         });
         on('#rl-camp-leave', 'click', () => finishNode(node));
@@ -818,21 +884,20 @@
         const continuePrompt = () => done();
         if (ch.kind === 'none') return done();
         if (ch.kind === 'heal') {
-            const heal = Math.max(6, Math.round(run.maxHp * (ch.value || 0.3)));
-            run.hp = clamp(run.hp + heal, 0, run.maxHp); saveRun(); toast(`+${heal} Leben.`); return done();
+            run.maxHp += 3; run.hp = run.maxHp; saveRun(); toast('+3 maximales Leben.'); return done();   // alte Spielstände: Heilen gibt es zwischen Kämpfen nicht mehr
         }
         if (ch.kind === 'gold') {
             if (ch.value < 0) {
                 if (run.gold < -ch.value) toast('Du hast nicht genug Gold – der Preis wird trotzdem gefordert.');
                 run.gold = Math.max(0, run.gold + ch.value);
             } else run.gold += ch.value;
-            if (ch.hp) run.hp = Math.max(1, run.hp - ch.hp);
+            if (ch.hp) { run.maxHp = Math.max(12, run.maxHp - ch.hp); run.hp = run.maxHp; }
             saveRun();
             toast(ch.value >= 0 ? `+${ch.value} Gold.` : `${ch.value} Gold.`);
             return done();
         }
         if (ch.kind === 'maxhp') {
-            run.maxHp += ch.value || 0; run.hp = clamp(run.hp + (ch.value || 0), 1, run.maxHp);
+            run.maxHp += ch.value || 0; run.hp = run.maxHp;
             saveRun(); toast(`Maximales Leben: ${run.maxHp}.`); return done();
         }
         if (ch.kind === 'artifact') {
@@ -841,7 +906,7 @@
             const ids = R.availableArtifacts(run, 3);
             if (!ids.length) { toast('Keine weiteren Artefakte verfügbar.'); return done(); }
             if (ch.hp) {
-                run.maxHp -= ch.hp; run.hp = clamp(run.hp, 1, run.maxHp);
+                run.maxHp -= ch.hp; run.hp = run.maxHp;
             }
             if (ch.value) run.gold -= ch.value;
             return openEventArtifactPick(ids, node);
@@ -862,12 +927,12 @@
             const n = ch.value || 1;
             const ids = R.rewardCards(run, n, { maxCost: 8 });
             ids.forEach(id => addCardToRun(id));
-            if (ch.hp) run.hp = Math.max(1, run.hp - ch.hp);
+            if (ch.hp) { run.maxHp = Math.max(12, run.maxHp - ch.hp); run.hp = run.maxHp; }
             saveRun(); toast(`${ids.length} Karte(n) erhalten.`); return done();
         }
         if (ch.kind === 'chest') {
             if (Math.random() < 0.5) { run.gold += 70; saveRun(); toast('Die Truhe enthält 70 Gold!'); }
-            else { run.hp = Math.max(1, run.hp - 12); saveRun(); toast('Eine Falle! 12 Schaden.'); }
+            else { run.maxHp = Math.max(12, run.maxHp - 4); run.hp = run.maxHp; saveRun(); toast('Eine Falle! −4 maximales Leben.'); }
             return done();
         }
         if (ch.kind === 'fightElite') {

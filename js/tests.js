@@ -1360,6 +1360,83 @@ function runRuleTests() {
         assert(s.pending.opts.filter(o => typeof o.v === 'string' && !o.v.startsWith('__')).every(o => big.cost + gy.find(g => g.uid === o.v).cost <= 7), 'Ally über Budget angeboten');
         assert(s.pending.prompt.includes(`${big.cost}/7`), 'Kostenanzeige fehlt: ' + s.pending.prompt);
     });
+    test(136, 'Roguelike: Aufwertungen bleiben im Spiel die Originalkarte (ID, Name, Death Rattle, Rückkehr ins Deck)', () => {
+        if (typeof RL === 'undefined') return;                                            // Node-Testlauf ohne Roguelike-Dateien
+        const byName = n => Object.values(CARDS).find(c => typeof c.id === 'number' && c.name === n);
+        const freeze = byName('Freeze'); assert(freeze && FX[freeze.id] && FX[freeze.id].deathRattle, 'Testaufbau: Freeze (Death Rattle) fehlt');
+        const key = RL.upgraded(freeze.id); assert(key !== freeze.id, 'Freeze wurde nicht aufgewertet');
+        const c = makeCardInst(key, false, 1);
+        assert(c.id === freeze.id && c.rlUp === key && c.name === freeze.name, `Instanz ${c.id}/${c.rlUp}/${c.name}`);
+        assert(c.upgradeEffect && RL.effectOf(c), 'Aufwertung an der Instanz fehlt');
+        // Death Rattle der aufgewerteten Karte löst aus (Wächter über die Friedhöfe, cardfx12.js)
+        const s = fresh(); s.rl = { arts: [], f: {}, act: 1, pid: 1 }; const p = P(s, 1);
+        s.waitTrig = []; STATE_FIX.forEach(f => f(s)); s.waitTrig = [];
+        p.graveyard.push(c); STATE_FIX.forEach(f => f(s));
+        assert((s.waitTrig || []).some(w => w.steps.some(st => st.k === 'deathRattle12')), 'Death Rattle der aufgewerteten Karte löst nicht aus');
+        // Rückkehr ins Deck behält die Aufwertung (deckId)
+        const al = makeCardInst(RL.upgraded(byName('Darnassus Sentinels').id), false, 1); p.allies.push(al);
+        leavePlay(s, al, 'deckTop', { destroyed: false });
+        assert(p.deck[p.deck.length - 1] === al.rlUp, 'Aufwertung beim Zurücklegen ins Deck verloren: ' + p.deck[p.deck.length - 1]);
+    });
+    test(137, 'Roguelike: neue Effekte – Death Rattle-Aufwertung, Wailing Souls, Void Star Talisman, Verhindern in diesem Zug (CR 717), Combo-Passung', () => {
+        if (typeof RL === 'undefined') return;
+        const s = fresh(); s.rl = { arts: ['art_knell', 'art_void', 'art_soulfrag'], f: {}, act: 1, pid: 1 }; const p = P(s, 1);
+        // Aufwertung mit Death Rattle (rlDR) + Wailing Souls: zwei Auslöser
+        const base = Object.values(CARDS).find(c => typeof c.id === 'number' && c.type === 'Ability' && RL.isPoolCard(c) && !(FX[c.id] || {}).deathRattle);
+        const up = RL.upgraded(base.id, 'up_dr_draw'); const c = makeCardInst(up, false, 1);
+        assert(c.rlDR && c.upgradeEffect === 'up_dr_draw', 'Death-Rattle-Aufwertung nicht gesetzt');
+        s.waitTrig = []; STATE_FIX.forEach(f => f(s)); s.waitTrig = [];
+        p.graveyard.push(c); STATE_FIX.forEach(f => f(s));
+        const drs = (s.waitTrig || []).filter(w => w.steps.some(st => st.k === 'E:rlDeathRattle'));
+        assert(drs.length === 2, `Wailing Souls: ${drs.length} statt 2 Auslöser`);
+        // Void Star Talisman + Soul Fragment: entfernte Karte ⇒ Klassenfähigkeit (kostet 1 weniger) und 2 Schaden verhindern
+        const h0 = p.hand.length; p.removed.push(makeCardInst(base.id, false, 1)); STATE_FIX.forEach(f => f(s));
+        assert(p.hand.length === h0 + 1 && p.hand[p.hand.length - 1].rlCostDown === 1, 'Void Star Talisman gibt keine Karte');
+        assert(RL.preventOf(s) === 2, `Soul Fragment: ${RL.preventOf(s)} statt 2 zu verhindernder Schaden`);
+        const d0 = p.hero.damage || 0; dealDamage(s, { src: P(s, 2).hero.uid, tgt: p.hero.uid, amt: 3, dt: 'Melee' }); process(s);
+        assert((p.hero.damage || 0) === d0 + 1, 'Verhindern wirkt nicht (3 Schaden, 2 verhindert)');
+        s.turn++; assert(RL.preventOf(s) === 0, 'Verhindern gilt länger als dieser Zug');
+        // Passung: Combo-Fähigkeiten bekommen die Combo-Aufwertung
+        assert(RL.effectForCard(CARDS[102]).id === 'up_combo_point', 'Sinister Strike (Combo) ohne Combo-Aufwertung');
+    });
+    test(138, 'Roguelike: Tränke wirken nur im eigenen Zug, Elite-Eigenschaften gelten für die Allies des Gegners', () => {
+        if (typeof RL === 'undefined') return;
+        const mk = () => { const s = fresh(); s.rl = { arts: [], f: {}, act: 1, pid: 1 }; s.chain = []; s.pending = null; s.battle = null; res(s, 1, 3); return s; };
+        // jeder Trank: in passender Lage benutzbar und mit Wirkung
+        for (const p of RL.POTIONS) {
+            const s = mk(); const me = P(s, 1), op = P(s, 2);
+            me.hero.damage = 10; me.resources.forEach(r => { r.exhausted = true; }); me.hero.exhausted = true;
+            const ally = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && (c.hp || 0) >= 4 && !c.unique);
+            const a1 = makeCardInst(ally.id, false, 2); op.allies.push(a1); const m1 = makeCardInst(ally.id, false, 1); me.allies.push(m1);
+            const before = JSON.stringify([me.hero.damage, me.hand.length, me.resources.filter(r => r.exhausted).length, a1.damage || 0, a1.exhausted, op.hero.damage || 0, me.hero.exhausted]);
+            assert(RL.usePotion(s, p.id), `${p.name}: nicht benutzbar`); process(s);
+            const after = JSON.stringify([me.hero.damage, me.hand.length, me.resources.filter(r => r.exhausted).length, a1.damage || 0, a1.exhausted, op.hero.damage || 0, me.hero.exhausted]);
+            const tmOk = (me.hero.tm || []).length || (m1.tm || []).length;
+            assert(before !== after || tmOk, `${p.name}: keine Wirkung`);
+        }
+        const s2 = mk(); s2.activePlayer = 2; assert(!RL.usePotion(s2, 'pot_wisdom'), 'Trank im gegnerischen Zug benutzbar');
+        // Elite: Fortitude gibt nur gegnerischen Allies +2 Gesundheit
+        const s3 = mk(); s3.rl.elite = 'el_fortitude';
+        const al = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && !(FX[c.id] || {}).aura);
+        const e1 = makeCardInst(al.id, false, 2), f1 = makeCardInst(al.id, false, 1); P(s3, 2).allies.push(e1); P(s3, 1).allies.push(f1);
+        assert(hpOf(s3, e1) === hpOf(s3, f1) + 2, `Fortitude: ${hpOf(s3, e1)} gegen ${hpOf(s3, f1)}`);
+    });
+    test(139, 'Combo-Punkte-Anzeige: nur mit Finishing Move, zählt wie beim Bezahlen (Filthy Tricks, Tyler Falconbridge)', () => {
+        const s = fresh(); const p = P(s, 1); p.graveyard = []; p.hand = []; p.deck = []; p.ongoing = []; p.allies = []; p.resources = [];
+        p.hero.weapons = []; p.hero.armors = [];
+        p.graveyard.push(makeCardInst(102, false, 1));                                     // Sinister Strike (Combo)
+        assert(comboPoints(s, 1) === 0, 'Anzeige ohne Finishing Move im Deck');
+        p.deck.push(97);                                                                    // Eviscerate (Finishing Move) im Deck
+        assert(comboPoints(s, 1) === 1, `1 Combo erwartet, ${comboPoints(s, 1)}`);
+        p.graveyard.push(makeCardInst(2147, false, 1));                                    // Tyler Falconbridge: im Friedhof auch eine Combo
+        const noCombo = Object.values(CARDS).find(c => c.type === 'Ability' && !(c.subtypes || []).includes('Combo') && c.id !== 2147 && c.id !== 2067);
+        p.graveyard.push(makeCardInst(noCombo.id, false, 1));
+        assert(comboPoints(s, 1) === 2, `Tyler: 2 erwartet, ${comboPoints(s, 1)}`);
+        p.ongoing.push(makeCardInst(2067, false, 1));                                      // Filthy Tricks: alle Karten im Friedhof sind Combos
+        assert(comboPoints(s, 1) === 3, `Filthy Tricks: 3 erwartet, ${comboPoints(s, 1)}`);
+        p.graveyard = [];
+        assert(comboPoints(s, 1) === 0, 'Anzeige bei leerem Friedhof');
+    });
     LANG = prevLang;
     return results;
 }

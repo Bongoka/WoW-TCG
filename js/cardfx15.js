@@ -468,7 +468,7 @@ FX[3520] = { aura: { kw: (s, src, sp, c, k) => k === 'protector' && isChar(c) &&
     on: { endOfTurn: (s, c, d, pid) => trig(s, { id: 3520, k: 'go', a: { pid } }) }, k: { go: (s, a) => makeToken(s, 3656, a.pid) } };
 // Nightmare Ender: "On your turn: Destroy this weapon >>> Shuffle your hand into your deck, then draw that many cards."
 FX[3521] = { powers: [{ key: 'ender', label: tr('Zerstören: Hand ins Deck mischen, gleich viele ziehen'), myTurn: true, selfCost: selfDestroyCost,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; const ids = p.hand.splice(0).map(c => c.id); if (n) evt(s, 'handLeft', { pid: it.pl }); p.deck.push(...ids); shuffleInPlace(p); drawCards(s, p, n); } }] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; const ids = p.hand.splice(0).map(deckId); if (n) evt(s, 'handLeft', { pid: it.pl }); p.deck.push(...ids); shuffleInPlace(p); drawCards(s, p, n); } }] };
 // Oathbinder: "At the start of your turn, your hero deals 1 nature damage to target hero for each ability, ally, and equipment you control."
 FX[3522] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3522, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => { const p = me(s, a.pid); const n = new Set([...(p.ongoing || []), ...p.allies, ...p.hero.weapons, ...p.hero.armors].map(c => c.uid)).size; if (!n) return;
@@ -497,7 +497,7 @@ FX[3527] = { enter: (s, c, pid) => { makeToken(s, 3657, pid); makeToken(s, 3657,
 FX[3528] = { reward: (s, pid) => { const p = me(s, pid); const n = [p.hero, ...alliesOf(p)].filter(c => c.damage > 0).length; if (n) drawCards(s, p, n); } };
 // Respite for a Tormented Soul: "Pay (2) to complete this quest. <p> Reward: Put target ally from a graveyard on top of its owner's deck."
 FX[3529] = { reward: (s, pid) => { const l = [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid); if (l.length) mustPick(s, pid, tr('Respite for a Tormented Soul: Ally aus einem Friedhof oben auf das Deck seines Besitzers'), 'Respite for a Tormented Soul', l, '3529:go', { pid }, u => locate(s, u).pid === pid ? (gyCard(s, u).c.cost || 0) : -1); },
-    k: { go: (s, a, u) => { const l = gyCard(s, u); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(l.c.id); L(s, tr`${l.c.name} kommt oben auf das Deck von ${o.hero.name}.`, '', a.pid); } } };
+    k: { go: (s, a, u) => { const l = gyCard(s, u); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(deckId(l.c)); L(s, tr`${l.c.name} kommt oben auf das Deck von ${o.hero.name}.`, '', a.pid); } } };
 // Securing the Ramparts: "If you control an armor, item, and weapon: Pay (1) to complete this quest. <p> Reward: Draw two cards."
 FX[3530] = { questCond: (s, pid) => { const h = me(s, pid).hero; return h.armors.some(a => a.type === 'Armor') && h.armors.some(a => a.type === 'Item') && h.weapons.length ? null : tr('Du brauchst eine Rüstung, einen Gegenstand und eine Waffe'); }, reward: (s, pid) => drawCards(s, me(s, pid), 2) };
 

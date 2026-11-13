@@ -176,7 +176,7 @@ FX[5] = { powers: [{ key: 'flip', label: tr('Umdrehen: Ziel kann nicht angreifen
     slots: (s, pid) => [{ label: tr('Ziel'), cands: targetCands(s, pid, CH), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'cantAttack', turn: s.turn }); } }] };
 FX[6] = { powers: [{ key: 'flip', label: tr('Umdrehen: Hand neu ziehen'), flip: true, cost: 3,
-    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.push(...p.hand.map(c => c.id)); handLeftAll(s, p); p.hand = []; shuffleInPlace(p); s._hidden = true; drawCards(s, p, n); } }] };
+    resolve: (s, it) => { const p = me(s, it.pl); const n = p.hand.length; p.deck.push(...p.hand.map(deckId)); handLeftAll(s, p); p.hand = []; shuffleInPlace(p); s._hidden = true; drawCards(s, p, n); } }] };
 FX[7] = { powers: [{ key: 'flip', label: tr('Umdrehen: Zerstöre erschöpften Ally'), flip: true, myTurn: true, cost: 5,
     slots: (s, pid) => [{ label: tr('Erschöpfter Ally'), cands: targetCands(s, pid, { ally: true, exhausted: true }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } }] };
@@ -357,6 +357,17 @@ FX[95] = { endStop: true, slots: poisonSlots, resolve: (s, it) => { it.attachTo 
 FX[96] = { slots: (s, pid) => [{ label: 'Ziel-Ausrüstung', cands: targetCands(s, pid, { equipment: true }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }], resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } };
 // Combos im Friedhof: gedruckt "Combo", Tyler Falconbridge ("also a Combo while in a graveyard"), Filthy Tricks ("Cards in your graveyard are Combos")
 const combosInGy = (s, pid) => { const all = me(s, pid).ongoing.some(o => o.id === 2067); return me(s, pid).graveyard.filter(c => all || (c.subtypes || []).includes('Combo') || c.id === 2147); };
+// Combo-Punkte: so viele Combos, wie ein Finishing Move jetzt entfernen könnte – gezählt
+// wie beim Bezahlen (combosInGy: Filthy Tricks, Tyler Falconbridge …). Nur wenn der Spieler einen Finishing Move mit
+// Standard-Beschreibung (Combo) besitzt, sonst 0. Die Hand zeigt die Punkte auf jedem solchen Finishing Move (ui.js, renderPlayerHand).
+const isComboFinisher = c => !!c && /Finishing Move \(/.test(c.text || '');
+function comboPoints(s, pid) {
+    const p = s && getPlayer(s, pid); if (!p) return 0;
+    const n = combosInGy(s, pid).length; if (!n) return 0;
+    const owned = [...p.deck.map(id => CARDS[id]), ...p.hand, ...p.graveyard, ...(p.removed || []), ...p.allies, ...p.ongoing,
+        ...p.hero.weapons, ...p.hero.armors, ...p.resources.map(r => r.card)];
+    return owned.some(isComboFinisher) ? n : 0;
+}
 function removeCombos(s, it) { const p = me(s, it.pl); let n = it.x || 0; for (const c of [...combosInGy(s, it.pl)]) { if (n <= 0) break; gyRemove(s, c.uid); n--; } combosRemoved(s, it); finishPrep(s); }
 // "When you remove one or more Combos from your graveyard to play a Finishing Move" (Find Weakness, Set 7)
 function combosRemoved(s, it) { if ((it.x || 0) > 0) evt(s, 'combosRemoved', { pid: it.pl, n: it.x }); }
@@ -768,7 +779,7 @@ FX[347] = { questCond: (s, pid) => me(s, pid).graveyard.filter(c => isAllyCard(c
             ask(s, { pid: a.pid, prompt: tr`Battle of Darrowshire: Ally aus dem Friedhof entfernen (noch ${a.left})`, src: 'Battle of Darrowshire', opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: -(findCharacter(s, u).cost || 0) })), k: '347:do', a }); },
         do: (s, a, v) => { gyRemove(s, v); q(s, { op: 'call', k: '347:pick', a: { ...a, left: a.left - 1 } }); } } };
 FX[348] = { reward: (s, pid) => q(s, { op: 'call', k: 'E:lookPick', a: { pid, n: 4, type: 'Equipment', reveal: true, byQuest: true, src: 'Big Game Hunter' } }) };
-FX[349] = { reward: (s, pid) => { const p = me(s, pid); p.deck.push(...p.graveyard.filter(c => !c.isToken).map(c => c.id)); p.graveyard = []; shuffleInPlace(p); s._hidden = true; } };
+FX[349] = { reward: (s, pid) => { const p = me(s, pid); p.deck.push(...p.graveyard.filter(c => !c.isToken).map(deckId)); p.graveyard = []; shuffleInPlace(p); s._hidden = true; } };
 FX[350] = { reward: (s, pid) => { const g = gyCands(s, pid, c => isAllyCard(c)); if (!g.length) return; ask(s, { pid, prompt: tr('Chasing A-Me 01: Ziel-Ally aus deinem Friedhof auf die Hand'), src: 'Chasing A-Me 01', opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: findCharacter(s, u).cost || 0 })), k: '350:do', a: {} }); },
     k: { do: (s, a, v) => fromGyToHand(s, v) } };
 FX[351] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); q(s, { op: 'call', k: 'E:discard', a: { pid, n: 1, src: 'A Donation of Wool' } }); } };

@@ -10,7 +10,7 @@ const oppWentFirst = (s, pid) => { const f = firstPid(s); return !!f && f !== pi
 // Karten aus dem Friedhof in das Deck mischen
 function gyToDeck(s, pid, uids) {
     const p = me(s, pid);
-    for (const u of uids) { const l = gyCard(s, u); if (!l || gyLocked(s, l.pid)) continue; const g = me(s, l.pid); g.graveyard.splice(g.graveyard.indexOf(l.c), 1); if (!l.c.isToken) me(s, l.c.owner || l.pid).deck.push(l.c.id); }
+    for (const u of uids) { const l = gyCard(s, u); if (!l || gyLocked(s, l.pid)) continue; const g = me(s, l.pid); g.graveyard.splice(g.graveyard.indexOf(l.c), 1); if (!l.c.isToken) me(s, l.c.owner || l.pid).deck.push(deckId(l.c)); }
     p.deck = shuffleDeck(p.deck);
 }
 // Genau n Karten nacheinander wählen (Zusatzkosten "… three allies …"), danach k mit der Liste
@@ -416,7 +416,7 @@ FX[6140] = { powers: [{ key: 'stormrage', label: tr('Beliebige Karte aus deinem 
 FX[6141] = { engine: true };   // Talian Bladebender: cantStrike (engine.js)
 FX[6142] = { enter: (s, c, pid) => trig(s, { id: 6142, k: 'ask', a: { pid } }),
     k: { ask: (s, a) => ask(s, { pid: a.pid, prompt: tr('Wildwatcher Elandra: Wessen Friedhof wird ins Deck gemischt?'), src: 'Wildwatcher Elandra', opts: [{ label: tr('Dein eigener'), v: a.pid, ai: 1 }, { label: tr('Der des Gegners'), v: a.pid === 1 ? 2 : 1, ai: 2 }], k: '6142:do', a }),
-        do: (s, a, v) => { const p = me(s, v); if (gyLocked(s, v)) return; const l = p.graveyard.filter(c => !c.isToken); p.graveyard = p.graveyard.filter(c => c.isToken); l.forEach(c => me(s, c.owner || v).deck.push(c.id)); p.deck = shuffleDeck(p.deck); L(s, tr`${p.hero.name} mischt den Friedhof ins Deck.`, '', v); } } };
+        do: (s, a, v) => { const p = me(s, v); if (gyLocked(s, v)) return; const l = p.graveyard.filter(c => !c.isToken); p.graveyard = p.graveyard.filter(c => c.isToken); l.forEach(c => me(s, c.owner || v).deck.push(deckId(c))); p.deck = shuffleDeck(p.deck); L(s, tr`${p.hero.name} mischt den Friedhof ins Deck.`, '', v); } } };
 FX[6143] = { on: { defends: (s, c, d, pid) => { if (d.def === c.uid) trig(s, { id: 6143, k: 'draw', a: { pid } }); } }, k: { draw: (s, a) => drawCards(s, me(s, a.pid), 1) } };
 FX[6144] = { noFatal: true };
 FX[6145] = { enter: (s, c, pid) => trig(s, { id: 6145, k: 'ask', a: { pid, uid: c.uid } }),

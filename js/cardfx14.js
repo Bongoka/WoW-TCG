@@ -433,7 +433,7 @@ FX[13151] = fxMix(onEnter(13151, 'go'), { k: { go: (s, a) => { const names = [..
     one: (s, a) => { const p = me(s, a.pid); s._hidden = true; const i = p.deck.findIndex(id => CARDS[id].name === a.name && isAllyCard(CARDS[id])); if (i < 0) { shuffleInPlace(p); return; } yesNo(s, a.pid, tr`King Ymiron: ${a.name} aus dem Deck ins Spiel bringen?`, 'King Ymiron', '13151:put', a, true); },
     put: (s, a, v) => { const p = me(s, a.pid); const i = p.deck.findIndex(id => CARDS[id].name === a.name && isAllyCard(CARDS[id])); if (v && i >= 0) { const id = p.deck.splice(i, 1)[0]; putIntoPlay(s, makeCardInst(id, false, a.pid), a.pid); } shuffleInPlace(p); } } });
 FX[13152] = fxMix(onEnter(13152, 'go'), { k: { go: (s, a) => mayPick(s, a.pid, tr('Malefic Necromancer: Ally aus dem Friedhof oben auf das Deck?'), 'Malefic Necromancer', gyAllyMine(s, a.pid), '13152:do', a, u => gyCard(s, u).c.cost || 0),
-    do: (s, a, v) => { const l = v && gyCard(s, v); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.deck.push(l.c.id); L(s, tr`${l.c.name} kommt oben auf das Deck.`, '', a.pid); } } });
+    do: (s, a, v) => { const l = v && gyCard(s, v); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.deck.push(deckId(l.c)); L(s, tr`${l.c.name} kommt oben auf das Deck.`, '', a.pid); } } });
 FX[13153] = { aura: { kw: (s, src, sp, c, k) => k === 'cantAttack' && c.uid === src.uid && !(s.p1.graveyard.length && s.p2.graveyard.length) } };
 FX[13154] = fxMix(deathRattle((s, a) => addTM(heroOf(s, a.pid), { k: 'assault', v: 1, turn: s.turn })),
     { powers: [{ key: 'orbaz', label: tr('3 Schaden auf sich, eigene Quest/Location zerstören: Ziel-Spieler zerstört eine gleicher Art'), canUse: (s, pid) => me(s, pid).resources.some(r => r.faceUp && (r.card.type === 'Quest' || r.card.type === 'Location')) || tr('Keine offene Quest oder Location'),
@@ -619,7 +619,7 @@ FX[13211] = { questCond: oppTurnQ, reward: (s, pid) => drawCards(s, me(s, pid), 
 FX[13212] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); mustPick(s, pid, tr('Cold Hearted: Schadensart von Ziel-Ally wird [Frost]'), 'Cold Hearted', targetCands(s, pid, { ally: true }), '13212:do', { pid }, () => 1); },
     k: { do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'dtAs', dt: 'Frost', turn: s.turn }); } } };
 FX[13213] = { reward: (s, pid) => { ask(s, { pid, prompt: tr('Everfrost: Wessen Friedhof wird ins Deck gemischt?'), src: 'Everfrost', opts: [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 1 }, { label: tr('Du selbst'), v: pid, ai: 2 }], k: '13213:do', a: { pid } }); },
-    k: { do: (s, a, v) => { const p = me(s, v); if (!gyLocked(s, p.id)) { p.deck.push(...p.graveyard.splice(0).map(c => c.id)); shuffleInPlace(p); } drawCards(s, me(s, a.pid), 2); } } };
+    k: { do: (s, a, v) => { const p = me(s, v); if (!gyLocked(s, p.id)) { p.deck.push(...p.graveyard.splice(0).map(deckId)); shuffleInPlace(p); } drawCards(s, me(s, a.pid), 2); } } };
 const CLASSES14 = ['Death Knight', 'Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior'];
 FX[13214] = { questExtra: questChoice(13214, tr("A Hero's Burden: Klasse nennen"), (s, pid) => CLASSES14.map(k => ({ label: k, v: k, ai: me(s, pid).deck.filter(id => isClassCardData(CARDS[id], k)).length }))),
     k: { qc: setQC }, reward: (s, pid, r) => revealTop(s, pid, 4, "A Hero's Burden", { pred: 'cls14', cls14: r.card.qc12, byQuest: true }) };

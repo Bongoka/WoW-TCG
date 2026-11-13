@@ -59,6 +59,7 @@
             <div class="rl-dbg-tabs">
                 <button class="rl-dbg-tab" data-tab="upgrades">Kartenaufwertungen</button>
                 <button class="rl-dbg-tab" data-tab="artifacts">Artefakte</button>
+                <button class="rl-dbg-tab" id="rl-dbg-enemies" title="Öffnet die Deck-Übersicht mit allen Gegner-Decks (bei jedem Öffnen neu gebaut)">Gegner-Decks</button>
             </div>
             <div class="rl-dbg-toolbar">
                 <input type="search" id="rl-dbg-search" placeholder="Suchen (Name, Text, ID) …" autocomplete="off">
@@ -76,6 +77,7 @@
         overlay.querySelector('[data-close]').onclick = close;
         overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
         overlay.querySelectorAll('.rl-dbg-tab').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; state.limit = 36; render(); });
+        overlay.querySelector('#rl-dbg-enemies').onclick = openEnemyDecks;
         const search = overlay.querySelector('#rl-dbg-search');
         search.value = state.q;
         search.oninput = () => {
@@ -90,6 +92,26 @@
     }
 
     function close() { if (overlay) { overlay.remove(); overlay = null; } }
+
+    // Gegner-Decks prüfen: jeder Archetyp in seinem Akt (Held und Deck so gebaut wie im Run) und die Bosse,
+    // angezeigt in der normalen Deck-Übersicht (Deck-Boxen, rechts Manakurve und Kartenliste beim Überfahren).
+    function openEnemyDecks() {
+        if (typeof openDeckOverview !== 'function') return;
+        const list = [];
+        for (let act = 1; act <= R.BLOCKS.length; act++) {
+            const b = R.block(act), decks = [];
+            for (const a of R.ARCHETYPES.filter(x => x.act === act)) {
+                const hero = R.heroForArch(a, act); if (!hero) continue;
+                decks.push({ id: 'rl_dbg_' + a.id, name: a.name, hero: hero.id, class: hero.class, faction: hero.faction, cards: R.buildThemeDeck(a, hero, act, 26 + act * 2) });
+            }
+            const boss = R.enemyFor({ act, row: 5 }, 'boss'), bh = CARDS[b.boss.hero] || CARDS[boss.hero];
+            decks.push({ id: 'rl_dbg_boss' + act, name: 'Boss: ' + b.boss.name.split(',')[0], hero: bh.id, class: boss.cls, faction: boss.faction, cards: boss.deck });
+            list.push({ head: `Akt ${act} · ${b.name}`, decks });
+        }
+        openDeckOverview({ title: 'Gegner-Decks (Debug, bei jedem Öffnen neu gebaut)', list, zIndex: 99800,
+            pick: d => { try { showToast(`${d.name}: ${d.cards.length} Karten`, false, 2000); } catch (e) { } } });
+    }
+    R.openEnemyDecks = openEnemyDecks;
 
     function render() {
         if (!overlay) return;

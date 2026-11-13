@@ -497,7 +497,7 @@ FX[5247] = { questCond: (s, pid) => alliesOf(me(s, pid)).some(a => FX[a.id] && F
 FX[5248] = { reward: (s, pid) => mustPick(s, pid, tr('Manaforge B\'naar: Ziel-Ally erschöpfen'), "Manaforge B'naar", targetCands(s, pid, { ally: true }), '5248:do', { pid }), k: { do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) exhaust(s, c); } } };
 FX[5249] = { questCond: (s, pid) => s.activePlayer === pid ? null : tr('Nur in deinem Zug'),
     reward: (s, pid) => mustPick(s, pid, tr('Deep Sea Salvage: Karte aus deinem Friedhof oben auf dein Deck'), 'Deep Sea Salvage', me(s, pid).graveyard.map(c => c.uid), '5249:do', { pid }, u => (findCharacter(s, u) || {}).cost || 0),
-    k: { do: (s, a, v) => { const l = gyCard(s, v); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); me(s, l.c.owner || l.pid).deck.push(l.c.id); } } };
+    k: { do: (s, a, v) => { const l = gyCard(s, v); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); me(s, l.c.owner || l.pid).deck.push(deckId(l.c)); } } };
 FX[5250] = { reward: (s, pid) => { const p = me(s, pid); if (!p.deck.length) return; const id = p.deck.pop(); L(s, tr`Dr. Boom!: ${CARDS[id].name}`); putDamage(s, p.hero, CARDS[id].cost || 0); p.hand.push(makeCardInst(id, false, pid)); } };
 FX[5251] = { questExtra: (s, pid) => pickMany(s, pid, tr('An Improper Burial: Allies aus deinem Friedhof entfernen (beliebig viele)'), 'An Improper Burial', gyCands(s, pid, c => isAllyCard(c)), '5251:pay', { pid }),
     reward: (s, pid) => { const m = pes(s, pid, 'burial').pop(); if (m && m.v >= 3) drawCards(s, me(s, pid), Math.floor(m.v / 3)); },
@@ -696,7 +696,7 @@ FX[5212] = { powers: [pathaleonPow(false), pathaleonPow(true)],
                 if (left.length) { ask(s, { pid: a.pid, prompt: tr('Pathaleon: Welche Handkarten unter das Deck legen?'), src: 'Pathaleon the Calculator', opts: [...left.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: (c.cost || 0) >= 6 ? 1 : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: '5212:pick', a: { ...a, list }, auto: false }); return; }
                 a = { ...a, list }; }
             const n = a.list.length; if (!n) return;
-            for (const u of a.list) { const i = p.hand.findIndex(c => c.uid === u); if (i >= 0) p.deck.unshift(p.hand.splice(i, 1)[0].id); }
+            for (const u of a.list) { const i = p.hand.findIndex(c => c.uid === u); if (i >= 0) p.deck.unshift(deckId(p.hand.splice(i, 1)[0])); }
             L(s, tr`Pathaleon: ${n} Karten unter das Deck.`, '', a.pid);
             drawCards(s, p, n);
         } } };
@@ -737,7 +737,7 @@ FX[5259] = { questNoPay: true,
             mustPick(s, a.pid, tr`Preparing for War: Karte ins Deck mischen (noch ${a.left})`, 'Preparing for War', c, '5259:add', a, u => { const l = gyCard(s, u); return l && l.pid === a.pid ? 1 + (l.c.cost || 0) * 0.1 : -1; });
         },
         add: (s, a, v) => q(s, { op: 'call', k: '5259:pick', a: { ...a, left: a.left - 1, list: [...a.list, v] } }),
-        go: (s, a) => { for (const u of a.list) { const l = gyCard(s, u); if (!l) continue; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(l.c.id); o.deck = shuffleDeck(o.deck); }
+        go: (s, a) => { for (const u of a.list) { const l = gyCard(s, u); if (!l) continue; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(deckId(l.c)); o.deck = shuffleDeck(o.deck); }
             if (a.list.length) L(s, tr`Preparing for War: ${a.list.length} Karten in die Decks gemischt.`, '', a.pid); } } };
 
 
@@ -767,7 +767,7 @@ FX[5205] = { sabotage: 'Player', on: { sabotages: (s, c, d, pid) => { if (d.att 
     k: { go: (s, a) => { const o = me(s, a.opp); const l = [...nonHeroCards(s, o).filter(c => ctrlOf(s, c) === o.id).map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), ...o.resources.map(r => ({ label: r.faceUp ? r.card.name : tr('verdeckte Ressource'), v: r.card.uid, ai: -1 }))];
             if (l.length) ask(s, { pid: a.opp, prompt: tr('Retainer Ryn: eigene Karte oben auf das Deck ihres Besitzers'), src: 'Retainer Ryn', opts: l, k: '5205:do', a }); },
         do: (s, a, v) => { const o = me(s, a.opp); const i = o.resources.findIndex(r => r.card.uid === v);
-            if (i >= 0) { const r = o.resources.splice(i, 1)[0]; me(s, r.card.owner || o.id).deck.push(r.card.id); L(s, tr`${r.faceUp ? r.card.name : tr('Eine Ressource')} kommt oben auf das Deck.`, '', o.id); return; }
+            if (i >= 0) { const r = o.resources.splice(i, 1)[0]; me(s, r.card.owner || o.id).deck.push(deckId(r.card)); L(s, tr`${r.faceUp ? r.card.name : tr('Eine Ressource')} kommt oben auf das Deck.`, '', o.id); return; }
             const c = findCharacter(s, v); if (c) leavePlay(s, c, 'deckTop', { destroyed: false }); } } };
 // Spymaster Thalodien: "When this ally sabotages a deck, reveal cards from the top until you reveal a non-quest. Remove that card from the game and put the rest on the bottom. You may play that card without paying its cost this turn. (If it has X in its cost, X is 0.)"
 FX[5207] = { sabotage: 'Deck', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5207, k: 'go', a: { pid, opp: oppPid(s, pid) } }); } },

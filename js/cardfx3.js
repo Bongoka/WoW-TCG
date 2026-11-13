@@ -277,7 +277,7 @@ FX[2104] = { slots: (s, pid) => [{ label: tr('Ziel-Allies (verteile 2 Feuerschad
 FX[2105] = { slots: slotAlly('Ziel-Ally', true), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { atk: (s, src, sp, c) => c.uid === src.attachedTo ? -2 : 0 },
     leave: (s, snap, dest, info) => { if (dest === 'graveyard' && info.destroyed) pushTrig(s, snap.wasCtrl, 2105, [{ op: 'call', k: '2105:top', a: { uid: snap.uid, owner: snap.owner } }]); },
-    k: { top: (s, a) => { const p = me(s, a.owner); const c = p.graveyard.find(x => x.uid === a.uid); if (!c) return; p.graveyard.splice(p.graveyard.indexOf(c), 1); p.deck.push(c.id); L(s, tr('Goblin Gumbo kommt oben auf das Deck seines Besitzers.')); } } };
+    k: { top: (s, a) => { const p = me(s, a.owner); const c = p.graveyard.find(x => x.uid === a.uid); if (!c) return; p.graveyard.splice(p.graveyard.indexOf(c), 1); p.deck.push(deckId(c)); L(s, tr('Goblin Gumbo kommt oben auf das Deck seines Besitzers.')); } } };
 FX[2106] = { powers: [{ key: 'fish', label: tr('Ziehe 3 und setze nächsten Zug aus'), act: true, myTurn: true, cost: 2, aiSkip: () => true,
     resolve: (s, it) => { drawCards(s, me(s, it.pl), 3); s.skip = s.skip || {}; s.skip[it.pl] = (s.skip[it.pl] || 0) + 1; } }] };
 FX[2107] = { aura: { playFromGy: (s, src, sp, pid, card, owner) => pid === sp && owner !== sp && isEquip(card) } };

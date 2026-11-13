@@ -373,3 +373,126 @@
     .rl-dbg-up { flex-direction: column; }
     .rl-dbg-artgrid { grid-template-columns: 1fr; }
 }
+
+/* ============================================================================
+   Überarbeitung 2026-11: Spielmatte als Hintergrund je Akt, WoW-Icons statt Emojis,
+   Karte ohne Scrollen mit Seitenleiste, Tränke. (Spätere Regeln überschreiben frühere.)
+   ============================================================================ */
+.rl-root {
+    background:
+        linear-gradient(180deg, rgba(8, 6, 5, .55) 0%, rgba(8, 6, 5, .42) 40%, rgba(5, 4, 3, .82) 100%),
+        var(--rl-bg, none) center / cover no-repeat,
+        #0b0807;
+}
+.rl-vignette { box-shadow: inset 0 0 260px 90px rgba(0, 0, 0, .85); }
+
+/* ---- HUD oben */
+.rl-hud { padding: 8px 14px; gap: 14px; background: linear-gradient(180deg, rgba(28, 20, 13, .94), rgba(14, 10, 7, .9));
+    border: 1px solid rgba(201, 168, 76, .45); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 230, 160, .08), 0 10px 26px rgba(0, 0, 0, .5); }
+.rl-stat { display: flex; align-items: center; gap: 6px; font-size: 15px; color: #fff3cd; }
+.rl-stat.life span { color: #e05252; font-size: 16px; }
+.rl-stat img { width: 22px; height: 22px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .7); }
+.rl-hud-arts { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; justify-content: center; min-width: 0; }
+.rl-art-ico { width: 34px; height: 34px; padding: 0; border-radius: 6px; cursor: pointer; overflow: hidden; background: #000;
+    border: 1px solid rgba(201, 168, 76, .55); box-shadow: 0 2px 6px rgba(0, 0, 0, .6); transition: transform .12s; }
+.rl-art-ico img { width: 100%; height: 100%; display: block; }
+.rl-art-ico:hover { transform: translateY(-2px) scale(1.08); }
+.rl-art-ico.rarity-legendary { border-color: #ff9d2e; }
+.rl-art-ico.rarity-rare { border-color: #4f8cff; }
+.rl-art-ico.rarity-starter { border-color: #e7c463; }
+
+/* ---- Trankplätze (HUD und Kampf) */
+.rl-pots { display: flex; gap: 5px; }
+.rl-pot { width: 32px; height: 32px; padding: 0; border-radius: 50%; overflow: hidden; background: rgba(0, 0, 0, .55);
+    border: 1px solid rgba(201, 168, 76, .5); box-shadow: inset 0 0 6px rgba(0, 0, 0, .8); display: inline-block; }
+.rl-pot img { width: 100%; height: 100%; display: block; }
+.rl-pot.empty { border-style: dashed; border-color: rgba(201, 168, 76, .25); }
+.rl-pot.use { cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.rl-pot.use:hover { transform: scale(1.12); box-shadow: 0 0 12px rgba(120, 200, 255, .7); }
+
+/* ---- Karte */
+.rl-map-screen { height: calc(100vh - 44px); max-width: 1320px; gap: 14px; }
+.rl-map-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+.rl-map-side { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 16px; overflow: auto;
+    background: linear-gradient(180deg, rgba(24, 17, 11, .9), rgba(10, 7, 5, .86)); border: 1px solid rgba(201, 168, 76, .32);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .5); }
+.rl-map-title { margin: 0; font-size: 24px; line-height: 1.15; background: linear-gradient(180deg, #fff3cd, #c9a84c 75%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rl-map-sets { font-size: 11px; letter-spacing: .06em; color: #a99d8c; }
+.rl-map-blurb { margin: 0; color: #cdbfa8; font-size: 13px; line-height: 1.5; font-style: italic; }
+.rl-boss-preview { display: flex; gap: 12px; align-items: flex-start; padding: 10px; border-radius: 12px;
+    background: rgba(60, 10, 10, .25); border: 1px solid rgba(220, 60, 60, .35); }
+.rl-boss-preview img { width: 92px; border-radius: 6px; box-shadow: 0 6px 16px rgba(0, 0, 0, .7); flex: none; }
+.rl-boss-preview div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rl-boss-preview small { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #ff9a9a; }
+.rl-boss-preview b { color: #fff3cd; font-size: 14px; line-height: 1.25; }
+.rl-boss-preview i { color: #a99d8c; font-size: 12px; line-height: 1.4; }
+.rl-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin-top: auto; padding-top: 6px; border-top: 1px solid rgba(201, 168, 76, .18); }
+.rl-legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #cdbfa8; cursor: help; }
+.rl-legend-item img { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(201, 168, 76, .5); }
+
+.rl-map-board { position: relative; min-height: 420px; border-radius: 18px; overflow: hidden;
+    border: 1px solid rgba(201, 168, 76, .32); box-shadow: inset 0 0 120px rgba(0, 0, 0, .75), 0 14px 30px rgba(0, 0, 0, .45);
+    background: radial-gradient(70% 60% at 50% 45%, rgba(20, 14, 8, .15), rgba(5, 4, 3, .6)); backdrop-filter: blur(1.5px); }
+.rl-root .rl-map { position: absolute; inset: 0; max-width: none; height: auto; margin: 0; }
+.rl-edge { stroke: rgba(231, 196, 99, .28); stroke-width: 2.5; stroke-dasharray: 2 7; stroke-linecap: round; }
+.rl-edge.done { stroke: rgba(231, 196, 99, .6); stroke-dasharray: none; }
+.rl-edge.next { stroke: #f3d68a; stroke-width: 3; stroke-dasharray: 3 6; }
+
+.rl-node-wrap { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 5px; z-index: 1; }
+.rl-root .rl-node { position: relative; transform: none; width: 64px; height: 64px; padding: 0; overflow: hidden; border-radius: 50%;
+    border: 3px solid #8a6d2f; background: #000;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, .8), 0 0 0 4px rgba(201, 168, 76, .35), 0 8px 18px rgba(0, 0, 0, .7); }
+.rl-root .rl-node img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rl-root .rl-node .rl-node-card { object-position: 50% 18%; transform: scale(1.5); transform-origin: 50% 25%; }
+.rl-root .rl-node.elite { border-color: #b3261e; }
+.rl-root .rl-node.boss { width: 104px; height: 104px; border-color: #e7c463; box-shadow: 0 0 0 2px #000, 0 0 0 5px rgba(201, 168, 76, .55), 0 0 40px rgba(220, 60, 40, .45); }
+.rl-root .rl-node.next { border-color: #ffe08a; animation: rlNodeGlow 1.6s ease-in-out infinite; cursor: pointer; }
+.rl-root .rl-node.next:hover { transform: scale(1.1); }
+.rl-root .rl-node.current { border-color: #fff3cd; box-shadow: 0 0 0 2px #000, 0 0 0 5px rgba(255, 243, 205, .5), 0 0 28px rgba(255, 243, 205, .55); }
+.rl-root .rl-node.done { opacity: 1; filter: grayscale(.85) brightness(.55); }
+.rl-root .rl-node.locked { opacity: 1; filter: brightness(.5) saturate(.6); cursor: default; }
+.rl-node-label { font-size: 11px; letter-spacing: .06em; color: #e8dcc8; white-space: nowrap; padding: 1px 7px; border-radius: 999px;
+    background: rgba(0, 0, 0, .65); text-shadow: 0 1px 2px #000; }
+.rl-node-wrap.next .rl-node-label { color: #ffe08a; }
+.rl-node-wrap.locked .rl-node-label, .rl-node-wrap.done .rl-node-label { color: #8d8172; }
+@keyframes rlNodeGlow { 0%, 100% { box-shadow: 0 0 0 2px #000, 0 0 0 4px rgba(255, 224, 138, .35), 0 0 14px rgba(255, 224, 138, .35); }
+    50% { box-shadow: 0 0 0 2px #000, 0 0 0 6px rgba(255, 224, 138, .55), 0 0 30px rgba(255, 224, 138, .7); } }
+
+/* ---- Kampf: nur Gold, Tränke, Aufgeben */
+.rl-battle-hud { left: 12px; bottom: 12px; max-width: none; }
+.rl-bh-main { gap: 10px; padding: 6px 10px; border-radius: 999px; flex-wrap: nowrap; }
+.rl-bh-gold { display: flex; align-items: center; gap: 6px; color: #fff3cd; font-size: 15px; }
+.rl-bh-gold img { width: 22px; height: 22px; border-radius: 4px; }
+.rl-bh-prevent { color: #bfe3ff; font-size: 13px; cursor: help; }
+.rl-bh-flag { background: none; border: 0; padding: 0 2px; cursor: pointer; font-size: 15px; opacity: .55; }
+.rl-bh-flag:hover { opacity: 1; }
+
+/* ---- Beute und Shop: Tränke */
+.rl-loot-potion { display: flex; align-items: center; gap: 12px; margin: 4px 0 6px; padding: 10px 12px; border-radius: 12px;
+    border: 1px solid rgba(120, 200, 255, .35); background: rgba(20, 50, 70, .25); }
+.rl-loot-potion img { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(201, 168, 76, .6); }
+.rl-loot-potion div { display: flex; flex-direction: column; }
+.rl-loot-potion small { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #9fd5ff; }
+.rl-loot-potion b { color: #fff3cd; }
+.rl-loot-potion span { color: #bfb3a2; font-size: 13px; }
+.rl-shop-pots { display: flex; gap: 10px; flex-wrap: wrap; }
+.rl-shop-pot { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px; border-radius: 12px; cursor: pointer; min-width: 260px; max-width: 360px;
+    border: 1px solid rgba(201, 168, 76, .3); background: rgba(20, 14, 10, .75); transition: transform .12s, border-color .12s; }
+.rl-shop-pot:hover { transform: translateY(-2px); border-color: rgba(231, 196, 99, .7); }
+.rl-shop-pot.cant { opacity: .5; }
+.rl-shop-pot img { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(201, 168, 76, .6); }
+.rl-shop-pot div { display: flex; flex-direction: column; flex: 1; }
+.rl-shop-pot b { color: #fff3cd; font-size: 13px; }
+.rl-shop-pot span { color: #bfb3a2; font-size: 12px; }
+.rl-shop-pot em { font-style: normal; color: #f3d68a; white-space: nowrap; }
+
+@media (max-width: 860px) {
+    .rl-map-screen { height: auto; }
+    .rl-map-body { grid-template-columns: 1fr; }
+    .rl-map-board { height: 560px; }
+    .rl-legend { grid-template-columns: repeat(3, 1fr); }
+    .rl-root .rl-node { width: 52px; height: 52px; }
+    .rl-root .rl-node.boss { width: 80px; height: 80px; }
+    .rl-hud-arts { justify-content: flex-start; }
+}

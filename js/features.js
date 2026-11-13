@@ -939,6 +939,9 @@ function openDeckOverview(opts = {}) {
             }
             f.decks.filter(x => !top.includes(x)).forEach(x => grid.appendChild(x.deck.locked ? lockedTile(x.deck) : tile(x.deck)));
         } else {
+            if (opts.list) {                                                                  // feste Deck-Listen (z. B. Roguelike-Gegner-Decks im Debug): [{ head, decks }]
+                opts.list.forEach(g => { if (g.head) head(esc(g.head)); g.decks.forEach(d => grid.appendChild(tile(d))); });
+            } else {
             if (own.length || opts.random || !pick) head(tr('Deine Decks'));
             if (opts.random) {
                 const r = document.createElement('div'); r.className = 'deck-tile special' + (opts.current === '' ? ' current' : ''); r.dataset.q = '';
@@ -954,6 +957,7 @@ function openDeckOverview(opts = {}) {
             }
             own.forEach(d => grid.appendChild(tile(d)));
             if (order.length) { head(tr('Turnier-Decks')); order.forEach(f => grid.appendChild(folderTile(f))); }
+            }
         }
         // Gestaffeltes Einblenden
         grid.querySelectorAll('.deck-tile').forEach((t, i) => t.style.setProperty('--i', Math.min(i, 30)));
@@ -968,6 +972,7 @@ function openDeckOverview(opts = {}) {
         t.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); t.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); };
     document.getElementById("deck-overview-close-btn").onclick = close;
     deckPreview(decks.find(d => d.id === opts.current) || null, grid.querySelector('.deck-tile.current'));   // zu Beginn: das gewählte Deck oder ein Hinweis
+    modal.style.zIndex = opts.zIndex ? String(opts.zIndex) : "";                       // über anderen Vollbild-Ebenen (Roguelike)
     modal.style.display = "flex";
 }
 // Kleine Schaltfläche mit Deck-Box und Namen, öffnet die Übersicht zur Auswahl (Test-Match, Online-Lobby)

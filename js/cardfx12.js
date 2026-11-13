@@ -51,8 +51,17 @@ STATE_FIX.push(s => {
         const e = p.dr12 || (p.dr12 = { sig: '0:', seen: [] });
         if (e.sig === sig) continue;
         e.sig = sig;
-        const now = g.filter(c => DR_IDS.has(c.id)).map(c => c.uid);
-        for (const u of now) if (!e.seen.includes(u)) { const c = g.find(x => x.uid === u); if (!c.noDR && !kwLostAll(s, c)) pushTrig(s, p.id, c.id, [{ op: 'trig', id: c.id, k: 'deathRattle12', a: { pid: p.id, uid: u } }], u); }
+        // c.rlDR: Death Rattle aus einer Roguelike-Aufwertung (roguelike_data.js, EK.rlDeathRattle);
+        // RL.drTimes: Artefakt "Wailing Souls" lässt Death Rattle zweimal auslösen
+        const now = g.filter(c => DR_IDS.has(c.id) || c.rlDR).map(c => c.uid);
+        for (const u of now) if (!e.seen.includes(u)) {
+            const c = g.find(x => x.uid === u); if (c.noDR || kwLostAll(s, c)) continue;
+            const times = (s.rl && typeof RL !== 'undefined' && RL.drTimes) ? RL.drTimes(s, p.id) : 1;
+            for (let t = 0; t < times; t++) {
+                if (DR_IDS.has(c.id)) pushTrig(s, p.id, c.id, [{ op: 'trig', id: c.id, k: 'deathRattle12', a: { pid: p.id, uid: u } }], u);
+                if (c.rlDR) pushTrig(s, p.id, c.id, [{ op: 'call', k: 'E:rlDeathRattle', a: { pid: p.id, uid: u } }], u);
+            }
+        }
         e.seen = now;
     }
     return false;
@@ -194,7 +203,7 @@ FX[11021] = { becomes: true,
             next(); },
         put: (s, a, v) => { const o = me(s, a.opp); if (!v) { if (a.z === 'deck') shuffleInPlace(o); return; }
             let c = null;
-            if (a.z === 'deck') { const id = +String(v).slice(3); const i = o.deck.indexOf(id); if (i >= 0) { o.deck.splice(i, 1); c = makeCardInst(id, false, o.id); } shuffleInPlace(o); }
+            if (a.z === 'deck') { const id = deckKey(String(v).slice(3)); const i = o.deck.indexOf(id); if (i >= 0) { o.deck.splice(i, 1); c = makeCardInst(id, false, o.id); } shuffleInPlace(o); }
             else { const arr = o[a.z], i = arr.findIndex(x => x.uid === v); if (i >= 0) { c = arr.splice(i, 1)[0]; resetInst(c); if (a.z === 'hand') evt(s, 'handLeft', { pid: o.id, uid: c.uid }); } }
             if (c) putIntoPlay(s, c, a.pid); } } };
 
@@ -893,7 +902,7 @@ FX[11261] = { questCond: (s, pid) => me(s, pid).graveyard.length ? null : tr('De
     reward: (s, pid, r) => revealTop(s, pid, 3, 'Tales of Destruction', { pred: 'kind12', kind12: r.card.qc12, byQuest: true }) };
 PRED.kind12 = (c, a) => kindOf12(c, a.kind12);
 FX[11262] = { reward: (s, pid) => { const p = me(s, pid), l = nonHeroCards(s, p).filter(c => ctrlOf(s, c) === pid); let n = 0; if (l.some(c => c.type === 'Ability' || c.isTotem)) n++; if (l.some(c => isAllyLike(c) && !c.isTotem)) n++; if (l.some(c => isEquip(c))) n++; if (n) drawCards(s, p, n); } };
-FX[11263] = { questCond: myTurnQ12, reward: (s, pid) => { for (const p of [s.p1, s.p2]) { if (gyLocked(s, p.id)) continue; p.deck.push(...p.graveyard.splice(0).map(c => c.id)); shuffleInPlace(p); } drawCards(s, me(s, pid), 1); } };
+FX[11263] = { questCond: myTurnQ12, reward: (s, pid) => { for (const p of [s.p1, s.p2]) { if (gyLocked(s, p.id)) continue; p.deck.push(...p.graveyard.splice(0).map(deckId)); shuffleInPlace(p); } drawCards(s, me(s, pid), 1); } };
 const DT8 = ['Arcane', 'Fire', 'Frost', 'Holy', 'Melee', 'Nature', 'Ranged', 'Shadow'];
 FX[11264] = { questExtra: questChoice(11264, tr('Under the Shadow: Schadensart nennen'), (s, pid) => DT8.map(dt => ({ label: dtName(dt), v: dt, ai: me(s, pid).deck.filter(id => CARDS[id].atkType === dt || CARDS[id].dmgType === dt).length }))),
     k: { qc: setQC }, reward: (s, pid, r) => revealTop(s, pid, 3, 'Under the Shadow', { pred: 'atkDt12', dt12: r.card.qc12, byQuest: true }) };

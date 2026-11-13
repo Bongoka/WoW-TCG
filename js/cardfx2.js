@@ -154,7 +154,7 @@ FX[1027] = { resolve: (s, it) => q(s, { op: 'call', k: '1027:pick', a: { pid: it
             opts.push({ label: tr('Nichts nehmen'), v: 0, ai: -1 });
             ask(s, { pid: a.pid, prompt: tr('Swiftshift: Form aus Deck oder Friedhof'), src: 'Swiftshift', opts, k: '1027:do', a, auto: false }); },
         do: (s, a, v) => { const p = me(s, a.pid);
-            if (v && v[0] === 'd') { const id = +v.slice(1); const i = p.deck.indexOf(id); if (i >= 0) { p.deck.splice(i, 1); p.hand.push(makeCardInst(id, false, p.id)); L(s, tr`🔎 ${p.hero.name} zeigt ${CARDS[id].name}.`); } }
+            if (v && v[0] === 'd') { const id = deckKey(v.slice(1)); const i = p.deck.indexOf(id); if (i >= 0) { p.deck.splice(i, 1); p.hand.push(makeCardInst(id, false, p.id)); L(s, tr`🔎 ${p.hero.name} zeigt ${CARDS[id].name}.`); } }
             else if (v && v[0] === 'g') { const u = v.slice(1); L(s, tr`${p.hero.name} zeigt ${nameOf(s, u)}.`); fromGyToHand(s, u); }
             shuffleInPlace(p); } } };   // Deck wurde durchsucht → mischen (413)
 FX[1028] = { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; },
@@ -778,7 +778,7 @@ FX[1304] = { questCond: onMyTurnQ, reward: raceChoice('Undead', { key: 'plague',
 RACE_CHOICE.poison = (s, pid) => q(s, { op: 'call', k: '1305:pick', a: { pid } });
 FX[1305] = { reward: raceChoice('Tauren', { key: 'poison', label: tr('Karten aus dem Friedhof ins Deck mischen'), ai: () => 0.5 }),
     k: { pick: (s, a) => { const g = me(s, a.pid).graveyard.map(c => c.uid); if (!g.length) { shuffleInPlace(me(s, a.pid)); return; } askMany(s, a.pid, tr('Poison Water: Karte aus dem Friedhof ins Deck mischen'), 'Poison Water', g, '1305:do', a, u => findCharacter(s, u).cost || 0, 99); },
-        do: (s, a, v) => { const p = me(s, a.pid); if (v === '__done') { shuffleInPlace(p); s._hidden = true; return; } const c = p.graveyard.find(x => x.uid === v); if (c) { p.graveyard.splice(p.graveyard.indexOf(c), 1); if (!c.isToken) p.deck.push(c.id); } q(s, { op: 'call', k: '1305:pick', a }); } } };
+        do: (s, a, v) => { const p = me(s, a.pid); if (v === '__done') { shuffleInPlace(p); s._hidden = true; return; } const c = p.graveyard.find(x => x.uid === v); if (c) { p.graveyard.splice(p.graveyard.indexOf(c), 1); if (!c.isToken) p.deck.push(deckId(c)); } q(s, { op: 'call', k: '1305:pick', a }); } } };
 FX[1306] = { questCond: onMyTurnQ, reward: (s, pid) => { const t = makeToken(s, 9107, pid); s.delayed = s.delayed || []; s.delayed.push({ at: 'nextStart', pid, k: '1306:rem', a: { pid, uid: t.uid }, srcId: 1306, srcName: 'Rite of Vision' }); },
     k: { rem: (s, a) => { const c = findCharacter(s, a.uid); if (!c || !removeFromGame(s, c)) return; const p = me(s, a.pid);
             const pool = Object.values(CARDS).filter(x => !x.isToken && x.type !== 'Hero' && cardMatchesPlayer(x, p)).map(x => ({ label: x.name, v: x.id, card: x.id, ai: (x.cost || 0) + (x.type === 'Ally' ? 2 : 0) }));
@@ -786,7 +786,7 @@ FX[1306] = { questCond: onMyTurnQ, reward: (s, pid) => { const t = makeToken(s, 
         take: (s, a, id) => { const p = me(s, a.pid); p.hand.push(makeCardInst(id, false, p.id)); L(s, tr`👁 ${p.hero.name} zeigt ${CARDS[id].name} und nimmt sie auf die Hand.`); } } };
 RACE_CHOICE.solanian = (s, pid) => { const g = gyCands(s, pid, c => c.type === 'Ability'); if (!g.length) return; ask(s, { pid, prompt: tr("Solanian's Belongings: Fähigkeit aus dem Friedhof oben auf das Deck"), src: "Solanian's Belongings", opts: g.map(u => ({ label: nameOf(s, u), v: u, ai: findCharacter(s, u).cost || 0 })), k: '1307:do', a: { pid } }); };
 FX[1307] = { reward: raceChoice('Blood Elf', { key: 'solanian', label: tr('Fähigkeit aus dem Friedhof oben auf das Deck'), ai: (s, pid) => me(s, pid).graveyard.some(c => c.type === 'Ability') ? 1 : -2 }),
-    k: { do: (s, a, v) => { const p = me(s, a.pid); const c = p.graveyard.find(x => x.uid === v); if (c) { p.graveyard.splice(p.graveyard.indexOf(c), 1); p.deck.push(c.id); L(s, tr`${c.name} kommt oben auf das Deck.`); } } } };
+    k: { do: (s, a, v) => { const p = me(s, a.pid); const c = p.graveyard.find(x => x.uid === v); if (c) { p.graveyard.splice(p.graveyard.indexOf(c), 1); p.deck.push(deckId(c)); L(s, tr`${c.name} kommt oben auf das Deck.`); } } } };
 FX[1308] = { reward: (s, pid) => { const p = me(s, pid); [...p.hand].forEach(c => EK.discardDo(s, {}, c.uid)); drawCards(s, p, 1); } };
 RACE_CHOICE.kolkar = (s, pid) => ask(s, { pid, prompt: tr('Thwarting Kolkar Aggression: Welcher Spieler dreht eine Quest um?'), src: 'Thwarting Kolkar Aggression', opts: [{ label: tr('Gegner'), v: pid === 1 ? 2 : 1, ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -2 }], k: '1309:who', a: { pid } });
 FX[1309] = { questCond: onMyTurnQ, reward: raceChoice('Troll', { key: 'kolkar', label: tr('Ziel-Spieler dreht eine Quest um'), ai: (s, pid) => foe(s, pid).resources.some(r => r.faceUp) ? 1.5 : -1 }),

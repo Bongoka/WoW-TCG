@@ -1268,6 +1268,13 @@ function renderPlayerHand(p) {
         const sc = shownCost(p, card);
         const node = createCardDOM(card, false, null, sc || {});
         if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down');
+        // Finishing Move: Combo-Punkte wie in WoW oben auf der Karte (5 Kreise, gefüllte = Combos im Friedhof, höchstens 5)
+        const cp = typeof isComboFinisher === 'function' && isComboFinisher(card) ? combosInGy(G, p.id).length : 0;
+        if (cp > 0) {
+            const cb = document.createElement("div"); cb.className = "card-combo";
+            cb.innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < cp ? 'on' : ''}"></i>`).join('');
+            node.appendChild(cb);
+        }
         const offset = idx - mid;
         slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(calc(${offset} * var(--fan-ang, 6deg)))`;
         if (choices.has(card.uid)) {

@@ -24,7 +24,7 @@
         { key: 'priest', en: 'Priest', name: 'Priester', hero: 1, faction: 'Alliance', icon: 'Class Icons/Priest.png', color: '#e7e2c8',
           tag: 'Heilung & Standhaftigkeit', blurb: 'Überlebe, heile und drehe lange Kämpfe um. Artefakt: Guardian Spirit.', art: 'sanctuary' },
         { key: 'rogue', en: 'Rogue', name: 'Schurke', hero: 7, faction: 'Alliance', icon: 'Class Icons/Rogue.png', color: '#b37ade',
-          tag: 'Echo & Kombos', blurb: 'Spiele viele Karten, wiederhole Effekte, exploite das Echo. Artefakt: Preparation.', art: 'echo_sigil' }
+          tag: 'Echo & Kombos', blurb: 'Spiele viele Karten, wiederhole Effekte, exploite das Echo. Artefakt: Honor Among Thieves.', art: 'echo_sigil' }
     ];
     R.classByKey = k => R.CLASSES.find(c => c.key === k);
 
@@ -39,7 +39,7 @@
             story: 'Rauch hängt über den Sümpfen. Wo gestern noch Grenzen waren, klafft nun das Dunkle Portal. Aus Outland strömen Kreaturen, die keinen Namen tragen – und hinter ihnen wartet ein Wächter, der nie besiegt wurde. Deine Reise beginnt am Rand der bekannten Welt. Wenn du hier fällst, wird niemand deinen Namen kennen.',
             boss: {
                 hero: 2013, name: 'Indalamar, Wächter des Dunklen Portals', cls: 'Warrior', faction: 'Horde', talent: 'Protection',
-                hp: 46, deckSize: 34, bias: 1.4, startRes: 4, gold: 130,
+                hp: 46, deckSize: 34, bias: 1.4, startRes: 4, gold: 130, arch: 'dwarf_wall',
                 quote: 'Du bist nicht der Erste, der durch dieses Tor will. Du wirst nur der Nächste sein, der davor verrottet.'
             },
             enemies: [
@@ -59,7 +59,7 @@
             story: 'Outland ist eine Wunde, die nicht heilt. Über den Ruinen von Schattenmond schwebt die Festung des Verräters, und in den Fel-Spalten marschieren Dämonen in Reih und Glied. Illidan Stormrage hat die Legion herausgefordert – und dich zu einem Werkzeug in seinem Krieg gemacht. Diesmal gibt es keine Grenze zwischen Held und Verräter. Nur zwischen denen, die überleben, und denen, die brennen.',
             boss: {
                 hero: 3301, name: 'Illidan Stormrage, der Verräter', cls: 'Warlock', faction: 'Horde', talent: 'Traitor',
-                traitorCards: true, hp: 58, deckSize: 36, bias: 1.5, startRes: 4, gold: 170,
+                traitorCards: true, hp: 58, deckSize: 36, bias: 1.5, startRes: 4, gold: 170, arch: 'demonology',
                 quote: 'Ihr seid nicht vorbereitet. Aber das wart ihr nie.'
             },
             enemies: [
@@ -79,7 +79,7 @@
             story: 'Die Legion ist zurückgedrängt, doch Outland hat eine neue Sprache gefunden: die der Arena. Trommeln hallen über die Klingenwüste, Gladiatoren kämpfen um Ruhm, Gold und das Recht, morgen noch zu atmen. Ein Großmarschall hat die Spiele zu einem Krieg gemacht. Wer die Arena gewinnt, gewinnt eine Armee. Wer verliert, wird zur Fußnote im Sand.',
             boss: {
                 hero: 7001, name: 'Großmarschall Goldensword, Champion der Arena', cls: 'Paladin', faction: 'Alliance', talent: 'Retribution',
-                hp: 66, deckSize: 38, bias: 1.5, startRes: 4, gold: 210,
+                hp: 66, deckSize: 38, bias: 1.5, startRes: 4, gold: 210, arch: 'gladiators',
                 quote: 'Ruhm ist nur der Name, den die Menge dem Sieger gibt. Ich gebe dir keinen.'
             },
             enemies: [
@@ -100,7 +100,7 @@
             story: 'Der Himmel über Nordend ist eine einzige graue Klinge. Die Geißel hat die Wrathgate überrannt, und aus den Feldern von Scourgewar steigen die Toten mit deinen Gesichtern. Vor dir liegt Eiskrone: eine Zitadelle aus schwarzem Eis, in der der Lichkönig sitzt und jeden deiner Schritte bereits gesehen hat. Dies ist der letzte Akt. Diesmal gibt es keinen Ort, an den du zurückkehren kannst.',
             boss: {
                 hero: 13016, name: 'Der Lichkönig', cls: 'Death Knight', faction: 'Neutral', talent: null, scourge: true,
-                hp: 78, deckSize: 40, bias: 1.6, startRes: 5, gold: 260,
+                hp: 78, deckSize: 40, bias: 1.6, startRes: 5, gold: 260, arch: 'scourge_plague',
                 quote: 'Ich habe dich bereits sterben sehen. Es war ... befriedigend.'
             },
             enemies: [
@@ -330,40 +330,6 @@
     };
 
     // ---------------------------------------------------------------- Aufwertungen
-    R.ARCH = {
-        echo:       { name: 'Echo',      short: 'Echo',      desc: 'Wenn du diese Karte spielst, erhältst du eine Kopie der Originalkarte auf die Hand (einmal pro Zug).' },
-        overload:   { name: 'Überladung',short: 'Überladung',desc: 'Kostet (2) weniger. Zu Beginn deines nächsten Zuges werden 2 deiner Ressourcen erschöpft.' },
-        blood:      { name: 'Blutmagie', short: 'Blut',      desc: 'Kostet (2) weniger. Wenn du diese Karte spielst, erleidet dein Held 3 Schaden.' },
-        soulbound:  { name: 'Seelenband',short: 'Seele',     desc: 'Diese Karte kommt nach dem Ausspielen (bzw. nach dem Verlassen des Spiels) auf deine Hand zurück.' },
-        guardian:   { name: 'Wächter',   short: 'Wächter',   desc: 'Verbessert deine Verteidigung: Ally +3 Gesundheit und Protektor, Fähigkeit verhindert 3 Schaden, Ausrüstung gibt deinem Helden +3 Gesundheit.' },
-        berserker:  { name: 'Berserker', short: 'Berserker', desc: '+2 Angriff und Eifer (kann sofort angreifen).' },
-        twin:       { name: 'Zwilling',  short: 'Zwilling',  desc: 'Wenn diese Karte ins Spiel kommt, beschwöre eine 1/1 Kopie.' },
-        vampiric:   { name: 'Vampirisch',short: 'Vampir',    desc: 'Schaden, den diese Karte verursacht, heilt deinen Helden in gleicher Höhe.' },
-        ritual:     { name: 'Ritual',    short: 'Ritual',    desc: 'Wenn du diese Karte spielst, ziehe eine Karte.' }
-    };
-    R.archFor = function (cd) {
-        const t = (cd.text || '');
-        if (cd.type === 'Ally') {
-            if (/Protector/i.test(t)) return 'guardian';
-            if ((cd.atk || 0) >= (cd.cost || 1) + 1) return 'berserker';
-            if (/When .*destroy|destroy target|dies|Friedhof/i.test(t)) return 'soulbound';
-            return (cd.id % 2) ? 'twin' : 'vampiric';
-        }
-        if (cd.type === 'Ability') {
-            if (/draw|ziehe/i.test(t)) return 'echo';
-            if (/damage|Schaden/i.test(t)) return (cd.id % 2) ? 'blood' : 'overload';
-            if (/heal|prevent|Damage|verhind/i.test(t)) return 'guardian';
-            if (/destroy|zerstör/i.test(t)) return 'soulbound';
-            return ['ritual', 'echo', 'overload'][cd.id % 3];
-        }
-        if (cd.type === 'Weapon') return ['vampiric', 'overload', 'soulbound'][cd.id % 3];
-        return ['guardian', 'overload', 'soulbound'][cd.id % 3];
-    };
-    R.upgradeText = function (baseId) {
-        const cd = CARDS[baseId]; if (!cd) return '';
-        const a = R.ARCH[R.archFor(cd)];
-        return a ? ('Aufwertung – ' + a.name + ': ' + a.desc) : '';
-    };
     function twinToken(baseId) {
         const key = 'RLTOK_' + baseId;
         if (!CARDS[key]) {
@@ -377,117 +343,12 @@
         }
         return key;
     }
-    // Liefert die synthetische, aufgewertete Karten-ID (wird bei Bedarf registriert).
-    R.upgraded = function (baseId) {
-        const base = CARDS[baseId];
-        if (!base) return baseId;
-        // Quests/Locations/Heroes haben kein Aufwertungs-Archetyp-FX und bleiben unverändert.
-        if (['Quest', 'Location', 'Hero'].includes(base.type)) return baseId;
-        const arch = R.archFor(base);
-        const key = 'RLUP_' + baseId + '_' + arch;
-        if (CARDS[key]) return key;
-        const card = {
-            ...base, id: key, name: base.name + ' ✦', imgName: base.imgName || base.name,
-            set: base.set || 1, num: base.set ? base.num : base.id,
-            upgradedFrom: baseId, upgradeArch: arch
-        };
-        const a = R.ARCH[arch];
-        // Kosten
-        let dc = 0;
-        if (arch === 'overload' || arch === 'blood') dc = -2;
-        else if (arch === 'soulbound' || arch === 'twin' || arch === 'vampiric') dc = 1;
-        card.baseCost = base.cost;
-        card.cost = Math.max(0, (base.cost || 0) + dc);
-        card.costDelta = card.cost - (base.cost || 0);
-        // Werte / Keywords
-        if (arch === 'berserker' && base.type === 'Ally') card.atk = (base.atk || 0) + 2;
-        if (arch === 'berserker' && base.type === 'Weapon') card.atk = (base.atk || 0) + 1;
-        if (arch === 'guardian' && base.type === 'Ally') card.hp = (base.hp || 0) + 3;
-        if (arch === 'berserker') card.kw = { ...(base.kw || {}), ferocity: true };
-        if (arch === 'guardian' && base.type === 'Ally') card.kw = { ...(base.kw || {}), protector: true };
-        if (arch === 'guardian' && ['Weapon', 'Armor', 'Item'].includes(base.type)) card.rlHeroHp = 3;
-        // Text (createCardDOM escapt HTML – daher reiner Text)
-        card.text = (base.text ? base.text + ' ' : '') + '[' + a.name + ': ' + a.desc + ']';
-        CARDS[key] = card;
-        // FX: Basisverhalten umschließen, nie ersetzen
-        const bf = FX[baseId] || {};
-        const nf = { ...bf };
-        if (base.type === 'Ability') {
-            nf.resolve = function (s, it) {
-                if (bf.resolve) bf.resolve(s, it);
-                R.afterAbility(s, it, baseId, key, arch);
-            };
-        } else {
-            nf.enter = function (s, c, pid, it) {
-                if (bf.enter) bf.enter(s, c, pid, it);
-                R.afterEnter(s, c, pid, baseId, key, arch);
-            };
-            nf.leave = function (s, snap, dest, info) {
-                if (bf.leave) bf.leave(s, snap, dest, info);
-                if (arch === 'soulbound' && dest === 'graveyard' && !snap.isToken) R.returnToHand(s, snap.uid, snap.wasCtrl || snap.owner || 1);
-            };
-        }
-        FX[key] = nf;
-        return key;
-    };
-    R.archOfCard = function (cardId) {
-        const cd = CARDS[cardId];
-        return cd && cd.upgradeArch ? R.ARCH[cd.upgradeArch] : null;
-    };
+    R.twinToken = twinToken;
     R.baseIdOf = function (cardId) {
         const cd = CARDS[cardId];
         return cd && cd.upgradedFrom ? cd.upgradedFrom : cardId;
     };
 
-    // Nach dem Ausspielen einer aufgewerteten Fähigkeit
-    R.afterAbility = function (s, it, baseId, upId, arch) {
-        if (!it || !it.card || it.card.id !== upId || !s.rl) return;
-        const p = getPlayer(s, it.pl);
-        if (arch === 'echo') {
-            if (!flag(s, 't:up_echo') && p.hand.length < 10) {
-                setFlag(s, 't:up_echo');
-                p.hand.push(makeCardInst(baseId, false, p.id));
-                L(s, tr`✦ Echo: ${CARDS[baseId].name} kehrt auf die Hand zurück.`, '', p.id);
-            }
-        } else if (arch === 'overload') {
-            addPE(s, p.id, { k: 'rlOverload', n: 2, untilTurn: s.turn + 2, used: false });
-            L(s, tr`⚡ Überladung: 2 Ressourcen im nächsten Zug erschöpft.`, '', p.id);
-        } else if (arch === 'blood') {
-            dealDamage(s, { src: p.hero.uid, tgt: p.hero.uid, amt: 3, sp: p.id });
-        } else if (arch === 'guardian') {
-            addPE(s, p.id, { k: 'rlGuard', v: 3, untilTurn: s.turn });
-            L(s, tr`🛡 Wächter: Die nächsten 3 Schaden an deinem Helden werden verhindert.`, '', p.id);
-        } else if (arch === 'ritual') {
-            trig(s, { k: 'draw', a: { pid: p.id, n: 1 } });
-        } else if (arch === 'soulbound') {
-            // Original wird entfernt, dafür kommt eine frische Kopie auf die Hand.
-            if (it.dest === 'graveyard' && p.hand.length < 10) {
-                p.hand.push(makeCardInst(it.card.id, false, p.id));
-                it.dest = 'removed';
-                L(s, tr`↩ Seelenband: ${it.card.name} kommt auf die Hand zurück.`, '', p.id);
-            }
-        }
-    };
-    // Nach dem Ins-Spiel-Kommen einer aufgewerteten Karte
-    R.afterEnter = function (s, c, pid, baseId, upId, arch) {
-        if (!c || c.id !== upId || !s.rl) return;
-        const p = getPlayer(s, pid);
-        if (arch === 'echo') {
-            if (!flag(s, 't:up_echo') && p.hand.length < 10) {
-                setFlag(s, 't:up_echo');
-                p.hand.push(makeCardInst(baseId, false, p.id));
-                L(s, tr`✦ Echo: ${CARDS[baseId].name} kehrt auf die Hand zurück.`, '', p.id);
-            }
-        } else if (arch === 'overload') {
-            addPE(s, p.id, { k: 'rlOverload', n: 2, untilTurn: s.turn + 2, used: false });
-        } else if (arch === 'blood') {
-            dealDamage(s, { src: p.hero.uid, tgt: p.hero.uid, amt: 3, sp: p.id });
-        } else if (arch === 'berserker') {
-            addTM(c, { k: 'ferocity', turn: s.turn });
-        } else if (arch === 'twin') {
-            makeToken(s, twinToken(baseId), pid, {});
-        }
-    };
     R.returnToHand = function (s, uid, pid) {
         const p = getPlayer(s, pid); if (!p) return;
         let c = null, i = p.graveyard.findIndex(x => x.uid === uid);
@@ -703,8 +564,8 @@
         }
     });
     defCard({
-        id: 'up_guard_spell', text: 'Beim Ausspielen: verhindere 3 Schaden an deinem Helden.', types: ['Ability'],
-        play: (s, it, p) => { if (p.id === 1) addPE(s, 1, { k: 'rlGuard', v: 3, untilTurn: s.turn }); }
+        id: 'up_guard_spell', text: 'Beim Ausspielen: Verhindere die nächsten 3 Schaden, die deinem Helden in diesem Zug zugefügt würden.', types: ['Ability'],
+        play: (s, it, p) => { if (p.id === 1) addPrevent(s, 3); }
     });
     // Ausrüstung
     defCard({ id: 'up_weapon_atk', text: '+2 Angriff.', types: ['Weapon'], mod: { atk: 2 } });
@@ -743,6 +604,146 @@
         enter: (s, c, pid) => { if (pid === 1 && ctrlRace(s, 1, 'Draenei')) healHeroFor(s, 1, 2); }
     });
 
+    // ---- Schlüsselwort-Aufwertungen (Regel-Keywords und Zonen) ---------------
+    // Instant (CR 410): auch im Zug des Gegners und im Kampf spielbar.
+    defCard({ id: 'up_quick', text: 'Instant: Du darfst diese Karte spielen, wann immer du Priorität hast – auch im Zug des Gegners.', types: ALL_CARD_TYPES, mod: { instant: true } });
+    // Thrown (Glossar): Long-Range beim Zuschlagen, am Zugende zurück auf die Hand (cardfx10.js liest das TM 'thrown').
+    defCard({
+        id: 'up_thrown', text: 'Thrown: Wenn du mit dieser Waffe zuschlägst, hat dein Held in diesem Kampf Long-Range. Am Ende des Zuges kommt diese Waffe auf deine Hand zurück.', types: ['Weapon'],
+        enter: (s, c, pid) => { if (pid === 1) addTM(c, { k: 'thrown' }); }
+    });
+    // Sentinel (Glossar): "When this card exhausts for the first time each turn, ready it."
+    defCard({
+        id: 'up_sentinel', text: 'Kostet (1) mehr. Sentinel: Wenn diese Karte zum ersten Mal in einem Zug erschöpft wird, mache sie bereit.', types: ['Ally', 'Armor', 'Item'], mod: { cost: 1 },
+        exhausted: (s, c) => { if (c.rlSent === s.turn) return; c.rlSent = s.turn; q(s, { op: 'call', k: 'E:rlReady', a: { uid: c.uid } }); }
+    });
+    defCard({
+        id: 'up_discard', text: 'Wenn du diese Karte abwirfst: ziehe 1 Karte und füge einem zufälligen Gegner 2 Schaden zu.', types: ['Ally', 'Ability'],
+        discarded: (s, c, d) => { if (d.pid !== 1) return; drawFor(s, 1, 1); q(s, { op: 'call', k: 'E:rlpingEnemy', a: { pid: 1, amt: 2, dt: 'Shadow' } }); }
+    });
+    // Death Rattle (Glossar): löst aus, wenn die Karte von irgendwo in den Friedhof kommt (cardfx12.js, c.rlDR).
+    defCard({
+        id: 'up_dr_draw', text: 'Death Rattle: Ziehe 1 Karte. (Wenn diese Karte von irgendwo in deinen Friedhof kommt.)', types: ALL_CARD_TYPES, mod: { rlDR: true },
+        dr: (s, c, pid) => { if (pid === 1) drawFor(s, 1, 1); }
+    });
+    defCard({
+        id: 'up_dr_ping', text: 'Death Rattle: Dein Held fügt einem zufälligen Gegner 2 Schattenschaden zu.', types: ALL_CARD_TYPES, mod: { rlDR: true },
+        dr: (s, c, pid) => { if (pid === 1) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { pid: 1, amt: 2, dt: 'Shadow' } }); }
+    });
+    // Eternal (Glossar): "When this card enters your graveyard from anywhere, you may shuffle it into your deck."
+    defCard({
+        id: 'up_eternal', text: 'Eternal: Wenn diese Karte in deinen Friedhof kommt, darfst du sie in dein Deck mischen.', types: ALL_CARD_TYPES, mod: { rlDR: true },
+        dr: (s, c, pid) => { if (pid === 1) yesNo(s, 1, c.name + ': Eternal?', c.name, 'E:rlEternal', { pid: 1, uid: c.uid }, true); }
+    });
+    // Stash-artig: Effekt, wenn die Karte als Ressource gelegt wird.
+    defCard({ id: 'up_res_draw', text: 'Wenn du diese Karte als Ressource legst: ziehe 1 Karte.', types: ALL_CARD_TYPES, res: (s) => drawFor(s, 1, 1) });
+    defCard({ id: 'up_res_ping', text: 'Wenn du diese Karte als Ressource legst: 2 Schaden an einem zufälligen Gegner.', types: ALL_CARD_TYPES, res: (s) => q(s, { op: 'call', k: 'E:rlpingEnemy', a: { pid: 1, amt: 2, dt: 'Fire' } }) });
+    defCard({ id: 'up_res_gold', text: 'Wenn du diese Karte als Ressource legst: erhalte 6 Gold.', types: ALL_CARD_TYPES, res: (s) => addRunGold(s, 6) });
+    defCard({ id: 'up_res_heal', text: 'Wenn du diese Karte als Ressource legst: heile 3 Schaden.', types: ALL_CARD_TYPES, res: (s) => healHeroFor(s, 1, 3) });
+    defCard({
+        id: 'up_ephemeral', text: 'Kostet (0). Nach dem Auflösen wird diese Karte aus dem Spiel entfernt.', types: ['Ability'], mod: { costSet: 0 },
+        play: (s, it, p) => { if (p.id === 1 && it.dest === 'graveyard') it.dest = 'removed'; }
+    });
+    defCard({
+        id: 'up_patience', text: 'Zu Beginn deines Zuges, wenn diese Karte auf deiner Hand ist: Sie kostet (1) weniger, bis du sie spielst (höchstens (3) weniger).', types: ALL_CARD_TYPES,
+        handStart: (s, c) => { c.rlPat = Math.min(3, (c.rlPat || 0) + 1); },
+        cost: (s, card) => -(card.rlPat || 0)
+    });
+    defCard({
+        id: 'up_bloodthirst', text: 'Wenn diese Karte einen gegnerischen Ally zerstört: Sie erhält für den Rest des Runs +1 ATK (höchstens +5).', types: ['Ally', 'Weapon'],
+        enter: (s, c, pid) => { if (pid !== 1) return; const v = ((s.rl.cardAtk || {})[c.rlUp]) || 0; if (v) addTM(c, { k: 'atk', v }); },
+        kill: (s, c) => {
+            const m = s.rl.cardAtk || (s.rl.cardAtk = {});
+            if ((m[c.rlUp] || 0) >= 5) return;
+            m[c.rlUp] = (m[c.rlUp] || 0) + 1; addTM(c, { k: 'atk', v: 1 });
+        }
+    });
+    defCard({
+        id: 'up_combo_point', text: 'Beim Ausspielen: Wenn bereits eine andere Combo in deinem Friedhof liegt, ziehe 1 Karte.', types: ['Ability'],
+        play: (s, it, p) => { if (p.id === 1 && p.graveyard.some(c => c.uid !== it.card.uid && (c.subtypes || []).indexOf('Combo') >= 0)) drawFor(s, 1, 1); }
+    });
+
+    // ---- Passung: Welche Aufwertung passt zu welcher Karte? -----------------
+    // fit(cd) liefert 0 (passt nicht) bis 5 (passt sehr gut). Gewählt wird unter den
+    // bestpassenden Effekten (höchster Wert und einer darunter) per Hash, damit
+    // ähnliche Karten unterschiedliche, aber passende Aufwertungen bekommen.
+    const txt = cd => cd.text || '';
+    const has = (cd, re) => re.test(txt(cd));
+    const raceIs = (cd, r) => cd.race === r || cd.petType === r || (cd.allyTypes || []).indexOf(r) >= 0;
+    const clsIs = (cd, k) => cd.allyClass === k || (cd.allowedClasses || []).indexOf(k) >= 0 || (cd.allyTypes || []).indexOf(k) >= 0;
+    const anyCls = (cd, list) => list.some(k => clsIs(cd, k));
+    const dmgText = cd => has(cd, /deals? \d+|damage/i);
+    const healText = cd => has(cd, /\bheal/i);
+    const drawText = cd => has(cd, /\bdraw/i);
+    const isOngoing = cd => !!cd.ongoing || /(?:^|<p> )Ongoing:/i.test(txt(cd));
+    const raceFit = r => cd => raceIs(cd, r) ? 3 : 0;
+    const FIT = {
+        up_fero: cd => has(cd, /Ferocity/) ? 0 : ((cd.atk || 0) > (cd.hp || 0) || anyCls(cd, ['Warrior', 'Rogue']) || cd.isPet) ? 3 : 1,
+        up_guard_ally: cd => ((cd.hp || 0) >= (cd.atk || 0) + 2 || raceIs(cd, 'Dwarf') || raceIs(cd, 'Tauren') || anyCls(cd, ['Paladin', 'Warrior'])) ? 3 : 1,
+        up_twin: cd => (cd.isPet || raceIs(cd, 'Beast') || has(cd, /token/i)) ? 3 : (cd.cost || 0) <= 3 ? 2 : 1,
+        up_enter_draw: cd => (drawText(cd) || anyCls(cd, ['Mage', 'Priest'])) ? 3 : 1,
+        up_enter_gold: cd => (raceIs(cd, 'Goblin') || has(cd, /gold|loot|treasure/i)) ? 4 : 1,
+        up_enter_heal: cd => (healText(cd) || anyCls(cd, ['Priest', 'Paladin', 'Druid', 'Shaman'])) ? 3 : 1,
+        up_enter_ping: cd => (anyCls(cd, ['Mage', 'Warlock', 'Hunter']) || dmgText(cd)) ? 2 : 1,
+        up_enter_exhaust: cd => (has(cd, /exhaust/i) || cd.atkType === 'Frost' || clsIs(cd, 'Rogue')) ? 3 : 1,
+        up_death_draw: cd => (has(cd, /destroyed|dies|graveyard/i) || raceIs(cd, 'Undead')) ? 3 : 1,
+        up_death_token: cd => (cd.isPet || raceIs(cd, 'Beast') || has(cd, /token/i)) ? 3 : raceIs(cd, 'Undead') ? 2 : 1,
+        up_death_gold: cd => raceIs(cd, 'Goblin') ? 4 : 1,
+        up_rage_atk: cd => (raceIs(cd, 'Orc') || clsIs(cd, 'Warrior') || has(cd, /Berserk|Assault/i)) ? 3 : 1,
+        up_attack_gold: cd => (raceIs(cd, 'Goblin') || clsIs(cd, 'Rogue')) ? 3 : 1,
+        up_attack_heal: cd => (anyCls(cd, ['Paladin', 'Priest', 'Death Knight']) || cd.atkType === 'Holy') ? 3 : 1,
+        up_attack_ping: cd => (cd.atkType === 'Ranged' || cd.slot === 'Ranged' || clsIs(cd, 'Hunter')) ? 3 : 1,
+        up_hurt_gold: cd => raceIs(cd, 'Goblin') ? 3 : 1,
+        up_hurt_thorns: cd => (has(cd, /Protector/) || (cd.hp || 0) >= 5 || clsIs(cd, 'Druid')) ? 3 : 1,
+        up_hurt_draw: cd => (has(cd, /Protector/) || clsIs(cd, 'Warrior')) ? 2 : 1,
+        up_start_draw: cd => (anyCls(cd, ['Mage', 'Priest']) || cd.type === 'Item') ? 3 : 1,
+        up_start_gold: cd => (raceIs(cd, 'Goblin') || cd.type === 'Item') ? 2 : 1,
+        up_start_heal: cd => (healText(cd) || anyCls(cd, ['Priest', 'Druid']) || cd.type === 'Armor') ? 2 : 1,
+        up_start_ping: cd => (anyCls(cd, ['Warlock', 'Shaman']) || ['Fire', 'Shadow'].indexOf(cd.atkType) >= 0) ? 2 : 1,
+        up_aura_atk: cd => (has(cd, /allies you control have|other allies/i) || ((cd.cost || 0) >= 4 && anyCls(cd, ['Warrior', 'Paladin']))) ? 4 : 1,
+        up_aura_hp: cd => (has(cd, /allies you control have/i) || ((cd.cost || 0) >= 4 && anyCls(cd, ['Paladin', 'Priest', 'Shaman']))) ? 3 : 1,
+        up_aura_cost: cd => (cd.cost || 0) >= 4 ? 2 : 1,
+        up_spell_aura: cd => anyCls(cd, ['Mage', 'Priest', 'Warlock', 'Shaman', 'Druid']) ? 3 : 0,
+        up_troll_atk: raceFit('Troll'), up_orc_hp: raceFit('Orc'), up_tauren_hp: raceFit('Tauren'), up_dwarf_guard: raceFit('Dwarf'),
+        up_nightelf_elusive: raceFit('Night Elf'), up_bloodelf_ping: raceFit('Blood Elf'), up_gnome_draw: raceFit('Gnome'), up_human_heal: raceFit('Human'),
+        up_play_draw: cd => drawText(cd) ? 1 : ((cd.cost || 0) <= 2 || clsIs(cd, 'Mage')) ? 3 : 2,
+        up_play_ping: cd => dmgText(cd) ? 3 : 1,
+        up_play_heal: cd => (healText(cd) || cd.school === 'Holy') ? 3 : 1,
+        up_play_gold: () => 1,
+        up_echo: cd => isOngoing(cd) ? 0 : (cd.cost || 0) <= 2 ? 3 : 1,
+        up_overload: cd => clsIs(cd, 'Shaman') ? 4 : (cd.cost || 0) >= 4 ? 2 : 0,
+        up_blood: cd => (anyCls(cd, ['Warlock', 'Death Knight']) || cd.school === 'Blood') ? 4 : (cd.cost || 0) >= 4 ? 2 : 0,
+        up_return: cd => has(cd, /destroy target|interrupt/i) ? 3 : 1,
+        up_guard_spell: cd => (has(cd, /prevent/i) || ['Protection', 'Holy', 'Discipline'].indexOf(cd.school) >= 0) ? 3 : 1,
+        up_weapon_atk: cd => cd.slot === 'Melee' ? 2 : 1,
+        up_armor_def: () => 2,
+        up_gear_hp: cd => cd.type === 'Armor' ? 3 : 1,
+        up_gear_reduce: cd => (has(cd, /prevent/i) || cd.type === 'Armor') ? 3 : 1,
+        up_gear_draw: cd => cd.type === 'Item' ? 3 : 1,
+        up_gear_gold: cd => cd.type === 'Item' ? 2 : 1,
+        up_gear_heal: cd => (healText(cd) || anyCls(cd, ['Priest', 'Paladin', 'Druid'])) ? 2 : 1,
+        up_vamp: cd => (cd.atkType === 'Shadow' || anyCls(cd, ['Death Knight', 'Warlock']) || raceIs(cd, 'Undead') || cd.school === 'Shadow') ? 4 : 1,
+        up_dmg1: cd => (dmgText(cd) || cd.type === 'Weapon') ? 2 : 1,
+        up_gold_dmg: () => 1,
+        up_cond_undead: cd => raceIs(cd, 'Undead') ? 3 : cd.faction === 'Horde' ? 1 : 0,
+        up_cond_draenei: cd => raceIs(cd, 'Draenei') ? 3 : cd.faction === 'Alliance' ? 1 : 0,
+        up_quick: cd => cd.instant ? 0 : cd.type === 'Ability' ? ((dmgText(cd) || has(cd, /destroy|exhaust|prevent/i)) ? 3 : 1) : has(cd, /Protector/) ? 4 : cd.type === 'Ally' ? 1 : 0,
+        up_thrown: cd => has(cd, /Thrown/) ? 0 : (cd.cost || 0) <= 3 ? 3 : 1,
+        up_sentinel: cd => cd.type === 'Ally' ? (has(cd, /Protector/) ? 4 : 0) : has(cd, /\[Activate\]|exhaust/i) ? 4 : cd.type === 'Armor' ? 2 : 0,
+        up_discard: cd => (has(cd, /discard/i) || clsIs(cd, 'Warlock')) ? 4 : 1,
+        up_dr_draw: cd => has(cd, /Death Rattle/) ? 0 : (cd.type === 'Ability' && !isOngoing(cd)) ? 2 : raceIs(cd, 'Undead') ? 3 : 1,
+        up_dr_ping: cd => has(cd, /Death Rattle/) ? 0 : (clsIs(cd, 'Death Knight') || raceIs(cd, 'Undead')) ? 4 : 1,
+        up_eternal: cd => (['Epic', 'Legendary'].indexOf(cd.rarity) >= 0 || (cd.cost || 0) >= 6) ? 3 : 1,
+        up_res_draw: cd => (cd.cost || 0) >= 5 ? 2 : 1,
+        up_res_ping: cd => (cd.cost || 0) >= 5 ? 2 : 1,
+        up_res_gold: cd => raceIs(cd, 'Goblin') ? 3 : 1,
+        up_res_heal: cd => (cd.cost || 0) >= 5 ? 2 : 1,
+        up_ephemeral: cd => (isOngoing(cd) || typeof cd.cost !== 'number') ? 0 : (cd.cost >= 2 && cd.cost <= 4) ? 3 : 0,
+        up_patience: cd => (cd.cost || 0) >= 5 ? 3 : 0,
+        up_bloodthirst: cd => (cd.type === 'Weapon' || (cd.atk || 0) >= 3) ? 3 : 1,
+        up_combo_point: cd => (cd.subtypes || []).indexOf('Combo') >= 0 ? 5 : 0
+    };
+    R.FIT = FIT;
     // ---- Neue Artefakt-Effekte: Gold, Rassen, Klassen ----------------------
     // Gold
     defArt({ id: 'gold_start', text: 'Du erhältst sofort 25 Gold.', runAcquire: run => { run.gold += 25; } });
@@ -845,7 +846,12 @@
     R.effectForCard = function (cd) {
         const pool = R.CARD_EFFECTS.filter(e => !e.types || e.types.indexOf(cd.type) >= 0);
         if (!pool.length) return R.CARD_EFFECTS[0];
-        return pool[hashStr(String(cd.id) + '|' + (cd.name || '') + '|' + cd.type) % pool.length];
+        // Passung bewerten (FIT); unter den bestpassenden Effekten entscheidet der Hash.
+        const scored = pool.map(e => { let v = 1; try { v = FIT[e.id] ? FIT[e.id](cd) : 1; } catch (err) { v = 1; } return { e, v: v || 0 }; }).filter(x => x.v > 0);
+        if (!scored.length) return pool[hashStr(String(cd.id)) % pool.length];
+        const best = Math.max(...scored.map(x => x.v));
+        const top = scored.filter(x => x.v >= best - 1).map(x => x.e);
+        return top[hashStr(String(cd.id) + '|' + (cd.name || '') + '|' + cd.type) % top.length];
     };
     R.archFor = function (cd) { return R.effectForCard(cd).id; };
     R.upgradeText = function (baseId) {
@@ -854,11 +860,11 @@
         return eff ? ('[' + eff.text + ']') : '';
     };
     // Liefert die synthetische, aufgewertete Karten-ID (wird bei Bedarf registriert).
-    R.upgraded = function (baseId) {
+    R.upgraded = function (baseId, effId) {   // effId: gespeicherte Aufwertung beibehalten (Spielstand)
         const base = CARDS[baseId];
         if (!base) return baseId;
         if (['Quest', 'Location', 'Hero'].includes(base.type)) return baseId;
-        const eff = R.effectForCard(base);
+        const eff = (effId && R.EFFECTS[effId] && R.EFFECTS[effId].kind === 'card') ? R.EFFECTS[effId] : R.effectForCard(base);
         const key = 'RLUP_' + baseId + '_' + eff.id;
         if (CARDS[key]) return key;
         const m = eff.mod || {};
@@ -868,47 +874,58 @@
             upgradedFrom: baseId, upgradeEffect: eff.id, upgradeArch: eff.id
         };
         card.baseCost = base.cost;
-        card.cost = Math.max(0, (base.cost || 0) + (m.cost || 0));
+        card.cost = m.costSet !== undefined ? m.costSet : Math.max(0, (base.cost || 0) + (m.cost || 0));
         card.costDelta = card.cost - (base.cost || 0);
         if (m.atk) card.atk = (base.atk || 0) + m.atk;
         if (m.hp) card.hp = (base.hp || 0) + m.hp;
         if (m.def) card.def = (base.def || 0) + m.def;
         if (m.kw) card.kw = { ...(base.kw || {}), ...m.kw };
         if (m.heroHp) card.rlHeroHp = m.heroHp;
+        if (m.instant) card.instant = true;
+        if (m.rlDR) card.rlDR = true;
         card.text = (base.text ? base.text + ' ' : '') + '[' + eff.text + ']';
         CARDS[key] = card;
+        // Im Spiel tragen aufgewertete Karten die ID der Originalkarte (makeCardInst, state.js).
+        // Darum wird FX der Originalkarte einmalig umhüllt; die Hülle wirkt nur bei Karten mit
+        // upgradeEffect und nur im Roguelike (s.rl) – normale Partien bleiben unverändert.
+        wrapBaseFx(baseId, base.type);
+        FX[key] = FX[baseId];
+        return key;
+    };
+    function wrapBaseFx(baseId, type) {
         const bf = FX[baseId] || {};
-        const nf = { ...bf };
-        if (base.type === 'Ability') {
+        if (bf.rlWrapped) return;
+        const nf = { ...bf, rlWrapped: true };
+        if (type === 'Ability') {
             nf.resolve = function (s, it) {
                 if (bf.resolve) bf.resolve(s, it);
-                R.afterAbility(s, it, baseId, key, eff.id);
+                const c = it && it.card;
+                if (s.rl && c && c.upgradeEffect) R.afterAbility(s, it, baseId, c.rlUp, c.upgradeEffect);
             };
         } else {
             nf.enter = function (s, c, pid, it) {
                 if (bf.enter) bf.enter(s, c, pid, it);
-                R.afterEnter(s, c, pid, baseId, key, eff.id);
+                if (s.rl && c && c.upgradeEffect) R.afterEnter(s, c, pid, baseId, c.rlUp, c.upgradeEffect);
             };
             nf.leave = function (s, snap, dest, info) {
                 if (bf.leave) bf.leave(s, snap, dest, info);
-                R.afterLeave(s, snap, dest, eff);
+                if (s.rl && snap && snap.upgradeEffect) R.afterLeave(s, snap, dest, R.EFFECTS[snap.upgradeEffect]);
             };
         }
-        FX[key] = nf;
-        return key;
-    };
+        FX[baseId] = nf;
+    }
     R.archOfCard = function (cardId) {
         const cd = CARDS[cardId];
         return cd && cd.upgradeEffect ? (R.EFFECTS[cd.upgradeEffect] || null) : null;
     };
     R.afterAbility = function (s, it, baseId, upId, effectId) {
-        if (!it || !it.card || it.card.id !== upId || !s.rl) return;
+        if (!it || !it.card || it.card.upgradeEffect !== effectId || !s.rl) return;
         const e = R.EFFECTS[effectId], p = getPlayer(s, it.pl);
         if (!e || !e.play) return;
         try { e.play(s, it, p, baseId, upId); } catch (err) { }
     };
     R.afterEnter = function (s, c, pid, baseId, upId, effectId) {
-        if (!c || c.id !== upId || !s.rl) return;
+        if (!c || c.upgradeEffect !== effectId || !s.rl) return;
         const e = R.EFFECTS[effectId];
         if (!e || !e.enter) return;
         try { e.enter(s, c, pid, baseId, upId); } catch (err) { }
@@ -929,6 +946,18 @@
             const p = getPlayer(s, 1);
             for (const c of p.allies.slice()) run(c, 'startTurn', 1);
             for (const c of p.hero.weapons.concat(p.hero.armors)) run(c, 'startTurn', 1);
+            for (const c of p.hand.slice()) run(c, 'handStart', 1);
+            return;
+        }
+        if (name === 'exhausted' && d && d.pid === 1) { const c = findCharacter(s, d.uid); if (c) run(c, 'exhausted', d); return; }
+        if (name === 'cardDiscarded' && d && d.pid === 1) { const c = getPlayer(s, 1).graveyard.find(x => x.uid === d.uid); if (c) run(c, 'discarded', d); return; }
+        if (name === 'resEnters' && d && d.pid === 1 && d.placed) { const r = getPlayer(s, 1).resources.find(x => x.card && x.card.uid === d.uid); if (r) run(r.card, 'res', d); return; }
+        if (name === 'cardPlayed' && d && d.pid === 1 && d.card) { d.card.rlPat = 0; return; }
+        if (name === 'dmg' && d && d.fatal && d.tpid === 2) {
+            // "Wenn diese Karte einen gegnerischen Ally zerstört": tödlicher Schaden von ihr (auch als Waffe beim Zuschlagen)
+            const t = findCharacter(s, d.tgt); if (!t || t.type !== 'Ally') return;
+            const seen = {};
+            for (const u of [d.src].concat(d.weapons || [])) { const c = u && findCharacter(s, u); if (c && !seen[c.uid] && ctrlOf(s, c) === 1) { seen[c.uid] = 1; run(c, 'kill', d); } }
             return;
         }
         if (name === 'attacks' && d) {
@@ -986,6 +1015,7 @@
         let v = 0;
         const e = R.effectOf(card);
         if (e && e.cost) v += (e.cost(s, card) || 0);
+        if (card.rlCostDown) v -= card.rlCostDown;                                         // z. B. Void Star Talisman
         if (card.type === 'Ally') {
             for (const a of getPlayer(s, 1).allies) { const ae = R.effectOf(a); if (ae && ae.auraCost) v -= ae.auraCost; }
         }
@@ -997,6 +1027,8 @@
 
     // ---------------------------------------------------------------- Artefakte
     // Helfer für Artefakt-Hooks
+    // CR 717: "Prevent the next N damage that would be dealt to your hero this turn" – gilt nur in diesem Zug
+    function addPrevent(s, n) { if (!s || !s.rl || !(n > 0)) return; addPE(s, 1, { k: 'rlGuard', v: n, untilTurn: s.turn }); }
     function flag(s, k) { return !!(s && s.rl && s.rl.f && s.rl.f[k]); }
     function setFlag(s, k) { if (!s || !s.rl) return; (s.rl.f || (s.rl.f = {}))[k] = 1; }
     function hasArt(s, id) { return !!(s && s.rl && s.rl.arts && s.rl.arts.indexOf(id) >= 0); }
@@ -1175,7 +1207,6 @@
             text: 'Wenn du in einem Zug die dritte Karte spielst, ziehe zwei Karten.',
             cardPlayed: (s, p) => {
                 if (p !== 1) return;
-                s.rl.plays = (s.rl.plays || 0) + 1;
                 if (s.rl.plays === 3 && !flag(s, 't:ritual')) { setFlag(s, 't:ritual'); trig(s, { k: 'draw', a: { pid: 1, n: 2 } }); }
             }
         },
@@ -1266,8 +1297,8 @@
         },
         {
             id: 'momentum', name: 'Momentum', rarity: 'common', price: 85,
-            text: 'Nach jedem gewonnenen Kampf erhältst du +5 maximales Leben und heilst 5.',
-            runWin: run => { run.maxHp += 5; run.hp = Math.min(run.maxHp, run.hp + 5); }
+            text: 'Nach jedem gewonnenen Kampf erhältst du +2 maximales Leben.',
+            runWin: run => { run.maxHp += 2; run.hp = run.maxHp; }
         },
         // ---- Weitere Artefakte (thematisch an die Akte angelehnt)
         {
@@ -1844,8 +1875,8 @@
         overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (2) weniger und fügt dem gegnerischen Helden 1 Arkanschaden zu.'],
         beastbond: ['Animal Handler', 'Abilities/AnimalHandler.png', 'Der erste Ally pro Zug kostet (1) weniger und kommt mit +1/+1.'],
         sanctuary: ['Guardian Spirit', 'Spells/GuardianSpirit.png', 'Ende des Zuges: heile 2. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.'],
-        echo_sigil: ['Preparation', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kommt am Zugende als Kopie auf die Hand.'],
-        emberheart: ['Sulfuras', 'Weapons/Unique_Sulfuras.png', 'Die erste Fähigkeit pro Zug fügt einem zufälligen Gegner 1 Feuerschaden zu.'],
+        echo_sigil: ['Honor Among Thieves', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kommt am Zugende als Kopie auf die Hand.'],
+        emberheart: ['Fiery Weapon', 'Spells/EnchantWeapon.png', 'Die erste Fähigkeit pro Zug fügt einem zufälligen Gegner 1 Feuerschaden zu.'],
         wardrum: ['Warsong Banner', 'Spells/WarsongBrutal.png'],
         gravecaller: ['Animate Dead', 'Spells/AnimateDead.png'],
         vampiric: ['Vampiric Embrace', 'Spells/ImprovedVampiricEmbrace.png', 'Schaden deines Helden heilt dich in gleicher Höhe.'],
@@ -1888,15 +1919,15 @@
         shieldwall: ['Shield Mastery', 'Abilities/ShieldMastery.png'],
         guardianangel: ['Guardian Ward', 'Spells/GuardianWard.png', 'Einmal pro Zug: Ein Protektor-Ally, der Kampfschaden erleidet, fügt dem Angreifer 1 Schaden zu.'],
         nightveil: ['Shadow Dance', 'Abilities/ShadowDance.png'],
-        assassin: ['Assassination', 'Abilities/Assassinate.png'],
+        assassin: ['Opportunity', 'Abilities/Assassinate.png'],
         smoke: ['Smoke Bomb', 'Miscellaneous/Bomb_03.png'],
         aegis: ['Spell Warding', 'Spells/SpellWarding.png', 'Allies mit Untargetable haben +2 Gesundheit. Dein Held erleidet 1 Schaden weniger.'],
         ghostwalk: ['Spectral Sight', 'Spells/SpectralSight.png'],
         sniper: ['Sniper Training', 'Abilities/SniperTraining.png'],
-        quiver: ["Rhok'delar", 'Weapons/Bow_41.png'],
+        quiver: ['Ancient Sinew Wrapped Lamina', 'Miscellaneous/Quiver_03.png'],
         warbringer: ['Heroic Leap', 'Abilities/HeroicLeap.png'],
         charge: ['Bull Rush', 'Abilities/BullRush.png'],
-        spring: ['Rejuvenation', 'Spells/Rejuvenation.png'],
+        spring: ['Living Seed', 'Spells/Rejuvenation.png'],
         martyrium: ['Spirit Link', 'Spells/SpiritLink.png'],
         bloodbloom: ['Bloodboil', 'Spells/BloodBoil.png'],
         plague: ['Creeping Plague', 'Spells/CreepingPlague.png'],
@@ -1948,7 +1979,7 @@
         newArtifact('troll_hp', 'Voodoo Charm', 'Spells/Hex.png', 'Rassen', 'common', 95, 'troll_hp'),
         newArtifact('orc_berserk', 'Warsong Sash', 'Spells/BloodPresence.png', 'Rassen', 'rare', 120, 'orc_berserk'),
         newArtifact('draenei_inspire', 'Exodar Life-Staff', 'Weapons/draenei_03.png', 'Rassen', 'rare', 125, 'draenei_inspire'),
-        newArtifact('undead_cost', 'Will of the Forsaken', 'Spells/AntiShadow.png', 'Rassen', 'rare', 115, 'undead_cost'),
+        newArtifact('undead_cost', 'Undercity Oath', 'Spells/PortalUnderCity.png', 'Rassen', 'rare', 115, 'undead_cost'),
         newArtifact('human_hp', 'Lionheart', 'Miscellaneous/AhnQirajTrinket_04.png', 'Rassen', 'common', 95, 'human_hp'),
         newArtifact('dwarf_protector', 'Dwarven Bunker', 'Places/Ironforge.png', 'Rassen', 'rare', 125, 'dwarf_protector'),
         newArtifact('nightelf_elusive', 'Nightseye', 'Trade/Nightseye_01.png', 'Rassen', 'rare', 120, 'nightelf_elusive'),
@@ -1972,6 +2003,287 @@
         newArtifact('gold_death', 'Scourge Bounty', 'Miscellaneous/Bone_Skull_02.png', 'Ökonomie', 'common', 100, 'gold_death'),
         newArtifact('gold_weapon', 'Trade Prince', 'Trade/Papyrus.png', 'Ökonomie', 'rare', 115, 'gold_weapon')
     );
+    // ---- Artefakte: Kette, Zonen, Erschöpfen, Rüstung (Namen aus Vanilla / TBC / WotLK) ----
+    const myHero = s => s.p1.hero;
+    const isMine = (s, uid) => { const c = uid && findCharacter(s, uid); return !!(c && ctrlOf(s, c) === 1); };
+    const dtList = dt => Array.isArray(dt) ? dt : (dt ? [dt] : []);
+    const isFinisher = c => !!c && /Finishing Move/.test(c.text || '');
+    const isCombo = c => !!c && (c.subtypes || []).indexOf('Combo') >= 0;
+    R.ARTIFACTS.push(
+        {
+            id: 'art_counter', name: 'Improved Counterspell', icon: 'Spells/Silence.png', cat: 'Kette', rarity: 'common', price: 85,
+            text: 'Instants, die du im Zug des Gegners spielst, kosten (1) weniger.',
+            cost: (s, p, card) => (card.instant && s.activePlayer === 2) ? -1 : 0
+        },
+        {
+            id: 'art_vigil', name: 'Shield Specialization', icon: 'Abilities/Vigilance.png', cat: 'Rüstung', rarity: 'common', price: 95,
+            text: 'Einmal pro Zug: Wenn eine deiner Rüstungen Schaden verhindert, ziehe 1 Karte.',
+            armorPrevented: (s, d) => { if (!d || d.pid !== 1 || flag(s, 't:vigil')) return; setFlag(s, 't:vigil'); drawFor(s, 1, 1); }
+        },
+        {
+            id: 'art_ironwall', name: 'Improved Shield Block', icon: 'Abilities/ShieldWall.png', cat: 'Rüstung', rarity: 'rare', price: 120,
+            text: 'Deine Rüstungen haben +1 DEF. Einmal pro Zug: Wenn eine deiner Rüstungen Schaden verhindert, mache sie bereit.',
+            stat: (s, c, kind) => (kind === 'def' && c && c.type === 'Armor' && ctrlOf(s, c) === 1) ? 1 : 0,
+            armorPrevented: (s, d) => { if (!d || d.pid !== 1 || flag(s, 't:ironwall')) return; setFlag(s, 't:ironwall'); q(s, { op: 'call', k: 'E:rlReady', a: { uid: d.uid } }); }
+        },
+        {
+            id: 'art_swordboard', name: 'Sword and Board', icon: 'Abilities/SwordandBoard.png', cat: 'Rüstung', rarity: 'rare', price: 115,
+            text: 'Einmal pro Zug: Wenn eine deiner Rüstungen Schaden verhindert, hat dein Held in diesem Zug +2 ATK.',
+            armorPrevented: (s, d) => { if (!d || d.pid !== 1 || flag(s, 't:swordboard')) return; setFlag(s, 't:swordboard'); addTM(myHero(s), { k: 'atk', v: 2, turn: s.turn }); }
+        },
+        {
+            id: 'art_knell', name: 'Wailing Souls', icon: 'Spells/DeathScream.png', cat: 'Friedhof', rarity: 'rare', price: 125,
+            text: 'Death Rattle deiner Karten löst zweimal aus.'
+        },
+        {
+            id: 'art_combo', name: 'Relentless Strikes', icon: 'Abilities/Eviscerate.png', cat: 'Kombo', rarity: 'rare', price: 115,
+            text: 'Einmal pro Zug: Wenn du einen Finishing Move spielst, erhalte eine zufällige Combo-Fähigkeit deiner Klasse auf die Hand.',
+            cardPlayed: (s, p, card) => {
+                if (p !== 1 || !isFinisher(card) || flag(s, 't:combo')) return;
+                const pl = getPlayer(s, 1); if (pl.hand.length >= 10) return;
+                const pool = R.poolFor(pl.className, pl.faction, s.rl.act || 1).filter(isCombo);
+                if (!pool.length) return;
+                setFlag(s, 't:combo'); const c = makeCardInst(R.pick(pool).id, false, 1); pl.hand.push(c);
+                L(s, tr`✦ Relentless Strikes: ${c.name} kommt auf die Hand.`, '', 1);
+            }
+        },
+        {
+            id: 'art_void', name: 'Void Star Talisman', icon: 'Trade/VoidSphere.png', cat: 'Entfernt', rarity: 'legendary', price: 175,
+            text: 'Wenn eine deiner Karten aus dem Spiel entfernt wird: Erhalte eine zufällige Fähigkeit deiner Klasse auf die Hand. Sie kostet (1) weniger. Höchstens 3 pro Zug.',
+            removedFromGame: (s, d) => {
+                if (d.pid !== 1 || (s.rl.f['t:void'] || 0) >= 3) return;
+                s.rl.f['t:void'] = (s.rl.f['t:void'] || 0) + 1;
+                const p = getPlayer(s, 1); if (p.hand.length >= 10) return;
+                const pool = R.poolFor(p.className, p.faction, s.rl.act || 1).filter(c => c.type === 'Ability' && (c.allowedClasses || []).indexOf(p.className) >= 0);
+                if (!pool.length) return;
+                const c = makeCardInst(R.pick(pool).id, false, 1); c.rlCostDown = 1; p.hand.push(c);
+                L(s, tr`✦ Void Star Talisman: ${c.name} kommt auf die Hand.`, '', 1);
+            }
+        },
+        {
+            id: 'art_soulfrag', name: 'Soul Fragment', icon: 'Trade/DustSoul.png', cat: 'Entfernt', rarity: 'common', price: 90,
+            text: 'Wenn eine Karte eines beliebigen Spielers aus dem Spiel entfernt wird: Verhindere die nächsten 2 Schaden, die deinem Helden in diesem Zug zugefügt würden (höchstens 3-mal pro Zug).',
+            removedFromGame: (s) => { if ((s.rl.f['t:sfrag'] || 0) >= 3) return; s.rl.f['t:sfrag'] = (s.rl.f['t:sfrag'] || 0) + 1; addPrevent(s, 2); }
+        },
+        {
+            id: 'art_shatter', name: 'Shatter', icon: 'Abilities/DeepFreeze.png', cat: 'Erschöpfen', rarity: 'rare', price: 120,
+            text: 'Erschöpfte gegnerische Charaktere erleiden 1 zusätzlichen Schaden aus deinen Quellen. Einmal pro Zug: Wenn ein erschöpfter gegnerischer Ally zerstört wird, ziehe 1 Karte.',
+            dmgPre: (s, o) => { const t = findCharacter(s, o.tgt); if (o.amt > 0 && t && t.exhausted && ctrlOf(s, t) === 2 && isMine(s, o.src)) o.amt += 1; },
+            died: (s, snap) => { if (!snap || snap.wasCtrl !== 2 || !snap.exhausted || !isAllyLike(snap) || flag(s, 't:shatter')) return; setFlag(s, 't:shatter'); drawFor(s, 1, 1); }
+        },
+        {
+            id: 'art_flurry', name: 'Flurry', icon: 'Abilities/EndlessRage.png', cat: 'Bereitmachen', rarity: 'rare', price: 115,
+            text: 'Wenn ein befreundeter Charakter außerhalb deines Ready-Steps bereitgemacht wird, erhält er bis Zugende +2 ATK (einmal pro Charakter und Zug).',
+            readied: (s, d) => {
+                const c = d && findCharacter(s, d.uid);
+                if (!c || ctrlOf(s, c) !== 1 || s.rl.rsTurn !== s.turn || c.rlFlurry === s.turn || !(c.type === 'Ally' || c.type === 'Hero')) return;
+                c.rlFlurry = s.turn; addTM(c, { k: 'atk', v: 2, turn: s.turn });
+            }
+        },
+        {
+            id: 'art_hoj', name: 'Hand of Justice', icon: 'Spells/FistOfJustice.png', cat: 'Waffen', rarity: 'rare', price: 125,
+            text: 'Einmal pro Zug: Wenn dein Held angegriffen und dabei mit einer Waffe zugeschlagen hat, mache ihn nach dem Kampf bereit. Die Waffe bleibt erschöpft.',
+            strike: (s, d) => { if (d && d.pid === 1) s.rl.struck = s.turn; },
+            combatEnd: (s, d) => {
+                if (!d || d.att !== myHero(s).uid || s.rl.struck !== s.turn || flag(s, 't:hoj')) return;
+                setFlag(s, 't:hoj'); q(s, { op: 'call', k: 'E:rlReady', a: { uid: d.att } });
+            }
+        },
+        {
+            id: 'art_potency', name: 'Combat Potency', icon: 'Abilities/DualWieldSpecialization.png', cat: 'Waffen', rarity: 'common', price: 95,
+            text: 'Wenn du in einem Zug mit einer zweiten, anderen Waffe zuschlägst, hat sie in diesem Zug +2 ATK.',
+            strike: (s, d) => {
+                if (!d || d.pid !== 1) return;
+                const list = s.rl.strikes || (s.rl.strikes = []);
+                if (list.length && list.indexOf(d.weapon) < 0) { const w = findCharacter(s, d.weapon); if (w) addTM(w, { k: 'atk', v: 2, turn: s.turn }); }
+                if (list.indexOf(d.weapon) < 0) list.push(d.weapon);
+            }
+        },
+        {
+            id: 'art_throwing', name: 'Throwing Specialization', icon: 'Abilities/ThrowingSpecialization.png', cat: 'Waffen', rarity: 'rare', price: 130,
+            text: 'Deine Waffen haben Thrown: Beim Zuschlagen hat dein Held Long-Range, am Ende des Zuges kommt die Waffe auf deine Hand zurück.',
+            entersPlay: (s, d) => { const w = d && findCharacter(s, d.uid); if (w && w.type === 'Weapon' && d.pid === 1) addTM(w, { k: 'thrown' }); },
+            battleStart: s => { for (const w of getPlayer(s, 1).hero.weapons) addTM(w, { k: 'thrown' }); }
+        },
+        {
+            id: 'art_static', name: 'Static Shock', icon: 'Spells/StaticShock.png', cat: 'Überladung', rarity: 'rare', price: 115,
+            text: 'Für jede Ressource, die Überladung erschöpft, fügt dein Held einem zufälligen Gegner 1 Naturschaden zu.'
+        },
+        {
+            id: 'art_citrine', name: 'Mana Citrine', icon: 'Spells/ConjureManaJewel.png', cat: 'Kette', rarity: 'common', price: 95,
+            text: 'Einmal pro Zug: Wenn du im Zug des Gegners eine Karte spielst, mache danach eine deiner erschöpften Ressourcen bereit.',
+            cardPlayed: (s, p) => { if (p !== 1 || s.activePlayer !== 2 || flag(s, 't:citrine')) return; setFlag(s, 't:citrine'); q(s, { op: 'call', k: 'E:rlReadyRes', a: { pid: 1 } }); }
+        },
+        {
+            id: 'art_totems', name: 'Restorative Totems', icon: 'Miscellaneous/TotemofLife.png', cat: 'Totems', rarity: 'rare', price: 110,
+            text: 'Deine Totems haben +2 Gesundheit und Protector. Wenn eines deiner Totems zerstört wird, ziehe 1 Karte.',
+            allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && c.isTotem) { addTM(c, { k: 'hp', v: 2 }); addTM(c, { k: 'protector' }); } },
+            died: (s, snap) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem)) drawFor(s, 1, 1); }
+        },
+        {
+            id: 'art_contagion', name: 'Contagion', icon: 'Spells/Contagion.png', cat: 'Anhänge', rarity: 'rare', price: 115,
+            text: 'Gegnerische Charaktere mit einem deiner Anhänge erleiden 1 zusätzlichen Schaden aus deinen Quellen. Einmal pro Zug: Wenn du eine Karte an einen gegnerischen Charakter anhängst, ziehe 1 Karte.',
+            dmgPre: (s, o) => {
+                if (!(o.amt > 0) || !isMine(s, o.src)) return;
+                const t = findCharacter(s, o.tgt); if (!t || ctrlOf(s, t) !== 2) return;
+                if (getPlayer(s, 1).ongoing.some(c => c.attachedTo === t.uid)) o.amt += 1;
+            },
+            entersPlay: (s, d) => {
+                if (!d || d.pid !== 1 || flag(s, 't:contagion')) return;
+                const c = getPlayer(s, 1).ongoing.find(x => x.uid === d.uid); const h = c && c.attachedTo && findCharacter(s, c.attachedTo);
+                if (h && ctrlOf(s, h) === 2) { setFlag(s, 't:contagion'); drawFor(s, 1, 1); }
+            }
+        },
+        {
+            id: 'art_worms', name: 'Bloodworms', icon: 'Abilities/Worm.png', cat: 'Tod', rarity: 'common', price: 95,
+            text: 'Wenn ein befreundeter Ally stirbt, fügt dein Held dem gegnerischen Helden 1 Schattenschaden zu.',
+            died: (s, snap) => { if (snap && snap.wasCtrl === 1 && isAllyLike(snap)) q(s, { op: 'call', k: 'E:rlpingHero', a: { pid: 1, amt: 1, dt: 'Shadow' } }); }
+        },
+        {
+            id: 'art_ghouls', name: 'Master of Ghouls', icon: 'Abilities/GhoulFrenzy.png', cat: 'Friedhof', rarity: 'rare', price: 120,
+            text: 'Zu Beginn deines Zuges: Wenn 4 oder mehr Allies in deinem Friedhof liegen, entferne einen davon aus dem Spiel und bringe einen 3/3-Ghul ins Spiel.',
+            startTurn: (s, pid) => {
+                if (pid !== 1) return;
+                const p = getPlayer(s, 1); const list = p.graveyard.filter(c => c.type === 'Ally' && !c.isToken);
+                if (list.length < 4) return;
+                const c = list[0]; p.graveyard.splice(p.graveyard.indexOf(c), 1); p.removed.push(c);
+                q(s, { op: 'call', k: 'E:rlmakeToken', a: { pid: 1, id: 11501 } });
+                L(s, tr`☠ Master of Ghouls: ${c.name} erhebt sich als Ghul.`, '', 1);
+            }
+        },
+        {
+            id: 'art_drums', name: 'Drums of Battle', icon: 'Miscellaneous/Drum_04.png', cat: 'Tokens', rarity: 'rare', price: 120,
+            text: 'Einmal pro Zug: Wenn in diesem Zug dein dritter Ally ins Spiel kommt (Tokens zählen mit), haben alle deine Allies bis Zugende Ferocity und +1 ATK.',
+            allyEnters: (s, p, uid) => {
+                if (p !== 1) return;
+                s.rl.alliesIn = (s.rl.alliesIn || 0) + 1;
+                if (s.rl.alliesIn !== 3 || flag(s, 't:drums')) return;
+                setFlag(s, 't:drums'); buffSide(s, 1, 'atk', 1, true); buffSide(s, 1, 'ferocity', undefined, true);
+            }
+        },
+        {
+            id: 'art_orb', name: 'Orb of Divination', icon: 'Miscellaneous/Orb_02.png', cat: 'Deck', rarity: 'common', price: 85,
+            text: 'Zu Beginn deines Zuges: Sieh dir die oberste Karte deines Decks an. Du darfst sie unter dein Deck legen.',
+            startTurn: (s, pid) => {
+                if (pid !== 1) return;
+                const p = getPlayer(s, 1); if (!p.deck.length) return;
+                const top = CARDS[p.deck[p.deck.length - 1]];
+                yesNo(s, 1, 'Orb of Divination: ' + (top ? top.name : '?') + ' unter das Deck legen?', 'Orb of Divination', 'E:rlOrb', { pid: 1 }, false);
+            }
+        },
+        {
+            id: 'art_bloodcraze', name: 'Blood Craze', icon: 'Abilities/BloodFrenzy.png', cat: 'Blut', rarity: 'rare', price: 115,
+            text: 'Wenn du deinem Helden selbst Schaden zufügst (z. B. durch Blut-Aufwertungen oder Blood Tap), erhält dein Held für diesen Kampf +1 ATK.',
+            damaged: (s, d) => { const h = myHero(s); if (d && d.amt > 0 && d.tgt === h.uid && d.src === h.uid) addTM(h, { k: 'atk', v: 1 }); }
+        },
+        {
+            id: 'art_necropolis', name: 'Will of the Necropolis', icon: 'Miscellaneous/Bone_Skull_01.png', cat: 'Blut', rarity: 'rare', price: 120,
+            text: 'Solange dein Held 10 oder weniger Leben hat: Deine Karten kosten (1) weniger und dein Held hat +2 ATK.',
+            cost: (s) => R.lowLife(s) ? -1 : 0,
+            stat: (s, c, kind) => (kind === 'atk' && c && c.uid === myHero(s).uid && R.lowLife(s)) ? 2 : 0
+        },
+        {
+            id: 'art_devast', name: 'Elemental Devastation', icon: 'Spells/ELEMENTALDEVASTATION.png', cat: 'Schadensarten', rarity: 'rare', price: 115,
+            text: 'Einmal pro Zug: Sobald du in einem Zug Schaden von 3 verschiedenen Schadensarten zugefügt hast, ziehe 2 Karten und heile 2.',
+            damaged: (s, d) => {
+                if (!d || d.spid !== 1 || !(d.amt > 0) || flag(s, 't:devast')) return;
+                const list = s.rl.dts || (s.rl.dts = []);
+                for (const t of dtList(d.dt)) if (list.indexOf(t) < 0) list.push(t);
+                if (list.length >= 3) { setFlag(s, 't:devast'); drawFor(s, 1, 2); healHeroFor(s, 1, 2); }
+            }
+        },
+        {
+            id: 'art_soulstone', name: 'Major Soulstone', icon: 'Spells/SoulGem.png', cat: 'Held', rarity: 'rare', price: 125,
+            text: 'Einmal pro Kampf: Wenn dein Held umgedreht wird, wird er zu Beginn deines nächsten Zuges wieder aufgedeckt. Seine Flip-Kraft kann erneut genutzt werden.',
+            heroFlipped: (s, d) => { if (d && d.pid === 1 && !flag(s, 'b:soulstone')) { setFlag(s, 'b:soulstone'); s.rl.unflip = true; } },
+            startTurn: (s, pid) => { if (pid === 1 && s.rl.unflip) { s.rl.unflip = false; myHero(s).flipped = false; L(s, tr`✦ Major Soulstone: ${myHero(s).name} wird wieder aufgedeckt.`, '', 1); } }
+        },
+        {
+            id: 'art_soulwell', name: 'Soulwell', icon: 'Miscellaneous/Bag_Soulbag.png', cat: 'Tod', rarity: 'rare', price: 110,
+            text: 'Wenn ein befreundeter Ally stirbt, erhält der Soulwell 1 Seele (bleibt im Run). Ab 15 Seelen: einmalig +5 maximales Leben, und jeder Kampf beginnt mit einem 3/3-Ghul.',
+            died: (s, snap) => { if (snap && snap.wasCtrl === 1 && isAllyLike(snap)) s.rl.souls = (s.rl.souls || 0) + 1; },
+            battleStart: s => { if ((s.rl.souls || 0) >= 15) makeToken(s, 11501, 1); },
+            runWin: (run, rl) => {
+                if (rl && typeof rl.souls === 'number') run.souls = rl.souls;
+                if ((run.souls || 0) >= 15 && !run.soulwellDone) { run.soulwellDone = true; run.maxHp += 5; run.hp += 5; }
+            }
+        },
+        {
+            id: 'art_valor', name: 'Tome of Valor', icon: 'Miscellaneous/Book_05.png', cat: 'Run', rarity: 'rare', price: 110,
+            text: 'Wenn du einen Kampf in einem Zug gewinnst, in dem du 3 oder mehr Karten gespielt hast: Werte eine zufällige Karte deines Decks auf.',
+            runWin: (run, rl) => { if (rl && rl.activePl === 1 && (rl.plays || 0) >= 3) R.upgradeRandomEntry(run); }
+        }
+    );
+    // Noch zu verhindernder Schaden an deinem Helden in diesem Zug (Anzeige im Kampf-HUD)
+    R.preventOf = s => pes(s, 1, 'rlGuard').filter(m => !m.used).reduce((n, m) => n + (m.v || 0), 0);
+    R.lowLife = s => { const h = s.p1.hero; return hpOf(s, h) - (h.damage || 0) <= 10; };
+    R.drTimes = (s, pid) => (pid === 1 && hasArt(s, 'art_knell')) ? 2 : 1;
+    // Eine zufällige, noch nicht aufgewertete Karte des Run-Decks aufwerten (Tome of Valor)
+    R.upgradeRandomEntry = function (run) {
+        const list = (run.deck || []).filter(e => !e.upgradedFrom && CARDS[e.id] && ['Ally', 'Ability', 'Weapon', 'Armor', 'Item'].indexOf(CARDS[e.id].type) >= 0);
+        if (!list.length) return null;
+        const e = R.pick(list), base = e.id, up = R.upgraded(base);
+        if (up === base) return null;
+        e.id = up; e.upgradedFrom = base;
+        return e;
+    };
+
+    // ---------------------------------------------------------------- Tränke
+    // Verbrauchsgegenstände: höchstens R.POTION_SLOTS im Run, im Kampf in deinem Zug benutzbar (wenn du am Zug bist
+    // und nichts auf der Kette liegt), danach verbraucht. Wirkungen in der Kartensprache des Originals.
+    R.POTION_SLOTS = 3;
+    const potRes = (s, n) => { let k = 0; for (const r of getPlayer(s, 1).resources) { if (k >= n) break; if (r.exhausted) { r.exhausted = false; k++; } } return k; };
+    R.POTIONS = [
+        { id: 'pot_mana', name: 'Major Mana Potion', icon: 'Trade/71_potion_potion.png', price: 45,
+          text: 'Mache bis zu 2 deiner erschöpften Ressourcen bereit.', use: s => potRes(s, 2) > 0 },
+        { id: 'pot_heal', name: 'Super Healing Potion', icon: 'Trade/50_potion_potion.png', price: 40,
+          text: 'Dein Held heilt 8 Schaden von sich.', use: s => { const h = s.p1.hero; if (!(h.damage > 0)) return false; heal(s, h.uid, h.uid, 8); return true; } },
+        { id: 'pot_giants', name: 'Elixir of the Giants', icon: 'Trade/39_potion_potion.png', price: 45,
+          text: 'Dein Held hat in diesem Zug +3 ATK.', use: s => { addTM(s.p1.hero, { k: 'atk', v: 3, turn: s.turn }); return true; } },
+        { id: 'pot_swift', name: 'Swiftness Potion', icon: 'Trade/59_potion_potion.png', price: 50,
+          text: 'Deine Allies haben in diesem Zug Ferocity.', use: s => { const l = getPlayer(s, 1).allies; if (!l.length) return false; for (const c of l) addTM(c, { k: 'ferocity', turn: s.turn }); return true; } },
+        { id: 'pot_wisdom', name: 'Elixir of Wisdom', icon: 'Trade/18_potion_potion.png', price: 50,
+          text: 'Ziehe 2 Karten.', use: s => { drawCards(s, getPlayer(s, 1), 2); return true; } },
+        { id: 'pot_free', name: 'Free Action Potion', icon: 'Trade/06_potion_potion.png', price: 55,
+          text: 'Mache deinen Helden und alle deine Waffen bereit.', use: s => { const h = s.p1.hero; if (!h.exhausted && !h.weapons.some(w => w.exhausted)) return false; readyCard(s, h); h.weapons.forEach(w => readyCard(s, w)); return true; } },
+        { id: 'pot_frostoil', name: 'Frost Oil', icon: 'Trade/72_potion_potion.png', price: 45,
+          text: 'Erschöpfe bis zu 2 zufällige gegnerische Allies.', use: s => { const l = R.shuffle(getPlayer(s, 2).allies.filter(c => !c.exhausted)).slice(0, 2); if (!l.length) return false; l.forEach(c => exhaust(s, c)); return true; } },
+        { id: 'pot_fire', name: 'Oil of Immolation', icon: 'Miscellaneous/FirePotion.png', price: 55,
+          text: 'Dein Held fügt jedem gegnerischen Ally 2 Feuerschaden zu.', use: s => { const l = getPlayer(s, 2).allies.slice(); if (!l.length) return false; l.forEach(c => dealDamage(s, { src: s.p1.hero.uid, tgt: c.uid, amt: 2, dt: 'Fire', ability: true })); return true; } },
+        { id: 'pot_shadow', name: 'Shadow Oil', icon: 'Trade/66_potion_potion.png', price: 45,
+          text: 'Dein Held fügt dem gegnerischen Helden 4 Schattenschaden zu.', use: s => { dealDamage(s, { src: s.p1.hero.uid, tgt: s.p2.hero.uid, amt: 4, dt: 'Shadow', ability: true }); return true; } },
+        { id: 'pot_rejuv', name: 'Major Rejuvenation Potion', icon: 'Trade/22_potion_potion.png', price: 45,
+          text: 'Dein Held heilt 4 Schaden von sich. Ziehe 1 Karte.', use: s => { const h = s.p1.hero; if (h.damage > 0) heal(s, h.uid, h.uid, 4); drawCards(s, getPlayer(s, 1), 1); return true; } }
+    ];
+    R.potById = id => R.POTIONS.find(p => p.id === id) || null;
+    R.randomPotion = () => R.pick(R.POTIONS).id;
+    // Kann ein Trank jetzt benutzt werden? Nur in deinem Zug, ohne offene Entscheidung und mit leerer Kette.
+    R.canUsePotion = s => !!(s && s.rl && !s.gameOver && s.activePlayer === 1 && !s.pending && !(s.chain && s.chain.length) && !s.battle);
+    // Wirkung ausführen; true = verbraucht. Der Aufrufer verarbeitet danach die Warteschlange (process) und zeichnet neu.
+    R.usePotion = function (s, id) {
+        const p = R.potById(id); if (!p || !R.canUsePotion(s)) return false;
+        let ok = false; try { ok = !!p.use(s); } catch (e) { ok = false; }
+        if (ok) L(s, tr`🧪 ${p.name}: ${p.text}`, '', 1);
+        return ok;
+    };
+
+    // ---------------------------------------------------------------- Elite-Eigenschaften
+    // Elites spielen ein stärkeres Themen-Deck und haben eine dauerhafte Eigenschaft (wie ein Ongoing-Effekt
+    // ihres Helden). Sie gilt nur für den Gegner (Spieler 2) und steht vor dem Kampf in der Meldung.
+    const enemyAlly = (s, c) => !!c && c.type === 'Ally' && ctrlOf(s, c) === 2;
+    R.ELITE_TRAITS = [
+        { id: 'el_presence', name: 'Commanding Presence', text: 'Die Allies des Gegners haben +1 ATK.',
+          stat: (s, c, kind) => (kind === 'atk' && enemyAlly(s, c)) ? 1 : 0 },
+        { id: 'el_fortitude', name: 'Fortitude', text: 'Die Allies des Gegners haben +2 Gesundheit.',
+          stat: (s, c, kind) => (kind === 'hp' && enemyAlly(s, c)) ? 2 : 0 },
+        { id: 'el_unholy', name: 'Unholy Aura', text: 'Wenn ein Ally des Gegners stirbt, erhalten seine anderen Allies dauerhaft +1/+1.',
+          died: (s, snap) => { if (!snap || snap.wasCtrl !== 2 || !isAllyLike(snap)) return; for (const c of getPlayer(s, 2).allies) { addTM(c, { k: 'atk', v: 1 }); addTM(c, { k: 'hp', v: 1 }); } } },
+        { id: 'el_bloodpact', name: 'Blood Pact', text: 'Der gegnerische Held hat +8 Gesundheit und beginnt mit einer zusätzlichen Ressource.',
+          stat: (s, c, kind) => (kind === 'hp' && c && c.uid === s.p2.hero.uid) ? 8 : 0, startRes: 1 },
+        { id: 'el_doom', name: 'Ritual of Doom', text: 'Wenn ein Ally des Gegners stirbt, erleidet dein Held 1 Schattenschaden.',
+          died: (s, snap) => { if (!snap || snap.wasCtrl !== 2 || !isAllyLike(snap)) return; q(s, { op: 'call', k: 'E:rlpingMe', a: { amt: 1 } }); } }
+    ];
+    R.eliteTrait = s => (s && s.rl && s.rl.elite) ? (R.ELITE_TRAITS.find(t => t.id === s.rl.elite) || null) : null;
     // Alle alten Artefakte werden ebenfalls zu Effekt-Einträgen (ein Pool).
     R.ARTIFACTS.forEach(a => { if (!R.EFFECTS[a.id]) R.EFFECTS[a.id] = { ...a, kind: 'art', text: a.text }; });
     // Kategorie für die Debug-Galerie (auch für die älteren Artefakte).
@@ -2022,6 +2334,7 @@
         const pid = ctrlOf(s, c);
         for (const a of artList(s)) if (a.stat) v += (a.stat(s, c, kind) || 0);
         v += R.cardStat(s, c, kind);
+        const et = R.eliteTrait(s); if (et && et.stat) v += (et.stat(s, c, kind) || 0);
         if (pid === 1 && c.type === 'Hero' && kind === 'hp') {
             const p = getPlayer(s, 1);
             for (const e of p.hero.armors.concat(p.hero.weapons)) if (e.rlHeroHp) v += e.rlHeroHp;
@@ -2040,39 +2353,34 @@
     }
     function artEvt(s, name, d) {
         if (!s || !s.rl) return;
-        // Rundenflags zu Beginn des Spielerzugs zurücksetzen
-        if (name === 'startOfTurn' && d && d.pid === 1) {
+        // "1x pro Zug" gilt je Zug (auch im gegnerischen Zug): Flags und Zugzähler bei jedem Zugbeginn zurücksetzen
+        if (name === 'startOfTurn' && d) {
             if (s.rl.f) for (const k of Object.keys(s.rl.f)) if (k.indexOf('t:') === 0) delete s.rl.f[k];
-            s.rl.plays = 0; s.rl.spells = 0; s.rl.draws = 0;
+            s.rl.plays = 0; s.rl.spells = 0; s.rl.draws = 0; s.rl.alliesIn = 0; s.rl.dts = []; s.rl.strikes = [];
+            s.rl.rsTurn = s.turn;                                                           // Ready-Step dieses Zuges ist vorbei
+        }
+        if (name === 'startOfTurn' && d && d.pid === 1) {
             // Überladung: Ressourcen im nächsten Zug erschöpfen
             const o = pes(s, 1, 'rlOverload').filter(m => !m.used);
-            for (const m of o) { exhaustRes(s, 1, m.n || 2); m.used = true; L(s, tr`⚡ Überladung erschöpft Ressourcen.`, '', 1); }
+            for (const m of o) {
+                const n = exhaustRes(s, 1, m.n || 2); m.used = true; L(s, tr`⚡ Überladung erschöpft Ressourcen.`, '', 1);
+                if (hasArt(s, 'art_static')) for (let i = 0; i < n; i++) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { pid: 1, amt: 1, dt: 'Nature' } });
+            }
         }
-        // Fähigkeitszähler für Kombo-/Zauber-Artefakte
-        if (name === 'cardPlayed' && d && d.pid === 1 && d.card && d.card.type === 'Ability') {
-            s.rl.spells = (s.rl.spells || 0) + 1;
+        // Zähler für Zauber-/Kombo-Artefakte (nur deine Karten)
+        if (name === 'cardPlayed' && d && d.pid === 1) {
+            s.rl.plays = (s.rl.plays || 0) + 1;
+            if (d.card && d.card.type === 'Ability') s.rl.spells = (s.rl.spells || 0) + 1;
         }
         if (name === 'startOfTurn' && s.rl.boss && d && d.pid === 2) {
             // Boss-Druck: bestraft leere Bretter, skaliert mit dem Akt
             const p1 = getPlayer(s, 1);
             const act = s.rl.act || 1;
-            if (p1.allies.filter(a => !a.isToken || true).length < 2) q(s, { op: 'call', k: 'E:rlheroDamage', a: { pid: 1, amt: 1 + Math.min(3, act) } });
-        }
-        // Vampirisch-Aufwertung: Schaden einer so aufgewerteten Karte heilt den Helden
-        if (name === 'damaged' && d && d.spid === 1 && d.amt > 0) {
-            let vam = false;
-            const sc = findCharacter(s, d.src);
-            if (sc && CARDS[sc.id] && CARDS[sc.id].upgradeArch === 'vampiric') vam = true;
-            if (!vam && d.weapons) {
-                for (const w of d.weapons) {
-                    const wc = findCharacter(s, w);
-                    if (wc && CARDS[wc.id] && CARDS[wc.id].upgradeArch === 'vampiric') { vam = true; break; }
-                }
-            }
-            if (vam) trig(s, { k: 'healHero', a: { pid: 1, amt: d.amt } });
+            if (p1.allies.length < 2) q(s, { op: 'call', k: 'E:rlheroDamage', a: { pid: 1, amt: 1 + Math.min(3, act) } });
         }
         // Aufwertungs-Effekte, die an einzelnen Karten hängen (nicht an Artefakten)
         R.cardEvt(s, name, d);
+        const et = R.eliteTrait(s); if (et && et[name]) { try { et[name](s, name === 'died' ? (d && d.snap) : d, d); } catch (e) { } }
         for (const a of artList(s)) {
             const fn = name === 'startOfTurn' ? (a.startTurn || a.startOfTurn)
                 : (name === 'endTurn' || name === 'endOfTurn') ? (a.endTurn || a.endOfTurn) : a[name];
@@ -2090,6 +2398,8 @@
     R.battleStart = function (s) {
         if (!s || !s.rl) return;
         for (const a of artList(s)) if (a.battleStart) { try { a.battleStart(s); } catch (e) { } }
+        const et = R.eliteTrait(s);   // Elite "Blood Pact": zusätzliche verdeckte Ressource für den Gegner
+        if (et && et.startRes) { const p2 = getPlayer(s, 2); for (let i = 0; i < et.startRes && p2.deck.length; i++) p2.resources.push({ card: makeCardInst(p2.deck.pop(), false, 2), faceUp: false, exhausted: false }); }
     };
     R.installHooks = function () {
         if (R._hooksInstalled) return;
@@ -2101,8 +2411,35 @@
             'resEnters', 'questDone', 'drew', 'cardDiscarded', 'discarded', 'destroyed', 'resTurnedDown', 'resDestroyed',
             'strike', 'protects', 'targeted', 'exhausted', 'readied', 'combatEnd', 'heroFlipped', 'inspired', 'entersPlay',
             'left', 'skippedDraw', 'dmgPrevented', 'armorPrevented', 'sabotages', 'proposes', 'combosRemoved', 'heroBecomes',
-            'nextEndOfTurn', 'handLeft'];
+            'nextEndOfTurn', 'handLeft', 'dmg'];
         evts.forEach(n => onEvt(n, (s, d) => artEvt(s, n, d)));
+        // Wächter über die Zone "aus dem Spiel entfernt" (CR 415.7): erkennt jedes Entfernen, egal auf welchem Weg
+        STATE_FIX.push(s => {
+            if (!s.rl) return false;
+            let hit = false;
+            for (const p of [s.p1, s.p2]) {
+                const seen = (s.rl.rmSeen || (s.rl.rmSeen = {}))[p.id] || 0;
+                if (p.removed.length < seen) s.rl.rmSeen[p.id] = p.removed.length;
+                if (p.removed.length <= seen) continue;
+                const fresh = p.removed.slice(seen); s.rl.rmSeen[p.id] = p.removed.length;
+                for (const c of fresh) {
+                    if (c.isToken) continue;
+                    for (const a of artList(s)) if (a.removedFromGame) { try { a.removedFromGame(s, { pid: p.id, card: c }); hit = true; } catch (e) { } }
+                }
+            }
+            return hit && !!(s._batch && s._batch.length);
+        });
+        EK['rlReady'] = (s, a) => { const c = findCharacter(s, a.uid); if (c) readyCard(s, c); };
+        EK['rlpingMe'] = (s, a) => dealDamage(s, { src: s.p2.hero.uid, tgt: s.p1.hero.uid, amt: a.amt, dt: 'Shadow', ability: true });
+        EK['rlReadyRes'] = (s, a) => { const r = getPlayer(s, a.pid).resources.find(x => x.exhausted); if (r) { r.exhausted = false; L(s, tr`✦ Mana Citrine: Eine Ressource wird bereit.`, '', a.pid); } };
+        EK['rlEternal'] = (s, a, v) => {
+            if (!v) return;
+            const p = getPlayer(s, a.pid); const i = p.graveyard.findIndex(x => x.uid === a.uid); if (i < 0) return;
+            const c = p.graveyard.splice(i, 1)[0]; p.deck.push(deckId(c)); shuffleInPlace(p);
+            L(s, tr`↺ ${c.name} wird in das Deck gemischt (Eternal).`, '', a.pid);
+        };
+        EK['rlOrb'] = (s, a, v) => { const p = getPlayer(s, a.pid); if (v && p.deck.length > 1) p.deck.unshift(p.deck.pop()); };
+        EK['rlDeathRattle'] = (s, a) => { const p = getPlayer(s, a.pid); const c = p && p.graveyard.find(x => x.uid === a.uid); const e = c && R.effectOf(c); if (e && e.dr) { try { e.dr(s, c, a.pid); } catch (err) { } } };
         EK['rlreturnCard'] = (s, a) => R.returnToHand(s, a.uid, a.pid);
         EK['rlmakeToken'] = (s, a) => makeToken(s, a.id, a.pid);
         EK['rladdCard'] = (s, a) => { const p = getPlayer(s, a.pid); if (p && p.hand.length < 10 && CARDS[a.id]) p.hand.push(makeCardInst(a.id, false, p.id)); };
@@ -2110,7 +2447,153 @@
         EK['rlheroDamage'] = (s, a) => { const p = getPlayer(s, a.pid); dealDamage(s, { src: p.hero.uid, tgt: p.hero.uid, amt: a.amt, sp: p.id }); };
         EK['rlpingEnemy'] = (s, a) => pingEnemy(s, a.amt, a.dt);
         EK['rlpingHero'] = (s, a) => { const o = getOpponent(s, a.pid); dealDamage(s, { src: getPlayer(s, a.pid).hero.uid, tgt: o.hero.uid, amt: a.amt, dt: a.dt || 'Arcane', ability: true }); };
-        EK['rlpingUid'] = (s, a) => { const c = findCharacter(s, a.uid); if (c) dealDamage(s, { src: c.uid, tgt: c.uid, amt: a.amt, dt: a.dt || 'Melee' }); };
+        EK['rlpingUid'] = (s, a) => { const c = findCharacter(s, a.uid); if (c) dealDamage(s, { src: getPlayer(s, 1).hero.uid, tgt: c.uid, amt: a.amt, dt: a.dt || 'Melee', ability: true }); };   // Quelle: dein Held (vorher fügte sich das Ziel den Schaden selbst zu)
+    };
+
+    // ---------------------------------------------------------------- Gegner-Decks (Archetypen)
+    // Gegner spielen normale, legale Decks, wie sie auch ein Spieler bauen könnte: ein Held aus den Sets
+    // des Akts, Karten nur aus dem Pool des Akts. Jeder Archetyp hat ein Thema (Rasse, Schlüsselwort,
+    // Schadensart …), das etwa die Hälfte des Decks ausmacht – so zeigt jeder Gegner eine Deck-Idee.
+    // theme(cd) liefert ein Gewicht (0 = gehört nicht zum Thema). cls/faction/race: bevorzugter Held.
+    const tx = (cd, re) => re.test(cd.text || '');
+    const rc = (cd, r) => cd.race === r || (cd.allyTypes || []).indexOf(r) >= 0;
+    const dmgOf = (cd, t) => cd.atkType === t || new RegExp(t + ' damage', 'i').test(cd.text || '');
+    R.ARCHETYPES = [
+        // ---- Akt 1: Azeroth, Dark Portal, Outland
+        { id: 'orc_horde', act: 1, name: 'Orc-Kriegshorde', cls: ['Warrior', 'Shaman', 'Hunter', 'Warlock', 'Rogue'], faction: 'Horde', race: 'Orc',
+          blurb: 'Orcs mit Ferocity stürmen sofort los. Billige Angreifer und Waffen setzen dich vom ersten Zug an unter Druck.',
+          theme: cd => (rc(cd, 'Orc') ? 3 : 0) + (tx(cd, /Ferocity/) ? 2 : 0) },
+        { id: 'dwarf_wall', act: 1, name: 'Zwergen-Schildwall', cls: ['Warrior', 'Paladin', 'Priest', 'Hunter'], faction: 'Alliance', race: 'Dwarf',
+          blurb: 'Zwerge mit Protector halten die Linie, Rüstungen verhindern Schaden. Wer hier durch will, braucht Geduld oder Entfernung.',
+          theme: cd => (rc(cd, 'Dwarf') ? 3 : 0) + (tx(cd, /Protector/) ? 2 : 0) + (cd.type === 'Armor' ? 1 : 0) },
+        { id: 'beast_pack', act: 1, name: 'Jäger-Rudel', cls: ['Hunter'], faction: null,
+          blurb: 'Pets und Long-Range: Der Jäger kämpft aus der Distanz, während sein Rudel deine Allies festhält.',
+          theme: cd => (cd.isPet ? 3 : 0) + (tx(cd, /Long-Range/) ? 2 : 0) + (cd.type === 'Weapon' && cd.slot === 'Ranged' ? 2 : 0) },
+        { id: 'pyromancer', act: 1, name: 'Feuer-Magier', cls: ['Mage', 'Warlock', 'Shaman'], faction: null,
+          blurb: 'Feuerschaden direkt ins Gesicht: Fireball, Flammen und brennende Allies. Halte dein Leben im Blick.',
+          theme: cd => (dmgOf(cd, 'Fire') ? 3 : 0) },
+        { id: 'combo_rogue', act: 1, name: 'Schatten und Kombos', cls: ['Rogue'], faction: null,
+          blurb: 'Combo-Karten füllen den Friedhof, Finishing Moves wie Eviscerate verwandeln sie in Schaden. Stealth schützt den Schurken.',
+          theme: cd => ((cd.subtypes || []).indexOf('Combo') >= 0 ? 3 : 0) + (tx(cd, /Finishing Move/) ? 3 : 0) + (tx(cd, /Stealth/) ? 1 : 0) },
+        { id: 'nelf_elusive', act: 1, name: 'Nachtelfen-Hinterhalt', cls: ['Druid', 'Hunter', 'Rogue', 'Warrior', 'Priest'], faction: 'Alliance', race: 'Night Elf',
+          blurb: 'Nachtelfen mit Elusive weichen jedem Kampf aus und treffen dort, wo du keinen Protector hast.',
+          theme: cd => (rc(cd, 'Night Elf') ? 3 : 0) + (tx(cd, /Elusive/) ? 2 : 0) },
+        { id: 'forsaken_shadow', act: 1, name: 'Kult der Verlassenen', cls: ['Priest', 'Warlock', 'Rogue', 'Mage'], faction: 'Horde', race: 'Undead',
+          blurb: 'Untote und Schattenschaden: Die Verlassenen zermürben dich langsam und holen ihre Toten zurück.',
+          theme: cd => (rc(cd, 'Undead') ? 3 : 0) + (dmgOf(cd, 'Shadow') ? 2 : 0) + (tx(cd, /graveyard/i) ? 1 : 0) },
+        { id: 'totem_circle', act: 1, name: 'Totem-Kreis', cls: ['Shaman'], faction: null,
+          blurb: 'Totems sind Allies, die nicht angreifen, aber jeden Zug wirken: heilen, schießen, schützen. Zerstöre sie früh.',
+          theme: cd => (cd.totem ? 4 : 0) + (rc(cd, 'Tauren') || rc(cd, 'Draenei') ? 1 : 0) + (dmgOf(cd, 'Nature') ? 1 : 0) },
+        { id: 'stormwind_guard', act: 1, name: 'Sturmwind-Garde', cls: ['Paladin', 'Warrior', 'Priest', 'Mage'], faction: 'Alliance', race: 'Human',
+          blurb: 'Menschen in Reih und Glied: viele solide Allies, Heilung und Protector. Ein Deck, das breit spielt.',
+          theme: cd => (rc(cd, 'Human') ? 3 : 0) + (tx(cd, /Protector/) ? 1 : 0) + (tx(cd, /\bheal/i) ? 1 : 0) },
+        { id: 'adventurers', act: 1, name: 'Abenteurer-Gilde', cls: null, faction: null, quests: 7,
+          blurb: 'Viele Quests als Ressourcen: Wer sie abschließt, zieht Karten und holt Belohnungen. Ein Deck, das in die Breite wächst.',
+          theme: cd => (cd.type === 'Quest' ? 4 : 0) + (tx(cd, /\bdraw/i) ? 1 : 0) },
+        // ---- Akt 2: March of the Legion, Servants of the Betrayer, Hunt for Illidan
+        { id: 'demonology', act: 2, name: 'Dämonenbeschwörer', cls: ['Warlock'], faction: null,
+          blurb: 'Dämonen-Allies und Portal: Der Hexenmeister holt die Legion aufs Feld und opfert, was nicht mehr gebraucht wird.',
+          theme: cd => (rc(cd, 'Demon') ? 4 : 0) + (tx(cd, /Demon/) ? 2 : 0) },
+        { id: 'draenei_light', act: 2, name: 'Draenei des Lichts', cls: ['Paladin', 'Priest', 'Shaman', 'Mage', 'Warrior', 'Hunter'], faction: 'Alliance', race: 'Draenei',
+          blurb: 'Draenei heilen sich und ihre Verbündeten. Lange Kämpfe gewinnt meist das Licht – setze auf Tempo.',
+          theme: cd => (rc(cd, 'Draenei') ? 3 : 0) + (tx(cd, /\bheal/i) ? 2 : 0) + (dmgOf(cd, 'Holy') ? 1 : 0) },
+        { id: 'magister', act: 2, name: 'Blutelfen-Magister', cls: ['Mage', 'Paladin', 'Warlock', 'Priest', 'Rogue', 'Hunter'], faction: 'Horde', race: 'Blood Elf',
+          blurb: 'Blutelfen und Arkanmagie: Mana Tap, arkane Geschosse und Allies, die mit jeder Fähigkeit stärker werden.',
+          theme: cd => (rc(cd, 'Blood Elf') ? 3 : 0) + (dmgOf(cd, 'Arcane') ? 2 : 0) },
+        { id: 'inspire', act: 2, name: 'Inspirierende Kommandanten', cls: null, faction: null,
+          blurb: 'Inspire macht Allies bereit: angreifen, wieder bereit werden, verteidigen. Der Gegner hat immer einen Zug mehr als gedacht.',
+          theme: cd => (tx(cd, /Inspire/) ? 4 : 0) + (tx(cd, /Protector/) ? 1 : 0) },
+        { id: 'illidari', act: 2, name: 'Illidari-Phantome', cls: null, faction: null,
+          blurb: 'Elusive und Untargetable: Diese Allies kannst du weder blocken noch gezielt entfernen. Wettlauf statt Kontrolle.',
+          theme: cd => (tx(cd, /Elusive/) ? 2 : 0) + (tx(cd, /Untargetable/) ? 3 : 0) + (tx(cd, /Stealth/) ? 1 : 0) },
+        { id: 'affliction', act: 2, name: 'Schattenflüche', cls: ['Warlock', 'Priest'], faction: null,
+          blurb: 'Flüche und Abwurf: Der Gegner zwingt dich, Karten abzuwerfen, und lässt Schattenschaden über Zeit wirken.',
+          theme: cd => (/Curse/.test((cd.subtypes || []).join(' ')) ? 4 : 0) + (tx(cd, /discard/i) ? 2 : 0) + (dmgOf(cd, 'Shadow') ? 1 : 0) },
+        { id: 'swarm', act: 2, name: 'Schwarmruf', cls: null, faction: null,
+          blurb: 'Tokens ohne Ende: Ein Deck, das viele kleine Allies erzeugt und dich mit Masse überrennt.',
+          theme: cd => (tx(cd, /token/i) ? 4 : 0) },
+        // ---- Akt 3: Drums of War, Blood of Gladiators, Fields of Honor
+        { id: 'forsaken', act: 3, name: 'Will of the Forsaken', cls: null, faction: 'Horde', race: 'Undead',
+          blurb: 'Untote mit Will of the Forsaken verlassen das Spiel nur, wenn sie sterben – kein Zurückschicken, kein Entfernen.',
+          theme: cd => (tx(cd, /Will of the Forsaken/) ? 5 : 0) + (rc(cd, 'Undead') ? 3 : 0) },
+        { id: 'troll_berserk', act: 3, name: 'Troll-Berserker', cls: null, faction: 'Horde', race: 'Troll',
+          blurb: 'Berserking: Trolle werden mit jedem Schaden stärker. Ein halb toter Troll ist der gefährlichste.',
+          theme: cd => (tx(cd, /Berserking/) ? 5 : 0) + (rc(cd, 'Troll') ? 3 : 0) + (tx(cd, /Ferocity/) ? 1 : 0) },
+        { id: 'diplomats', act: 3, name: 'Diplomaten von Sturmwind', cls: null, faction: 'Alliance', race: 'Human',
+          blurb: 'Diplomacy: Menschen ziehen Karten, wenn sie ins Spiel kommen. Ein Deck, dem nie die Ideen ausgehen.',
+          theme: cd => (tx(cd, /Diplomacy/) ? 5 : 0) + (rc(cd, 'Human') ? 3 : 0) },
+        { id: 'warstomp', act: 3, name: 'Donnerhuf-Stampede', cls: null, faction: 'Horde', race: 'Tauren',
+          blurb: 'War Stomp: Tauren erschöpfen beim Angreifen deine Verteidiger. Große Körper, die den Weg freiräumen.',
+          theme: cd => (tx(cd, /War Stomp/) ? 5 : 0) + (rc(cd, 'Tauren') ? 3 : 0) },
+        { id: 'shadowmeld', act: 3, name: 'Schattenmimen von Darnassus', cls: null, faction: 'Alliance', race: 'Night Elf',
+          blurb: 'Shadowmeld: Nachtelfen verschwinden aus dem Kampf und schlagen aus dem Hinterhalt zurück.',
+          theme: cd => (tx(cd, /Shadowmeld/) ? 5 : 0) + (rc(cd, 'Night Elf') ? 3 : 0) + (tx(cd, /Stealth/) ? 1 : 0) },
+        { id: 'wanderers', act: 3, name: 'Weltenwanderer', cls: null, faction: null, locations: 4,
+          blurb: 'Locations als Ressourcen: Jede offene Location ist eine eigene kleine Kraft auf dem Spielfeld.',
+          theme: cd => (cd.type === 'Location' ? 5 : 0) + (tx(cd, /Location/) ? 2 : 0) },
+        { id: 'gladiators', act: 3, name: 'Gladiatoren der Arena', cls: ['Warrior', 'Rogue', 'Paladin', 'Hunter', 'Shaman'], faction: null,
+          blurb: 'Waffen und Ehre: Der Held selbst greift an, Strike-Kosten werden zur wichtigsten Ressource.',
+          theme: cd => (cd.type === 'Weapon' ? 3 : 0) + (tx(cd, /honor counter|strike/i) ? 2 : 0) },
+        // ---- Akt 4: Scourgewar, Wrathgate, Icecrown
+        { id: 'scourge_plague', act: 4, name: 'Seuche der Geißel', cls: ['Death Knight', 'Warlock', 'Priest'], faction: null,
+          blurb: 'Death Rattle: Diese Karten wirken noch einmal, wenn sie in den Friedhof kommen. Töten hilft dem Gegner.',
+          theme: cd => (tx(cd, /Death Rattle/) ? 4 : 0) + (rc(cd, 'Undead') ? 2 : 0) + (cd.scourge ? 2 : 0) },
+        { id: 'menders', act: 4, name: 'Heiler von Nordend', cls: ['Priest', 'Paladin', 'Druid', 'Shaman'], faction: null,
+          blurb: 'Mend: Allies heilen sich und andere. Schaden muss in einem Zug tödlich sein, sonst ist er weg.',
+          theme: cd => (tx(cd, /Mend \d/) ? 4 : 0) + (tx(cd, /\bheal/i) ? 2 : 0) },
+        { id: 'assault', act: 4, name: 'Sturmangriff', cls: ['Warrior', 'Paladin', 'Death Knight', 'Rogue', 'Hunter'], faction: null,
+          blurb: 'Assault: Allies und Waffen sind im eigenen Zug stärker. Ein Deck, das jeden Zug angreift.',
+          theme: cd => (tx(cd, /Assault \d/) ? 4 : 0) + (tx(cd, /Ferocity/) ? 1 : 0) },
+        { id: 'argent', act: 4, name: 'Argentumkreuzzug', cls: ['Paladin', 'Priest', 'Warrior'], faction: null,
+          blurb: 'Argent Crusade: Champions beider Fraktionen gegen die Geißel – Protector, Heilung und heiliger Zorn.',
+          theme: cd => (tx(cd, /Argent/) || /Argent/.test(cd.name || '') ? 4 : 0) + (tx(cd, /Protector/) ? 1 : 0) + (dmgOf(cd, 'Holy') ? 1 : 0) },
+        { id: 'frostbound', act: 4, name: 'Frostgebunden', cls: ['Mage', 'Death Knight', 'Shaman'], faction: null,
+          blurb: 'Frost erschöpft und hält fest: Deine Allies kommen nicht zum Angreifen, während der Gegner Zeit gewinnt.',
+          theme: cd => (dmgOf(cd, 'Frost') ? 3 : 0) + (tx(cd, /exhaust|can't attack|can't ready/i) ? 2 : 0) },
+        { id: 'cavalry', act: 4, name: 'Kavallerie', cls: null, faction: null,
+          blurb: 'Mounts: Reittiere machen Quests billiger und bringen Allies schneller ins Spiel.',
+          theme: cd => (tx(cd, /Mount/) ? 4 : 0) + (cd.type === 'Quest' ? 1 : 0) }
+    ];
+    R.archById = id => R.ARCHETYPES.find(a => a.id === id) || null;
+    // Helden für Gegner: aus den Sets bis zum Akt, mit Klasse und Fraktion, ohne Sonderregeln (Traitor, Deckbau-Regeln)
+    R.enemyHeroes = function (act) {
+        const sets = new Set(R.actSets(act));
+        return Object.values(CARDS).filter(c => c.type === 'Hero' && typeof c.id === 'number' && !c.isToken && c.class && sets.has(R.setOf(c))
+            && (c.faction === 'Alliance' || c.faction === 'Horde') && c.talent !== 'Traitor' && !/Deckbuilding/i.test(c.text || '')
+            && !(typeof HERO_DECK_RULES !== 'undefined' && HERO_DECK_RULES[c.id]));
+    };
+    function themeCards(arch, hero, act) {
+        const pool = R.poolFor(hero.class, hero.faction, act, { heroId: hero.id, talent: hero.talent || null, race: hero.race || null, scourge: !!hero.scourge, traitorCards: !!hero.traitorCards });
+        return pool.filter(c => (arch.theme(c) || 0) > 0 && (c.type !== 'Quest' || arch.quests) && (c.type !== 'Location' || arch.locations));
+    }
+    // Passender Held: Klasse/Fraktion/Rasse des Archetyps, unter den Kandidaten der mit den meisten Themenkarten
+    R.heroForArch = function (arch, act) {
+        let list = R.enemyHeroes(act).filter(h => (!arch.cls || arch.cls.indexOf(h.class) >= 0) && (!arch.faction || h.faction === arch.faction));
+        if (!list.length) return null;
+        const byRace = arch.race ? list.filter(h => h.race === arch.race) : [];
+        if (byRace.length) list = byRace;
+        const scored = list.map(h => ({ h, n: themeCards(arch, h, act).length })).filter(x => x.n >= 6);
+        if (!scored.length) return null;
+        const best = Math.max(...scored.map(x => x.n));
+        return R.pick(scored.filter(x => x.n >= best * 0.7)).h;
+    };
+    // Themen-Deck: etwa 55 % Themenkarten (je bis 2 Kopien, stärkere Themenwerte zuerst), Rest nach Manakurve.
+    R.buildThemeDeck = function (arch, hero, act, size, opts = {}) {
+        const theme = themeCards(arch, hero, act);
+        const curSets = new Set(R.block(act).sets);
+        const rar = c => opts.elite ? ({ Rare: 1, Epic: 2, Legendary: 2.5 }[c.rarity] || 0) : 0;   // Elites: seltenere, stärkere Themenkarten
+        const ranked = theme.map(c => ({ c, w: arch.theme(c) * (curSets.has(R.setOf(c)) ? 1.5 : 1) + rar(c) + Math.random() * 1.5 }))
+            .sort((a, b) => b.w - a.w).map(x => x.c);
+        const deck = [], counts = {};
+        const add = id => { if ((counts[id] || 0) >= 2 || deck.length >= size) return false; counts[id] = (counts[id] || 0) + 1; deck.push(id); return true; };
+        const core = Math.round(size * (opts.share || 0.55));
+        for (const c of ranked) { if (deck.length >= core) break; add(c.id); if (deck.length < core) add(c.id); }
+        const fill = R.buildDeck(hero.class, hero.faction, size + 10, {
+            act, bias: opts.bias || 0, heroId: hero.id, talent: hero.talent || null, scourge: !!hero.scourge, traitorCards: !!hero.traitorCards,
+            quests: arch.quests || undefined, locations: arch.locations || undefined
+        });
+        for (const id of fill) { if (deck.length >= size) break; add(id); }
+        return deck;
     };
 
     // ---------------------------------------------------------------- Gegner
@@ -2120,40 +2603,45 @@
         const block = R.block(act);
         const floor = run ? (run.row + 1) : 1;
         if (kind === 'boss') {
-            const b = block.boss, heroId = R.bossHero(act);
+            const b = block.boss, heroId = R.bossHero(act), arch = R.archById(b.arch);
+            const size = b.deckSize || 34;
+            const deck = arch ? R.buildThemeDeck(arch, CARDS[heroId], act, size, { bias: b.bias || 1.4, share: 0.45 })
+                : R.buildDeck(b.cls || 'Warrior', b.faction || 'Horde', size, { act, bias: b.bias || 1.4, talent: b.talent, heroId, scourge: !!b.scourge, traitorCards: !!b.traitorCards });
             return {
                 kind, cls: b.cls || 'Warrior', hero: heroId, faction: b.faction || 'Horde',
-                name: b.name, title: b.title || '', quote: b.quote || '',
-                hp: b.hp || 46, gold: b.gold || (90 + act * 40), deckSize: b.deckSize || 34,
-                bias: b.bias || 1.4, style: 'boss', startRes: b.startRes || 4, isBoss: true,
-                deck: R.buildDeck(b.cls || 'Warrior', b.faction || 'Horde', b.deckSize || 34, {
-                    act, bias: b.bias || 1.4, talent: b.talent, heroId,
-                    scourge: !!b.scourge, traitorCards: !!b.traitorCards
-                })
+                name: b.name, title: b.title || '', quote: b.quote || '', deckName: arch ? arch.name : '', deckIdea: arch ? arch.blurb : '',
+                hp: b.hp || 46, gold: b.gold || (90 + act * 40), deckSize: size,
+                bias: b.bias || 1.4, style: 'boss', startRes: b.startRes || 4, isBoss: true, deck
             };
         }
-        const spec = R.pick(block.enemies);
-        const hero = CARDS[spec.hero] || CARDS[9];
-        const cls = spec.cls || hero.class || 'Warrior';
-        const faction = spec.faction || hero.faction || 'Horde';
-        let bias, hpBonus, gold, deckSize, name;
-        if (kind === 'elite') {
-            bias = 1.2; hpBonus = 8 + floor * 2 + (act - 1) * 6; gold = 40 + act * 15; deckSize = 30 + act;
-            name = R.pick(block.eliteNames);
-        } else {
-            bias = Math.max(0, Math.floor(floor / 4)) + (act - 1) * 0.15;
-            hpBonus = Math.floor(floor / 2) + (act - 1) * 3; gold = 16 + act * 5; deckSize = 26 + act * 2;
-            name = R.pick(block.names);
+        // Archetyp wählen: Decks des aktuellen Akts bevorzugt, bereits gesehene möglichst nicht wiederholen
+        const seen = new Set((run && run.seenArch) || []);
+        let cands = R.ARCHETYPES.filter(a => a.act <= act && !seen.has(a.id));
+        if (!cands.length) cands = R.ARCHETYPES.filter(a => a.act <= act);
+        let arch = null, hero = null;
+        for (let tries = 0; tries < 12 && !hero; tries++) {
+            const w = cands.map(a => a.act === act ? 4 : 1), tot = w.reduce((x, y) => x + y, 0);
+            let r = Math.random() * tot, i = 0; for (; i < cands.length - 1; i++) { r -= w[i]; if (r <= 0) break; }
+            arch = cands[i]; hero = R.heroForArch(arch, act);
+            if (!hero) cands = cands.filter(a => a !== arch);
+            if (!cands.length) break;
         }
-        const hp = (hero.hp || 28) + hpBonus;
+        if (run && arch && hero) (run.seenArch || (run.seenArch = [])).push(arch.id);
+        let bias, hpBonus, gold, deckSize;
+        if (kind === 'elite') { bias = 1.2; hpBonus = 6 + floor + (act - 1) * 5; gold = 60 + act * 20; deckSize = 30 + act; }
+        else { bias = (act - 1) * 0.2; hpBonus = (act - 1) * 3; gold = 30 + act * 10; deckSize = 26 + act * 2; }
+        if (!hero) {                                                                        // Rückfall: zufälliges Klassendeck
+            const spec = R.pick(block.enemies); hero = CARDS[spec.hero] || CARDS[9]; arch = null;
+        }
+        const deck = arch ? R.buildThemeDeck(arch, hero, act, deckSize, { bias, elite: kind === 'elite', share: kind === 'elite' ? 0.6 : 0.55 })
+            : R.buildDeck(hero.class, hero.faction, deckSize, { act, bias, talent: hero.talent, heroId: hero.id });
+        const name = arch ? (kind === 'elite' ? arch.name + ' (Elite)' : arch.name) : R.pick(kind === 'elite' ? block.eliteNames : block.names);
         return {
-            kind, cls, hero: spec.hero, faction, name, title: '',
-            quote: R.pick(block.banter), hp, gold, deckSize, bias,
-            style: kind === 'boss' ? 'boss' : R.pick(R.ENEMY_STYLES),
-            deck: R.buildDeck(cls, faction, deckSize, {
-                act, bias, talent: hero.talent, heroId: spec.hero,
-                scourge: !!hero.scourge, traitorCards: !!hero.traitorCards
-            }),
+            kind, cls: hero.class, hero: hero.id, faction: hero.faction, name, title: hero.name,
+            quote: arch ? arch.blurb : R.pick(block.banter), deckName: arch ? arch.name : '', deckIdea: arch ? arch.blurb : '', arch: arch ? arch.id : null,
+            trait: kind === 'elite' ? R.pick(R.ELITE_TRAITS).id : null,
+            hp: (hero.hp || 28) + hpBonus, gold, deckSize, bias,
+            style: R.pick(R.ENEMY_STYLES), deck,
             startRes: kind === 'elite' ? 3 : 2,
             isBoss: false
         };
@@ -2168,8 +2656,8 @@
             id: 'fountain', acts: [1], title: 'Die ewige Quelle', icon: '💧',
             text: 'Zwischen moosigen Steinen plätschert eine Quelle, deren Wasser silbern schimmert. Eine Stimme flüstert deinen Namen – sie klingt wie deine eigene.',
             choices: [
-                { kind: 'heal', value: 0.32, label: 'Trinken', hint: 'Heile 32 % deines maximalen Lebens.' },
-                { kind: 'gold', value: 35, hp: 6, label: 'Wasser abfüllen', hint: 'Erhalte 35 Gold, verliere 6 Leben.' },
+                { kind: 'maxhp', value: 4, label: 'Trinken', hint: 'Erhalte +4 maximales Leben.' },
+                { kind: 'gold', value: 35, hp: 3, label: 'Wasser abfüllen', hint: 'Erhalte 35 Gold, verliere 3 maximales Leben.' },
                 { kind: 'none', label: 'Weitergehen', hint: 'Nichts geschieht.' }
             ]
         },
@@ -2177,8 +2665,8 @@
             id: 'outpost', acts: [1], title: 'Vorposten am Portal', icon: '🛡️',
             text: 'Ein letzter Vorposten hält die Stellung. Die Soldaten sehen dich an, als wärst du bereits tot. Der Hauptmann bietet dir an, was sie noch haben.',
             choices: [
-                { kind: 'heal', value: 0.22, label: 'Verbände annehmen', hint: 'Heile 22 % deines maximalen Lebens.' },
-                { kind: 'maxhp', value: 6, label: 'Proviant teilen', hint: 'Erhalte +6 maximales Leben und heile 6.' },
+                { kind: 'upgrade', label: 'Ausrüstung flicken', hint: 'Werte eine Karte dauerhaft auf.' },
+                { kind: 'maxhp', value: 6, label: 'Proviant teilen', hint: 'Erhalte +6 maximales Leben.' },
                 { kind: 'gold', value: 30, label: 'Ausrüstung verkaufen', hint: 'Erhalte 30 Gold.' }
             ]
         },
@@ -2187,7 +2675,7 @@
             text: 'Die Ränder des Portals pulsieren wie eine offene Wunde. Etwas auf der anderen Seite bietet dir Macht – für einen Teil von dir.',
             choices: [
                 { kind: 'artifact', hp: 6, label: 'Hand hineinstrecken', hint: 'Verliere 6 maximales Leben für ein Artefakt aus Outland.' },
-                { kind: 'maxhp', value: 10, label: 'Dem Sog widerstehen', hint: 'Erhalte +10 maximales Leben und heile 10.' },
+                { kind: 'maxhp', value: 10, label: 'Dem Sog widerstehen', hint: 'Erhalte +10 maximales Leben.' },
                 { kind: 'none', label: 'Zurückweichen', hint: 'Das Flüstern verstummt.' }
             ]
         },
@@ -2205,7 +2693,7 @@
             text: 'Ein schwarzer Schrein steht im Zentrum einer Lichtung aus Fel-Glas. Runen verlangen einen Preis – und sie akzeptieren kein Gold.',
             choices: [
                 { kind: 'artifact', hp: 8, label: 'Blutopfer', hint: 'Verliere 8 maximales Leben für ein zufälliges Artefakt.' },
-                { kind: 'maxhp', value: 8, label: 'Segnung', hint: 'Erhalte +8 maximales Leben und heile 8.' },
+                { kind: 'maxhp', value: 8, label: 'Segnung', hint: 'Erhalte +8 maximales Leben.' },
                 { kind: 'none', label: 'Den Schrein meiden', hint: 'Nichts geschieht.' }
             ]
         },
@@ -2214,7 +2702,7 @@
             text: 'Ein alter Schmied schärft eine Klinge, die kein Licht reflektiert. „Ich sehe, was du werden könntest. Willst du es auch sehen?"',
             choices: [
                 { kind: 'upgrade', label: 'Klinge schärfen', hint: 'Werte eine Karte dauerhaft auf.' },
-                { kind: 'randomCard', value: 1, hp: 4, label: 'Lehre annehmen', hint: 'Erhalte eine seltene Karte, verliere 4 Leben.' },
+                { kind: 'randomCard', value: 1, hp: 2, label: 'Lehre annehmen', hint: 'Erhalte eine Karte, verliere 2 maximales Leben.' },
                 { kind: 'none', label: 'Weitergehen', hint: 'Nichts geschieht.' }
             ]
         },
@@ -2232,7 +2720,7 @@
             text: 'Treppen aus schwarzem Gestein führen in die Tiefe. Jede Stufe zeigt ein Gesicht, das du kennst. Manche davon lächeln.',
             choices: [
                 { kind: 'upgrade', label: 'Der Versuchung nachgeben', hint: 'Werte eine Karte dauerhaft auf.' },
-                { kind: 'randomCard', value: 2, hp: 7, label: 'Die Stimmen anhören', hint: 'Erhalte 2 Karten, verliere 7 Leben.' },
+                { kind: 'randomCard', value: 2, hp: 4, label: 'Die Stimmen anhören', hint: 'Erhalte 2 Karten, verliere 4 maximales Leben.' },
                 { kind: 'none', label: 'Umkehren', hint: 'Die Gesichter erlöschen.' }
             ]
         },
@@ -2241,7 +2729,7 @@
             id: 'chest', acts: [3, 4], title: 'Die verfluchte Truhe', icon: '📦',
             text: 'Eine Truhe aus schwarzem Holz. Das Schloss ist offen – fast als würde etwas warten. Auf dem Deckel steht dein Name.',
             choices: [
-                { kind: 'chest', label: 'Öffnen', hint: '50 %: 70 Gold. 50 %: 12 Schaden.' },
+                { kind: 'chest', label: 'Öffnen', hint: '50 %: 70 Gold. 50 %: verliere 4 maximales Leben.' },
                 { kind: 'none', label: 'Stehen lassen', hint: 'Vernünftig. Vielleicht.' }
             ]
         },
@@ -2258,7 +2746,7 @@
             id: 'honor', acts: [3], title: 'Das Ehrenmal', icon: '🏅',
             text: 'Reihen von Namen sind in den Stein gemeißelt. Ganz unten ist Platz für einen weiteren – und der Steinmetz wartet bereits.',
             choices: [
-                { kind: 'maxhp', value: 10, label: 'Namen eingravieren', hint: 'Erhalte +10 maximales Leben und heile 10.' },
+                { kind: 'maxhp', value: 10, label: 'Namen eingravieren', hint: 'Erhalte +10 maximales Leben.' },
                 { kind: 'upgrade', label: 'Waffe weihen', hint: 'Werte eine Karte dauerhaft auf.' },
                 { kind: 'none', label: 'Weiterziehen', hint: 'Der Steinmetz nickt.' }
             ]
@@ -2268,7 +2756,7 @@
             text: 'Ein alter Gladiator mit zu vielen Narben mustert dich. „Gold kauft keine Ehre. Aber es kauft Ausrüstung, und Ausrüstung kauft Überleben."',
             choices: [
                 { kind: 'artifact', value: 70, label: 'Ausrüstung kaufen', hint: 'Zahle 70 Gold für ein Artefakt.' },
-                { kind: 'gold', value: 50, hp: 6, label: 'Kampf gegen Gold', hint: 'Erhalte 50 Gold, verliere 6 Leben.' },
+                { kind: 'gold', value: 50, hp: 3, label: 'Kampf gegen Gold', hint: 'Erhalte 50 Gold, verliere 3 maximales Leben.' },
                 { kind: 'none', label: 'Ablehnen', hint: '„Dann stirb mit leeren Taschen."' }
             ]
         },
@@ -2277,7 +2765,7 @@
             id: 'spirit', acts: [3, 4], title: 'Gefangener Geist', icon: '👻',
             text: 'Ein Geist ist in einer Glasphiole gefangen. Er bittet um Freiheit – oder um Rache. Seine Stimme klingt, als käme sie von weit unter dem Eis.',
             choices: [
-                { kind: 'randomCard', value: 2, hp: 5, label: 'Befreien', hint: 'Erhalte 2 Karten, verliere 5 Leben.' },
+                { kind: 'randomCard', value: 2, hp: 3, label: 'Befreien', hint: 'Erhalte 2 Karten, verliere 3 maximales Leben.' },
                 { kind: 'gold', value: 40, label: 'Verkaufen', hint: 'Erhalte 40 Gold.' },
                 { kind: 'none', label: 'Ignorieren', hint: 'Der Geist verstummt.' }
             ]
@@ -2286,8 +2774,8 @@
             id: 'frozen', acts: [4], title: 'Die gefrorene Quelle', icon: '❄️',
             text: 'Unter einer Schicht blauen Eises glitzert Wasser. Wer davon trinkt, vergisst vielleicht seinen Namen – aber nicht seine Wunden.',
             choices: [
-                { kind: 'heal', value: 0.40, label: 'Eis brechen und trinken', hint: 'Heile 40 % deines maximalen Lebens.' },
-                { kind: 'maxhp', value: 12, label: 'Eis in die Rüstung schmelzen', hint: 'Erhalte +12 maximales Leben und heile 12.' },
+                { kind: 'upgrade', label: 'Eis brechen und trinken', hint: 'Werte eine Karte dauerhaft auf.' },
+                { kind: 'maxhp', value: 12, label: 'Eis in die Rüstung schmelzen', hint: 'Erhalte +12 maximales Leben.' },
                 { kind: 'none', label: 'Weitergehen', hint: 'Das Eis knirscht unter deinen Stiefeln.' }
             ]
         },
@@ -2296,7 +2784,7 @@
             text: 'In einer Grube stapeln sich Leichen. Etwas darin bewegt sich noch – und es bietet dir an, was die Geißel am besten kann: mehr Zeit.',
             choices: [
                 { kind: 'artifact', hp: 12, label: 'In die Grube steigen', hint: 'Verliere 12 maximales Leben für ein Artefakt der Geißel.' },
-                { kind: 'randomCard', value: 2, hp: 8, label: 'Die Toten bestehlen', hint: 'Erhalte 2 Karten, verliere 8 Leben.' },
+                { kind: 'randomCard', value: 2, hp: 4, label: 'Die Toten bestehlen', hint: 'Erhalte 2 Karten, verliere 4 maximales Leben.' },
                 { kind: 'none', label: 'Die Grube versiegeln', hint: 'Etwas darin lacht.' }
             ]
         },
@@ -2305,7 +2793,7 @@
             text: 'Ein einzelner Paladin hält Wache vor einem Tor, das längst keine Mauer mehr hat. „Geh weiter", sagt er. „Ich halte sie auf. So lange ich kann."',
             choices: [
                 { kind: 'fightElite', label: 'Ihm beistehen', hint: 'Besiege einen Elite-Gegner für Beute und ein Artefakt.' },
-                { kind: 'heal', value: 0.25, label: 'Seine Vorräte teilen', hint: 'Heile 25 % deines maximalen Lebens.' },
+                { kind: 'randomCard', value: 1, label: 'Seine Vorräte teilen', hint: 'Erhalte eine Karte.' },
                 { kind: 'none', label: 'Weitergehen', hint: 'Du hörst ihn beten, als du gehst.' }
             ]
         },

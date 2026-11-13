@@ -37,6 +37,12 @@ function logStrip(s, msg, lead) {
 }
 const pidOf = (s, c) => (c && locate(s, c.uid) || {}).pid;
 function fx(c) { return c ? (FX[c.id] || {}) : {}; }
+// Roguelike: Aufgewertete Karten tragen im Spiel die ID der Originalkarte (c.id, damit alle Kartenregeln greifen)
+// und merken sich die Aufwertung in c.rlUp (siehe makeCardInst). Im Deck steht dagegen die Aufwertungs-ID –
+// wer eine Karte ins Deck zurücklegt, nimmt deckId(c), sonst ginge die Aufwertung verloren.
+function deckId(c) { return (c && c.rlUp) || (c && c.id); }
+function baseCardId(id) { const d = CARDS[id]; return (d && d.upgradedFrom) || id; }   // Deck-ID → ID der Originalkarte
+function deckKey(str) { return /^\d+$/.test(str) ? +str : str; }                      // Deck-ID aus einem Auswahlwert (Zahl oder Aufwertungs-ID)
 function newUid(p) { return (p || 'c_') + Math.random().toString(36).substr(2, 9); }
 function turnPl(s) { return s.activePlayer; }
 function sameTurn(s, t) { return t === s.turn; }
@@ -565,7 +571,8 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     // Ersatzeffekte "If … would be put into your graveyard …, remove it from the game instead" (Dramla, Readiness)
     if (dest === 'graveyard' && gyReplaced(s, c, owner.id, wasCtrl, true)) dest = 'removed';
     const snapshot = { id: c.id, uid: c.uid, name: c.name, type: c.type, atk: c.atk, hpBase: c.b ? c.b.hp : c.hp, attachedTo: c.attachedTo, wasCtrl, owner: owner.id, cost: c.cost, race: c.race, tm: c.tm, counters: c.counters, isToken: !!c.isToken,
-        corruption: attachedTo(s, c.uid, 120).length, damage: c.damage || 0, isPet: !!c.isPet, totem: c.totem || null, faction: c.faction, allyTypes: c.allyTypes || null, dest };
+        corruption: attachedTo(s, c.uid, 120).length, damage: c.damage || 0, isPet: !!c.isPet, totem: c.totem || null, faction: c.faction, allyTypes: c.allyTypes || null, dest,
+        rlUp: c.rlUp, upgradeEffect: c.upgradeEffect, exhausted: !!c.exhausted, isTotem: !!c.isTotem };   // Roguelike: Aufwertung, Zustand beim Verlassen
     // An diese Karte angehängte Fähigkeiten gehen auf den Friedhof ihres Besitzers
     for (const pp of [s.p1, s.p2]) for (const o of [...pp.ongoing]) if (o.attachedTo === c.uid) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' });
     fxEvent(s, { t: 'leave', uid: c.uid, dest: c.isToken ? 'token' : dest, owner: owner.id,
@@ -574,8 +581,8 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     if (c.isToken) { /* Tokens hören auf zu existieren */ }
     else if (dest === 'hand') owner.hand.push(c);
     else if (dest === 'removed') owner.removed.push(c);
-    else if (dest === 'deckTop') owner.deck.push(c.id);
-    else if (dest === 'deckBottom') owner.deck.unshift(c.id);
+    else if (dest === 'deckTop') owner.deck.push(deckId(c));
+    else if (dest === 'deckBottom') owner.deck.unshift(deckId(c));
     else if (dest === 'resource') { owner.resources.push({ card: c, faceUp: false, exhausted: !!info.exhausted }); evt(s, 'resEnters', { pid: owner.id, faceUp: false, uid: c.uid, id: c.id }); }   // Hibernate (Set drums)
     else owner.graveyard.push(c);
     // Auslöser
@@ -1624,7 +1631,7 @@ function resolveCard(s, it) {
 EK.placeAbility = (s, a) => {
     const it = a.it; const p = getPlayer(s, it.pl); const c = it.card;
     if (it.dest === 'removed') { leaveChain(s, it, 'removed'); return; }
-    if (it.dest === 'deckOf') { const tp = getPlayer(s, it.deckOf); tp.deck.push(c.id); L(s, tr`${c.name} kommt oben auf das Deck von ${tp.hero.name}.`, '', it.pl); return; }   // Paper Airplane (Set 6)
+    if (it.dest === 'deckOf') { const tp = getPlayer(s, it.deckOf); tp.deck.push(deckId(c)); L(s, tr`${c.name} kommt oben auf das Deck von ${tp.hero.name}.`, '', it.pl); return; }   // Paper Airplane (Set 6)
     if (it.dest === 'resource') { resetInst(c); p.resources.push({ card: c, faceUp: false, exhausted: false }); L(s, tr`${c.name} kommt verdeckt und bereit in die Ressourcenreihe.`, '', it.pl); return; }   // Vigor (Set illidan)
     if (it.dest === 'play') {
         c.exhausted = false; c.damage = 0; c.joinedTurn = s.turn;

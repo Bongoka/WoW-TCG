@@ -28,6 +28,9 @@ function makeCardInst(cardId, forceMask = false, ownerPid) {
         damage: 0, exhausted: false, tm: [], counters: {}, owner: ownerPid,
         b: { atk: d.atk || 0, hp: d.hp || 0, def: d.def || 0, strike: d.strike || 0 } };
     if (d.totem) inst.b.hp = d.totemHp || d.hp || 1;
+    // Roguelike-Aufwertung: Im Spiel ist die Karte weiterhin die Originalkarte (ID für Kartenregeln, Uniqueness,
+    // Death Rattle …); die Aufwertung bleibt in den kopierten Werten und in rlUp (für die Rückkehr ins Deck, deckId).
+    if (d.upgradedFrom && CARDS[d.upgradedFrom]) { inst.rlUp = cardId; inst.id = d.upgradedFrom; inst.name = CARDS[d.upgradedFrom].name; }
     return applyRandomDamage(inst, forceMask);
 }
 

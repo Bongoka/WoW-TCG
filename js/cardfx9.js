@@ -720,7 +720,7 @@ PRED.rarity9 = (c, a) => c.rarity === a.rarity;
 FX[7251] = { resExhausted: true, reward: (s, pid) => drawCards(s, me(s, pid), 1) };
 FX[7252] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); q(s, { op: 'call', k: '7252:ask', a: { pid } }); },
     k: { ask: (s, a) => { if (me(s, a.pid).graveyard.length) yesNo(s, a.pid, tr('Scouring the Desert: Friedhof ins Deck mischen?'), 'Scouring the Desert', '7252:do', a, me(s, a.pid).deck.length < 15); },
-        do: (s, a, v) => { if (!v || gyLocked(s, a.pid)) return; const p = me(s, a.pid); const l = p.graveyard.filter(c => !c.isToken); p.graveyard = p.graveyard.filter(c => c.isToken); l.forEach(c => me(s, c.owner || a.pid).deck.push(c.id)); p.deck = shuffleDeck(p.deck); L(s, tr`${p.hero.name} mischt den Friedhof ins Deck.`, '', a.pid); } } };
+        do: (s, a, v) => { if (!v || gyLocked(s, a.pid)) return; const p = me(s, a.pid); const l = p.graveyard.filter(c => !c.isToken); p.graveyard = p.graveyard.filter(c => c.isToken); l.forEach(c => me(s, c.owner || a.pid).deck.push(deckId(c))); p.deck = shuffleDeck(p.deck); L(s, tr`${p.hero.name} mischt den Friedhof ins Deck.`, '', a.pid); } } };
 FX[7253] = { questCond: myTurnQuest, reward: (s, pid) => makeToken(s, 9807, pid) };
 FX[7254] = { resExhausted: true, reward: (s, pid) => drawCards(s, me(s, pid), 2) };
 const otherFaceUp = (s, pid, uid) => me(s, pid).resources.filter(r => r.faceUp && r.card.uid !== uid);

@@ -803,7 +803,7 @@ onEvt('startOfTurn', (s, d) => pes(s, d.pid, 'oox').filter(m => !m.used).forEach
     pushTrig(s, d.pid, 4310, [{ op: 'trig', id: 4310, k: 'back', a: { pid: d.pid, uids: m.uids } }]); }));
 FX[4310].k = { back: (s, a) => { let n = 0; a.uids.forEach(u => { const c = findCharacter(s, u); if (c && isInPlayZone((locate(s, u) || {}).zone) && removeFromGame(s, c) !== false) n++; }); if (n) drawCards(s, me(s, a.pid), n); } };
 FX[4311] = { reward: (s, pid) => { if (!me(s, pid).resources.some(r => !r.exhausted)) drawCards(s, me(s, pid), 1); } };
-FX[4312] = { reward: (s) => [s.p1, s.p2].forEach(p => { if (gyLocked(s, p.id) || !p.graveyard.length) return; p.graveyard.splice(0).forEach(c => p.deck.push(c.id)); shuffleInPlace(p); }) };
+FX[4312] = { reward: (s) => [s.p1, s.p2].forEach(p => { if (gyLocked(s, p.id) || !p.graveyard.length) return; p.graveyard.splice(0).forEach(c => p.deck.push(deckId(c))); shuffleInPlace(p); }) };
 FX[4313] = { questCond: myTurnQ, reward: (s, pid) => mustPick(s, pid, tr('The Root of All Evil: Quest verdeckt umdrehen'), 'The Root of All Evil', [...s.p1.resources, ...s.p2.resources].filter(r => r.faceUp && r.card.type === 'Quest').map(r => r.card.uid), '4313:do', { pid }, u => (locate(s, u) || {}).pid === pid ? -3 : 3),
     k: { do: (s, a, v) => { const l = locate(s, v); if (l && l.zone === 'resource') l.res.faceUp = false; } } };
 FX[4314] = { questExtra: (s, pid) => { putDamage(s, heroOf(s, pid), 3); q(s, { op: 'call', k: 'E:questPay', a: {} }); }, reward: Qd(1) };
