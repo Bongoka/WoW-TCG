@@ -1535,6 +1535,14 @@ function runRuleTests() {
             const canAtk = cd.type === 'Weapon' || (cd.type === 'Ally' && !cd.cantAttack && !cd.totem && (cd.atk || 0) > 0 && !/can[’']t attack/i.test(t));
             if (dmgUps.indexOf(e) >= 0) assert(canAtk || /\bdeals?\b[^.]*\bdamage\b/i.test(t), `${cd.name}: ${e} ohne Schaden`);
             if (atkUps.indexOf(e) >= 0) assert(canAtk, `${cd.name}: ${e}, kann nicht angreifen`);
+            const eff = RL.EFFECTS[e];
+            assert(!eff.types || eff.types.indexOf(cd.type) >= 0, `${cd.name} (${cd.type}): ${e} nur für ${eff.types}`);
+            assert(!(e === 'up_quick' && cd.instant), `${cd.name}: Instant-Aufwertung auf einer Instant-Karte`);
+        }
+        // Gespeicherte, unpassende Aufwertung (Ally-Effekt auf einer Fähigkeit) wird beim Laden ersetzt: Holy Shield
+        for (const bad of ['up_enter_draw', 'up_guard_ally', 'up_pet_slot', 'up_quick']) {
+            assert(!RL.effectFits(RL.EFFECTS[bad], CARDS[70]), `${bad} passt angeblich auf Holy Shield`);
+            assert(CARDS[RL.upgraded(70, bad)].upgradeEffect !== bad, `Holy Shield behält ${bad}`);
         }
         // Frost Trap (macht keinen Schaden): eine alte, gespeicherte Schadens-Aufwertung wird beim Laden ersetzt
         const ft = RL.upgraded(1033, 'up_vamp');

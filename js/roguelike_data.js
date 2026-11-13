@@ -1055,7 +1055,15 @@
         up_echo: cd => !isOngoing(cd), up_ephemeral: cd => !isOngoing(cd),
         up_sentinel: cd => cd.type !== 'Ally' || has(cd, /Protector/) || canAttackCd(cd)
     };
-    R.effectFits = (e, cd) => { const f = e && NEED[e.id]; try { return !f || !!f(cd); } catch (err) { return true; } };
+    // Passt eine Aufwertung auf die Karte? Kartentyp (e.types), Voraussetzung (NEED) und Passung (FIT 0 = sinnlos,
+    // z. B. Instant auf einer Instant-Karte, Pet-Platz ohne Pet) – gilt auch für gespeicherte Aufwertungen (R.upgraded)
+    R.effectFits = (e, cd) => {
+        if (!e || !cd) return false;
+        if (e.types && e.types.indexOf(cd.type) < 0) return false;
+        try { if (NEED[e.id] && !NEED[e.id](cd)) return false; } catch (err) { }
+        try { if (FIT[e.id] && !(FIT[e.id](cd) > 0)) return false; } catch (err) { }
+        return true;
+    };
     // ---- Neue Artefakt-Effekte: Gold, Rassen, Klassen ----------------------
     // Gold
     defArt({ id: 'gold_start', text: 'Du erhältst sofort 25 Gold.', runAcquire: run => { run.gold += 25; } });
