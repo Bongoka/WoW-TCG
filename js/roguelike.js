@@ -117,6 +117,13 @@
     const ICON = p => 'WoW Icon Pack/' + encodeURI(p);
     // Hintergrund je Akt (Spielmatten aus backgrounds/), außerhalb eines Runs die Azeroth-Matte
     const ACT_BG = { 1: 'Through the Dark Portal.webp', 2: 'Darkmoon Faire Illidan 2009.webp', 3: 'Fields of Honor Sneak Preview.webp', 4: 'Darkmoon Faire Lich King.webp' };
+    // Kampf-Hintergründe je Akt (Bilder aus "backgrounds", passend zu den Sets des Akts)
+    const ACT_BATTLE_BG = {
+        1: ['Heroes of Azeroth.webp', 'Through the Dark Portal.webp', 'Through the Dark Portal release.webp', 'Fires of Outlands.webp', 'Fires of Outlands release.webp', 'Fires of Outlands sneak preview.webp', "Onyxia's Lair Raid Deck.webp"],
+        2: ['March of the Legion.webp', 'Servants of the Betrayer Sneak Preview.webp', 'The Hunt for Illidan Sneak Preview.webp', 'Darkmoon Faire Illidan 2009.webp'],
+        3: ['Fields of Honor Sneak Preview.webp', 'Blood of Gladiators sneak preview.webp', 'Aspect of the Hawk.webp', 'Continental Championship Krog the Deathfist 2010.webp'],
+        4: ['Darkmoon Faire Lich King.webp', 'Epic Collection Scourgewar.webp', 'Epic Collection Icecrown.webp', 'Crusade Engineer Spitzpatrick Judge.webp'],
+    };
     function applyBg() {
         if (!root) return;
         const f = run ? (ACT_BG[run.act] || ACT_BG[1]) : 'Heroes of Azeroth.webp';
@@ -470,6 +477,8 @@
         const enemy = R.enemyFor(run, node.type === 'boss' ? 'boss' : node.type);
         battleCtx = { node, enemy, fromEvent: !!fromEvent, finished: false };
         hideRoot();
+        // Spielfeld-Hintergrund passend zum Akt (Boss: das Motiv des Akts)
+        if (typeof pickMatchBackgroundFrom === 'function') pickMatchBackgroundFrom(enemy.isBoss ? [ACT_BG[run.act] || ACT_BG[1]] : (ACT_BATTLE_BG[run.act] || ACT_BATTLE_BG[1]));
         if (typeof hideGameOver === 'function') hideGameOver();
         if (typeof tutStop === 'function') tutStop();
         if (typeof netLeaveGame === 'function') netLeaveGame();

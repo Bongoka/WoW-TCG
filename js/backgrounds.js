@@ -74,3 +74,9 @@ function pickMatchBackground() {
     };
     tryNext(pool.length);   // alle probieren: online (GitHub Pages) liegt nur eine kleine Auswahl der Liste
 }
+// Hintergrund aus einer festen Auswahl (Roguelike: Bilder passend zum Akt). Fehlt ein Bild, wird ein anderes probiert.
+function pickMatchBackgroundFrom(files) {
+    const keep = MATCH_BG.files;
+    MATCH_BG.files = (files && files.length) ? files.slice() : keep;
+    try { pickMatchBackground(); } finally { MATCH_BG.files = keep; }
+}
