@@ -406,7 +406,11 @@
         { id: 'weapons', name: 'Waffenarsenal', desc: 'Waffen für deinen Helden.', core: cd => cd.type === 'Weapon', support: cd => cd.type !== 'Weapon' && dHas(cd, /\bweapons?\b/i) },
         { id: 'armor', name: 'Rüstkammer', desc: 'Rüstungen, die Schaden verhindern.', core: cd => cd.type === 'Armor' },
         { id: 'items', name: 'Kram & Tand', desc: 'Nützliche Items.', core: cd => cd.type === 'Item' },
-        { id: 'quests', name: 'Abenteuer', desc: 'Quests als Ressourcen mit Belohnung.', core: cd => cd.type === 'Quest' },
+        // Quests: immer 2 Quests + 1 Karte, die mit Quests arbeitet (Menge im Deck steuert draftPackOffers: 2–4 Quests)
+        { id: 'quests', quest: true, name: 'Abenteuer', desc: 'Quests als Ressourcen mit Belohnung.', core: cd => cd.type === 'Quest' },
+        { id: 'quests_draw', quest: true, name: 'Gelehrte Aufträge', desc: 'Quests, die Karten ziehen.', core: cd => cd.type === 'Quest' && /Reward:[\s\S]*\bdraws?\b/i.test(dTxt(cd)) },
+        { id: 'quests_war', quest: true, name: 'Kopfgelder', desc: 'Quests, deren Belohnung Gegner trifft.', core: cd => cd.type === 'Quest' && /Reward:[\s\S]*(damage|destroy|exhaust)/i.test(dTxt(cd)) },
+        { id: 'quests_ally', quest: true, name: 'Gefährten gesucht', desc: 'Quests, die Allies bringen oder stärken.', core: cd => cd.type === 'Quest' && /Reward:[\s\S]*\b(ally|allies|token)\b/i.test(dTxt(cd)) },
         { id: 'locations', name: 'Orte der Macht', desc: 'Locations als Ressourcen.', core: cd => cd.type === 'Location' },
         { id: 'tokens', name: 'Verstärkung', desc: 'Karten, die zusätzliche Allies bringen.', core: cd => dHas(cd, /\btokens?\b/i) },
         { id: 'cheap', name: 'Frühe Angreifer', desc: 'Billige Allies für einen schnellen Start.', core: cd => dAlly(cd) && (cd.cost || 0) <= 2 && (cd.atk || 0) >= 2 },
@@ -445,7 +449,7 @@
         for (const cls of Object.keys(trees)) for (const t of trees[cls])
             R.DRAFT_THEMES.push({ id: 'tree_' + cls + '_' + t, name: t, desc: 'Karten aus diesem Talentbaum.', cls: [cls], core: cd => cd.school === t && (cd.allowedClasses || []).includes(cls) });
     }
-    const DRAFT_GENERIC = new Set(['draw', 'heal', 'cc', 'removal', 'burn', 'aoe', 'tricks', 'weapons', 'armor', 'items', 'quests', 'cheap', 'big', 'ongoing', 'discard', 'tokens']);
+    const DRAFT_GENERIC = new Set(['draw', 'heal', 'cc', 'removal', 'burn', 'aoe', 'tricks', 'weapons', 'armor', 'items', 'cheap', 'big', 'ongoing', 'discard', 'tokens']);
     const DRAFT_GEAR = new Set(['weapons', 'armor', 'items']);
     R.draftThemeById = id => R.DRAFT_THEMES.find(t => t.id === id) || null;
     // Pool des Draft-Helden (Akt 1; Todesritter mit ihren Klassenkarten, siehe poolFor)
@@ -505,8 +509,18 @@
         });
     };
     // Paket aus einem Thema: 2 Hauptkarten + 1 Verstärker (sonst 3 Hauptkarten)
+    const dQuestSupport = cd => cd.type !== 'Quest' && /\bquests?\b/i.test(dTxt(cd));
+    R.DRAFT_THEMES.forEach(t => { if (t.quest) t.support = cd => dQuestSupport(cd) || (cd.type === 'Ally' && (cd.cost || 0) <= 3); });
     function dPack(theme, pool, deck, cls) {
         const taken = new Set();
+        if (theme.quest) {                                                                   // 2 Quests + 1 Quest-Verstärker (sonst ein billiger Ally)
+            const q = dPick(pool.filter(theme.core), 2, deck, cls, taken);
+            if (q.length < 2) return null;
+            let s = dPick(pool.filter(dQuestSupport), 1, deck, cls, taken);
+            if (!s.length) s = dPick(pool.filter(cd => cd.type === 'Ally' && (cd.cost || 0) <= 3), 1, deck, cls, taken);
+            return s.length ? { kind: 'pack', theme: theme.id, cards: q.concat(s).map(cd => cd.id) } : null;
+        }
+        pool = pool.filter(cd => cd.type !== 'Quest');                                       // Quests nur über Quest-Themen (Menge kontrolliert)
         const core = pool.filter(theme.core);
         const sup = theme.support ? pool.filter(cd => theme.support(cd) && !theme.core(cd)) : [];
         let cards = dPick(core, sup.length ? 2 : 3, deck, cls, taken);
@@ -527,12 +541,32 @@
             return Math.random() * w + Math.min(0.6, R.classCards(core, cls).length / 10);
         };
         const ranked = cands.map(t => ({ t, s: score(t) })).filter(x => x.s >= 0).sort((a, b) => b.s - a.s);
+        // Quests (Ressourcen mit Belohnung): am Ende 2–4 im Deck. Unter 3 Quests ist in jedem Angebot genau eine Quest-Auswahl
+        // (2 Quests); ab 3 keine mehr. Fehlen in den letzten zwei Wahlen noch Quests, enthält jede Auswahl eine.
+        const nQ = draft.deck.filter(id => CARDS[id] && CARDS[id].type === 'Quest').length;
+        const packsLeft = R.DRAFT_STEPS.slice(draft.step).filter(s => s === 'pack').length;
         const out = [];
+        if (nQ < 3) {
+            for (const { t } of ranked) {
+                if (!t.quest) continue;
+                const p = dPack(t, pool, draft.deck, cls);
+                if (p) { out.push(p); break; }
+            }
+        }
         for (const { t } of ranked) {
             if (out.length >= 3) break;
+            if (t.quest) continue;
             if (DRAFT_GEAR.has(t.id) && out.some(p => DRAFT_GEAR.has(p.theme))) continue;
             const p = dPack(t, pool, draft.deck, cls);
             if (p) out.push(p);
+        }
+        if (nQ < 2 && packsLeft <= 2) {
+            const quests = pool.filter(cd => cd.type === 'Quest');
+            for (const p of out) {
+                if (p.cards.some(id => CARDS[id].type === 'Quest')) continue;
+                const q = dPick(quests, 1, draft.deck, cls, new Set(p.cards));
+                if (q.length) p.cards[2] = q[0].id;
+            }
         }
         out.forEach(p => { offered[p.theme] = (offered[p.theme] || 0) + 1; });
         draft.offered = offered;
