@@ -1490,6 +1490,41 @@ function runRuleTests() {
         const hb = hpOf(s, tb); P(s, 1).allies.push(ta);
         assert(hpOf(s, tb) === hb + 2, `up_totem_aura: ${hpOf(s, tb)} statt ${hb + 2}`);
     });
+    test(141, 'Roguelike: Siegel/Dämonen/Formen-Synergien, Artefakt-Angebote passen zum Deck', () => {
+        if (typeof RL === 'undefined') return;
+        const mk = () => { const s = fresh(); s.rl = { arts: [], f: {}, act: 1, pid: 1 }; const p = P(s, 1); p.allies = []; p.ongoing = []; return s; };
+        const viol = (s, tag) => { const v = findLimitViolation(s, P(s, 1)); return !!(v && v.label.indexOf(tag) === 0); };
+        // Seal Twisting / up_seal_slot: ein zweites Siegel
+        const seals = Object.values(CARDS).filter(c => c.limitTags && c.limitTags.Seal === 1);
+        let s = mk(); P(s, 1).ongoing.push(makeCardInst(seals[0].id, false, 1), makeCardInst(seals[1].id, false, 1));
+        assert(viol(s, 'Seal'), 'zwei Siegel ohne Extra erlaubt');
+        s.rl.arts = ['seal_slot']; assert(!viol(s, 'Seal'), 'Seal Twisting: zweites Siegel nicht erlaubt');
+        s = mk(); P(s, 1).ongoing.push(makeCardInst(RL.upgraded(seals[0].id, 'up_seal_slot'), false, 1), makeCardInst(seals[1].id, false, 1));
+        assert(!viol(s, 'Seal'), 'up_seal_slot: zweites Siegel nicht erlaubt');
+        // Dämonen: +1/+1, Kosten -1, up_demon_aura +1 Angriff für andere Dämonen
+        const demons = Object.values(CARDS).filter(c => c.type === 'Ally' && /\bDemon\b/.test(c.race || '') && !c.unique && !c.isToken && !(FX[c.id] || {}).aura && (c.cost || 0) >= 1);
+        s = mk(); const d1 = makeCardInst(demons[0].id, false, 1); P(s, 1).allies.push(d1);
+        const b = [atkOf(s, d1), hpOf(s, d1)]; s.rl.arts = ['demon_bond'];
+        assert(atkOf(s, d1) === b[0] + 1 && hpOf(s, d1) === b[1] + 1, 'Demonic Empowerment wirkt falsch');
+        s.rl.arts = ['demon_cost'];
+        assert(getPlayCost(s, P(s, 1), CARDS[demons[1].id]) === demons[1].cost - 1, 'Fel Domination: Dämon nicht günstiger');
+        s = mk(); const d2 = makeCardInst(demons[1].id, false, 1); P(s, 1).allies.push(d2); const a2 = atkOf(s, d2);
+        P(s, 1).allies.push(makeCardInst(RL.upgraded(demons[0].id, 'up_demon_aura'), false, 1));
+        assert(atkOf(s, d2) === a2 + 1, 'up_demon_aura wirkt falsch');
+        // Master Shapeshifter: Form kommt ins Spiel → 1 Karte (1x/Zug)
+        s = mk(); s.rl.arts = ['form_draw'];
+        const form = makeCardInst(Object.values(CARDS).find(c => c.limitTags && c.limitTags.Form === 1 && c.type === 'Ability').id, false, 1);
+        P(s, 1).ongoing.push(form); const h0 = P(s, 1).hand.length;
+        evt(s, 'entersPlay', { uid: form.uid, pid: 1 }); evt(s, 'entersPlay', { uid: form.uid, pid: 1 }); process(s);
+        assert(P(s, 1).hand.length === h0 + 1, `Master Shapeshifter: ${P(s, 1).hand.length - h0} Karten gezogen`);
+        // Angebote: ohne Pets im Deck kommen Pet-Artefakte erst, wenn nichts anderes mehr übrig ist
+        const plain = Object.values(CARDS).filter(c => c.type === 'Ability' && !c.limitTags && !c.totem).slice(0, 15);
+        const run = { act: 1, artifacts: [], deck: plain.map((c, i) => ({ uid: 'u' + i, id: c.id })) };
+        for (let i = 0; i < 30; i++) assert(!RL.availableArtifacts(run, 3).some(id => RL.ART_NEED[id]), 'unpassendes Artefakt angeboten');
+        run.deck.push(...Object.values(CARDS).filter(c => c.isPet).slice(0, 2).map((c, i) => ({ uid: 'p' + i, id: c.id })));
+        let seen = false; for (let i = 0; i < 200 && !seen; i++) seen = RL.availableArtifacts(run, 3).indexOf('pet_bond') >= 0;
+        assert(seen, 'Beast Mastery trotz Pets nie angeboten');
+    });
     LANG = prevLang;
     return results;
 }

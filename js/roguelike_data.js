@@ -374,6 +374,8 @@
     function defCard(def) { def.kind = 'card'; return defEffect(def); }
     function defArt(def) { def.kind = 'art'; return defEffect(def); }
     function isRace(c, r) { return !!c && (c.race === r || (c.allyTypes || []).indexOf(r) >= 0); }
+    function isPetCard(c) { return !!c && (c.isPet || !!(c.limitTags && c.limitTags.Pet !== undefined)); }   // Jäger-Pets und Warlock-Dämonen (Tag Pet)
+    function isDemon(c) { return !!c && c.type === 'Ally' && (/\bDemon\b/.test(c.race || '') || (c.allyTypes || []).indexOf('Demon') >= 0); }   // auch „Imp Demon“ usw.
     function isClass(c, k) { return !!c && (c.allyClass === k || (c.allyTypes || []).indexOf(k) >= 0); }
     function ctrlRace(s, pid, r) { const p = getPlayer(s, pid); return !!(p && (p.allies || []).some(a => isRace(a, r))); }
     function ctrlClass(s, pid, k) { const p = getPlayer(s, pid); return !!(p && (p.allies || []).some(a => isClass(a, k))); }
@@ -668,7 +670,7 @@
     defCard({ id: 'up_pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', types: ['Ally'], tagLimit: (s, c, t) => t === 'Pet' ? 1 : 0 });
     defCard({
         id: 'up_pet_aura', text: 'Deine anderen Pets haben +1/+1.', types: ['Ally'],
-        aura: (s, self, other, kind) => (other.isPet && (kind === 'atk' || kind === 'hp')) ? 1 : 0
+        aura: (s, self, other, kind) => (isPetCard(other) && (kind === 'atk' || kind === 'hp')) ? 1 : 0
     });
     defCard({
         id: 'up_totem_slot', text: 'Du kannst 1 zusätzliches Totem dieses Elements kontrollieren.', types: ['Ability'],
@@ -679,6 +681,11 @@
         aura: (s, self, other, kind) => (self.isTotem && other.isTotem && kind === 'hp') ? 2 : 0
     });
     defCard({ id: 'up_aura_slot', text: 'Du kannst 1 zusätzliche Aura kontrollieren.', types: ['Ability'], tagLimit: (s, c, t) => t === 'Aura' ? 1 : 0 });
+    defCard({ id: 'up_seal_slot', text: 'Du kannst 1 zusätzliches Siegel kontrollieren.', types: ['Ability'], tagLimit: (s, c, t) => t === 'Seal' ? 1 : 0 });
+    defCard({
+        id: 'up_demon_aura', text: 'Deine anderen Dämonen haben +1 Angriff.', types: ['Ally'],
+        aura: (s, self, other, kind) => (kind === 'atk' && isDemon(other)) ? 1 : 0
+    });
 
     // ---- Passung: Welche Aufwertung passt zu welcher Karte? -----------------
     // fit(cd) liefert 0 (passt nicht) bis 5 (passt sehr gut). Gewählt wird unter den
@@ -759,11 +766,13 @@
         up_patience: cd => (cd.cost || 0) >= 5 ? 3 : 0,
         up_bloodthirst: cd => (cd.type === 'Weapon' || (cd.atk || 0) >= 3) ? 3 : 1,
         up_combo_point: cd => (cd.subtypes || []).indexOf('Combo') >= 0 ? 5 : 0,
-        up_pet_slot: cd => cd.isPet ? 4 : 0,
-        up_pet_aura: cd => cd.isPet ? 4 : clsIs(cd, 'Hunter') ? 3 : 0,
+        up_pet_slot: cd => isPetCard(cd) ? 4 : 0,
+        up_pet_aura: cd => isPetCard(cd) ? 4 : clsIs(cd, 'Hunter') ? 3 : 0,
         up_totem_slot: cd => cd.totem ? 4 : 0,
         up_totem_aura: cd => cd.totem ? 4 : 0,
-        up_aura_slot: cd => (cd.limitTags && cd.limitTags.Aura !== undefined) ? 5 : 0
+        up_aura_slot: cd => (cd.limitTags && cd.limitTags.Aura !== undefined) ? 5 : 0,
+        up_seal_slot: cd => (cd.limitTags && cd.limitTags.Seal !== undefined) ? 5 : 0,
+        up_demon_aura: cd => isDemon(cd) ? 4 : 0
     };
     R.FIT = FIT;
     // ---- Neue Artefakt-Effekte: Gold, Rassen, Klassen ----------------------
@@ -837,7 +846,6 @@
         healed: (s, d) => { if (!d || d.hpid !== 1 || !(d.amt > 0) || flag(s, 't:priest_heal')) return; setFlag(s, 't:priest_heal'); healHeroFor(s, 1, 1); }
     });
     // Pets, Totems, Auren
-    const isPetCard = c => !!c && (c.isPet || !!(c.limitTags && c.limitTags.Pet !== undefined));
     defArt({ id: 'pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', tagLimit: (s, t) => t === 'Pet' ? 1 : 0 });
     defArt({
         id: 'pet_bond', text: 'Deine Pets haben +1/+1.',
@@ -853,6 +861,21 @@
         id: 'aura_slot', text: 'Du kannst 1 zusätzliche Aura kontrollieren. Deine Auren kosten (1) weniger.',
         tagLimit: (s, t) => t === 'Aura' ? 1 : 0,
         cost: (s, p, card) => (card.limitTags && card.limitTags.Aura !== undefined) ? -1 : 0
+    });
+    // Siegel, Dämonen, Formen
+    defArt({ id: 'seal_slot', text: 'Du kannst 1 zusätzliches Siegel kontrollieren.', tagLimit: (s, t) => t === 'Seal' ? 1 : 0 });
+    defArt({
+        id: 'demon_bond', text: 'Deine Dämonen haben +1/+1.',
+        stat: (s, c, kind) => ((kind === 'atk' || kind === 'hp') && isDemon(c) && ctrlOf(s, c) === 1) ? 1 : 0
+    });
+    defArt({ id: 'demon_cost', text: 'Deine Dämonen kosten (1) weniger.', cost: (s, p, card) => isDemon(card) ? -1 : 0 });
+    defArt({
+        id: 'form_draw', text: 'Wenn eine deiner Formen ins Spiel kommt: ziehe 1 Karte (1x/Zug).',
+        entersPlay: (s, d) => {
+            if (!d || d.pid !== 1 || flag(s, 't:form_draw')) return;
+            const c = getPlayer(s, 1).ongoing.find(x => x.uid === d.uid);
+            if (c && c.limitTags && c.limitTags.Form !== undefined) { setFlag(s, 't:form_draw'); drawFor(s, 1, 1); }
+        }
     });
     defArt({
         id: 'rogue_stealth', text: 'Schurken-Allies haben Stealth.',
@@ -2063,7 +2086,11 @@
         newArtifact('pet_call', 'Call Pet', 'Abilities/BeastCall.png', 'Pets', 'common', 95, 'pet_call'),
         newArtifact('totem_cost', 'Totemic Focus', 'Spells/Elemental_Totem.png', 'Totems', 'rare', 115, 'totem_cost'),
         newArtifact('totem_slot', 'Totemic Mastery', 'Miscellaneous/TotemofRage.png', 'Totems', 'rare', 125, 'totem_slot'),
-        newArtifact('aura_slot', 'Improved Devotion Aura', 'Spells/DEVOTIONAURA.png', 'Auren', 'rare', 120, 'aura_slot')
+        newArtifact('aura_slot', 'Improved Devotion Aura', 'Spells/DEVOTIONAURA.png', 'Auren', 'rare', 120, 'aura_slot'),
+        newArtifact('seal_slot', 'Seal Twisting', 'Abilities/SEAL.png', 'Siegel', 'rare', 120, 'seal_slot'),
+        newArtifact('demon_bond', 'Demonic Empowerment', 'Abilities/DemonicEmpowerment.png', 'Dämonen', 'rare', 115, 'demon_bond'),
+        newArtifact('demon_cost', 'Fel Domination', 'Spells/SummonFelGuard.png', 'Dämonen', 'rare', 115, 'demon_cost'),
+        newArtifact('form_draw', 'Master Shapeshifter', 'Abilities/MasterShapeshifter.png', 'Formen', 'rare', 115, 'form_draw')
     );
     // ---- Artefakte: Kette, Zonen, Erschöpfen, Rüstung (Namen aus Vanilla / TBC / WotLK) ----
     const myHero = s => s.p1.hero;
@@ -2378,8 +2405,28 @@
         const act = (run && run.act) || 1;
         // Artefakte mit acts-Liste erscheinen nur in ihrem Akt; ältere Artefakte bleiben überall möglich.
         const list = R.ARTIFACTS.filter(a => a.rarity !== 'starter' && !owned.has(a.id) && (!a.acts || a.acts.includes(act)));
-        return R.shuffle(list).slice(0, n).map(a => a.id);
+        // Artefakte für bestimmte Karten (Rasse, Klasse, Pets, Totems …) nur, wenn das Deck mindestens 2 davon hat;
+        // reicht die Auswahl nicht, wird mit den übrigen aufgefüllt.
+        const deck = (run.deck || []).map(e => CARDS[R.baseIdOf(e.id)]).filter(Boolean);
+        const fits = a => { const f = ART_NEED[a.id]; return !f || deck.filter(cd => { try { return f(cd); } catch (e) { return false; } }).length >= 2; };
+        const good = R.shuffle(list.filter(fits)), rest = R.shuffle(list.filter(a => !fits(a)));
+        return good.concat(rest).slice(0, n).map(a => a.id);
     };
+    const tagIs = t => cd => !!(cd.limitTags && cd.limitTags[t] !== undefined);
+    const raceNeed = r => cd => cd.type === 'Ally' && isRace(cd, r);
+    const clsNeed = k => cd => cd.type === 'Ally' && isClass(cd, k);
+    const ART_NEED = {
+        pet_slot: isPetCard, pet_bond: isPetCard, pet_call: isPetCard,
+        totem_cost: cd => cd.totem, totem_slot: cd => cd.totem, art_totems: cd => cd.totem,
+        aura_slot: tagIs('Aura'), seal_slot: tagIs('Seal'), form_draw: tagIs('Form'),
+        demon_bond: isDemon, demon_cost: isDemon,
+        troll_cost: raceNeed('Troll'), troll_atk: raceNeed('Troll'), troll_hp: raceNeed('Troll'), orc_berserk: raceNeed('Orc'),
+        draenei_inspire: raceNeed('Draenei'), undead_cost: raceNeed('Undead'), human_hp: raceNeed('Human'), dwarf_protector: raceNeed('Dwarf'),
+        nightelf_elusive: raceNeed('Night Elf'), bloodelf_ping: raceNeed('Blood Elf'), tauren_atk: raceNeed('Tauren'), gnome_draw: raceNeed('Gnome'),
+        mage_hp: clsNeed('Mage'), hunter_cost: clsNeed('Hunter'), rogue_stealth: clsNeed('Rogue'), shaman_ferocity: clsNeed('Shaman'),
+        paladin_protector: clsNeed('Paladin'), druid_hp: clsNeed('Druid')
+    };
+    R.ART_NEED = ART_NEED;
     R.starterArt = clsKey => { const c = R.classByKey(clsKey); return c ? c.art : null; };
     R.maxHpBonus = () => 0;
 

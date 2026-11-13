@@ -556,3 +556,13 @@ Vorgabe des Nutzers: Slay the Spire nur als Ideenquelle, das Spiel soll sich wie
 - **Kürzere Runs:** 6 Reihen je Akt (Kampf, Ereignis/Kampf, Shop/Ereignis, Elite/Kampf/Ereignis, Lagerfeuer, Boss), etwa 10–15 Duelle pro Run.
 - **Volles Leben vor jedem Kampf:** Leben ist kein Run-Vorrat mehr. Lebenskosten in Ereignissen kosten maximales Leben, das Lagerfeuer bietet Training (+5 max. Leben) statt Rasten, Karte entfernen ist dort kostenlos.
 - **Gegner mit echten Themen-Decks (`R.ARCHETYPES`):** 30 Archetypen (je Akt 6–10), z. B. Orc-Kriegshorde, Totem-Kreis, Dämonenbeschwörer, Will of the Forsaken, Troll-Berserker, Diplomaten von Sturmwind, Seuche der Geißel, Heiler von Nordend. Held und Karten stammen nur aus den Sets bis zum aktuellen Akt, die Decks sind legal (wie ein Spieler sie bauen könnte), etwa 55 % Themenkarten. Die Bosse spielen ebenfalls Themen-Decks. Im Kampf-HUD stehen Deck-Name und Deck-Idee.
+
+## 12. Weitere Umsetzung (13.11.2026)
+
+- **Elites und Tränke:** Elite-Knoten mit Eigenschaft (`R.ELITE_TRAITS`) und 3 Artefakten zur Auswahl; 10 Tränke (`R.POTIONS`), 3 Plätze, nur im eigenen Zug bei leerer Kette.
+- **Combo-Punkte-Anzeige:** 5 Kreise auf Finishing Moves in der Hand, zählt wie beim Bezahlen (Filthy Tricks, Tyler Falconbridge).
+- **Debug-Galerie:** Reiter „Gegner-Decks“, Klick auf ein Deck zeigt seine Karten.
+- **Aufwertungen auf der Karte:** violetter Rahmen; der Effekttext steht nur in der Hover-Vergrößerung, ohne den Originaltext zu verdecken (leerer Textkasten, sonst unten über Flavor/Set-Zeile, sonst unterer Bildrand).
+- **Tag-Plätze und Synergien (CR 414.3b):** Aufwertungen und Artefakte für zusätzliche Pets, Totems (je Element), Auren und Siegel (`R.tagLimitExtra` über `TAG_LIMIT_EXTRA`). Synergien: Pets +1/+1 (Beast Mastery, auch Warlock-Dämonen mit Tag Pet), Call Pet, Totemic Focus, Totem-Aura, Demonic Empowerment, Fel Domination, Master Shapeshifter (Formen).
+- **Passende Artefakt-Angebote:** Rassen-, Klassen-, Pet-, Totem-, Aura-, Siegel-, Dämonen- und Form-Artefakte erscheinen nur, wenn das Deck mindestens 2 passende Karten hat (`R.ART_NEED`); sonst wird mit den übrigen aufgefüllt.
+- **Offen:** Balance (Gegnerleben, Gold) und ein kompletter Run sind nicht getestet. Nicht umgesetzt: Sly, Nachhall, Warp, Uralte, Flüche, Wachs-Artefakte, Mythic+-Affixe.
