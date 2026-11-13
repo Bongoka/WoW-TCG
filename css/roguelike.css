@@ -585,3 +585,7 @@
 .rl-pick-cls:hover .rl-pick-name { color: var(--cl, #f3dfa2); }
 .rl-pick-foot { display: flex; gap: 14px; }
 @media (max-width: 760px) { .rl-pick-grid { grid-template-columns: repeat(3, auto); gap: 24px 28px; } }
+/* Klassensymbole: das Bild hat seinen eigenen Goldring – es füllt den Kreis ganz; Inhalt im 92-px-Bild liegt 1 px links / 1,5 px oben */
+.rl-pick-ring { background: none; overflow: hidden; box-shadow: 0 0 0 2px rgba(0, 0, 0, .7), 0 14px 30px rgba(0, 0, 0, .6); }
+.rl-pick-ring img { width: 100%; height: 100%; border-radius: 0; transform: translate(1.1%, 1.6%) scale(1.035); }
+.rl-pick-cls:hover .rl-pick-ring { box-shadow: 0 0 0 2px var(--cl, #c9a84c), 0 18px 36px rgba(0, 0, 0, .65), 0 0 34px var(--cl, #c9a84c); }
