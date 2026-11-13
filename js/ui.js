@@ -1264,10 +1264,10 @@ function renderPlayerHand(p) {
     const choices = choiceUids();
     p.hand.forEach((card, idx) => {
         const slot = document.createElement("div"); slot.className = "hand-card-slot";
-        // Aktuelle Kosten (Rabatte wie Nature's Swiftness, Aufschläge): Plakette auf der Karte, günstigere Karten leuchten grün
+        // Aktuelle Kosten (Rabatte wie Nature's Swiftness, Aufschläge): Plakette auf der Karte
         const sc = shownCost(p, card);
         const node = createCardDOM(card, false, null, sc || {});
-        if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down');
+        // Grüner Rahmen erst weiter unten: nur wenn die Karte günstiger ist UND jetzt spielbar (die Kosten-Plakette bleibt immer)
         // Finishing Move: Combo-Punkte wie in WoW oben auf der Karte (5 Kreise, gefüllte = Combos im Friedhof, höchstens 5)
         const cp = typeof isComboFinisher === 'function' && isComboFinisher(card) ? combosInGy(G, p.id).length : 0;
         if (cp > 0) {
@@ -1283,7 +1283,7 @@ function renderPlayerHand(p) {
             node.onclick = (e) => { e.stopPropagation(); boardPick(card.uid); };
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
-            if (playable) { node.classList.add("can-act"); slot.classList.add("playable"); }
+            if (playable) { node.classList.add("can-act"); slot.classList.add("playable"); if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down'); }
             node.draggable = true;
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });
