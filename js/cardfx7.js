@@ -647,8 +647,8 @@ function returnRemoved(s, uids) {
             const i = (p.removed || []).findIndex(c => c.uid === u); if (i < 0) continue;
             const c = p.removed.splice(i, 1)[0]; resetInst(c); c.joinedTurn = s.turn;
             if (c.type === 'Ally' || c.totem) putIntoPlay(s, c, p.id);
-            else if (c.type === 'Weapon') { p.hero.weapons.push(c); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); }
-            else if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); }
+            else if (c.type === 'Weapon') { equipEnterCounters(c); p.hero.weapons.push(c); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); }
+            else if (c.type === 'Armor' || c.type === 'Item') { equipEnterCounters(c); p.hero.armors.push(c); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); }
             else if (c.type === 'Ability' && c.ongoing && !c.attach) { p.ongoing.push(c); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); }
             else { p.removed.push(c); continue; }   // Anhang ohne Ziel bzw. Fähigkeit ohne Ongoing: bleibt entfernt
             L(s, tr`${c.name} kommt zurück ins Spiel.`, '', p.id);

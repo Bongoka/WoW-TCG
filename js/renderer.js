@@ -226,7 +226,7 @@
     };
     function placePreview(L) {
         const pv = S.pv;
-        const r = L.wrap.querySelector('.cfx-rot').getBoundingClientRect();
+        const r = (L.anchor || L.wrap.querySelector('.cfx-rot')).getBoundingClientRect();
         const W = zoomW();
         const H = Math.round(W * 1.4);
         pv.style.setProperty('--cw', W + 'px');
@@ -286,7 +286,8 @@
         const L = S.live;
         if (!L) { S.raf = 0; return; }
         // Neu gezeichnet (Aktion im Spiel): Vorschau an die neue Karte mit derselben Kennung hängen statt zu schließen
-        if (!L.wrap.isConnected && !L.releasing) { const n = sameCard(L.wrap); if (n) adopt(L, n); else release(); }
+        if (L.anchor) { if (!L.anchor.isConnected && !L.releasing) release(); }             // Listenzeile weg (Liste neu gezeichnet)
+        else if (!L.wrap.isConnected && !L.releasing) { const n = sameCard(L.wrap); if (n) adopt(L, n); else release(); }
         L.x += (L.tx - L.x) * 0.22; L.y += (L.ty - L.y) * 0.22; L.h += ((L.releasing ? 0 : 1) - L.h) * 0.18;
         applyFx(L.tilt, L, now, 7, L.lift);
         if (L.clone && !L.releasing) applyFx(L.clone, L, now, 13, 0);
@@ -304,7 +305,8 @@
         if (T.wrap) T.wrap = n;                                                           // Touch: gedrückt gehaltene Karte
     }
     function release() { const L = S.live; if (!L || L.releasing) return; L.releasing = true; L.tx = 0.5; L.ty = 0.5; hideKeywords(); if (S.pv) S.pv.classList.remove('show'); }
-    function enter(wrap) {
+    // anchor: Element, das keine Karte ist (Zeile der Deck-Liste u. a.) – Vorschau daneben, Kippen nach der Maus über dem Element
+    function enter(wrap, anchor) {
         if (S.live) finish(S.live);
         const tilt = wrap.querySelector('.cfx-tilt');
         if (!tilt || !wrap._cfx) return;
@@ -332,7 +334,7 @@
         clone.classList.add('cfx-live');
         tilt.classList.add('cfx-live');
         pv.style.display = 'block';
-        const L = { wrap, tilt, clone, x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, h: 0, spin, seed: meta.seed, t0: performance.now(), releasing: false, lift: wrap.classList.contains('hand-card') ? 14 : 8 };
+        const L = { wrap, tilt, clone, x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, h: 0, spin, seed: meta.seed, t0: performance.now(), releasing: false, lift: wrap.classList.contains('hand-card') ? 14 : 8, anchor: anchor || null };
         S.live = L;
         fillKeywords(meta);
         placePreview(L);
@@ -345,12 +347,26 @@
     document.addEventListener('pointermove', (e) => {
         if (e.pointerType === 'touch') return;
         const t = e.target;
+        const A = S.live && !S.live.releasing && S.live.anchor;
+        if (A) {                                                                           // Vorschau zu einer Listenzeile: folgt der Maus über der Zeile
+            if (A.isConnected && A.contains(t)) { const p = localPos(A, e); S.live.tx = p.x; S.live.ty = p.y; if (!S.raf) S.raf = requestAnimationFrame(tick); return; }
+            release();
+        }
         const w = (t && t.closest) ? t.closest('.card-wrapper:not(#cfx-preview):not(.no-fx)') : null;
         const cur = S.live && !S.live.releasing ? S.live.wrap : null;
         if (w !== cur) { if (S.live && !S.live.releasing) release(); if (w) enter(w); }
         if (w && S.live && S.live.wrap === w) { const p = localPos(w, e); S.live.tx = p.x; S.live.ty = p.y; }
         if (S.live && !S.raf) S.raf = requestAnimationFrame(tick);
     }, { passive: true });
+    // Dieselbe Zoom-Karte (3D, Größe, Keywords) für Elemente, die keine Karte sind: Deck-Liste im Deck-Builder, Coach
+    window.cardPreview = {
+        show(cardId, anchor) {
+            if (!CARDS[cardId] || !anchor) return;
+            const node = createCardDOM({ ...CARDS[cardId], uid: 'pv_' + cardId }, false, null, { previewMode: 'ea' });
+            enter(node, anchor);
+        },
+        hide() { if (S.live && S.live.anchor) release(); }
+    };
     document.addEventListener('pointerdown', () => { if (S.live) release(); }, true);
     // Ziehen beginnt: Zoom weg – außer beim eingebauten Ziehen des Handy-Browsers während Gedrückthalten (wird in ui.js blockiert)
     document.addEventListener('dragstart', (e) => { if (e.isTrusted && T.wrap) return; if (S.live) finish(S.live); }, true);

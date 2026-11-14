@@ -426,12 +426,13 @@ function optDecorate(changed = []) {
 }
 // Vorschau beim Überfahren einer Deck-Zeile (links neben der Liste)
 function dbHoverShow(id, row) {
+    if (window.cardPreview) { window.cardPreview.show(id, row); return; }                  // gleiche Zoom-Karte wie überall im Spiel (renderer.js)
     const h = document.getElementById('db-hover'); h.innerHTML = '';
     h.appendChild(createCardDOM({ ...CARDS[id], uid: 'db_hover_' + id }, false));
     const r = row.getBoundingClientRect();
     h.style.display = 'block'; h.style.left = (r.left - 236) + 'px'; h.style.top = Math.max(10, Math.min(window.innerHeight - 330, r.top - 140)) + 'px';
 }
-function dbHoverHide() { document.getElementById('db-hover').style.display = 'none'; }
+function dbHoverHide() { if (window.cardPreview) window.cardPreview.hide(); document.getElementById('db-hover').style.display = 'none'; }
 
 // Speichern: neues Deck oder das bearbeitete überschreiben
 function dbSave() {

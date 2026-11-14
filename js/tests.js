@@ -1657,6 +1657,22 @@ function runRuleTests() {
             else assert(Math.abs(s.gain) < 0.05, `ohne Effekte zu großer Gewinn geschätzt: ${s.gain}`);
         }
     });
+    test(147, 'Edge of Oblivion / Breastplate of Undeath: Ausrüstung kommt mit ihren Zählern ins Spiel (+5 ATK bzw. +5 DEF), Zugbeginn nimmt einen weg', () => {
+        const s = fresh(); const p = P(s, 1); p.hero.weapons = []; p.hero.armors = []; res(s, 1, 8);
+        for (const id of [11235, 11218]) {
+            const c = makeCardInst(id, false, 1); p.hand.push(c);
+            resolveCard(s, { kind: 'card', card: c, pl: 1 }); process(s); autoResolve(s);
+        }
+        const w = p.hero.weapons.find(x => x.id === 11235), a = p.hero.armors.find(x => x.id === 11218);
+        assert(w && weaponAtk(s, w) === 5, `Edge of Oblivion: ${w && weaponAtk(s, w)} statt 5 ATK`);
+        assert(a && (a.counters || {}).def === 5, `Breastplate of Undeath: ${JSON.stringify(a && a.counters)} statt 5 DEF-Zähler`);
+        FX[11235].k.tick(s, { uid: w.uid });
+        assert(weaponAtk(s, w) === 4, `nach Zugbeginn ${weaponAtk(s, w)} statt 4 ATK`);
+        // direkt ins Spiel gebracht (Girdle of Razuvious): ebenfalls mit Zählern
+        p.hero.weapons = []; p.deck.unshift(11235);
+        FX[3415].k.go(s, { pid: 1 }, 11235);
+        assert(p.hero.weapons.length && weaponAtk(s, p.hero.weapons[0]) === 5, 'Girdle of Razuvious: Edge of Oblivion ohne Zähler');
+    });
     LANG = prevLang;
     return results;
 }

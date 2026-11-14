@@ -246,7 +246,7 @@ FX[3415] = { enter: (s, c, pid) => trig(s, { id: 3415, k: 'search', a: { pid } }
             if (!opts.length) { shuffleInPlace(p); return; } ask(s, { pid: a.pid, prompt: tr('Girdle of Razuvious: Welche Waffe?'), src: 'Girdle of Razuvious', opts, k: '3415:go', a }); },
         go: (s, a, id) => { const p = me(s, a.pid); const i = p.deck.indexOf(id); if (i < 0) { shuffleInPlace(p); return; } p.deck.splice(i, 1); shuffleInPlace(p);
             putDamage(s, p.hero, CARDS[id].cost || 0); const w = makeCardInst(id, false, a.pid); w.owner = a.pid; w.joinedTurn = s.turn; const f = fx(w);
-            p.hero.weapons.push(w); w.exhausted = !!f.entersExhausted; L(s, tr`✨ ${w.name} kommt ins Spiel.`, '', a.pid); evt(s, 'entersPlay', { uid: w.uid, pid: a.pid }); if (f.enter) asTrigger(s, w, a.pid, () => f.enter(s, w, a.pid, null)); } } };
+            equipEnterCounters(w); p.hero.weapons.push(w); w.exhausted = !!f.entersExhausted; L(s, tr`✨ ${w.name} kommt ins Spiel.`, '', a.pid); evt(s, 'entersPlay', { uid: w.uid, pid: a.pid }); if (f.enter) asTrigger(s, w, a.pid, () => f.enter(s, w, a.pid, null)); } } };
 // Gloves of Calculated Risk: "You pay (1) less to play equipment, to a minimum of (1). <p> Weapons you control have +1 ATK, and other armor you control have +1 [DEF].
 // <p> When this armor is destroyed, destroy all equipment you control."
 FX[3416] = { aura: { cost: (s, src, sp, pid, card) => pid === sp && isEquip(card) ? { min1: 1 } : 0, watk: (s, src, sp, w) => ctrlBy(s, w, sp) ? 1 : 0,

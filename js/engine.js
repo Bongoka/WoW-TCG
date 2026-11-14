@@ -1610,6 +1610,8 @@ function leaveChain(s, it, dest) {
     if (dest === 'graveyard' && gyReplaced(s, it.card, owner.id, it.pl)) dest = 'removed';
     if (dest === 'removed') owner.removed.push(it.card); else owner.graveyard.push(it.card);
 }
+// "This weapon/armor enters play with N … counters" – gilt für jeden Weg ins Spiel (gespielt oder direkt ins Spiel gebracht)
+function equipEnterCounters(c) { const f = FX[c.id]; if (f && f.enterCounters) c.counters = { ...(c.counters || {}), ...f.enterCounters }; }
 function T(it, i = 0) { return (it.targets && it.targets[i]) || []; }
 function T1(s, it, i = 0) { const u = T(it, i)[0]; return u ? findCharacter(s, u) : null; }
 
@@ -1626,6 +1628,7 @@ function resolveCard(s, it) {
         return;
     }
     if (c.type === 'Master Hero') { becomeHero(s, p, c); return; }                         // Master Hero (CR 301.4a): ersetzt den Helden, ohne Kette
+    if (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') equipEnterCounters(c);   // Edge of Oblivion, Breastplate of Undeath
     if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.joinedTurn = s.turn; c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     // Fähigkeit
