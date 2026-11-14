@@ -308,8 +308,11 @@ function dbAfterRows(box, n, hero) {
 // Ab OPT_MIN_CARDS verschiedenen Karten (15 × 4 = 60). Varianten des Decks – nur seine Karten, je 0–4 Kopien, genau 60 –
 // spielen über runSimulation (Web Worker) gegeneinander; nach jeder Partie wird neu geschätzt. Die beste Anzahl je Karte
 // steht live in der Zeile (mit Sicherheit), Übernehmen/Verwerfen beendet den Test. Jede Änderung am Deck verwirft ihn.
-const OPT_MIN_CARDS = 15, OPT_MAX_GAMES = 10000;
-const OPT = { on: false, m: null, sum: null, sig: '', token: 0, t0: 0, lastChange: 0, cardChange: [], prevRec: null, timer: null, finished: false, hist: [] };
+// Ist die Empfehlung stabil, folgt eine Bestätigungsrunde: die empfohlene Liste (ab da fest) gegen das Ausgangsdeck in frischen
+// Partien. Das prüft, was das Modell nicht abbildet (Synergien zwischen Karten) und ob die Empfehlung nur Zufall war (Winner's Curse).
+const OPT_MIN_CARDS = 15, OPT_MAX_GAMES = 10000, OPT_VAL_GAMES = 1000;
+const OPT = { on: false, m: null, sum: null, sig: '', token: 0, t0: 0, hist: [], timer: null, finished: false, val: null };
+const optRec = () => OPT.val ? OPT.val.rec : OPT.sum.rec;          // angezeigte Empfehlung (in der Bestätigungsrunde fest)
 const optSig = () => currentDeckBuilder.heroId + '|' + [...currentDeckBuilder.cards].sort((a, b) => a - b).join();
 async function optStart() {
     const hero = dbHero(); if (!hero || OPT.on) return;
@@ -322,10 +325,12 @@ async function optStart() {
     // Gegner: Varianten untereinander und – jede zweite Partie – die Turnier-Decks (nicht nur auf Spiegelmatches optimieren)
     const opps = (typeof TOURNEY_DECKS !== 'undefined' ? tourneySimDecks() : []).map((d, j) => ({ ...d, _o: j }));
     const m = optCreate(ids, ids.map(id => counts[id]), max, 60, opps.length);
-    Object.assign(OPT, { on: true, m, sig: optSig(), token: OPT.token + 1, t0: performance.now(), lastChange: 0, cardChange: ids.map(() => 0), prevRec: null, finished: false, hist: [], opps: opps.length, gOpp: 0 });
+    Object.assign(OPT, { on: true, m, sig: optSig(), token: OPT.token + 1, t0: performance.now(), hist: [], finished: false, val: null });
     OPT.sum = optSummary(m, 24);
     const token = OPT.token, hid = hero.id;
     const pair = () => {
+        // Bestätigungsrunde: Empfehlung gegen das Ausgangsdeck, Sitzplatz abwechselnd (gleich oft Startspieler)
+        if (OPT.val) { const r = optDeck(m, OPT.val.rec, hid), c = optDeck(m, m.cur, hid); r._v = 1; c._v = 0; return OPT.val.k++ % 2 ? [r, c] : [c, r]; }
         const a = optDeck(m, optVariant(m), hid);
         if (!opps.length || Math.random() < 0.5) return [a, optDeck(m, optVariant(m), hid)];
         const o = opps[Math.floor(Math.random() * opps.length)];
@@ -335,7 +340,10 @@ async function optStart() {
     const ok = await runSimulation(OPT_MAX_GAMES, [], tr('Anzahlen optimieren'), [pair], { quiet: true, onGame: (a, b, res) => {
         if (OPT.token !== token) return;
         optAddGame(m, a._c || a._o, b._c || b._o, res.winner === 1);
-        if (a._o !== undefined || b._o !== undefined) OPT.gOpp++;
+        if (a._v !== undefined && OPT.val) {
+            OPT.val.n++; if ((a._v === 1) === (res.winner === 1)) OPT.val.w++;
+            if (OPT.val.n >= OPT_VAL_GAMES) SIM_STOP.req = true;                        // genug bestätigt: Test endet
+        }
         if (!OPT.timer) OPT.timer = setTimeout(() => { OPT.timer = null; if (OPT.token === token) optUpdate(); }, 350);
     } });
     if (OPT.token !== token) return;
@@ -352,24 +360,24 @@ function optStop() {
 function optUpdate() {
     if (!OPT.on) return;
     if (document.getElementById('deck-builder-modal').style.display === 'none') { optStop(); return; }   // Deck-Builder geschlossen
-    const m = OPT.m, s = OPT.sum = optSummary(m, 48), changed = [];
-    if (OPT.prevRec) s.rec.forEach((k, i) => { if (k !== OPT.prevRec[i]) { changed.push(i); OPT.cardChange[i] = m.games; } });
-    if (changed.length) OPT.lastChange = m.games;
-    OPT.prevRec = s.rec;
-    OPT.hist.push([performance.now(), m.games]); if (OPT.hist.length > 30) OPT.hist.shift();
-    optDecorate(changed);
+    const m = OPT.m, s = OPT.sum = optSummary(m, 48);
+    OPT.hist.push([m.games, s.rec]);
+    if (!OPT.val && !OPT.finished && optState().done && s.rec.some((k, i) => k !== m.cur[i])) OPT.val = { rec: s.rec.slice(), n: 0, w: 0, k: 0 };
+    optDecorate();
 }
-// Stabil: Empfehlung seit vielen Partien (mind. 400 bzw. 35 %) unverändert. Abgestimmt an Testdaten mit bekannten Kartenwerten:
-// nach ~5000 Partien rund drei Viertel des möglichen Gewinns, bei kleinen Effekten nie schlechter als das Ausgangsdeck
+// Stabil (im Wert): alle Empfehlungen der letzten max(400, 35 %) Partien sind nach heutigem Stand höchstens OPT_TIE schlechter
+// als die jetzige. Fast gleichwertige Anzahlen (z. B. 3 oder 4 Kopien zweier ähnlicher Karten) kippen sonst ewig hin und her.
+const OPT_TIE = 0.005;
 function optState() {
-    const s = OPT.sum, g = OPT.m.games, stable = g - OPT.lastChange;
-    const conf = s.conf.reduce((x, y) => x + y, 0) / s.conf.length;
-    return { g, stable, conf, done: g >= 1000 && stable >= Math.max(400, g * 0.35) };
+    const m = OPT.m, s = OPT.sum, g = m.games, W = Math.max(400, g * 0.35);
+    const V = c => c.reduce((t, k, i) => t + m.mean[m.off[i] + k], 0), now = V(s.rec);
+    const win = OPT.hist.filter(([gg]) => gg >= g - W);
+    const spans = OPT.hist.some(([gg]) => gg <= g - W);
+    return { g, done: g >= 1000 && spans && win.every(([, r]) => now - V(r) <= OPT_TIE) };
 }
 function optPanel() {
     const p = document.createElement('div'); p.id = 'db-opt-panel';
     p.innerHTML = `<div class="dop-head"><b>${tr('⚗ Anzahlen optimieren')}</b><span class="dop-status"></span></div>
-        <div class="dop-bar" title="${tr('Sicherheit: wie oft die Empfehlung auch unter der verbleibenden Unsicherheit die beste ist (Mittel über alle Karten)')}"><div></div></div>
         <div class="dop-info"></div>
         <div class="dop-btns"><button class="dop-apply success">${tr('Übernehmen')}</button><button class="dop-discard">${tr('Verwerfen')}</button></div>`;
     p.querySelector('.dop-apply').onclick = optApply;
@@ -378,7 +386,7 @@ function optPanel() {
 }
 function optApply() {
     if (!OPT.on || !OPT.sum) return;
-    const m = OPT.m, rec = OPT.sum.rec, cur = currentDeckBuilder.cards, out = [];
+    const m = OPT.m, rec = optRec(), cur = currentDeckBuilder.cards, out = [];
     let diff = 0; m.ids.forEach((id, i) => diff += Math.abs(rec[i] - m.cur[i]));
     // Reihenfolge wie bisher (erste Kopie jeder Karte), Karten mit 0 fallen weg
     [...new Set(cur)].forEach(id => { const i = m.ids.indexOf(id); for (let k = 0; k < rec[i]; k++) out.push(id); });
@@ -387,41 +395,32 @@ function optApply() {
     renderDBAll();
     dbFlash(tr`Anzahlen übernommen: ${out.length} Karten, ${diff} Kopien geändert.`);
 }
-// Panel und Zeilen aktualisieren, ohne die Liste neu zu zeichnen
-function optDecorate(changed = []) {
+// Panel und Zeilen aktualisieren, ohne die Liste neu zu zeichnen. Bewusst schlicht: Kartenzahl jetzt / nach Empfehlung
+// und je Zeile die empfohlene Anzahl mit Pfeil (↑ mehr, ↓ weniger, = gleich)
+function optDecorate() {
     const box = document.getElementById('db-deck-cards'), panel = document.getElementById('db-opt-panel');
     if (!OPT.on || !box || !panel) return;
-    const m = OPT.m, s = OPT.sum, st = optState(), pct = x => (x * 100).toFixed(1);
-    const h = OPT.hist, rate = h.length > 1 ? (h[h.length - 1][1] - h[0][1]) / Math.max(0.001, (h[h.length - 1][0] - h[0][0]) / 1000) : 0;
-    const cores = SIM_POOL.list ? SIM_POOL.list.length : 1, total = s.rec.reduce((x, y) => x + y, 0);
-    const nDiff = s.rec.filter((k, i) => k !== m.cur[i]).length;
-    panel.classList.toggle('stable', st.done || OPT.finished);
-    panel.querySelector('.dop-status').textContent = OPT.finished ? tr('fertig') : st.done ? tr('✓ stabil') : st.g ? tr('läuft …') : tr('startet …');
-    panel.querySelector('.dop-bar > div').style.width = (st.conf * 100).toFixed(0) + '%';
-    const gainCls = s.gain > s.gainSe ? 'up' : s.gain < -s.gainSe ? 'down' : '';
-    panel.querySelector('.dop-info').innerHTML =
-        `<div>${tr`<b>${st.g}</b> Partien`} · ${tr`${rate.toFixed(1)}/s`} · ${tr`${cores} Kerne`}</div>`
-        + (OPT.opps ? `<div>${tr`davon ${OPT.gOpp} gegen ${OPT.opps} Turnier-Decks, der Rest Varianten untereinander`}</div>` : '')
-        + `<div>${tr`Sicherheit Ø <b>${(st.conf * 100).toFixed(0)} %</b>`} · ${tr`stabil seit <b>${st.stable}</b> Partien`}</div>`
-        + `<div title="${tr('Geschätzte Winrate der empfohlenen Anzahlen gegen dein aktuelles Deck (± Standardfehler)')}">${tr`Empfehlung gegen dein Deck: <b class="${gainCls}">${pct(0.5 + s.gain)} %</b> (±${pct(s.gainSe)})`}</div>`
-        + `<div>${tr`${nDiff} Karten anders`} · <span class="${total === 60 ? 'ok' : 'bad'}">Σ ${total}</span></div>`;
+    const m = OPT.m, st = optState(), recs = optRec(), total = recs.reduce((x, y) => x + y, 0), v = OPT.val;
+    const same = recs.every((k, i) => k === m.cur[i]);
+    // Bestätigung: Winrate der Empfehlung gegen dein Deck mit 95-%-Intervall; „bestätigt“, sobald es ganz über 50 % liegt
+    let vs = null, vt = '';
+    if (v && v.n) {
+        const p = v.w / v.n, ci = 1.96 * Math.sqrt(Math.max(p * (1 - p), 0.01) / v.n);
+        vs = v.n >= 100 && p - ci > 0.5 ? 'ok' : v.n >= 100 && p + ci < 0.5 ? 'bad' : '';
+        vt = tr`Gegen dein Deck: ${(p * 100).toFixed(0)} % (±${(ci * 100).toFixed(0)}) in ${v.n} Partien`;
+    }
+    panel.classList.toggle('stable', vs === 'ok' || (st.done && same)); panel.classList.toggle('bad', vs === 'bad');
+    panel.querySelector('.dop-status').textContent = vs === 'ok' ? tr('✓ bestätigt') : vs === 'bad' ? tr('✗ nicht besser') : v ? tr('Bestätigung läuft …')
+        : OPT.finished ? tr('fertig') : st.done && same ? tr('✓ stabil – keine Änderung') : st.g ? tr`läuft · ${st.g} Partien` : tr('startet …');
+    panel.querySelector('.dop-info').textContent = tr`Im Deck: ${currentDeckBuilder.cards.length} Karten · Empfehlung: ${total} Karten` + (vt ? ' · ' + vt : '');
     box.querySelectorAll('.db-row[data-id]').forEach(row => {
         const i = m.ids.indexOf(+row.dataset.id); if (i < 0) return;
-        const rec = s.rec[i], cur = m.cur[i], vals = s.val[i], lo = Math.min(...vals), hi = Math.max(...vals);
-        let spark = row.querySelector('.dop-spark'), chip = row.querySelector('.dop-rec');
-        if (!spark) {
-            spark = document.createElement('span'); spark.className = 'dop-spark'; row.querySelector('.db-row-name').after(spark);
-            chip = document.createElement('span'); chip.className = 'dop-rec'; row.appendChild(chip);
-        }
-        // Mini-Balken je Anzahl 0–4: Höhe = geschätzter Wert, gold = Empfehlung, weiß umrandet = aktuelle Anzahl
-        spark.innerHTML = vals.map((v, k) => `<i class="${k === rec ? 'best' : ''}${k === cur ? ' cur' : ''}" style="height:${(3 + (hi > lo ? (v - lo) / (hi - lo) : 0.5) * 15).toFixed(1)}px"></i>`).join('');
-        chip.textContent = rec === cur ? `= ${rec}` : `→ ${rec}`;
-        chip.className = 'dop-rec ' + (rec > cur ? 'up' : rec < cur ? (rec ? 'down' : 'zero') : 'same');
-        chip.style.setProperty('--conf', (s.conf[i] * 100).toFixed(0) + '%');
-        const tip = vals.map((v, k) => tr`${k}×: ${(v - vals[Math.min(cur, vals.length - 1)]) * 100 >= 0 ? '+' : ''}${((v - vals[Math.min(cur, vals.length - 1)]) * 100).toFixed(1)} pp · beste in ${Math.round(s.freq[i][k] / s.freq[i].reduce((x, y) => x + y, 0) * 100)} % · ${m.obs[i][k]} Decks`
-            + (k === cur ? tr(' · aktuell') : '') + (k === rec ? ' ★' : '')).join('\n');
-        chip.title = spark.title = tr`${CARDS[m.ids[i]].name}: beste Anzahl ${rec} (Sicherheit ${(s.conf[i] * 100).toFixed(0)} %, unverändert seit ${m.games - OPT.cardChange[i]} Partien)` + '\n' + tip;
-        if (changed.includes(i)) { row.classList.remove('dop-chg'); void row.offsetWidth; row.classList.add('dop-chg'); }
+        const rec = recs[i], cur = m.cur[i];
+        let chip = row.querySelector('.dop-rec');
+        if (!chip) { chip = document.createElement('span'); row.appendChild(chip); }
+        chip.textContent = rec > cur ? `↑ ${rec}` : rec < cur ? `↓ ${rec}` : `= ${rec}`;
+        chip.className = 'dop-rec ' + (rec > cur ? 'up' : rec < cur ? 'down' : 'same');
+        chip.title = tr`${CARDS[m.ids[i]].name}: jetzt ${cur}, empfohlen ${rec}`;
     });
 }
 // Vorschau beim Überfahren einer Deck-Zeile (links neben der Liste)
