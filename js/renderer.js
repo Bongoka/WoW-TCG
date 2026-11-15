@@ -231,7 +231,8 @@
         const H = Math.round(W * 1.4);
         pv.style.setProperty('--cw', W + 'px');
         const roomR = window.innerWidth - r.right, roomL = r.left;
-        let x = (roomR >= roomL) ? r.right + 14 : r.left - 14 - W;
+        // Touch: lieber links neben die Karte (die rechte Hand verdeckt sonst die Zoom-Karte), solange dort Platz ist
+        let x = (S.touch && roomL >= W + 22) ? r.left - 14 - W : (roomR >= roomL) ? r.right + 14 : r.left - 14 - W;
         x = clamp(x, 8, window.innerWidth - W - 8);
         const y = clamp(r.top + r.height / 2 - H / 2, 8, window.innerHeight - H - 8);
         pv.style.left = x + 'px';
@@ -389,6 +390,7 @@
     };
     const touchEnd = () => { clearTimeout(T.timer); if (T.shown) { release(); T.eatClick = true; setTimeout(() => { T.eatClick = false; }, 450); } T.shown = false; T.wrap = null; };
     document.addEventListener('pointerdown', (e) => {
+        S.touch = e.pointerType === 'touch';                                              // letzte Eingabe: Touch → Zoom-Karte links (placePreview)
         if (e.pointerType !== 'touch') return;
         const w = e.target && e.target.closest ? e.target.closest('.card-wrapper:not(#cfx-preview):not(.no-fx)') : null;
         clearTimeout(T.timer); T.wrap = w; T.shown = false; T.x = e.clientX; T.y = e.clientY;

@@ -3,7 +3,7 @@
 // Hintergrund: Spielmatten aus "backgrounds/" (klar, nicht abgedunkelt), wechseln langsam und folgen der Maus (Parallax),
 // davor aufsteigende Glut. Links Titel + Knöpfe, rechts die Deck-Box „Meine Decks“ (Deck-Übersicht) und ein Booster-Stapel.
 // ============================================================================
-const MM = { el: null, raf: 0, mx: 0, my: 0, tx: 0, ty: 0, bgTimer: 0, bgFiles: null, bgFront: 0, sparks: [] };
+const MM = { el: null, raf: 0, frame: 0, covered: undefined, mx: 0, my: 0, tx: 0, ty: 0, bgTimer: 0, bgFiles: null, bgFront: 0, sparks: [] };
 
 function mmBuild() {
     if (MM.el) return MM.el;
@@ -54,6 +54,7 @@ function openMainMenu(boot) {
     const el = mmBuild();
     mmFillProps();
     el.classList.toggle('has-game', !!(G && !G.gameOver));                             // laufende Partie bleibt im Hintergrund erhalten
+    MM.covered = undefined; el.style.visibility = '';
     el.classList.remove('out'); el.classList.toggle('boot', !!boot); el.style.display = 'flex';   // boot: beim Seitenstart ohne Einblenden (sonst schiene das Spielfeld durch)
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open');
@@ -125,9 +126,29 @@ function mmBurst(x, y) {
     for (let i = 0; i < 18; i++) { const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 4;
         MM.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, life: 1, r: 1 + Math.random() * 2.2, burst: true }); }
 }
+// Liegt ein (fast) undurchsichtiges Vollbild-Fenster über dem Menü (Deck-Übersicht, Deck-Builder, Booster, Roguelike …),
+// wird das Menü unsichtbar und die Glut pausiert: Tablets (hohe Pixeldichte) gehen sonst die Grafik-Kacheln aus und das Fenster
+// wird nur teilweise gezeichnet (Xiaomi Pad 7: untere Hälfte samt Schließen-Knopf fehlte).
+function mmCovered() {
+    const z0 = parseInt(getComputedStyle(MM.el).zIndex) || 0;
+    return [...document.body.children].some(e => {
+        if (e === MM.el || e.tagName === 'SCRIPT') return false;
+        const cs = getComputedStyle(e);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || (parseInt(cs.zIndex) || 0) <= z0 || +cs.opacity < .99) return false;
+        const r = e.getBoundingClientRect();
+        if (r.left > 1 || r.top > 1 || r.right < innerWidth - 1 || r.bottom < innerHeight - 1) return false;
+        const a = cs.backgroundColor.match(/[\d.]+/g);                                  // rgb(…) = deckend, rgba(…) ab 85 %
+        return cs.backgroundImage !== 'none' || !!(a && (a.length < 4 || +a[3] >= .85));
+    });
+}
 function mmTick() {
     MM.raf = requestAnimationFrame(mmTick);
     if (!MM.el || MM.el.style.display === 'none') return;
+    if (++MM.frame % 5 === 0 || MM.covered === undefined) {
+        MM.covered = mmCovered();
+        MM.el.style.visibility = MM.covered ? 'hidden' : '';
+    }
+    if (MM.covered) return;
     // Parallax: Hintergrund folgt der Maus träge, die Glut davor stärker (Tiefe)
     MM.tx += (MM.mx - MM.tx) * .015; MM.ty += (MM.my - MM.ty) * .015;
     MM.el.style.setProperty('--px', MM.tx.toFixed(4)); MM.el.style.setProperty('--py', MM.ty.toFixed(4));

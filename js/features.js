@@ -158,7 +158,9 @@ function dbPoolMore(poolBox, sentinel) {
         badge.textContent = n ? `${n}${card.unlimited ? '' : '/4'}` : '';
         tile.appendChild(badge);
         tile.onclick = () => dbAdd(card.id);
-        tile.oncontextmenu = (e) => { e.preventDefault(); dbRemove(card.id); };
+        // Rechtsklick entfernt; auf Touch ist Gedrückthalten die Zoom-Karte (renderer.js) – dort nichts entfernen
+        tile.onpointerdown = (e) => { tile._touch = e.pointerType === 'touch'; };
+        tile.oncontextmenu = (e) => { e.preventDefault(); if (!tile._touch) dbRemove(card.id); };
         frag.appendChild(tile);
     });
     poolBox.insertBefore(frag, sentinel.parentNode === poolBox ? sentinel : null);
@@ -275,6 +277,7 @@ function dbRenderRows(box, cards, hero, o = {}) {
                 plus.disabled = counts[id] >= dbMax(c);                                    // 4 Kopien: + grau und ohne Wirkung
                 plus.onclick = (e) => { e.stopPropagation(); dbAdd(id); };
                 row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
+                row.oncontextmenu = (e) => e.preventDefault();                                // Touch: Gedrückthalten = Zoom-Karte, kein Browser-Menü
             }
             box.appendChild(row);
         });

@@ -7,6 +7,9 @@
 // ============================================================================
 const LANG_KEY = 'wow_tcg_lang';
 let LANG = (() => { try { return localStorage.getItem(LANG_KEY) || 'en'; } catch (e) { return 'en'; } })();
+// Seitensprache = Spielsprache, und keine automatische Browser-Übersetzung (Chrome bot sonst bei jedem Start „Seite übersetzen?“ an
+// und würde Kartennamen und -texte verfälschen)
+if (typeof document !== 'undefined' && document.documentElement) { document.documentElement.lang = LANG; document.documentElement.setAttribute('translate', 'no'); }
 var I18N_EN = typeof I18N_EN !== 'undefined' ? I18N_EN : {};
 const I18N_MISS = new Set();   // fehlende Übersetzungen (Konsole: [...I18N_MISS])
 // Oberfläche ohne Emoji (nur das Log behält sie): Schlüssel und Übersetzungen auch ohne Emoji auffindbar
