@@ -4798,3 +4798,7 @@ Tokens small/*
 
 # Tablet-App: Build-Ausgabe (bin/build-apk.sh)
 /android/build/
+
+# Deck-Sync-Ablage von bin/SyncServer.java (eigene Decks aller Geräte) und scrcpy (adb fürs Handy)
+/bin/decks-sync.json*
+/scrcpy-win64-*/

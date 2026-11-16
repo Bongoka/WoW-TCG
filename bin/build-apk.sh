@@ -2,13 +2,13 @@
 # Baut die Tablet-App android/ → android/build/wowtcg.apk (ohne Gradle, direkt mit dem Android-SDK).
 # Werkzeuge (nicht im Projekt): JDK 17 und Android-SDK (platforms;android-35, build-tools;35.0.0), Standard: G:\downloads\android-build
 #   bash bin/build-apk.sh            bauen
-#   bash bin/build-apk.sh install    bauen und per USB aufs Tablet installieren (adb)
+#   bash bin/build-apk.sh install [Seriennr]   bauen und per USB installieren (adb; Xiaomi blockiert das – dann APK nach /sdcard/Download kopieren und am Gerät antippen)
 set -e
 cd "$(dirname "$0")/.."
 TOOLS=${ANDROID_BUILD:-/g/downloads/android-build}
 JH=$(ls -d "$TOOLS"/jdk/*/ | head -1); JH=${JH%/}; export JAVA_HOME=$(cygpath -w "$JH")
 SDK="$TOOLS/sdk"; BT="$SDK/build-tools/35.0.0"; JAR="$SDK/platforms/android-35/android.jar"
-ADB=${ADB:-adb}; command -v "$ADB" >/dev/null 2>&1 || ADB=/c/adb/adb.exe
+ADB=${ADB:-adb}; command -v "$ADB" >/dev/null 2>&1 || { ADB=$(ls -d scrcpy*/adb.exe 2>/dev/null | tail -1); [ -n "$ADB" ] || ADB=/c/adb/adb.exe; }   # adb im PATH, sonst das von scrcpy im Projektordner
 export MSYS_NO_PATHCONV=1
 OUT=android/build; rm -rf "$OUT"; mkdir -p "$OUT/res/mipmap-xxxhdpi" "$OUT/classes" "$OUT/flat"
 w() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
@@ -30,4 +30,4 @@ KS="$TOOLS/wowtcg-debug.keystore"
     -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=WoW TCG" >/dev/null 2>&1
 "$BT/apksigner.bat" sign --ks "$(w "$KS")" --ks-pass pass:android --key-pass pass:android --out "$(w "$OUT/wowtcg.apk")" "$(w "$OUT/aligned.apk")"
 echo "OK: $OUT/wowtcg.apk ($(du -k "$OUT/wowtcg.apk" | cut -f1) KB)"
-if [ "$1" = "install" ]; then "$ADB" install -r "$(w "$OUT/wowtcg.apk")"; fi
+if [ "$1" = "install" ]; then "$ADB" ${2:+-s "$2"} install -r "$(w "$OUT/wowtcg.apk")"; fi

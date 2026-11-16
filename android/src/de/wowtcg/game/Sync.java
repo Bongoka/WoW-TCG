@@ -72,6 +72,40 @@ class Sync {
         return need.size() + (need.size() == 1 ? " Datei" : " Dateien") + " vom PC aktualisiert";
     }
 
+    /**
+     * Deck-Sync: GET/POST an http://<PC>:8766/__decks. PC = zuletzt bekannte Adresse; antwortet sie nicht,
+     * höchstens jede Minute das ganze WLAN neu absuchen. Ergebnis {Status, Text}, Status 0 = kein PC.
+     */
+    static long lastScan;
+    static String[] deckReq(MainActivity act, String method, String query, String body) throws Exception {
+        SharedPreferences prefs = act.getSharedPreferences("sync", 0);
+        String host = prefs.getString("host", null);
+        if (host == null || !ping(host, 800)) {
+            if (System.currentTimeMillis() - lastScan < 60000) return new String[] { "0", "" };
+            lastScan = System.currentTimeMillis();
+            host = find(host);
+            if (host == null) return new String[] { "0", "" };
+            prefs.edit().putString("host", host).apply();
+        }
+        String q = query == null ? "" : query.replaceAll("[^?=&A-Za-z0-9_-]", "");
+        HttpURLConnection c = (HttpURLConnection) new URL("http://" + host + ":" + MainActivity.SYNC_PORT + "/__decks" + q).openConnection();
+        c.setConnectTimeout(3000); c.setReadTimeout(8000);
+        try {
+            if ("POST".equals(method)) {
+                byte[] b = (body == null ? "" : body).getBytes("UTF-8");
+                c.setRequestMethod("POST"); c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "text/plain; charset=utf-8");
+                c.setFixedLengthStreamingMode(b.length);
+                try (OutputStream o = c.getOutputStream()) { o.write(b); }
+            }
+            int code = c.getResponseCode();
+            InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+            if (in != null) try { byte[] b = new byte[65536]; int r; while ((r = in.read(b)) > 0) o.write(b, 0, r); } finally { in.close(); }
+            return new String[] { String.valueOf(code), new String(o.toByteArray(), "UTF-8") };
+        } finally { c.disconnect(); }
+    }
+
     /** PC suchen: zuerst die zuletzt bekannte Adresse, sonst alle Adressen im eigenen /24-Netz parallel. */
     static String find(String last) throws Exception {
         if (last != null && ping(last, 600)) return last;

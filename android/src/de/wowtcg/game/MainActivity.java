@@ -147,6 +147,17 @@ public class MainActivity extends Activity {
                 ui.removeCallbacks(toLow); ui.postDelayed(toLow, 700);
             } });
         }
+
+        /** Deck-Sync (js/decksync.js): Anfrage an /__decks des PCs im WLAN, Antwort über deckSyncReply(id, status, text). */
+        @android.webkit.JavascriptInterface
+        public void deckReq(final String method, final String query, final String body, final String id) {
+            new Thread(new Runnable() { @Override public void run() {
+                String[] r;
+                try { r = Sync.deckReq(MainActivity.this, method, query, body); } catch (Throwable t) { r = new String[] { "0", "" }; }
+                final String js = "window.deckSyncReply&&deckSyncReply(" + org.json.JSONObject.quote(id) + "," + Integer.parseInt(r[0]) + "," + org.json.JSONObject.quote(r[1]) + ")";
+                ui.post(new Runnable() { @Override public void run() { if (web != null) web.evaluateJavascript(js, null); } });
+            } }).start();
+        }
     }
 
     void immersive() {

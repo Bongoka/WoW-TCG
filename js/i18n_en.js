@@ -521,6 +521,7 @@ var I18N_EN = {
     '{0} Decks gesichert': '{0} decks backed up',
     'Keine Decks in dieser Datei gefunden.': 'No decks found in this file.',
     '{0} Decks wiederhergestellt': '{0} decks restored',
+    '{0} Deck(s) von anderen Geräten übernommen': '{0} deck(s) synced from other devices',
     'Gegner-Deck': 'Opponent deck',
     '🧪 Simulieren': '🧪 Simulate',
     '🎲 Zufall': '🎲 Random',
