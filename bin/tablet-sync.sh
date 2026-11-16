@@ -14,6 +14,8 @@ ADB=("$ADB"); [ -n "$SERIAL" ] && ADB+=(-s "$SERIAL")
 DST=/sdcard/Documents/WoWTCG
 STAMP=.tablet-sync; [ -n "$SERIAL" ] && STAMP=".tablet-sync.$SERIAL"                       # Merker je Gerät
 "${ADB[@]}" get-state >/dev/null 2>&1 || { echo "Kein Gerät verbunden (USB-Debugging an? Kabel? Mehrere Geräte: -s <Seriennr>, siehe adb devices)"; exit 1; }
+# Gerät hat das Spiel schon, aber noch keinen eigenen Merker (z. B. das Tablet von vor -s): ab dem alten Merker .tablet-sync weiter
+[ -n "$SERIAL" ] && [ ! -e "$STAMP" ] && [ -e .tablet-sync ] && "${ADB[@]}" shell ls "$DST/index.html" >/dev/null 2>&1 && cp -p .tablet-sync "$STAMP"
 newer=(); [ -z "$ALL" ] && [ -e "$STAMP" ] && newer=(-newer "$STAMP")
 touch "$STAMP.new"
 # Alles neu: ganze Ordner auf einmal (je Datei ein adb-Aufruf dauerte bei ~27 000 Dateien sehr lange)
