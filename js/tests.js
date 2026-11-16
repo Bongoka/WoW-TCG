@@ -1723,6 +1723,21 @@ function runRuleTests() {
         payRes(p, 1);
         assert(L1.exhausted, 'die Location zuletzt');
     });
+    test(150, 'Shred: beim Eintreten 2 Nahkampfschaden an erschöpftes Ziel (nur erschöpfte wählbar), Cat Form +1 ATK beim Angreifen, Form (1) ohne Kraftkosten, Nicht-Feral zerstört', () => {
+        const s = freshH(1007, 9); res(s, 1, 2);
+        const fresh2 = put(s, 2, 262), tired = put(s, 2, 180); tired.exhausted = true;
+        const ok = act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 4027) }, 1);
+        assert(ok !== false, 'Shred nicht spielbar');
+        const sh = P(s, 1).ongoing.find(o => o.id === 4027);
+        assert(sh && !sh.attachedTo, 'Shred liegt nicht als Ongoing im Spiel');
+        assert(tired.damage === 2 && !fresh2.damage, `Schaden: erschöpft ${tired.damage}, bereit ${fresh2.damage || 0} (erwartet 2 / 0)`);
+        assert(P(s, 1).resources.every(r => r.exhausted), 'Kosten 2 nicht bezahlt');
+        assert(hasCatForm(s, 1) && atkOf(s, P(s, 1).hero, { attacking: true }) === 1 && atkOf(s, P(s, 1).hero) === 0, 'Cat Form: +1 ATK nur beim Angreifen');
+        assert(!getLegalActions(s, 1).some(a => a.type === 'ACTIVATE' && a.uid === sh.uid), 'Shred hat eine Kraft (die (1) gehört zu Form (1))');
+        const s2 = cloneState(s); res(s2, 1, 3);
+        act(s2, { type: 'PLAY_CARD', handIdx: hand(s2, 1, 1030), targets: [[P(s2, 2).hero.uid]] }, 1);   // Wrath: keine Feral-Fähigkeit
+        assert(!P(s2, 1).ongoing.some(o => o.id === 4027), 'Shred nach Nicht-Feral-Fähigkeit nicht zerstört');
+    });
     LANG = prevLang;
     return results;
 }
