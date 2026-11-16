@@ -258,7 +258,7 @@ function stackSig(c, pid, attached) {
     if (attached.has(c.uid) || UI.attacker === c.uid || (G.battle && (G.battle.att === c.uid || G.battle.def === c.uid))) return null;
     if (choiceUids().has(c.uid)) return null;                                              // einzeln wählbar (Ziel einer Entscheidung)
     const o = {}; for (const k in c) if (!STACK_SKIP.has(k)) o[k] = c[k];
-    o._ready = c.joinedTurn !== undefined && c.joinedTurn < turnStartOf(G, pid);
+    if (isChar(c)) o._ready = c.joinedTurn !== undefined && c.joinedTurn < turnStartOf(G, pid);   // Angriffsstatus: nur bei Allies (CR 302.2)
     try { o._atk = atkOf(G, c); o._hp = hpOf(G, c); } catch (e) {}
     return stableJson(o);
 }
