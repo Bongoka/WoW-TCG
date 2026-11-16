@@ -586,6 +586,7 @@ function bootGame() {
     document.getElementById("btn-draw").onclick = () => { if (!G.pending) { drawCards(G, G.p1, 1); process(G); refreshDisplay(G); render(); } };
     document.getElementById("btn-spawn-card").onclick = debugSpawnCard;
     document.getElementById("btn-zoom-tune").onclick = openZoomTune;
+    document.getElementById("btn-fx-test").onclick = () => { if (typeof mmHide === 'function') mmHide(); loadFxTest(); };
     const spawnInput = document.getElementById("dbg-spawn-name");
     spawnInput.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); debugSpawnCard(); } };
     debugFillSpawnList();

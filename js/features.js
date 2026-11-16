@@ -1396,6 +1396,36 @@ function loadQuickTest() {
     render();
 }
 
+// Effekt-Test (Debug): Zauber-Effekte und Sounds ausprobieren. Auf der Hand je Effekt-Art (spellfx.js SPX_T) eine Karte,
+// dazu Mehrfach-Treffer: Orlund im Spiel + Abwurf-Karten (je Abwurf ein Geschoss) und verteilter Schaden. Kartenbeschränkungen
+// (Klasse, Fraktion, Held) sind hier aufgehoben, Ressourcen reichlich, gegnerische Allies als Ziele.
+function loadFxTest() {
+    loadQuickTest();
+    const p = G.p1, o = G.p2;
+    const free = c => { c.allowedClasses = null; c.allowedFactions = null; c.heroReq = null; c.talentReq = null; c.raceReq = null; return c; };
+    const byName = n => Object.values(CARDS).find(c => c.name === n && c.type === 'Ability' && !c.isToken);
+    p.resources = Array.from({ length: 150 }, () => ({ card: makeCardInst(192, false, 1), faceUp: false, exhausted: false }));   // reicht für alle Karten (neu laden = wieder voll)
+    p.hand = [];
+    const seen = new Set();
+    if (typeof SPELL_NAME !== 'undefined') for (const [name, line] of Object.entries(SPELL_NAME)) {
+        const t = String(line).split(/[ .]/)[0], c = byName(name);
+        if (!c || seen.has(t) || c.xCost || c.attach || /can't play|can't attack|skip|end your turn|loses? the game/i.test(c.text || '')) continue;   // nichts, was die Szene sperrt (Ice Block)
+        const inst = free(makeCardInst(c.id, false, 1));
+        if (canPlayCard(G, 1, inst)) continue;                                            // braucht etwas (Bear Form …): nächste Karte dieser Art
+        seen.add(t); p.hand.push(inst);
+    }
+    [12077, 11068, 2059].forEach(id => CARDS[id] && p.hand.push(free(makeCardInst(id, false, 1))));   // verteilter Schaden, Abwurf (Orlund), Pact of Shadow
+    if (CARDS[10113]) p.allies.push(Object.assign(makeCardInst(10113, false, 1), { joinedTurn: 1 }));   // Orlund: 3 Schatten je Abwurf des Gegners
+    // Gegnerseite leer räumen: keine Rüstung (verhindert Schaden), keine Totems/Dauereffekte (leiten Ziele um) – nur Allies ohne Text
+    o.hero.armors = []; o.hero.weapons = []; o.ongoing = []; o.allies = [];
+    const filler = Object.values(CARDS).filter(c => c.type === 'Ally' && !c.text && !c.isToken && (c.hp || 0) >= 4).slice(0, 5);
+    filler.forEach(c => o.allies.push(Object.assign(makeCardInst(c.id, false, 2), { joinedTurn: 1 })));
+    o.hand = Array.from({ length: 10 }, () => makeCardInst(192, false, 2));
+    o.hero.damage = 0; p.hero.damage = 0; G.placedResource = true;
+    addLog(tr`✨ Effekt-Test: ${p.hand.length} Karten mit verschiedenen Zauber-Effekten. Mehrfach-Treffer: Abwurf-Karten (Orlund) und verteilter Schaden.`, "log-turn");
+    render();
+}
+
 function loadMaskTest() {
     initGame('alliance_paladin', 'horde_warrior');
     document.getElementById("decision-modal").style.display = "none";

@@ -977,10 +977,10 @@ function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
     G.fxq = [];
     let k = 0, spellAt = null;                                                           // spellAt: Zahlen erst beim Einschlag des Zaubers (spellfx.js)
-    let occ = {}, bolts = 0;                                                             // Treffer je Ziel / Geschosse ohne Zauber (spxDmgBolt)
+    let occ = {}, bolts = 0, spellSrc = null;                                                           // Treffer je Ziel / Geschosse ohne Zauber (spxDmgBolt)
     for (let i = 0; i < evs.length; i++) {
         const e = evs[i];
-        if (e.t === 'spell') { spellAt = typeof playSpellFx === 'function' ? playSpellFx(e, evs.slice(i), prevRects) : null; k = 0; occ = {}; continue; }
+        if (e.t === 'spell') { spellAt = typeof playSpellFx === 'function' ? playSpellFx(e, evs.slice(i), prevRects) : null; spellSrc = e.src; k = 0; occ = {}; continue; }
         if (e.t === 'play') {
             if (e.pid === 1 && e.cost >= 7) screenShake(1.2);                                   // CPU-Karten wackeln beim Landen (landShowcase)
             else if (e.pid === 2 && !SHOWCASED.has(e.uid)) showcasePlayed(e.uid, e.cost);       // Online-Gegner, CPU-Reaktionen im eigenen Zug
@@ -994,8 +994,10 @@ function playFxEvents(prevRects) {
         const dx = n ? (n % 2 ? 1 : -1) * Math.ceil(n / 2) * r0.width * 0.16 : 0, dy = n ? -n * r0.height * 0.05 : 0;
         const r = n ? { left: r0.left + dx, top: r0.top + dy, width: r0.width, height: r0.height, right: r0.right + dx, bottom: r0.bottom + dy } : r0;
         let delay;
-        if (spellAt) delay = spellAt(e.uid, k++, n);
-        else if (e.t === 'dmg' && !e.combat && e.src && typeof spxDmgBolt === 'function') { const b = spxDmgBolt(e, prevRects, bolts); if (b != null) { bolts++; delay = b; } }
+        // Schaden einer anderen Quelle als der Zaubernde (Auslöser wie Orlund nach Dark Penance): eigenes Geschoss
+        const ownBolt = e.t === 'dmg' && !e.combat && e.src && (!spellAt || (e.src !== spellSrc && e.src !== null));
+        if (spellAt && !ownBolt) delay = spellAt(e.uid, k++, n);
+        else if (ownBolt && typeof spxDmgBolt === 'function') { const b = spxDmgBolt(e, prevRects, bolts); if (b != null) { bolts++; delay = b; } }
         if (delay == null) delay = Math.min(k++, 6) * 90 + n * 160;
         if (e.t === 'dmg') {
             const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
