@@ -1626,3 +1626,11 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 .dop-rec { justify-self: end; min-width: 38px; padding: 3px 4px; border-radius: 4px; text-align: center; font: 900 14px/1 Georgia, serif;
     background: rgba(8,6,4,.8); border: 1px solid #4b3f30; color: #a89880; }
 .dop-rec.up { color: #4ade80; border-color: #166534; } .dop-rec.down { color: #f87171; border-color: #991b1b; }
+
+/* Touch (Tablet/Handy): Bedienelemente mindestens 44 px hoch (Fingerbreite). Maus-Bedienung bleibt unverändert. */
+@media (pointer: coarse) {
+    #side-panel button, #side-panel select, #side-panel summary, #side-panel input:not([type=range]):not([type=checkbox]) { min-height: 44px; box-sizing: border-box; }
+    #side-panel summary { display: flex; align-items: center; }
+    #side-panel #btn-fullscreen { padding: 0 14px !important; font-size: 13px !important; }
+    #btn-end-turn { min-height: 44px; }
+}

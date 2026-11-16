@@ -273,15 +273,14 @@
     }
     function applyFx(node, L, now, maxTilt, lift) {
         const dx = (L.x - 0.5) * 2, dy = (L.y - 0.5) * 2;
-        const s = node.style;
-        s.setProperty('--rx', (-dy * maxTilt * L.h).toFixed(2) + 'deg');
-        s.setProperty('--ry', (dx * maxTilt * L.h).toFixed(2) + 'deg');
-        s.setProperty('--lift', (-L.h * lift).toFixed(2) + 'px');
-        s.setProperty('--mx', (L.x * 100).toFixed(1) + '%');
-        s.setProperty('--my', (L.y * 100).toFixed(1) + '%');
-        s.setProperty('--h', L.h.toFixed(3));
+        // Nur geänderte Werte setzen: jede gesetzte Variable lässt den Stil der ganzen Karte neu berechnen
+        // (ruht der Finger, wäre das sonst in jedem Frame ~2 ms auf dem Tablet)
+        const v = [(-dy * maxTilt * L.h).toFixed(2) + 'deg', (dx * maxTilt * L.h).toFixed(2) + 'deg', (-L.h * lift).toFixed(2) + 'px',
+            (L.x * 100).toFixed(1) + '%', (L.y * 100).toFixed(1) + '%', L.h.toFixed(3)];
+        const last = node._fxv || (node._fxv = []);
+        for (let i = 0; i < 6; i++) if (last[i] !== v[i]) { last[i] = v[i]; node.style.setProperty(VARS[i], v[i]); }
     }
-    function clearFx(node) { if (!node) return; node.classList.remove('cfx-live'); VARS.forEach(v => node.style.removeProperty(v)); }
+    function clearFx(node) { if (!node) return; node.classList.remove('cfx-live'); node._fxv = null; VARS.forEach(v => node.style.removeProperty(v)); }
     function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; hideKeywords(); if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } showDemo(); } }
     function tick(now) {
         const L = S.live;
@@ -289,7 +288,10 @@
         // Neu gezeichnet (Aktion im Spiel): Vorschau an die neue Karte mit derselben Kennung hängen statt zu schließen
         if (L.anchor) { if (!L.anchor.isConnected && !L.releasing) release(); }             // Listenzeile weg (Liste neu gezeichnet)
         else if (!L.wrap.isConnected && !L.releasing) { const n = sameCard(L.wrap); if (n) adopt(L, n); else release(); }
-        L.x += (L.tx - L.x) * 0.22; L.y += (L.ty - L.y) * 0.22; L.h += ((L.releasing ? 0 : 1) - L.h) * 0.18;
+        // Nachziehen nach Zeit statt je Frame (ausgelegt auf 60 Hz): bei 90/120/144 Hz gleich schnell und gleich weich
+        const f = Math.min(4, Math.max(0, (now - (L.tPrev || now - 16.667)) / 16.667)); L.tPrev = now;
+        const kxy = 1 - Math.pow(1 - 0.22, f), kh = 1 - Math.pow(1 - 0.18, f);
+        L.x += (L.tx - L.x) * kxy; L.y += (L.ty - L.y) * kxy; L.h += ((L.releasing ? 0 : 1) - L.h) * kh;
         applyFx(L.tilt, L, now, 7, L.lift);
         if (L.clone && !L.releasing) applyFx(L.clone, L, now, 13, 0);
         if (L.releasing && L.h < 0.01) { finish(L); S.raf = 0; return; }

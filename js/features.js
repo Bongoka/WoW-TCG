@@ -646,8 +646,11 @@ function boosterFxTick() {
     g.clearRect(0, 0, c.width, c.height);
     g.globalCompositeOperation = 'lighter';
     BFX.parts = BFX.parts.filter(p => p.life > 0);
+    // nach Zeit (ausgelegt auf 60 Hz): bei 90/120/144 Hz gleich schnell
+    const now = performance.now(), f = Math.min(4, Math.max(0, (now - (BFX.tPrev && now - BFX.tPrev < 200 ? BFX.tPrev : now - 16.667)) / 16.667)); BFX.tPrev = now;
+    const d97 = Math.pow(0.97, f);
     for (const p of BFX.parts) {
-        p.x += p.vx; p.y += p.vy; p.vx *= 0.97; p.vy = p.vy * 0.97 + 0.12; p.life -= p.decay;
+        p.x += p.vx * f; p.y += p.vy * f; p.vx *= d97; p.vy = p.vy * d97 + 0.12 * f; p.life -= p.decay * f;
         const r = p.size * (0.4 + p.life * 0.6);
         g.fillStyle = `rgba(${p.rgb},${Math.max(0, p.life).toFixed(3)})`;
         if (p.spin) { g.fillRect(p.x - r, p.y - r * 0.35, r * 2, r * 0.7); }

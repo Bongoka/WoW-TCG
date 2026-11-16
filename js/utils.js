@@ -25,6 +25,7 @@ class SoundManager {
     constructor() { this.ctx = null; this.muted = false; }
     init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
     play(type) {
+        haptic(type);                                                                     // Vibration (Einstellung, Standard aus) – auch bei stummem Ton
         if (this.muted) return;
         try {
             this.init(); if (!this.ctx) return;
@@ -40,5 +41,11 @@ class SoundManager {
     }
 }
 const sfx = new SoundManager();
+// Vibration auf Touch-Geräten (Einstellung „Vibration“, gemerkt; Standard: aus). Kurze Impulse zu denselben Ereignissen wie die Töne.
+const HAPTIC_KEY = 'wow_tcg_vibrate';
+const HAPTIC_MS = { play: 12, hit: 35, destroy: 25 };
+const hapticOn = () => { try { return localStorage.getItem(HAPTIC_KEY) === '1'; } catch (e) { return false; } };
+const hapticAvailable = () => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function' && typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+function haptic(type) { const ms = HAPTIC_MS[type]; if (ms && hapticOn() && hapticAvailable()) try { navigator.vibrate(ms); } catch (e) {} }
 
 function shuffleDeck(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }

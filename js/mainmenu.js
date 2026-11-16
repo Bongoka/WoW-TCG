@@ -141,6 +141,15 @@ function mmCovered() {
         return cs.backgroundImage !== 'none' || !!(a && (a.length < 4 || +a[3] >= .85));
     });
 }
+// Ein Glutfunke als fertiges Bild (Verlauf wie zuvor je Funke: hell-gelb → orange → transparent), skaliert gezeichnet
+function mmSparkSprite() {
+    if (MM.spr) return MM.spr;
+    const S = 64, cv = document.createElement('canvas'); cv.width = cv.height = S * 2;
+    const c = cv.getContext('2d'), g = c.createRadialGradient(S, S, 0, S, S, S);
+    g.addColorStop(0, 'rgba(255,220,140,1)'); g.addColorStop(.35, 'rgba(255,140,40,.55)'); g.addColorStop(1, 'rgba(255,90,0,0)');
+    c.fillStyle = g; c.fillRect(0, 0, S * 2, S * 2);
+    return (MM.spr = cv);
+}
 function mmTick() {
     MM.raf = requestAnimationFrame(mmTick);
     if (!MM.el || MM.el.style.display === 'none') return;
@@ -149,26 +158,32 @@ function mmTick() {
         MM.el.style.visibility = MM.covered ? 'hidden' : '';
     }
     if (MM.covered) return;
+    // Alle Bewegungen nach Zeit (ausgelegt auf 60 Hz): bei 90/120/144 Hz gleich schnell, nur flüssiger
+    const now = performance.now(), f = Math.min(4, Math.max(0, (now - (MM.tPrev && now - MM.tPrev < 200 ? MM.tPrev : now - 16.667)) / 16.667)); MM.tPrev = now;
     // Parallax: Hintergrund folgt der Maus träge, die Glut davor stärker (Tiefe)
-    MM.tx += (MM.mx - MM.tx) * .015; MM.ty += (MM.my - MM.ty) * .015;
-    MM.el.style.setProperty('--px', MM.tx.toFixed(4)); MM.el.style.setProperty('--py', MM.ty.toFixed(4));
-    const cv = MM.el.querySelector('.mm-sparks'), dpr = Math.min(2, devicePixelRatio || 1);
+    const kp = 1 - Math.pow(1 - .015, f);
+    MM.tx += (MM.mx - MM.tx) * kp; MM.ty += (MM.my - MM.ty) * kp;
+    const pxs = MM.tx.toFixed(4), pys = MM.ty.toFixed(4);                               // nur Änderungen setzen (Stil des ganzen Menüs)
+    if (pxs !== MM.pxs) { MM.pxs = pxs; MM.el.style.setProperty('--px', pxs); }
+    if (pys !== MM.pys) { MM.pys = pys; MM.el.style.setProperty('--py', pys); }
+    const cv = MM.cv || (MM.cv = MM.el.querySelector('.mm-sparks')), dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);
-    if (MM.sparks.filter(s => !s.burst).length < 28 && Math.random() < .12)
+    if (MM.sparks.filter(s => !s.burst).length < 28 && Math.random() < 1 - Math.pow(1 - .12, f))
         MM.sparks.push({ x: Math.random() * innerWidth, y: innerHeight + 10, vx: (Math.random() - .5) * .15, vy: -(.15 + Math.random() * .35), life: 1, r: .8 + Math.random() * 2, depth: .4 + Math.random() * .9 });
     c.globalCompositeOperation = 'lighter';
+    const spr = mmSparkSprite(), d96 = Math.pow(.96, f);
     MM.sparks = MM.sparks.filter(s => {
-        s.x += s.vx + (s.burst ? 0 : Math.sin((s.y + s.r * 40) / 90) * .12); s.y += s.vy;
-        if (s.burst) { s.vy += .12; s.vx *= .96; s.life -= .03; } else s.life -= .0011;
+        s.x += (s.vx + (s.burst ? 0 : Math.sin((s.y + s.r * 40) / 90) * .12)) * f; s.y += s.vy * f;
+        if (s.burst) { s.vy += .12 * f; s.vx *= d96; s.life -= .03 * f; } else s.life -= .0011 * f;
         if (s.life <= 0 || s.y < -20) return false;
         const px = s.burst ? 0 : -MM.tx * 26 * s.depth, py = s.burst ? 0 : -MM.ty * 16 * s.depth;
-        const g = c.createRadialGradient(s.x + px, s.y + py, 0, s.x + px, s.y + py, s.r * 4);
-        const al = Math.min(1, s.life * 1.4) * (s.burst ? 1 : .8);
-        g.addColorStop(0, `rgba(255,220,140,${al})`); g.addColorStop(.35, `rgba(255,140,40,${al * .55})`); g.addColorStop(1, 'rgba(255,90,0,0)');
-        c.fillStyle = g; c.beginPath(); c.arc(s.x + px, s.y + py, s.r * 4, 0, Math.PI * 2); c.fill();
+        // Vorgezeichneter Verlauf (gleiche Farbstufen) mit Deckkraft al statt je Funke und Frame ein neuer Verlauf
+        const al = Math.min(1, s.life * 1.4) * (s.burst ? 1 : .8), R = s.r * 4;
+        c.globalAlpha = al; c.drawImage(spr, s.x + px - R, s.y + py - R, R * 2, R * 2);
         return true;
     });
+    c.globalAlpha = 1;
     c.globalCompositeOperation = 'source-over';
 }
 document.getElementById('btn-main-menu').onclick = () => openMainMenu();

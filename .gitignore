@@ -4802,3 +4802,6 @@ Tokens small/*
 !Tokens small/Blighthound.webp
 !Tokens/Spider - Wrathgate.webp
 !Tokens small/Spider - Wrathgate.webp
+
+# Merker von bin/tablet-sync.sh
+/.tablet-sync*

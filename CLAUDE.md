@@ -75,7 +75,7 @@ Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von 
 ### Kartenbilder
 Ordner je Set (`SET_IMG` in main.js): `cards/<set>` (716×1000), `<set> small` (358×500), `<set> big` (1432×2000), `<set> scans` (745×1040) und `<set> scans small` (372×519), alles WebP mit Qualität 92. Auf GitHub liegen nur `<set>` und `<set> small`. Dateinamen überall `<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp` (`cardImgBase`/`imgFileName` in main.js), z. B. `AZEROTH-100 Lobotomize (EA).webp`.
 
-Neue Bilder: PNG mit diesem Namen in den Ordner legen und mit `bin/conv.sh <png> card` (Set-Ordner → normal, small, big) bzw. `bin/conv.sh <png> scan` (Scan-Ordner → scans, scans small) umwandeln. Das PNG wird danach gelöscht. Das Skript nutzt ImageMagick portable in `bin/imagemagick/` (nur lokal, von den GitHub-Releases von ImageMagick). Quelle der Bilder: `D:\warcraft tcg\NoRules\<Set>` (EA, sonst normal), sonst `D:\warcraft tcg\Scans\<Set>`.
+Neue Bilder: PNG mit diesem Namen in den Ordner legen und mit `bin/conv.sh <png> card` (Set-Ordner → normal, small, big) bzw. `bin/conv.sh <png> scan` (Scan-Ordner → scans, scans small) umwandeln. Das PNG wird danach gelöscht. Danach `bash bin/imgindex.sh` ausführen: erzeugt `js/imgindex.js` (welche Karten eine EA haben, welche Bildordner es gibt) – das Spiel fragt so keine fehlenden Dateien an. Das Skript nutzt ImageMagick portable in `bin/imagemagick/` (nur lokal, von den GitHub-Releases von ImageMagick). Quelle der Bilder: `D:\warcraft tcg\NoRules\<Set>` (EA, sonst normal), sonst `D:\warcraft tcg\Scans\<Set>`.
 
 ### Doppelte Kartenbilder (nicht auf GitHub)
 Hat eine Karte eine Extended-Art-Fassung (`… (EA).webp`), ist die EA die vollständige Karte – die normale Fassung bleibt lokal (Abschnitt `EA-Doppel` in `.gitignore`). Das Spiel nimmt überall zuerst die EA (`imageCandidatesAll`), nur Helden (ohne EA) und der Coach-Avatar nutzen die normale Karte. Nach neuen Kartenbildern den Abschnitt neu erzeugen und danach `git add -A cards`:
@@ -85,6 +85,9 @@ find cards -path '* big' -prune -o -path '* scans*' -prune -o -name '* (EA).webp
 sed -i '/^# >>> EA-Doppel/,/^# <<< EA-Doppel/{//!d}' .gitignore && sed -i '/^# >>> EA-Doppel/r /tmp/d.txt' .gitignore
 git ls-files -ci --exclude-standard -z | xargs -0 -r git rm -q --cached --   # schon eingecheckte Doppel aus Git nehmen
 ```
+
+### Tablet (offline, Xiaomi Pad 7)
+Das Spiel liegt auf dem Tablet unter `/sdcard/Documents/WoWTCG`, die App „Simple HTTP Server“ (Port 8080, nur localhost, Autostart) liefert es aus; gespielt wird über die installierte Web-App `http://localhost:8080`. Änderungen per USB übertragen: `bash bin/tablet-sync.sh` (nur seit dem letzten Abgleich geänderte Dateien; `--all` = alles). Fernsteuern/Messen: `adb forward tcp:9222 localabstract:chrome_devtools_remote` → Chrome DevTools Protocol. Die Bildrate begrenzt HyperOS für Chrome auf 90 Hz (ohne Berührung 50 Hz); alle Animationen laufen nach Zeit (`f = dt / 16,667`), nicht je Frame.
 
 ## Testen
 

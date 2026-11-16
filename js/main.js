@@ -40,12 +40,14 @@ function probeImageDirs(done) {
         const ed = firsts.map(c => `${cardImgBase(c)}.webp`);
         const tries = { [dir]: ed, [dir + ' small']: ed, [dir + ' big']: ed, [dir + ' scans']: ed, [dir + ' scans small']: ed };
         for (const [folder, files] of Object.entries(tries)) {
+            if (typeof IMG_DIRS !== 'undefined' && !IMG_DIRS.includes(folder)) { IMG_DIR_MISSING.add(folder); continue; }   // laut js/imgindex.js nicht vorhanden
             open++; let k = 0; const img = new Image();
             img.onload = finish;
             img.onerror = () => { if (++k < files.length) img.src = encodeURI(`cards/${folder}/${files[k]}`); else { IMG_DIR_MISSING.add(folder); finish(); } };
             img.src = encodeURI(`cards/${folder}/${files[0]}`);
         }
     }
+    if (open === 0 && done) done();                                                       // nichts zu prüfen
 }
 // Menü: Optionen ohne Bilder sperren (Grundlage: Set 1). Ist die gewählte Option nicht installiert, gilt "Normal".
 function updateImgStyleOptions() {
@@ -84,6 +86,18 @@ function getImageCandidates(id, mode = 'ea', q) {
     const all = imageCandidatesAll(id, mode, q), ok = all.filter(u => !IMG_BAD.has(imgKey404(u)));
     return ok.length ? ok : all.slice(-1);
 }
+// Welche Karten eine Extended Art haben (js/imgindex.js, erzeugt von bin/imgindex.sh): ohne EA wird die EA-Datei
+// gar nicht erst angefragt (spart je Karte und Größe einen 404). Ohne Index: wie bisher erst EA probieren.
+const IMG_EA_SET = {};
+function hasEA(dir, num) {
+    if (typeof IMG_EA === 'undefined' || !(dir in IMG_EA)) return true;
+    let s = IMG_EA_SET[dir];
+    if (!s) {
+        s = IMG_EA_SET[dir] = new Set();
+        for (const r of IMG_EA[dir].split(',')) { if (!r) continue; const [a, b] = r.split('-').map(Number); for (let n = a; n <= (b || a); n++) s.add(n); }
+    }
+    return s.has(+num);
+}
 function imageCandidatesAll(id, mode = 'ea', q) {
     const cd = CARDS[id];
     if (!q) q = imgQ(mode === 'full' || mode === 'eaBig' ? 'zoom' : 'hand');
@@ -93,7 +107,8 @@ function imageCandidatesAll(id, mode = 'ea', q) {
     }
     const si = cd && SET_IMG[cd.set || 1]; if (!si) return [];
     const [dir] = si, num = cd.set ? cd.num : id, base = cardImgBase(cd);
-    const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) ? [] : [encodeURI(`cards/${folder}/${base}${IMG_SUF[suf]}.webp`)];
+    const ea = hasEA(dir, num);
+    const ed = (folder, suf) => IMG_DIR_MISSING.has(folder) || (suf === '-EA' && !ea) ? [] : [encodeURI(`cards/${folder}/${base}${IMG_SUF[suf]}.webp`)];
     // Ordner in der Reihenfolge der gewählten Stufe; fehlt die Datei, die nächstbeste Größe
     const order = { small: [' small', '', ' big'], norm: ['', ' big', ' small'], big: [' big', '', ' small'] }[q];
     const at = sfx => order.flatMap(o => sfx.flatMap(s => ed(dir + o, s)));      // je Ordner: zuerst die erste Variante (z. B. EA)
@@ -612,6 +627,12 @@ function bootGame() {
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
     document.getElementById("btn-rules-text").onclick = toggleRulesTextMode;
+    // Vibration (nur Touch-Geräte mit Vibrationsmotor sichtbar; Standard: aus – utils.js haptic)
+    const vibBtn = document.getElementById("btn-vibrate");
+    const updVib = () => { vibBtn.textContent = hapticOn() ? tr('Vibration: An') : tr('Vibration: Aus'); };
+    if (hapticAvailable()) vibBtn.style.display = '';
+    vibBtn.onclick = () => { try { localStorage.setItem(HAPTIC_KEY, hapticOn() ? '0' : '1'); } catch (e) {} updVib(); if (hapticOn()) haptic('hit'); };
+    updVib();
     document.getElementById("btn-cpu-speed").onclick = () => { try { localStorage.setItem(CPU_SPEED_KEY, cpuSpeed() === 'fast' ? 'normal' : 'fast'); } catch (e) {} updCpuSpeedBtn(); };
     updCpuSpeedBtn();
     // Klick/Tipp auf eine freie Stelle (nicht auf Karten – die will man während des CPU-Zugs lesen) überspringt die Pausen
@@ -665,6 +686,21 @@ function bootGame() {
     const cover = document.getElementById('boot-cover');
     if (cover) requestAnimationFrame(() => { cover.classList.add('gone'); setTimeout(() => cover.remove(), 1000); });
 }
+
+// Bildschirm bleibt an, solange eine Partie läuft (Screen Wake Lock; Tablets/Handys gingen sonst aus, während die CPU
+// zieht oder man überlegt). Ohne Unterstützung (ältere Browser, file://) passiert einfach nichts.
+const WAKE = { lock: null, busy: false };
+function wakeUpdate() {
+    if (!('wakeLock' in navigator) || WAKE.busy) return;
+    const want = document.visibilityState === 'visible' && typeof G !== 'undefined' && !!G && !G.gameOver;
+    if (want && !WAKE.lock) {
+        WAKE.busy = true;
+        navigator.wakeLock.request('screen').then(l => { WAKE.lock = l; l.addEventListener('release', () => { WAKE.lock = null; }); })
+            .catch(() => {}).finally(() => { WAKE.busy = false; });
+    } else if (!want && WAKE.lock) { WAKE.lock.release().catch(() => {}); WAKE.lock = null; }
+}
+document.addEventListener('visibilitychange', wakeUpdate);
+setInterval(wakeUpdate, 3000);
 
 if (document.readyState === 'loading') window.addEventListener("DOMContentLoaded", bootGame);
 else bootGame();
