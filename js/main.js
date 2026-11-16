@@ -700,6 +700,30 @@ function wakeUpdate() {
     } else if (!want && WAKE.lock) { WAKE.lock.release().catch(() => {}); WAKE.lock = null; }
 }
 document.addEventListener('visibilitychange', wakeUpdate);
+// Liegt ein deckendes Vollbild-Fenster über dem Spielfeld (Hauptmenü, Deck-Builder, Deck-Übersicht, Booster, Simulation,
+// Roguelike), wird das Spielfeld unsichtbar geschaltet. Sonst zeichnet der Browser das verdeckte Brett weiter mit: auf dem
+// Tablet (hohe Pixeldichte) reichte dann der Grafikspeicher nicht und Karten im Fenster blieben leer (Chrome: "tile memory limits exceeded").
+const COVER_SEL = '#main-menu, #deck-builder-modal, #deck-overview-modal, #booster-modal, #sim-modal, #rl-root';
+setInterval(() => {
+    const arena = document.getElementById('arena'); if (!arena) return;
+    const covered = [...document.querySelectorAll(COVER_SEL)].some(e => {
+        const cs = getComputedStyle(e);
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > .99 && !e.classList.contains('out');
+    });
+    const v = covered ? 'hidden' : '';
+    if (arena.style.visibility !== v) arena.style.visibility = v;
+}, 250);
+// FPS-Anzeige zum Vergleichen von Browsern/Geräten: nur mit "?fps" in der Adresse (z. B. http://localhost:8080/?fps)
+if (/[?&]fps\b/.test(location.search)) {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;left:6px;top:6px;z-index:2147483647;pointer-events:none;font:700 14px monospace;color:#7CFC00;background:rgba(0,0,0,.7);padding:3px 6px;border-radius:4px';
+    document.documentElement.appendChild(el);
+    let n = 0, t0 = performance.now(), worst = 0, last = t0;
+    const loop = (t) => { n++; worst = Math.max(worst, t - last); last = t;
+        if (t - t0 >= 500) { el.textContent = `${Math.round(n * 1000 / (t - t0))} fps · max ${worst.toFixed(1)} ms`; n = 0; t0 = t; worst = 0; }
+        requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+}
 setInterval(wakeUpdate, 3000);
 
 if (document.readyState === 'loading') window.addEventListener("DOMContentLoaded", bootGame);

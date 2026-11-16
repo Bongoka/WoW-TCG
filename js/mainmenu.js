@@ -36,6 +36,7 @@ function mmBuild() {
     el.addEventListener('pointermove', e => { MM.mx = e.clientX / innerWidth - .5; MM.my = e.clientY / innerHeight - .5; });
     // Deck-Box und Booster neigen sich der Maus zu
     el.querySelectorAll('.mm-prop').forEach(p => p.addEventListener('pointermove', e => {
+        if (e.pointerType === 'touch') return;                                          // Touch: kein Neigen (jede Bewegung zeichnete die Booster mit Schatten-Filter neu → Ruckeln)
         const r = p.getBoundingClientRect(); p.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); p.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); }));
     el.querySelector('.mm-opt-close').onclick = mmCloseOptions;
     el.querySelector('.mm-options').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseOptions(); });
@@ -163,9 +164,15 @@ function mmTick() {
     // Parallax: Hintergrund folgt der Maus träge, die Glut davor stärker (Tiefe)
     const kp = 1 - Math.pow(1 - .015, f);
     MM.tx += (MM.mx - MM.tx) * kp; MM.ty += (MM.my - MM.ty) * kp;
-    const pxs = MM.tx.toFixed(4), pys = MM.ty.toFixed(4);                               // nur Änderungen setzen (Stil des ganzen Menüs)
-    if (pxs !== MM.pxs) { MM.pxs = pxs; MM.el.style.setProperty('--px', pxs); }
-    if (pys !== MM.pys) { MM.pys = pys; MM.el.style.setProperty('--py', pys); }
+    // Verschiebung direkt als transform der beiden Ebenen (gleiche Werte wie --px/--py in style.css): eine geerbte
+    // Variable am Menü ließe jedes Bild den Stil des ganzen Menüs neu berechnen (Tablet: ~3,5 ms pro Bild beim Berühren)
+    const pxs = MM.tx.toFixed(4), pys = MM.ty.toFixed(4);
+    if (pxs !== MM.pxs || pys !== MM.pys) {
+        MM.pxs = pxs; MM.pys = pys;
+        const bg = MM.bgEl || (MM.bgEl = MM.el.querySelector('.mm-bg')), pr = MM.prEl || (MM.prEl = MM.el.querySelector('.mm-props'));
+        if (bg) bg.style.transform = `translate3d(${(MM.tx * -16).toFixed(2)}px, ${(MM.ty * -10).toFixed(2)}px, 0)`;
+        if (pr) pr.style.transform = `translate3d(${(MM.tx * 8).toFixed(2)}px, ${(MM.ty * 5).toFixed(2)}px, 0)`;
+    }
     const cv = MM.cv || (MM.cv = MM.el.querySelector('.mm-sparks')), dpr = Math.min(2, devicePixelRatio || 1);
     if (cv.width !== innerWidth * dpr) { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
     const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);

@@ -277,10 +277,20 @@
         // (ruht der Finger, wäre das sonst in jedem Frame ~2 ms auf dem Tablet)
         const v = [(-dy * maxTilt * L.h).toFixed(2) + 'deg', (dx * maxTilt * L.h).toFixed(2) + 'deg', (-L.h * lift).toFixed(2) + 'px',
             (L.x * 100).toFixed(1) + '%', (L.y * 100).toFixed(1) + '%', L.h.toFixed(3)];
+        // Kippen (--rx/--ry/--lift, in cards.css als nicht vererbt registriert) an der Karte; Lichtpunkt (--mx/--my/--h) nur an
+        // Glanz und Foil – sonst berechnet jede Änderung den Stil aller Kind-Elemente der Karte neu (Tablet: ~1,5 ms pro Bild)
         const last = node._fxv || (node._fxv = []);
-        for (let i = 0; i < 6; i++) if (last[i] !== v[i]) { last[i] = v[i]; node.style.setProperty(VARS[i], v[i]); }
+        const fx = node._fxEls || (node._fxEls = [...node.querySelectorAll('.cfx-glare, .cfx-foil')]);
+        for (let i = 0; i < 6; i++) if (last[i] !== v[i]) {
+            last[i] = v[i];
+            if (i < 3) node.style.setProperty(VARS[i], v[i]); else fx.forEach(e => e.style.setProperty(VARS[i], v[i]));
+        }
     }
-    function clearFx(node) { if (!node) return; node.classList.remove('cfx-live'); node._fxv = null; VARS.forEach(v => node.style.removeProperty(v)); }
+    function clearFx(node) {
+        if (!node) return; node.classList.remove('cfx-live'); node._fxv = null;
+        VARS.forEach(v => node.style.removeProperty(v));
+        (node._fxEls || []).forEach(e => VARS.forEach(v => e.style.removeProperty(v))); node._fxEls = null;
+    }
     function finish(L) { clearFx(L.tilt); if (S.live === L) { S.live = null; hideKeywords(); if (S.pv) { S.pv.classList.remove('show'); S.pv.style.display = 'none'; } showDemo(); } }
     function tick(now) {
         const L = S.live;

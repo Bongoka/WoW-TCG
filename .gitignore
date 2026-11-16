@@ -4805,3 +4805,6 @@ Tokens small/*
 
 # Merker von bin/tablet-sync.sh
 /.tablet-sync*
+
+# Tablet-App: Build-Ausgabe (bin/build-apk.sh)
+/android/build/

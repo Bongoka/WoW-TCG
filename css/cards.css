@@ -6,6 +6,10 @@
 .cfx-rot  { position: absolute; inset: 0; }
 .card-wrapper.is-exhausted > .cfx-rot { transform: rotate(90deg); }
 .cfx-tilt { position: absolute; inset: 0; pointer-events: none; transition: transform 0.1s; }
+/* Kipp-Werte nur für .cfx-tilt selbst: nicht vererbt, damit eine Änderung nicht den Stil aller Kind-Elemente neu berechnet */
+@property --rx { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@property --ry { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@property --lift { syntax: '<length>'; inherits: false; initial-value: 0px; }
 .cfx-tilt.cfx-live { transform: perspective(900px) translateY(var(--lift, 0px)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
 .card-visual { --bd: #4a3f35; position: absolute; inset: 0; overflow: hidden; isolation: isolate; border-radius: 4.6cqw; background: linear-gradient(180deg, #1f1a16 0%, #0f0c0a 100%); box-shadow: 0 0.8cqw 2.4cqw rgba(0,0,0,.65); backface-visibility: hidden; }
 .card-visual::after { content: ''; position: absolute; inset: 0; z-index: 9; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 0 0.7cqw var(--bd); }

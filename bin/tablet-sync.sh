@@ -12,7 +12,7 @@ STAMP=.tablet-sync
 "$ADB" get-state >/dev/null 2>&1 || { echo "Kein Tablet verbunden (USB-Debugging an? Kabel?)"; exit 1; }
 newer=(); [ "$1" != "--all" ] && [ -e "$STAMP" ] && newer=(-newer "$STAMP")
 touch "$STAMP.new"
-mapfile -t files < <(find . \( -path ./.git -o -path ./addon -o -path ./bin -o -path ./docs -o -path ./tools -o -path ./.claude -o -name 'node_modules' \) -prune \
+mapfile -t files < <(find . \( -path ./.git -o -path ./addon -o -path ./bin -o -path ./docs -o -path ./tools -o -path ./android -o -path ./.claude -o -name 'node_modules' \) -prune \
     -o -type f "${newer[@]}" ! -name '.tablet-sync*' ! -name '*.png.tmp' -print | sed 's#^\./##')
 if [ ${#files[@]} -eq 0 ]; then echo "Nichts geändert."; mv "$STAMP.new" "$STAMP"; exit 0; fi
 echo "${#files[@]} Datei(en) → Tablet"
