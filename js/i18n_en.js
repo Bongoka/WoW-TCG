@@ -4465,4 +4465,5 @@ var I18N_EN = {
     'Anzahlen übernommen: {0} Karten, {1} Kopien geändert.': 'Counts applied: {0} cards, {1} copies changed.',
     'Beim Angreifen: {0} ATK': 'When attacking: {0} ATK',
     'Zähler: {0} von {1}': 'Counters: {0} of {1}',
+    '★ Empfohlen': '★ Recommended',
 };

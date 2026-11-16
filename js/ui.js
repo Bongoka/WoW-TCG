@@ -1985,7 +1985,11 @@ function renderChoiceModal(d) {
         title.textContent = d.reason === 'combat' ? tr('Kampf – reagieren?') : tr('Reagieren?');
         prompt.textContent = d.prompt;
         fillContext(chainContext());
-        priorityChoices().forEach(ch => addChoice(ch.card, ch.good ? tr`★ ${ch.caption}` : ch.caption, ch.run, ch.good ? 'cm-good' : 'cm-other'));
+        // Alle Optionen sind spielbar (gelber Rand wie auf der Hand); die Empfehlung der Engine trägt nur ein Schild darüber
+        priorityChoices().forEach((ch, i) => {
+            addChoice(ch.card, ch.caption, ch.run, 'cm-play');
+            if (ch.good && ch.rank === 0) { const t = document.createElement('div'); t.className = 'cm-tag'; t.textContent = tr('★ Empfohlen'); cards.lastChild.prepend(t); cards.lastChild.classList.add('cm-good'); }
+        });
         addButton(tr('Passen'), 'success', () => humanAct({ type: 'PASS' }));
         return;
     }

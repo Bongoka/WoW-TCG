@@ -903,10 +903,6 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 .mp-player .mp-role { flex: 0 0 44px; }
 .mp-player b, .mp-lobby b { flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
 /* Antwort-Dialog: sinnvolle Antworten (Engine) vorn und leuchtend, die übrigen gedämpft */
-#choice-modal .cm-good { box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(253,230,138,.55); border-radius: 8px; }
-#choice-modal .cm-good .cm-caption { color: #fde68a; font-weight: bold; }
-#choice-modal .cm-other { opacity: .6; filter: saturate(.7); transition: opacity .15s, filter .15s; }
-#choice-modal .cm-other:hover { opacity: 1; filter: none; }
 /* Hochformat auf Touch-Geräten sperren: Hinweis zum Drehen über allem (das Spiel ist für Querformat gebaut) */
 #rotate-hint { display: none; position: fixed; inset: 0; z-index: 2147483000; background: radial-gradient(circle at 50% 40%, #2a2016, #0a0705 70%);
     color: #f4ecdc; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; padding: 0 60px; font-family: Georgia, serif; }
@@ -1639,3 +1635,9 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 .card-wrapper.loc-ready .card-visual { --bd: #22d3ee; box-shadow: 0 0 0 0.9cqw #22d3ee, 0 0 5cqw rgba(34,211,238,.8); animation: locReady 1.6s ease-in-out infinite; }
 .card-wrapper.loc-ready .card-visual.has-img::after { box-shadow: inset 0 0 0 0.9cqw #22d3ee; }
 @keyframes locReady { 50% { box-shadow: 0 0 0 0.9cqw #67e8f9, 0 0 8cqw rgba(103,232,249,.95); } }
+/* Prioritätsfenster: jede Option spielbar (gelber Rand wie spielbare Handkarten); Empfehlung der Engine mit Schild "★ Empfohlen" */
+#choice-modal .cm-play .card-visual { box-shadow: 0 0 0 0.7cqw #facc15, 0 0 3cqw rgba(250,204,21,.45); }
+#choice-modal .cm-play:hover .card-visual { box-shadow: 0 0 0 0.9cqw #fde047, 0 0 5cqw rgba(250,204,21,.85); }
+#choice-modal .cm-good { position: relative; }
+.cm-tag { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 5; pointer-events: none; padding: 2px 10px; border-radius: 999px; font: bold 11px/1.4 Georgia, serif; color: #1a1206;
+    background: linear-gradient(180deg, #fde68a, #f5b82e); border: 1px solid #fff3c4; box-shadow: 0 0 10px rgba(250,204,21,.6), 0 2px 4px rgba(0,0,0,.7); white-space: nowrap; }
