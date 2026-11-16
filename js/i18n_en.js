@@ -4463,4 +4463,5 @@ var I18N_EN = {
     'Optimierung verworfen – das Deck bleibt unverändert.': 'Optimization discarded – the deck stays unchanged.',
     'Anzahlen übernommen: {0} Karten, {1} Kopien geändert.': 'Counts applied: {0} cards, {1} copies changed.',
     'Beim Angreifen: {0} ATK': 'When attacking: {0} ATK',
+    'Zähler: {0} von {1}': 'Counters: {0} of {1}',
 };

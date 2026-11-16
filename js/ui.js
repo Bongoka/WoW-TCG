@@ -98,6 +98,15 @@ function openGraveyard(player) {
     document.getElementById("graveyard-modal").style.display = "flex";
 }
 
+// Offene Location: Turm unten rechts (über dem gedruckten) mit den Zählern und der Kapazität (CR 306.3), z. B. 2 / 5
+function locCapBadge(node, c) {
+    const face = node.querySelector('.card-visual'); if (!face) return;
+    const n = Object.entries(c.counters || {}).filter(([k]) => k !== 'atk1' && k !== 'def').reduce((a, [, v]) => a + (v || 0), 0);
+    const b = document.createElement('div'); b.className = 'loc-cap' + (c.capacity !== undefined && n >= c.capacity ? ' full' : '');
+    b.title = tr`Zähler: ${n} von ${c.capacity !== undefined ? c.capacity : '∞'}`;
+    b.innerHTML = `<img src="Bottom Icons/Location Capacity.png" alt=""><span>${n}${c.capacity !== undefined ? `<small>/${c.capacity}</small>` : ''}</span>`;
+    face.appendChild(b);
+}
 // ---------------------------------------------------------------- Ressourcen (getappt = erschöpft)
 function renderResourceTray(player, containerId, isHuman) {
     const box = document.getElementById(containerId); if (!box) return; box.innerHTML = "";
@@ -112,6 +121,7 @@ function renderResourceTray(player, containerId, isHuman) {
             const cardNode = createCardDOM(r.card, false, null, shownCost(player, r.card) || {});   // offene Quest: aktuelle Abschlusskosten (Mounts u. a.)
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
+            if (r.card.type === 'Location') locCapBadge(cardNode, r.card);
             if (r.card.type === 'Location' && isHuman) {
                 decorateInPlay(cardNode, r.card);                                                 // offene Location (Set drums): Kräfte per Klick
                 if (usablePowers(r.card).length) { cardNode.classList.remove('can-act'); cardNode.classList.add('loc-ready'); }   // genug Zähler, aktivierbar: eigene Farbe
@@ -1182,11 +1192,44 @@ function placeAttachments() {
     }
 }
 
+// ---------------------------------------------------------------- Aktive Formen am Helden (Cat, Bear, Moonkin, Shadowform …)
+// Je Form-Art ein rundes Icon am linken Rand der Heldenkarte (icons/forms/). Quelle: Form-Fähigkeiten im Spiel (Form (1), nicht
+// angehängt) und Formen des Helden selbst (heroFormOn, z. B. durch einen Flip). Master Instinct zählt in seinem Zug als Cat Form.
+const FORM_BY_NAME = [[/moonkin/i, 'moonkin'], [/tree of life/i, 'tree'], [/travel form/i, 'travel'], [/flight form/i, 'flight'],
+    [/aquatic form/i, 'aquatic'], [/shadowform/i, 'shadow'], [/serpent/i, 'serpent']];
+const FORM_LABEL = { cat: 'Cat Form', bear: 'Bear Form', moonkin: 'Moonkin Form', tree: 'Tree of Life', travel: 'Travel Form',
+    flight: 'Flight Form', aquatic: 'Aquatic Form', shadow: 'Shadowform', serpent: 'Form of the Serpent' };
+function heroForms(p) {
+    const out = new Map();                                                                // Art → Kartennamen
+    const add = (k, n) => { if (!out.has(k)) out.set(k, []); if (n) out.get(k).push(n); };
+    for (const o of p.ongoing || []) {
+        const cd = CARDS[o.id]; if (!cd || o.attachedTo || !(o.limitTags && o.limitTags.Form !== undefined)) continue;
+        try { if (!active(G, o)) continue; } catch (e) {}
+        const k = (cd.catForm || o.catTurn === G.turn) ? 'cat' : cd.bearForm ? 'bear' : ((FORM_BY_NAME.find(([re]) => re.test(cd.name)) || [])[1] || 'form');
+        add(k, o.name || cd.name);
+    }
+    for (const k of ['cat', 'bear']) if (heroFormOn(G, p.id, k)) add(k, p.hero.name);
+    return out;
+}
+function showHeroForms(node, p) {
+    const forms = heroForms(p); if (!forms.size) return;
+    const box = document.createElement('div'); box.className = 'hero-forms' + (p.id === 1 ? '' : ' opp');   // Gegner: rechter Rand (sein Held liegt links am Bildrand)
+    for (const [k, names] of forms) {
+        const label = FORM_LABEL[k] || 'Form';
+        const f = document.createElement('div'); f.className = 'hero-form form-' + k;
+        const extra = [...new Set(names)].filter(n => n !== label);
+        f.title = label + (extra.length ? ': ' + extra.join(', ') : '');
+        f.innerHTML = FORM_LABEL[k] ? `<img src="icons/forms/${k}.webp" alt="${label}">` : '<b>F</b>';
+        box.appendChild(f);
+    }
+    node.appendChild(box);
+}
 function renderHeroCard(p, containerId) {
     const box = document.getElementById(containerId); box.innerHTML = "";
     box.classList.add('hero-with-hp');
     const h = createCardDOM(p.hero, true, null, { imageMode: p.hero.flipped ? 'back' : 'ea' });
     decorateInPlay(h, p.hero);
+    showHeroForms(h, p);
     if (UI.flipHide === p.hero.uid) h.style.visibility = 'hidden';                     // fliegt gerade als Flip-Animation
     box.appendChild(h);
     box.appendChild(heroHpBar(p));
