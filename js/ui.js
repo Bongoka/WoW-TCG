@@ -112,7 +112,10 @@ function renderResourceTray(player, containerId, isHuman) {
             const cardNode = createCardDOM(r.card, false, null, shownCost(player, r.card) || {});   // offene Quest: aktuelle Abschlusskosten (Mounts u. a.)
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
-            if (r.card.type === 'Location' && isHuman) decorateInPlay(cardNode, r.card);         // offene Location (Set drums): Kräfte per Klick
+            if (r.card.type === 'Location' && isHuman) {
+                decorateInPlay(cardNode, r.card);                                                 // offene Location (Set drums): Kräfte per Klick
+                if (usablePowers(r.card).length) { cardNode.classList.remove('can-act'); cardNode.classList.add('loc-ready'); }   // genug Zähler, aktivierbar: eigene Farbe
+            }
             if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
                 wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
                 wrap.title = tr("Klicken: Quest abschließen");
@@ -974,18 +977,26 @@ function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
     G.fxq = [];
     let k = 0, spellAt = null;                                                           // spellAt: Zahlen erst beim Einschlag des Zaubers (spellfx.js)
+    let occ = {}, bolts = 0;                                                             // Treffer je Ziel / Geschosse ohne Zauber (spxDmgBolt)
     for (let i = 0; i < evs.length; i++) {
         const e = evs[i];
-        if (e.t === 'spell') { spellAt = typeof playSpellFx === 'function' ? playSpellFx(e, evs.slice(i), prevRects) : null; k = 0; continue; }
+        if (e.t === 'spell') { spellAt = typeof playSpellFx === 'function' ? playSpellFx(e, evs.slice(i), prevRects) : null; k = 0; occ = {}; continue; }
         if (e.t === 'play') {
             if (e.pid === 1 && e.cost >= 7) screenShake(1.2);                                   // CPU-Karten wackeln beim Landen (landShowcase)
             else if (e.pid === 2 && !SHOWCASED.has(e.uid)) showcasePlayed(e.uid, e.cost);       // Online-Gegner, CPU-Reaktionen im eigenen Zug
             continue;
         }
         const node = document.querySelector(`#arena [data-uid="${e.uid}"]`);
-        const r = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
-        if (!r || !r.width) continue;
-        const delay = spellAt ? spellAt(e.uid, k++) : Math.min(k++, 6) * 90;
+        const r0 = node ? node.getBoundingClientRect() : prevRects.get(e.uid);
+        if (!r0 || !r0.width) continue;
+        // Mehrere Treffer auf dasselbe Ziel: jede Zahl etwas versetzt (sonst lägen sie übereinander und sähen wie ein Treffer aus)
+        const n = e.t === 'dmg' || e.t === 'heal' ? (occ[e.uid] = (occ[e.uid] || 0) + 1) - 1 : 0;
+        const dx = n ? (n % 2 ? 1 : -1) * Math.ceil(n / 2) * r0.width * 0.16 : 0, dy = n ? -n * r0.height * 0.05 : 0;
+        const r = n ? { left: r0.left + dx, top: r0.top + dy, width: r0.width, height: r0.height, right: r0.right + dx, bottom: r0.bottom + dy } : r0;
+        let delay;
+        if (spellAt) delay = spellAt(e.uid, k++, n);
+        else if (e.t === 'dmg' && !e.combat && e.src && typeof spxDmgBolt === 'function') { const b = spxDmgBolt(e, prevRects, bolts); if (b != null) { bolts++; delay = b; } }
+        if (delay == null) delay = Math.min(k++, 6) * 90 + n * 160;
         if (e.t === 'dmg') {
             const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
             burstParticles(r, st.c, 18, delay);

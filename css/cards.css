@@ -143,3 +143,10 @@
    Ohne Kartenbild steht die Aufwertung schon in [Klammern] im Ersatztext */
 .card-up-text { display: none; }
 #cfx-preview .card-visual.has-img > .card-up-text { display: block; }
+
+/* Zähler auf Karten (Locations: capture/honor/arena u. a.) – rechts oben, gut lesbar */
+.cfx-counters { position: absolute; top: 14cqw; right: 3cqw; z-index: 30; display: flex; flex-direction: column; gap: 2cqw; pointer-events: none; }
+.cfx-counter { display: flex; align-items: center; gap: 1.5cqw; padding: 1cqw 3cqw 1cqw 1cqw; border-radius: 99px;
+    background: rgba(10,7,5,.85); border: 0.6cqw solid #c9a84c; box-shadow: 0 1cqw 3cqw rgba(0,0,0,.7); }
+.cfx-counter img { width: 13cqw; height: 13cqw; border-radius: 50%; object-fit: cover; display: block; }
+.cfx-counter span { color: #fde68a; font: 800 12cqw/1 Georgia, serif; text-shadow: 0 0.5cqw 1cqw #000; min-width: 6cqw; text-align: center; }

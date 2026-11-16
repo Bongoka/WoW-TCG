@@ -1711,6 +1711,18 @@ function runRuleTests() {
         assert(own.every(w => findCharacter(k2, w.uid) && !(w.damage >= v3.hp)), 'Gladiator Kileana (CPU): tötet nur eigene Allies');
         assert(s3.pending && s3.pending.opts.some(o => o.v === hurt.uid) && !s3.pending.opts.some(o => typeof o.v === 'string' && o.v !== hurt.uid && (findCharacter(s3, o.v) || {}).damage === 0), 'Royal Scepter: beschädigter Ally fehlt oder unbeschädigter wählbar');
     });
+    test(149, 'Bezahlen: erst verdeckte Ressourcen, dann offene Quests, offene Locations zuletzt', () => {
+        const s = fresh(); const p = P(s, 1); p.resources = [];
+        const loc = Object.values(CARDS).find(c => c.type === 'Location' && !c.isToken), quest = Object.values(CARDS).find(c => c.type === 'Quest' && !c.isToken);
+        const add = (id, faceUp) => { const r = { card: makeCardInst(id, false, 1), faceUp, exhausted: false }; p.resources.push(r); return r; };
+        const L1 = add(loc.id, true), Q1 = add(quest.id, true), D1 = add(192, false), D2 = add(192, false);
+        payRes(p, 2);
+        assert(D1.exhausted && D2.exhausted && !Q1.exhausted && !L1.exhausted, 'zuerst die verdeckten Ressourcen');
+        payRes(p, 1);
+        assert(Q1.exhausted && !L1.exhausted, 'danach die Quest, die Location bleibt bereit');
+        payRes(p, 1);
+        assert(L1.exhausted, 'die Location zuletzt');
+    });
     LANG = prevLang;
     return results;
 }

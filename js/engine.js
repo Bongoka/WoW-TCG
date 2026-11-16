@@ -1121,8 +1121,10 @@ function payRes(p, n) {
     if (n <= 0) return true;
     if (getReadyRes(p) < n) return false;
     let paid = 0;
-    // Erst verdeckte Ressourcen, dann offene Quests
+    // Erst verdeckte Ressourcen, dann offene Quests, offene Locations zuletzt (ihre [Activate]-Kräfte brauchen sie bereit)
+    const isLoc = r => r.card && r.card.type === 'Location';
     for (const r of p.resources) if (!r.exhausted && !r.faceUp && paid < n) { r.exhausted = true; paid++; }
+    for (const r of p.resources) if (!r.exhausted && !isLoc(r) && paid < n) { r.exhausted = true; paid++; }
     for (const r of p.resources) if (!r.exhausted && paid < n) { r.exhausted = true; paid++; }
     for (const c of extraPayers(p)) if (paid < n) { c.exhausted = true; paid++; }               // "as though they were resources"
     return true;
@@ -2040,7 +2042,7 @@ function dmgApply(s, st) {
         t.dmgTurn = s.turn;
         L(s, tr`💥 ${t.name} −${amt}` + (st.src && st.src !== t.uid ? ` (${nameOf(s, st.src)})` : ''), "log-hit", tl.pid);
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('hit');
-        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero' });
+        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero', src: st.src || null });   // src: Geschoss von der Quelle (spellfx.js)
         if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; }
         const src = st.src ? findCharacter(s, st.src) : null;
         if (src && src.type === 'Hero' && st.dt === 'Fire') addPE(s, ctrlOf(s, src), { k: 'heroFire' });   // Eye of Flame

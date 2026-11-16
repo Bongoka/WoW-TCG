@@ -10,6 +10,8 @@
     const IMG_OK = new Map();
     // Foil-Arten (css/cards.css): n1 = Prisma-Holo (sanft), n5 = Magic-Foil 1999
     window.randomFoil = () => ['n1', 'n5'][Math.floor(Math.random() * 2)];
+    // Zähler-Symbole (icons/counters, aus dem WoW Icon Pack): capture = Warsong-Flagge, honor = PvP-Ehre, arena = Gladiatorenwaffe
+    const COUNTER_ICONS = { capture: 'capture', honor: 'honor', arena: 'arena' };
 
     function createCardDOM(card, isField = false, forceFoil = null, opts = {}) {
         const wrap = el('div', 'card-wrapper' + (isField ? '' : ' hand-card'));
@@ -66,6 +68,18 @@
             face.appendChild(statsBar);
         }
         
+        // Zähler (counters) auf Karten im Spiel – Locations: capture/honor/arena; ATK/DEF-Zähler stecken schon in den Werten
+        const cnt = card.counters && Object.entries(card.counters).filter(([k, n]) => n > 0 && k !== 'atk1' && k !== 'def');
+        if (cnt && cnt.length) {
+            const box = el('div', 'cfx-counters');
+            for (const [k, n] of cnt) {
+                const ch = el('div', 'cfx-counter' + (COUNTER_ICONS[k] ? '' : ' generic'));
+                ch.title = `${n} ${k} counter${n === 1 ? '' : 's'}`;
+                ch.innerHTML = `<img src="icons/counters/${COUNTER_ICONS[k] || 'generic'}.webp" alt=""><span>${n}</span>`;
+                box.appendChild(ch);
+            }
+            face.appendChild(box);
+        }
         // opts.imgSrc: fest vorgegebenes Bild (Bild-Test-Szene)
         // Bildqualität (Einstellung je Bereich): Karten im Spiel / Handkarten; Zoom- und Booster-Modi wählen selbst
         const mode = opts.imageMode || 'ea';

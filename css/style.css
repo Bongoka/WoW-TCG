@@ -1634,3 +1634,8 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
     #side-panel #btn-fullscreen { padding: 0 14px !important; font-size: 13px !important; }
     #btn-end-turn { min-height: 44px; }
 }
+
+/* Location mit genug Zählern, jetzt aktivierbar: türkis pulsierend (Handkarten/Allies leuchten gelb) */
+.card-wrapper.loc-ready .card-visual { --bd: #22d3ee; box-shadow: 0 0 0 0.9cqw #22d3ee, 0 0 5cqw rgba(34,211,238,.8); animation: locReady 1.6s ease-in-out infinite; }
+.card-wrapper.loc-ready .card-visual.has-img::after { box-shadow: inset 0 0 0 0.9cqw #22d3ee; }
+@keyframes locReady { 50% { box-shadow: 0 0 0 0.9cqw #67e8f9, 0 0 8cqw rgba(103,232,249,.95); } }

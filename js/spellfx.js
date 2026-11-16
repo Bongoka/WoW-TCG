@@ -393,7 +393,7 @@ const SPX_T = {
                 sGlow(g, p.x, p.y, sz * 2.2 * f, P[2], 0.75); sGlow(g, p.x, p.y, sz * f, P[0], 1);
             });
             spxImpact(t, P, d0 + T, C.s);
-            hits[t.uid] = d0 + T;
+            spxHit(hits, t.uid, d0 + T);
         });
         return hits;
     },
@@ -412,7 +412,7 @@ const SPX_T = {
                 sGlow(g, hx, hy, 10 * C.s, P[1], kh < 1 ? 1 : 0);
             });
             spxImpact(t, P, d0 + T, 0.8 * C.s);
-            hits[t.uid] = d0 + T;
+            spxHit(hits, t.uid, d0 + T);
         });
         return hits;
     },
@@ -767,6 +767,11 @@ const SPX_T = {
     }
 };
 // Vorlagen, die ohne Ziel am eigenen Helden spielen (sonst: gegnerischer Held bzw. gegnerische Seite)
+// Einschlagzeiten: bei mehreren Treffern auf dasselbe Ziel eine Liste (je Treffer ein Geschoss)
+function spxHit(hits, uid, ms) { const h = hits[uid]; hits[uid] = h == null ? ms : Array.isArray(h) ? [...h, ms] : [h, ms]; }
+// Geschoss-Vorlagen: trifft ein Zauber dasselbe Ziel mehrmals (z. B. "deals 1 damage three times"), fliegt je Treffer ein eigenes
+// Geschoss – leicht versetzt und auf leicht anderer Bahn (bolt: zufällige Krümmung je Geschoss)
+const SPX_MULTI = new Set(['bolt', 'arrow']);
 const SPX_SELF = new Set(['aura', 'shield', 'heal', 'poof']);
 const SPX_AREA = new Set(['nova', 'rain', 'ground']);
 // Vorlagen mit eigener Standardfarbe (sonst Element der Karte)
@@ -887,10 +892,10 @@ function playSpellFx(e, evs, prevRects) {
     const card = CARDS[e.id];
     if (typeof G !== 'undefined') spxPreload(G);
     // Was der Zauber tatsächlich getan hat (bis zum nächsten Zauber)
-    const info = { dmg: [], heal: [], dt: null, other: [] };
+    const info = { dmg: [], heal: [], dt: null, other: [], cnt: {} };
     for (const x of evs) {
         if (x === e) continue; if (x.t === 'spell') break;
-        if (x.t === 'dmg') { if (!info.dmg.includes(x.uid)) info.dmg.push(x.uid); info.dt = info.dt || x.dt; }
+        if (x.t === 'dmg') { if (!info.dmg.includes(x.uid)) info.dmg.push(x.uid); info.dt = info.dt || x.dt; info.cnt[x.uid] = (info.cnt[x.uid] || 0) + 1; }
         else if (x.t === 'heal') { if (!info.heal.includes(x.uid)) info.heal.push(x.uid); }
         else if (x.uid) info.other.push(x.uid);
     }
@@ -914,19 +919,38 @@ function playSpellFx(e, evs, prevRects) {
         else if (p.who === 'opp') tg = rects([oppHero && oppHero.uid]);
         else tg = (p.t === 'heal' && info.heal.length) ? rects(info.heal) : (p.t !== 'heal' && info.dmg.length && !declared.length) ? rects(info.dmg) : declared.length ? declared : affected.length ? affected : null;
         if (!tg || !tg.length) tg = SPX_SELF.has(p.t) || !oppHero ? [src] : SPX_AREA.has(p.t) ? [] : rects([oppHero.uid]);
+        if (SPX_MULTI.has(p.t)) tg = tg.flatMap(t => Array(Math.max(1, Math.min(8, info.cnt[t.uid] || 1))).fill(t));   // je Treffer ein Geschoss
         const C = { src, tg, pal: P, pn, s: spec.s, n: spec.n, at, area: (p.t === 'rain' || p.t === 'ground') ? spxSideArea(p.who === 'self' ? (oppHero && oppHero.uid) : e.src, tg) : null };
         if (p.t === 'ground' && p.who === 'self') C.area = spxSideArea(oppHero && oppHero.uid, [src]);
         const hits = SPX_T[p.t](C) || {};
-        if (i === 0) { hitsAll = hits; const first = Object.values(hits); const d = first.length ? Math.min(...first) : lag; at = uid => uid != null && hits[uid] != null ? hits[uid] : d; }
+        const t0 = v => Array.isArray(v) ? v[0] : v;
+        if (i === 0) { hitsAll = hits; const first = Object.values(hits).map(t0); const d = first.length ? Math.min(...first) : lag; at = uid => uid != null && hits[uid] != null ? t0(hits[uid]) : d; }
         else for (const [u, ms] of Object.entries(hits)) if (hitsAll[u] == null) hitsAll[u] = ms;
     });
     // Sound: erster zum Start, zweiter (Einschlag) beim ersten Treffer
-    const firstHit = Object.values(hitsAll).length ? Math.min(...Object.values(hitsAll)) : 0;
+    const allHits = Object.values(hitsAll).flatMap(v => Array.isArray(v) ? v : [v]);
+    const firstHit = allHits.length ? Math.min(...allHits) : 0;
     const vol = ent ? 1 : 0.6;
     if (spec.snd[0]) spxPlaySnd(spec.snd[0], lag, vol);
     if (spec.snd[1]) spxPlaySnd(spec.snd[1], Math.max(lag, firstHit - 60), vol);
     const fallback = firstHit;
-    return (uid, k) => (hitsAll[uid] != null ? hitsAll[uid] : fallback) + Math.min(k, 6) * 40;
+    // occ: wievielter Treffer auf dieses Ziel – bei mehreren Geschossen die Zahl beim jeweiligen Einschlag
+    return (uid, k, occ = 0) => { const h = hitsAll[uid];
+        if (Array.isArray(h)) return h[Math.min(occ, h.length - 1)] + (occ >= h.length ? (occ - h.length + 1) * 140 : 0);
+        return (h != null ? h : fallback) + Math.min(k, 6) * 40 + occ * 140; };
+}
+// Schaden ohne Zauber, aber mit Quelle (Ally- und Heldenfähigkeiten, Auslöser wie Orlund, Flip-Kräfte): ein Geschoss von der Quelle
+// zum Ziel, je Treffer eins – leicht versetzt (idx) und auf leicht anderer Bahn. Rückgabe: ms bis zum Einschlag (oder null)
+function spxDmgBolt(e, prevRects, idx) {
+    if (!SPX.on || !e || !e.src || e.src === e.uid) return null;
+    const src = spxRect(e.src, prevRects), t = spxRect(e.uid, prevRects);
+    if (!src || !t) return null;
+    const pn = SPX_DT[e.dt] || 'steel', P = SPX_PAL[pn] || SPX_PAL.holy;
+    const at = () => idx * 140 + sRnd(0, 40);
+    const hits = SPX_T.bolt({ src, tg: [t], pal: P, pn, s: 0.6 + Math.min(0.5, (e.amt || 1) * 0.08), at });
+    const ms = Array.isArray(hits[t.uid]) ? hits[t.uid][0] : hits[t.uid];
+    const snd = SPX_SND_PAL[pn]; if (snd) spxPlaySnd(snd, Math.max(0, ms - 60), 0.45);
+    return ms;
 }
 
 // ---------------------------------------------------------------- Einstellung "Zauber-Effekte An/Aus" (neben "Sound An")
