@@ -150,3 +150,6 @@
     background: rgba(10,7,5,.85); border: 0.6cqw solid #c9a84c; box-shadow: 0 1cqw 3cqw rgba(0,0,0,.7); }
 .cfx-counter img { width: 13cqw; height: 13cqw; border-radius: 50%; object-fit: cover; display: block; }
 .cfx-counter span { color: #fde68a; font: 800 12cqw/1 Georgia, serif; text-shadow: 0 0.5cqw 1cqw #000; min-width: 6cqw; text-align: center; }
+/* ATK beim Angreifen (Vorschau, ui.js showAttackAtk): Wert in Klammern über dem ATK-Symbol */
+.cfx-stat-badge .atk-att { position: absolute; left: 42%; bottom: 92%; transform: translateX(-50%); padding: 1.5cqw 4cqw; border-radius: 99px; white-space: nowrap; pointer-events: none;
+    background: rgba(20, 14, 10, .92); border: 0.8cqw solid #ff9b3d; color: #ffb347; font: 900 13cqw/1 Impact, 'Arial Black', sans-serif; box-shadow: 0 1cqw 3cqw #000; }

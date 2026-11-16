@@ -246,16 +246,18 @@ const stableJson = v => v && typeof v === 'object' ? (Array.isArray(v) ? '[' + v
     : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}') : JSON.stringify(v);
 function stackSig(c, pid, attached) {
     if (attached.has(c.uid) || UI.attacker === c.uid || (G.battle && (G.battle.att === c.uid || G.battle.def === c.uid))) return null;
+    if (choiceUids().has(c.uid)) return null;                                              // einzeln wählbar (Ziel einer Entscheidung)
     const o = {}; for (const k in c) if (!STACK_SKIP.has(k)) o[k] = c[k];
     o._ready = c.joinedTurn !== undefined && c.joinedTurn < turnStartOf(G, pid);
     try { o._atk = atkOf(G, c); o._hp = hpOf(G, c); } catch (e) {}
     return stableJson(o);
 }
-// Slots der Ally-Zone → Einheiten (Liste von Slots, die erste liegt oben); Reihenfolge nach dem ersten Mitglied
-function stackUnits(aSlots, p) {
+// Slots der Ally-Zone → Einheiten (Liste von Slots, die erste liegt oben); Reihenfolge nach dem ersten Mitglied.
+// cards: Karten der Zone (Standard: Allies; Ausrüstung/Ongoing-Reihe: Waffen, Rüstung, Ongoing-Karten)
+function stackUnits(aSlots, p, cards = p.allies) {
     const attached = new Set();
     for (const q of [G.p1, G.p2]) for (const c of [...q.hero.weapons, ...q.hero.armors, ...(q.ongoing || [])]) { const h = attachHost(c); if (h) attached.add(h.uid); }
-    const byUid = new Map(p.allies.map(c => [c.uid, c])), units = [], bySig = new Map();
+    const byUid = new Map(cards.map(c => [c.uid, c])), units = [], bySig = new Map();
     for (const s of aSlots) {
         const c = !s.dataset.gap && s.firstElementChild && byUid.get(s.firstElementChild.dataset.uid);
         const sig = c ? stackSig(c, p.id, attached) : null;
@@ -287,23 +289,26 @@ function layoutBoard(animate = true) {
         const [l, r] = opp ? [rr.width - R, rr.width - L] : [L, R];
         const az = row.querySelector('.bf-ally-zone'), ez = row.querySelector('.bf-equip-zone');
         const aSlots = az ? [...az.children] : [], eSlots = ez ? [...ez.children] : [];
-        // (2) Passen nicht alle nebeneinander, liegen gleiche Allies auf einem Platz
-        const R2 = Math.max(l + w, r), gapW = aSlots.length && eSlots.length ? Math.max(24, w * 0.2) : 0;
+        // (2) Passen nicht alle nebeneinander, liegen gleiche Allies auf einem Platz.
+        //     Gleiche Ausrüstung/Ongoing-Karten (z. B. 3× Nature of the Beast) liegen immer gestapelt, leicht senkrecht versetzt.
+        const pl = opp ? G.p2 : G.p1, hx = pl.hero;
+        const eUnits = stackUnits(eSlots, pl, [...hx.weapons, ...hx.armors, ...(pl.ongoing || [])]);
+        const R2 = Math.max(l + w, r), gapW = aSlots.length && eUnits.length ? Math.max(24, w * 0.2) : 0;
         const natural = n => n ? n * (w + 16) - 16 : 0;
-        const units = natural(aSlots.length) + gapW + natural(eSlots.length) > R2 - l ? stackUnits(aSlots, opp ? G.p2 : G.p1) : aSlots.map(s => [s]);
-        const pos = rowPositions(units.length, eSlots.length, l, R2, mid, w);
+        const units = natural(aSlots.length) + gapW + natural(eUnits.length) > R2 - l ? stackUnits(aSlots, pl) : aSlots.map(s => [s]);
+        const pos = rowPositions(units.length, eUnits.length, l, R2, mid, w);
         const flip = x => opp ? rr.width - x - w : x;
-        // Stapel: leicht versetzt (bis 2 Karten schauen oben zur Seite heraus), die erste liegt oben
-        const SDX = 6, slots = [];
-        units.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xa[i] + Math.min(k, 2) * (opp ? -SDX : SDX)), k, u.length, Math.min(k, 2) * SDX])));
-        eSlots.forEach((s, i) => slots.push([s, flip(pos.xe[i]), 0, 1, 0]));
+        // Stapel: leicht versetzt (bis 2 Karten schauen oben heraus), die erste liegt oben. [Slot, x, Lage, Anzahl, dy, dx]
+        const SDX = 6, SDY = Math.round(w * 0.09), slots = [];
+        units.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xa[i] + Math.min(k, 2) * (opp ? -SDX : SDX)), k, u.length, Math.min(k, 2) * SDX, Math.min(k, 2) * SDX])));
+        eUnits.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xe[i]), k, u.length, Math.min(k, 2) * SDY, 0])));
         plans.push({ rowId, opp, row, slots });
     }
     const next = new Map();
     for (const { rowId, opp, row, slots } of plans) {
         row.querySelectorAll('.stack-count').forEach(b => b.remove());
         // Überlagerung: eigene Seite – die weiter links liegende Karte oben; Gegner – die weiter rechts liegende; im Stapel die erste
-        const base = i => slots[i][1] - slots[i][4];                                       // Platz ohne Stapel-Versatz (der zeigt immer nach rechts oben)
+        const base = i => slots[i][1] - slots[i][5];                                       // Platz ohne seitlichen Stapel-Versatz
         const rank = slots.map((_, i) => i).sort((a, b) => (opp ? base(b) - base(a) : base(a) - base(b)) || slots[a][2] - slots[b][2]);
         rank.forEach((i, k) => {
             const [s, x, layer, count, dy] = slots[i];
@@ -540,7 +545,7 @@ function nothingLeftToDo() {
         if (a.type === 'END_TURN') return false;
         if (a.type === 'ATTACK') {
             const c = findCharacter(G, a.attackerUid);
-            return !!c && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true, target: findCharacter(G, a.defenderUid) })) > 0;
+            return !!c && attackPower(c, findCharacter(G, a.defenderUid)) > 0;
         }
         return true;
     });
@@ -1057,7 +1062,7 @@ function decorateInPlay(node, c) {
     //    schlägt mit genau dieser Waffe zu (Regeln wie immer: erst der Angriff, dann der Schlag, CR 602.1).
     if (mine && !pend) {
         // Gelber Rand (wie spielbare Handkarten): Angriff mit Schaden oder bezahlbare Kraft möglich
-        const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && (c.type === 'Hero' ? getHeroAttackPower(G.p1) : atkOf(G, c, { attacking: true })) > 0;
+        const canHit = canMain() && isChar(c) && canAttackNow(G, c, G.p1) && attackPower(c) > 0;
         // Kraft mit Kosten X: Rahmen erst ab 1 bereiten Ressource (X = 0 wäre wirkungslos)
         const worth = pw => pw.cost !== 'X' || getReadyRes(G.p1) >= 1;
         const swing = weaponSwing(c);
@@ -1080,11 +1085,39 @@ function decorateInPlay(node, c) {
     }
     if (UI.attacker === uid) node.classList.add('target-selected');
     if (G.battle && (G.battle.att === uid || G.battle.def === uid)) node.classList.add('in-combat');
+    showAttackAtk(node, c);
     // Drop-Ziel für Handkarten (Fähigkeit direkt aufs Ziel), Angriffe und Protector
     node.addEventListener('dragover', (e) => { if (dropAllowedOn(uid)) e.preventDefault(); });
     node.addEventListener('drop', (e) => { if (!dropAllowedOn(uid)) return; e.preventDefault(); e.stopPropagation(); dropOn(uid); });
 }
 
+// ATK beim Angreifen (Vorschau): Boni "while attacking" (Cat Form, Nature of the Beast, Auren …) und beim Helden die bereite,
+// bezahlbare Waffe. Ziel der Rechnung: der gegnerische Held. Für die Rechnung liegt kurz ein Kampf an (Auren, die s.battle prüfen).
+function attackAtkPreview(c) {
+    if (!isChar(c) || (G.battle && (G.battle.att === c.uid || G.battle.def === c.uid))) return null;
+    return attackPower(c);
+}
+// Schaden eines Angriffs von c auf target (Standard: gegnerischer Held) inkl. "while attacking"-Boni und bereiter Waffe des Helden.
+// Auch für Auto-Zugende und den gelben Rahmen: ein Feral-Held mit 0 ATK, aber Cat Form / Nature of the Beast kann angreifen.
+function attackPower(c, target) {
+    const pid = ctrlOf(G, c); if (!pid) return null;
+    const p = getPlayer(G, pid), t = target || getOpponent(G, pid).hero, prev = G.battle;
+    if (prev) return atkOf(G, c, { attacking: true, target: t, weapon: c.type === 'Hero' ? hasUsableWeapon(p) : null });
+    try {
+        G.battle = { att: c.uid, def: t.uid };
+        return atkOf(G, c, { attacking: true, target: t, weapon: c.type === 'Hero' ? hasUsableWeapon(p) : null });
+    } catch (e) { return null; } finally { G.battle = prev; }
+}
+// Zeigt den Wert in Klammern über dem ATK-Symbol, wenn er vom angezeigten ATK abweicht
+function showAttackAtk(node, c) {
+    const v = attackAtkPreview(c); if (v === null) return;
+    const shown = (c.atk || 0) + (c.tempAtkBonus || 0);
+    const badge = node.querySelector('.cfx-stat-badge.lean'); if (!badge || v === shown) return;
+    badge.style.opacity = '';
+    const t = document.createElement('b'); t.className = 'atk-att'; t.textContent = `(${v})`;
+    badge.title = tr`Beim Angreifen: ${v} ATK`;
+    badge.appendChild(t);
+}
 // Bereite eigene Waffe, mit der der Held jetzt angreifen und zuschlagen könnte
 function weaponSwing(c) {
     return c.type === 'Weapon' && canMain() && isMine(c.uid) && canAttackNow(G, G.p1.hero, G.p1) && strikeOptions(G, 1).some(w => w.uid === c.uid);
