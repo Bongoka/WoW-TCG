@@ -1877,6 +1877,8 @@ function targetCands(s, pid, spec) {
 function targetLabel(s, uid, pid) {
     const l = locate(s, uid); if (!l) return '?';
     const c = l.c; const who = l.pid === pid ? tr('eigen') : tr('Gegner');
+    // Ressourcen (auch Ally-Karten als Ressource): als solche kennzeichnen; verdeckte des Gegners nicht verraten (verborgene Information)
+    if (l.zone === 'resource') return l.res && !l.res.faceUp && l.pid !== pid ? tr`Verdeckte Ressource (${who})` : tr`${c.name} (Ressource, ${who})`;
     if (isChar(c)) return `${c.name} (${who}, ${Math.max(0, hpOf(s, c) - (c.damage || 0))} HP)`;
     if (l.zone === 'graveyard') return tr`${c.name} (Friedhof)`;
     if (l.zone === 'hand') return `${c.name}`;
@@ -3048,8 +3050,33 @@ function aiProtectValue(s, pr, att, def) {
     if (aDefAtk >= attLeft) v += cardValue(s, att) * 0.8;
     return v;
 }
+// KI-Entscheidungen (Ja/Nein, Ziel, Modus …): jede Option in einer Kopie durchspielen und die Spiellage danach bewerten
+// (evaluateState) statt nur Faustregeln (o.ai) – z. B. Gladiator Kileana, die zwei gegnerische Allies mit 1 Leben erledigt.
+// Nur in der echten Partie bzw. Simulation, nicht in Kopien der Vorausschau (look) – sonst rechnete jede Kopie wieder Kopien.
+const AI_SIM_MAX_OPTS = 10;
+function aiPickSim(s, d) {
+    if (s.look || s._aiSim || typeof evaluateState !== 'function' || d.kind === 'priority') return undefined;
+    // Nur Karten-Effekte ("id:name"). Regel-Entscheidungen der Engine ("E:…": Rüstung, Waffenschlag, Protector, Abwerfen …)
+    // behalten ihre Faustregeln – dort sieht die Bewertung nur den Augenblick (bereite Ressourcen gegen Schaden) und wählt schlechter.
+    if (!d.k || String(d.k).startsWith('E:')) return undefined;
+    const opts = d.opts.filter(o => o.v !== '__cancel');
+    if (opts.length < 2 || opts.length > AI_SIM_MAX_OPTS) return undefined;
+    let best, bv = -Infinity;
+    for (const o of opts) {
+        let v;
+        try {
+            const c = cloneState(s); c._aiSim = true; c._batch = [];
+            callK(c, d.k, d.a, o.v); process(c); autoResolve(c);
+            v = evaluateState(c, d.pid);
+        } catch (e) { return undefined; }                                                  // Kopie scheitert: Faustregel nehmen
+        v += 1e-4 * (typeof o.ai === 'number' && isFinite(o.ai) ? Math.max(-100, Math.min(100, o.ai)) : 0);   // Gleichstand: Faustregel entscheidet
+        if (v > bv) { bv = v; best = o; }
+    }
+    return best ? best.v : undefined;
+}
 function aiPick(s, d) {
     if (d.kind === 'priority') return null;
+    const sim = aiPickSim(s, d); if (sim !== undefined) return sim;
     let best = d.opts[0], bv = -Infinity;
     for (const o of d.opts) { const v = o.ai !== undefined ? o.ai : 0; if (v > bv) { bv = v; best = o; } }
     return best.v;

@@ -49,7 +49,7 @@ public class MainActivity extends Activity {
         base = new File(Environment.getExternalStorageDirectory(), "Documents/WoWTCG");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         requestHighestRefreshRate();
-        if (Environment.isExternalStorageManager()) startGame(); else askPermission();
+        if (Environment.isExternalStorageManager()) syncThenStart(); else askPermission();
     }
 
     @Override
@@ -57,8 +57,38 @@ public class MainActivity extends Activity {
         super.onResume();
         immersive();
         requestHighestRefreshRate();
-        if (web == null && Environment.isExternalStorageManager()) startGame();
+        if (web == null && Environment.isExternalStorageManager()) syncThenStart();
         if (web != null) web.onResume();
+    }
+
+    // ------------------------------------------------------------------ WLAN-Abgleich mit dem PC (bin/SyncServer.java)
+    // Beim Start: PC im WLAN suchen (zuletzt bekannte Adresse, sonst das ganze Netz /24 auf Port 8766), geänderte Dateien
+    // in den Spielordner laden, dann das Spiel starten. Kein PC erreichbar → sofort offline mit dem vorhandenen Stand.
+    static final int SYNC_PORT = 8766;
+    boolean starting;
+    TextView status;
+
+    void syncThenStart() {
+        if (starting || web != null) return;
+        starting = true;
+        status = new TextView(this);
+        status.setTextColor(Color.rgb(232, 220, 200)); status.setTextSize(18); status.setGravity(Gravity.CENTER);
+        status.setBackgroundColor(Color.rgb(10, 7, 5)); status.setText("WoW TCG …");
+        setContentView(status);
+        new Thread(new Runnable() { @Override public void run() {
+            String msg = null;
+            try { msg = Sync.run(MainActivity.this, base); } catch (Throwable t) { msg = "Abgleich abgebrochen: " + t.getMessage(); }
+            final String m = msg;
+            runOnUiThread(new Runnable() { @Override public void run() {
+                starting = false;
+                if (m != null) android.widget.Toast.makeText(MainActivity.this, m, android.widget.Toast.LENGTH_LONG).show();
+                startGame();
+            } });
+        } }).start();
+    }
+
+    void syncStatus(final String s) {
+        runOnUiThread(new Runnable() { @Override public void run() { if (status != null) status.setText(s); } });
     }
 
     @Override
@@ -73,19 +103,50 @@ public class MainActivity extends Activity {
         if (focus) immersive();
     }
 
-    /** Höchste Bildwiederholrate bei gleicher Auflösung anfordern (sonst gibt das System Apps oft nur 60 Hz). */
-    void requestHighestRefreshRate() {
+    /**
+     * Bildrate nach Bedarf: bei Berührung oder Bewegung im Spiel (Seite meldet über WTCG.active) die höchste Rate,
+     * sonst die niedrigste – ein stehendes Bild braucht keine 120 Hz (Akku).
+     */
+    boolean high = true;
+    final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+    final Runnable toLow = new Runnable() { @Override public void run() { setHigh(false); } };
+
+    void requestHighestRefreshRate() { setHigh(true); ui.removeCallbacks(toLow); ui.postDelayed(toLow, 2000); }
+
+    void setHigh(boolean h) {
         Display d = getDisplay();
         if (d == null) return;
-        Display.Mode cur = d.getMode(), best = cur;
+        Display.Mode cur = d.getMode(), pick = null;
         for (Display.Mode m : d.getSupportedModes()) {
-            if (m.getPhysicalWidth() == cur.getPhysicalWidth() && m.getPhysicalHeight() == cur.getPhysicalHeight()
-                    && m.getRefreshRate() > best.getRefreshRate()) best = m;
+            if (m.getPhysicalWidth() != cur.getPhysicalWidth() || m.getPhysicalHeight() != cur.getPhysicalHeight()) continue;
+            if (pick == null || (h ? m.getRefreshRate() > pick.getRefreshRate() : m.getRefreshRate() < pick.getRefreshRate())) pick = m;
         }
+        if (pick == null) return;
+        high = h;
         WindowManager.LayoutParams lp = getWindow().getAttributes();
-        lp.preferredDisplayModeId = best.getModeId();
-        lp.preferredRefreshRate = best.getRefreshRate();
+        if (lp.preferredDisplayModeId == pick.getModeId()) return;
+        lp.preferredDisplayModeId = pick.getModeId();
+        lp.preferredRefreshRate = pick.getRefreshRate();
         getWindow().setAttributes(lp);
+    }
+
+    /** Berührung: sofort hoch, nach 2 s Ruhe wieder runter (sofern die Seite keine Bewegung meldet). */
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent e) {
+        if (!high) setHigh(true);
+        ui.removeCallbacks(toLow); ui.postDelayed(toLow, 2000);
+        return super.dispatchTouchEvent(e);
+    }
+
+    /** Aufrufe aus der Seite (window.WTCG.active()): gerade bewegt sich etwas (Animation, CPU-Zug …). */
+    public class Bridge {
+        @android.webkit.JavascriptInterface
+        public void active() {
+            ui.post(new Runnable() { @Override public void run() {
+                if (!high) setHigh(true);
+                ui.removeCallbacks(toLow); ui.postDelayed(toLow, 700);
+            } });
+        }
     }
 
     void immersive() {
@@ -166,6 +227,7 @@ public class MainActivity extends Activity {
                 return true;                                                    // fremde Links im Browser öffnen
             }
         });
+        web.addJavascriptInterface(new Bridge(), "WTCG");
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         setContentView(web);
         web.loadUrl(START);

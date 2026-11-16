@@ -47,7 +47,7 @@ function firstSlotCands(card) {
     } catch (e) { return []; }
 }
 function handPlayable(card) {
-    if (card.type === 'Quest') return canMain() && !G.placedResource;
+    if (card.type === 'Quest' || card.type === 'Location') return canMain() && !G.placedResource;   // nur als Ressource spielbar: leuchten, solange in diesem Zug noch keine gelegt ist
     if (!canMain() && !canInstant()) return false;
     return !canPlayCard(G, 1, card);
 }
@@ -1819,7 +1819,12 @@ function cardByName(name) {
 function cardNode(card, cls, caption) {
     const box = document.createElement("div"); box.className = cls;
     const l = card.uid && locate(G, card.uid);
-    box.appendChild(createCardDOM({ ...card, exhausted: false }, !!l && (isInPlayZone(l.zone) || l.zone === 'chain')));
+    if (l && l.zone === 'resource' && l.res && !l.res.faceUp && l.pid !== 1) {           // verdeckte Ressource des Gegners: nur die Rückseite zeigen
+        const w = document.createElement("div"); w.className = "card-wrapper";
+        const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.alt = ""; img.draggable = false;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:4.6cqw;display:block";
+        w.appendChild(img); box.appendChild(w);
+    } else box.appendChild(createCardDOM({ ...card, exhausted: false }, !!l && (isInPlayZone(l.zone) || l.zone === 'chain')));
     if (caption) { const c = document.createElement("div"); c.className = "cm-caption"; c.textContent = caption; box.appendChild(c); }
     return box;
 }

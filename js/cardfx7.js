@@ -235,10 +235,11 @@ RES_GRANTS.push((s, card, l) => l && pes(s, l.pid, 'invoc5062').length ? ['invoc
 // "any number of …": Karten nacheinander wählen, "Fertig" beendet; danach k(a, Liste)
 // KI bei "beliebig viele": eigene Handkarten (aufdecken) und gegnerische Karten (Schaden/Zerstören) lohnen, eigene Karten im Spiel nicht
 function pickManyAi(s, pid, u) { const l = locate(s, u); if (!l) return -1; if (l.zone === 'hand') return 1; if (l.zone === 'graveyard' || l.zone === 'removed') return 0.5; return aiTargetValue(s, pid, u, true); }
-function pickMany(s, pid, prompt, src, cands, k, a, aiFn) { q(s, { op: 'call', k: 'E:pickMany', a: { pid, prompt, src, cands, k, a, list: [], ai: !!aiFn } }); }
+// max: höchstens so viele Karten ("up to N target …"); danach endet die Auswahl von selbst
+function pickMany(s, pid, prompt, src, cands, k, a, aiFn, max) { q(s, { op: 'call', k: 'E:pickMany', a: { pid, prompt, src, cands, k, a, list: [], ai: !!aiFn, max: max || 0 } }); }
 EK.pickMany = (s, a) => { const left = a.cands.filter(u => !a.list.includes(u) && findCharacter(s, u));
-    if (!left.length) { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; }
-    ask(s, { pid: a.pid, prompt: a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: a.ai ? pickManyAi(s, a.pid, u) : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false }); };
+    if (!left.length || (a.max && a.list.length >= a.max)) { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; }
+    ask(s, { pid: a.pid, prompt: a.max ? `${a.prompt} (${a.list.length}/${a.max})` : a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: a.ai ? pickManyAi(s, a.pid, u) : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false }); };
 EK.pickManyAdd = (s, a, v) => { if (v === '__done') { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; } q(s, { op: 'call', k: 'E:pickMany', a: { ...a, list: [...a.list, v] } }); };
 
 // ============================================================================

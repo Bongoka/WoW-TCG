@@ -713,6 +713,18 @@ setInterval(() => {
     const v = covered ? 'hidden' : '';
     if (arena.style.visibility !== v) arena.style.visibility = v;
 }, 250);
+// Tablet-App (android/, window.WTCG): Bildrate nach Bedarf. Solange sich etwas bewegt (Animationsschleifen über
+// requestAnimationFrame, CSS-Animationen/Übergänge), meldet die Seite das; steht das Bild, schaltet die App das Display herunter.
+if (window.WTCG && typeof window.WTCG.active === 'function') {
+    let lastRaf = 0;
+    const raf0 = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = cb => { lastRaf = performance.now(); return raf0(cb); };
+    setInterval(() => {
+        const moving = performance.now() - lastRaf < 400
+            || (document.getAnimations ? document.getAnimations().some(a => a.playState === 'running') : false);
+        if (moving) try { window.WTCG.active(); } catch (e) {}
+    }, 300);
+}
 // FPS-Anzeige zum Vergleichen von Browsern/Geräten: nur mit "?fps" in der Adresse (z. B. http://localhost:8080/?fps)
 if (/[?&]fps\b/.test(location.search)) {
     const el = document.createElement('div');

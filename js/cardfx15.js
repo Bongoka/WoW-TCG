@@ -292,7 +292,7 @@ FX[3423] = { powers: [actPow('curse', tr('Ziel-Anhang zerstören, Controller zie
 // Icy Blast Amulet: "When your hero is dealt damage on an opponent's turn, you may pay (1). If you do, it deals 1 frost damage to target hero or ally."
 FX[3424] = { on: { damaged: (s, c, d, pid) => { if (d.tgt === heroOf(s, pid).uid && d.amt > 0 && s.activePlayer !== pid) trig(s, { id: 3424, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPay(s, a.pid, 1, tr('Icy Blast Amulet: (1) bezahlen – 1 Frostschaden?'), 'Icy Blast Amulet', '3424:go', a),
-        go: (s, a) => mustPick(s, a.pid, tr('Icy Blast Amulet: 1 Frostschaden an Ziel'), 'Icy Blast Amulet', targetCands(s, a.pid, { char: true }).map(c => c.uid), '3424:dmg', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
+        go: (s, a) => mustPick(s, a.pid, tr('Icy Blast Amulet: 1 Frostschaden an Ziel'), 'Icy Blast Amulet', targetCands(s, a.pid, { char: true }), '3424:dmg', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
         dmg: (s, a, u) => { if (u) heroDmg(s, a.pid, u, 1, 'Frost', { ability: false }); } } };
 // Signet of Manifested Pain: "At the start of your turn, you may put 2 damage on your hero. If you do, put a 2 [Melee] / 2 [Health] ally token into play with the same class and race as your hero."
 FX[3425] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3425, k: 'ask', a: { pid } }); } },
@@ -322,7 +322,7 @@ FX[3429] = { canPlay: (s, pid) => humOrc15(s, pid).length > 0 || tr('Du brauchst
 FX[3430] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr("Calamity's Grasp: Wähle eine Kartenart"), src: "Calamity's Grasp",
         opts: [['ability', tr('Fähigkeit')], ['ally', tr('Ally')], ['equipment', tr('Ausrüstung')]].map(([v, l]) => ({ label: l, v, ai: me(s, pid).hand.some(h => kind15(CARDS[h.id]) === v) ? 1 + targetCands(s, pid, { char: true, ability: true, equipment: true, side: 'enemy' }).filter(t => kind15(t) === v).length : 0 })), k: '3430:kind', a: { pid } }),
     k: { kind: (s, a, kd) => { const p = me(s, a.pid); const h = p.hand.filter(c => kind15(CARDS[c.id]) === kd); if (!h.length) return;
-            mayPick(s, a.pid, tr("Calamity's Grasp: Karte dieser Art abwerfen?"), "Calamity's Grasp", h.map(c => c.uid), '3430:disc', { ...a, kd }, u => targetCands(s, a.pid, { ally: true, ability: true, equipment: true, side: 'enemy' }).some(t => kind15(t) === kd) ? 1 : -1); },
+            mayPick(s, a.pid, tr("Calamity's Grasp: Karte dieser Art abwerfen?"), "Calamity's Grasp", h.map(c => c.uid), '3430:disc', { ...a, kd }, u => targetCands(s, a.pid, { ally: true, ability: true, equipment: true, side: 'enemy' }).some(t => kind15(findCharacter(s, t)) === kd) ? 1 : -1); },
         disc: (s, a, u) => { if (!u) return; EK.discardDo(s, {}, u); const t = targetCands(s, a.pid, { ally: true, ability: true, equipment: true }).filter(c => kind15(c) === a.kd); if (!t.length) return;
             mustPick(s, a.pid, tr("Calamity's Grasp: Ziel-Karte dieser Art zerstören"), "Calamity's Grasp", t.map(c => c.uid), '3430:kill', a, x => ctrlOf(s, findCharacter(s, x)) === a.pid ? -5 : (findCharacter(s, x).cost || 0) + 1); },
         kill: (s, a, u) => { const t = findCharacter(s, u); if (t) destroy(s, t); } } };
@@ -344,7 +344,7 @@ EK.dmn15 = (s, a) => { const h = heroOf(s, a.pid); dealDamage(s, { src: h.uid, t
 // Envoy of Mortality: "When you strike with this weapon, your hero has Long-Range this combat. <p> When your hero deals damage with this weapon,
 // it also deals that much ranged damage to target friendly hero or ally."
 FX[3433] = { on: { ...strikeLongRange, dmg: (s, c, d, pid) => { if (d.amt > 0 && d.src === heroOf(s, pid).uid && (d.weapons || []).includes(c.uid)) trig(s, { id: 3433, k: 'go', a: { pid, n: d.amt } }); } },
-    k: { go: (s, a) => mustPick(s, a.pid, tr`Envoy of Mortality: ${a.n} Fernkampfschaden an befreundetes Ziel`, 'Envoy of Mortality', targetCands(s, a.pid, { char: true, side: 'friendly' }).map(c => c.uid), '3433:dmg', a,
+    k: { go: (s, a) => mustPick(s, a.pid, tr`Envoy of Mortality: ${a.n} Fernkampfschaden an befreundetes Ziel`, 'Envoy of Mortality', targetCands(s, a.pid, { char: true, side: 'friendly' }), '3433:dmg', a,
             u => { const t = findCharacter(s, u); return t.type === 'Hero' ? -a.n : -(t.cost || 0) - 5; }),
         dmg: (s, a, u) => { if (u) dealDamage(s, { src: heroOf(s, a.pid).uid, tgt: u, amt: a.n, dt: 'Ranged' }); } } };
 // Last Laugh: "When this weapon enters play, target opponent gains control of it until the start of your next turn."
@@ -402,8 +402,8 @@ FX[3503] = { on: { allyEnters: nest15, entersPlay: nest15 },
 // <p> When you or a friendly player plays a frost or [Frost] card, your hero may deal 1 frost damage to target ally."
 const dtCard15 = (c, dt) => !!c && ((c.type === 'Ability' && c.school === dt) || c.atkType === dt || c.dmgType === dt || new RegExp(`\\b${dt.toLowerCase()} damage\\b`).test(c.text || ''));
 FX[3504] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid !== pid) return; if (dtCard15(d.card, 'Fire')) trig(s, { id: 3504, k: 'fire', a: { pid } }); if (dtCard15(d.card, 'Frost')) trig(s, { id: 3504, k: 'frost', a: { pid } }); } },
-    k: { fire: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Feuerschaden an Ziel-Held?'), 'Nexus Link', targetCands(s, a.pid, { hero: true }).map(c => c.uid), '3504:dF', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
-        frost: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Frostschaden an Ziel-Ally?'), 'Nexus Link', targetCands(s, a.pid, { ally: true }).map(c => c.uid), '3504:dI', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
+    k: { fire: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Feuerschaden an Ziel-Held?'), 'Nexus Link', targetCands(s, a.pid, { hero: true }), '3504:dF', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
+        frost: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Frostschaden an Ziel-Ally?'), 'Nexus Link', targetCands(s, a.pid, { ally: true }), '3504:dI', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
         dF: (s, a, u) => { if (u) heroDmg(s, a.pid, u, 1, 'Fire', { ability: false }); }, dI: (s, a, u) => { if (u) heroDmg(s, a.pid, u, 1, 'Frost', { ability: false }); } } };
 // Grace of the Lightbringer: "Ongoing: If a friendly hero would deal holy ([Holy]) or melee ([Melee]) damage, it deals that much +1 instead."
 FX[3505] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.type === 'Hero' && ctrlBy(s, from, sp) && (o.dt === 'Holy' || o.dt === 'Melee') ? 1 : 0 } };
@@ -417,7 +417,7 @@ FX[3508] = { enterTrig: (s, c, pid) => { const l = (s.chain || []).filter(i => i
         if (l.length) mayPick(s, pid, tr('Windshear Totem: Ziel-Fähigkeit unterbrechen?'), 'Windshear Totem', l, '3508:int', { pid }, u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 3 : -3; }); },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3508, k: 'tick', a: { pid, uid: c.uid } }); } },
     k: { int: (s, a, u) => { if (u && interruptUid(s, u)) L(s, tr('Windshear Totem unterbricht die Fähigkeit.'), '', a.pid); },
-        tick: (s, a) => { if (!findCharacter(s, a.uid)) return; mustPick(s, a.pid, tr('Windshear Totem: 1 Naturschaden an Ziel'), 'Windshear Totem', targetCands(s, a.pid, { char: true }).map(c => c.uid), '3508:dmg', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2); },
+        tick: (s, a) => { if (!findCharacter(s, a.uid)) return; mustPick(s, a.pid, tr('Windshear Totem: 1 Naturschaden an Ziel'), 'Windshear Totem', targetCands(s, a.pid, { char: true }), '3508:dmg', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2); },
         dmg: (s, a, u) => { if (u && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: u, amt: 1, dt: 'Nature' }); } } };
 // Fel Trade: "Destroy any number of allies you control. Then, search your deck for an ally with cost less than or equal to the combined cost of cards destroyed this way and put it into play."
 FX[3509] = { resolve: (s, it) => pickMany(s, it.pl, tr('Fel Trade: Eigene Allies zerstören (Fertig = keine weiteren)'), 'Fel Trade', alliesOf(me(s, it.pl)).map(c => c.uid), '3509:kill', { pid: it.pl }, u => { const c = findCharacter(s, u); return c && c.isToken ? 1 : -1; }),
@@ -472,7 +472,7 @@ FX[3521] = { powers: [{ key: 'ender', label: tr('Zerstören: Hand ins Deck misch
 // Oathbinder: "At the start of your turn, your hero deals 1 nature damage to target hero for each ability, ally, and equipment you control."
 FX[3522] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3522, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => { const p = me(s, a.pid); const n = new Set([...(p.ongoing || []), ...p.allies, ...p.hero.weapons, ...p.hero.armors].map(c => c.uid)).size; if (!n) return;
-            mustPick(s, a.pid, tr`Oathbinder: ${n} Naturschaden an Ziel-Held`, 'Oathbinder', targetCands(s, a.pid, { hero: true }).map(c => c.uid), '3522:dmg', { ...a, n }, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -9 : 5); },
+            mustPick(s, a.pid, tr`Oathbinder: ${n} Naturschaden an Ziel-Held`, 'Oathbinder', targetCands(s, a.pid, { hero: true }), '3522:dmg', { ...a, n }, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -9 : 5); },
         dmg: (s, a, u) => { if (u) heroDmg(s, a.pid, u, a.n, 'Nature', { ability: false }); } } };
 // Pugius, Fist of Defiance: "When your hero is dealt damage for the first time each turn, you may add a +1 ATK counter to this weapon."
 FX[3523] = { on: { damaged: (s, c, d, pid) => { if (d.tgt !== heroOf(s, pid).uid || !(d.amt > 0)) return; const k = `${pid}:${s.turn}`; if ((s.pug15 || {})[c.uid] === k) return; s.pug15 = { ...(s.pug15 || {}), [c.uid]: k };
@@ -480,10 +480,13 @@ FX[3523] = { on: { damaged: (s, c, d, pid) => { if (d.tgt !== heroOf(s, pid).uid
     k: { ask: (s, a) => yesNo(s, a.pid, tr('Pugius: +1-ATK-Marke auf die Waffe legen?'), 'Pugius, Fist of Defiance', '3523:go', a, true), go: (s, a, v) => { const w = findCharacter(s, a.uid); if (v && w) addCounter(s, w, 'atk1', 1); } } };
 // Royal Scepter of Terenas II: "When a card enters your resource row, your hero may heal 2 damage from target hero or ally."
 FX[3524] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3524, k: 'ask', a: { pid } }); } },
-    k: { ask: (s, a) => mayPick(s, a.pid, tr('Royal Scepter of Terenas II: 2 Schaden bei Ziel heilen?'), 'Royal Scepter of Terenas II', targetCands(s, a.pid, { char: true }).filter(c => c.damage > 0).map(c => c.uid), '3524:go', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 2 : -3),
+    k: { ask: (s, a) => mayPick(s, a.pid, tr('Royal Scepter of Terenas II: 2 Schaden bei Ziel heilen?'), 'Royal Scepter of Terenas II', targetCands(s, a.pid, { char: true }).filter(u => (findCharacter(s, u) || {}).damage > 0), '3524:go', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 2 : -3),
         go: (s, a, u) => { if (u) heal(s, heroOf(s, a.pid).uid, u, 2); } } };
 // Shadowmourne: "When this weapon enters play, remove target ally from the game. If you do, add X +1 ATK counters to this weapon, where X was the ATK of that removed ally."
-FX[3525] = { enter: (s, c, pid) => { const l = targetCands(s, pid, { ally: true }); if (l.length) mustPick(s, pid, tr('Shadowmourne: Ziel-Ally aus dem Spiel entfernen'), 'Shadowmourne', l.map(x => x.uid), '3525:go', { uid: c.uid }, u => { const t = findCharacter(s, u); return (ctrlOf(s, t) === pid ? -5 : 2) + atkOf(s, t); }); },
+FX[3525] = { enter: (s, c, pid) => { const l = targetCands(s, pid, { ally: true }); if (!l.length) return;
+        // Auswahl zeigt je Ally den ATK-Gewinn (X = ATK des entfernten Allys); targetCands liefert Kennungen (uid)
+        ask(s, { pid, prompt: tr('Shadowmourne: Ziel-Ally aus dem Spiel entfernen'), src: 'Shadowmourne', k: '3525:go', a: { uid: c.uid },
+            opts: l.map(u => { const t = findCharacter(s, u); return { label: tr`${targetLabel(s, u, pid)} → +${Math.max(0, atkOf(s, t))} ATK`, v: u, ai: (ctrlOf(s, t) === pid ? -5 : 2) + atkOf(s, t) }; }) }); },
     k: { go: (s, a, u) => { const t = findCharacter(s, u); if (!t) return; const x = atkOf(s, t); if (!removeFromGame(s, t)) return; L(s, tr`${t.name} wird aus dem Spiel entfernt.`); const w = findCharacter(s, a.uid); if (w && x > 0) addCounter(s, w, 'atk1', x); } } };
 // Stormfury, Black Blade of the Betrayer: "At the start of your turn, if this weapon has two or fewer Demonic counters on it, add a Demonic counter.
 // <p> This weapon has +1 ATK and you pay (1) less to strike with it for each Demonic counter on it."
@@ -590,7 +593,7 @@ EK.ebon16Do = (s, a, v) => { const w = findCharacter(s, a.uid); if (!w) return; 
 // Runed Soulblade: "When this weapon enters play, you may destroy an ally you control. If you do, your hero deals shadow damage equal to that ally's ATK to target ally."
 FX[3723] = { enter: (s, c, pid) => { const l = alliesOf(me(s, pid)); if (l.length) mayPick(s, pid, tr('Runed Soulblade: Eigenen Ally zerstören?'), 'Runed Soulblade', l.map(x => x.uid), '3723:kill', { pid }, u => { const x = findCharacter(s, u); return x && x.isToken ? 1 : -1; }); },
     k: { kill: (s, a, u) => { const c = u && findCharacter(s, u); if (!c) return; const x = atkOf(s, c, {}); destroy(s, c); const l = locate(s, u); if (l && isInPlayZone(l.zone)) return;
-            const t = targetCands(s, a.pid, { ally: true }); if (t.length && x > 0) mustPick(s, a.pid, tr`Runed Soulblade: ${x} Schattenschaden an Ziel-Ally`, 'Runed Soulblade', t.map(y => y.uid), '3723:dmg', { ...a, x }, v => ctrlOf(s, findCharacter(s, v)) === a.pid ? -5 : 2); },
+            const t = targetCands(s, a.pid, { ally: true }); if (t.length && x > 0) mustPick(s, a.pid, tr`Runed Soulblade: ${x} Schattenschaden an Ziel-Ally`, 'Runed Soulblade', t, '3723:dmg', { ...a, x }, v => ctrlOf(s, findCharacter(s, v)) === a.pid ? -5 : 2); },
         dmg: (s, a, u) => { if (u) heroDmg(s, a.pid, u, a.x, 'Shadow', { ability: false }); } } };
 // Betrayal: "On your turn: Destroy an ally you control and pay (1) to complete this quest. <p> Reward: Draw a card."
 FX[3724] = { questCond: (s, pid) => s.activePlayer !== pid ? tr('Nur in deinem Zug') : alliesOf(me(s, pid)).length ? null : tr('Du brauchst einen eigenen Ally'),

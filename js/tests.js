@@ -1673,6 +1673,44 @@ function runRuleTests() {
         FX[3415].k.go(s, { pid: 1 }, 11235);
         assert(p.hero.weapons.length && weaponAtk(s, p.hero.weapons[0]) === 5, 'Girdle of Razuvious: Edge of Oblivion ohne Zähler');
     });
+    test(148, 'Shadowmourne: Auswahl nennt echte Allies samt ATK-Gewinn, entfernt den Ally und gibt X +1 ATK; Jin\'rohk: höchstens so viele Karten wie Schaden, verdeckte Ressourcen des Gegners bleiben verborgen', () => {
+        const s = fresh(); s.humans = [1]; const p = P(s, 1); p.hero.weapons = []; res(s, 1, 8);
+        const vid = ctVanilla(3).id, al = put(s, 2, vid), x = atkOf(s, al); put(s, 1, ctVanilla(2).id);   // zwei Allies: sonst wählt die Engine von selbst
+        const sm = makeCardInst(3525, false, 1); p.hand.push(sm);
+        resolveCard(s, { kind: 'card', card: sm, pl: 1 }); process(s);
+        const d = s.pending;
+        assert(d && d.kind === 'choose' && d.opts.every(o => typeof o.v === 'string' && locate(s, o.v)), `Shadowmourne: Optionen ohne gültige Allies: ${JSON.stringify(d && d.opts)}`);
+        const o = d.opts.find(o => o.v === al.uid);
+        assert(o && o.label.includes(`+${x} ATK`) && o.label.includes(al.name), `Shadowmourne: Beschriftung "${o && o.label}" ohne Namen/ATK-Gewinn`);
+        applyAction(s, { type: 'CHOOSE', v: al.uid, actorId: 1 }, true, 1); process(s); autoResolve(s);
+        const w = p.hero.weapons.find(c => c.id === 3525);
+        assert(!findCharacter(s, al.uid) || locate(s, al.uid).zone === 'removed', 'Shadowmourne: Ally nicht entfernt');
+        assert(w && weaponAtk(s, w) === x, `Shadowmourne: ${w && weaponAtk(s, w)} statt ${x} ATK`);
+        // Jin'rohk: 2 Schaden → höchstens 2 Karten; verdeckte gegnerische Ressource ohne Namen
+        const s2 = fresh(); s2.humans = [1]; res(s2, 2, 3); for (let i = 0; i < 3; i++) put(s2, 2, vid);
+        FX[10177].k.ask(s2, { pid: 1, opp: 2, n: 2 }); process(s2);
+        const r0 = P(s2, 2).resources[0].card;
+        let d2 = s2.pending;
+        const lab = d2.opts.find(o => o.v === r0.uid).label;
+        assert(!lab.includes(r0.name) && /Verdeckte Ressource|Face-down resource/.test(lab), `Jin'rohk: verdeckte Ressource verraten: "${lab}"`);
+        applyAction(s2, { type: 'CHOOSE', v: d2.opts[0].v, actorId: 1 }, true, 1); process(s2);
+        applyAction(s2, { type: 'CHOOSE', v: s2.pending.opts[0].v, actorId: 1 }, true, 1); process(s2); autoResolve(s2);
+        assert(!s2.pending || s2.pending.src !== "Jin'rohk, The Great Apocalypse", "Jin'rohk: nach 2 Karten noch eine dritte Auswahl");
+        const left = P(s2, 2).resources.length + P(s2, 2).allies.length;
+        assert(left === 4, `Jin'rohk: ${6 - left} statt 2 Karten zerstört`);
+        // Royal Scepter of Terenas II: nur beschädigte Ziele (vorher wegen falscher Kennungen nie welche)
+        const s3 = fresh(); s3.humans = [1]; const hurt = put(s3, 1, vid, { damage: 1 }); put(s3, 1, vid);
+        FX[3524].k.ask(s3, { pid: 1 }); process(s3);
+        // Gladiator Kileana (CPU): zwei gegnerische Allies mit 1 Leben → sie nutzt den Feuerschaden; nur eigene Verluste → nicht
+        const k1 = fresh(); k1.humans = [1]; const v3 = CARDS[vid];
+        const weak = [put(k1, 1, vid, { damage: v3.hp - 1 }), put(k1, 1, vid, { damage: v3.hp - 1 })], kil = put(k1, 2, 8129);
+        FX[8129].k.ask(k1, { pid: 2, uid: kil.uid }); process(k1); autoResolve(k1);
+        assert(weak.every(w => !findCharacter(k1, w.uid) || locate(k1, w.uid).zone !== 'allies'), 'Gladiator Kileana (CPU): zwei gegnerische Allies mit 1 Leben nicht erledigt');
+        const k2 = fresh(); k2.humans = [1]; const own = [put(k2, 2, vid, { damage: v3.hp - 1 }), put(k2, 2, vid, { damage: v3.hp - 1 })], kil2 = put(k2, 2, 8129);
+        FX[8129].k.ask(k2, { pid: 2, uid: kil2.uid }); process(k2); autoResolve(k2);
+        assert(own.every(w => findCharacter(k2, w.uid) && !(w.damage >= v3.hp)), 'Gladiator Kileana (CPU): tötet nur eigene Allies');
+        assert(s3.pending && s3.pending.opts.some(o => o.v === hurt.uid) && !s3.pending.opts.some(o => typeof o.v === 'string' && o.v !== hurt.uid && (findCharacter(s3, o.v) || {}).damage === 0), 'Royal Scepter: beschädigter Ally fehlt oder unbeschädigter wählbar');
+    });
     LANG = prevLang;
     return results;
 }
