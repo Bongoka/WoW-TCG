@@ -1738,6 +1738,15 @@ function runRuleTests() {
         act(s2, { type: 'PLAY_CARD', handIdx: hand(s2, 1, 1030), targets: [[P(s2, 2).hero.uid]] }, 1);   // Wrath: keine Feral-Fähigkeit
         assert(!P(s2, 1).ongoing.some(o => o.id === 4027), 'Shred nach Nicht-Feral-Fähigkeit nicht zerstört');
     });
+    test(151, 'Bear/Cat Form (CR-Glossar): jede Karte mit der Form wird zerstört, wenn du eine Nicht-Feral-Fähigkeit spielst – auch ohne Erinnerungstext (Grizzly Defender, Predatory Sense …)', () => {
+        const bad = [];
+        for (const c of Object.values(CARDS).filter(c => (c.catForm || c.bearForm) && !c.isToken && !CARD_ISSUES[c.id])) {
+            const s = freshH(1007, 9); const o = put(s, 1, c.id); res(s, 1, 3);
+            act(s, { type: 'PLAY_CARD', handIdx: hand(s, 1, 1030), targets: [[P(s, 2).hero.uid]] }, 1);   // Wrath (Balance)
+            if (P(s, 1).ongoing.includes(o)) bad.push(c.name);
+        }
+        assert(!bad.length, 'nicht zerstört: ' + bad.join(', '));
+    });
     LANG = prevLang;
     return results;
 }

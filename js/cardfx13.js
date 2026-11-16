@@ -117,7 +117,7 @@ FX[12029] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t =
 // ============================================================================
 FX[12030] = { slots: (s, pid) => [{ label: tr('Bis zu drei Ziele'), cands: targetCands(s, pid, { char: true }), min: 1, max: 3, harm: true }],
     resolve: (s, it) => T(it).forEach(u => { const c = findCharacter(s, u); if (c) { addTM(c, { k: 'cantAttack', turn: s.turn }); addTM(c, { k: 'cantProtect', turn: s.turn }); } }) };
-FX[12031] = { aura: { hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 5 * alliesOf(me(s, sp)).length : 0 } };
+FX[12031] = { on: bearOn, aura: { hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 5 * alliesOf(me(s, sp)).length : 0 } };
 FX[12032] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; }, aura: attachAura(6, 6),
     on: { destroyed: (s, c, d, pid) => { if (d.snap.uid === c.attachedTo) trig(s, { id: 12032, k: 'draw', a: { pid } }); } }, k: { draw: (s, a) => drawCards(s, me(s, a.pid), 2) } };
 FX[12033] = { alt: lessonAlt('Druid'), slots: slotAlly(tr('Nicht-Token-Ally'), true, { filter: c => !c.isToken }),

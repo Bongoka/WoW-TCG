@@ -101,7 +101,7 @@ FX[10020] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && isAllyC
     k: { ask: (s, a) => mustPick(s, a.pid, tr`Convocation: Ziel-Held (${a.n} Natur oder Heilung)`, 'Convocation', targetCands(s, a.pid, { hero: true }), '10020:mode', a, u => 1),
         mode: (s, a, v) => ask(s, { pid: a.pid, prompt: tr('Convocation: Schaden oder Heilung?'), src: 'Convocation', opts: [{ label: tr`${a.n} Naturschaden`, v: 1, ai: ctrlOf(s, findCharacter(s, v)) === a.pid ? -2 : 3 }, { label: tr`${a.n} heilen`, v: 2, ai: ctrlOf(s, findCharacter(s, v)) === a.pid ? 2 : -2 }], k: '10020:do', a: { ...a, t: v } }),
         do: (s, a, v) => { if (v === 1) heroDmg(s, a.pid, a.t, a.n, 'Nature'); else heroHeal(s, a.pid, a.t, a.n); } } };
-FX[10021] = { aura: { atk: (s, src, sp, c) => isChar(c) && ctrlOf(s, c) === sp && !c.exhausted ? 2 : 0 } };
+FX[10021] = { on: bearOn, aura: { atk: (s, src, sp, c) => isChar(c) && ctrlOf(s, c) === sp && !c.exhausted ? 2 : 0 } };
 FX[10022] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 10022, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => { const p = me(s, a.pid); if (p.deck.length) yesNo(s, a.pid, tr('Omen of Clarity: oberste Karte aufdecken?'), 'Omen of Clarity', '10022:do', a, true); },
         do: (s, a, v) => { if (!v) return; const p = me(s, a.pid), id = p.deck[p.deck.length - 1]; L(s, tr`Omen of Clarity: ${CARDS[id].name} aufgedeckt.`, '', a.pid); addPE(s, a.pid, { k: 'omen11', name: CARDS[id].name }); } } };

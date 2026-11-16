@@ -253,7 +253,7 @@ FX[11033] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.
 FX[11034] = fxMix({ aura: { resAllow: (s, src, sp, pid) => pid === sp && (s.questRes12 || {})[sp] === s.turn ? 1 : 0 } },
     deathRattle((s, a) => revealTop(s, a.pid, 3, 'Call of the Grove', { type: 'Quest' })));
 onEvt('resEnters', (s, d) => { const l = locate(s, d.uid); if (l && l.c && l.c.type === 'Quest') s.questRes12 = { ...(s.questRes12 || {}), [d.pid]: s.turn }; });
-FX[11035] = { powers: [actPow('ready', tr('Helden bereit machen'), { cost: 2, resolve: (s, it) => readyCard(s, heroOf(s, it.pl)) })] };
+FX[11035] = { on: catOn, powers: [actPow('ready', tr('Helden bereit machen'), { cost: 2, resolve: (s, it) => readyCard(s, heroOf(s, it.pl)) })] };
 FX[11036] = { enterCounters: { wind: 2 },
     aura: { kw: (s, src, sp, c, k) => (k === 'cantAttack' || k === 'cantProtect') && isChar(c) && ctrlOf(s, c) !== sp },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 11036, k: 'tick', a: { pid, uid: c.uid } }); } },
@@ -271,7 +271,7 @@ FX[11038] = { modes: () => [{ label: tr('4 Naturschaden an Ziel-Ally'), v: 1, ai
 FX[11039] = { aura: { heal: (s, src, sp, healer, t) => t.uid === heroOf(s, sp).uid ? 5 : 0 },
     on: { healed: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (t && isAllyLike(t) && ctrlOf(s, t) === pid && d.amt > 0) trig(s, { id: 11039, k: 'draw', a: { pid } }); } },
     k: { draw: (s, a) => yesNo(s, a.pid, tr('Nourish: Eine Karte ziehen?'), 'Nourish', '11039:d', a, true), d: (s, a, v) => { if (v) drawCards(s, me(s, a.pid), 1); } } };
-FX[11040] = { powers: [actPow('ready', tr('Helden bereit machen'), { cost: 1, resolve: (s, it) => readyCard(s, heroOf(s, it.pl)) })] };
+FX[11040] = { on: bearOn, powers: [actPow('ready', tr('Helden bereit machen'), { cost: 1, resolve: (s, it) => readyCard(s, heroOf(s, it.pl)) })] };
 
 // ============================================================================
 // JÄGER (41–49)

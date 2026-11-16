@@ -118,7 +118,7 @@ FX[13025] = { powers: [actPow('dom', tr('Eigener Druide: Assault 1 oder Protecto
 FX[13027] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; }, aura: { ...attachAura(2, 2), mend: (s, src, sp, c) => c.uid === src.attachedTo ? 1 : 0 } };
 FX[13028] = { on: { questDone: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 13028, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => yesNo(s, a.pid, tr('Natural Reclamation: Treant-Token?'), 'Natural Reclamation', '13028:d', a, true), d: (s, a, v) => { if (v) makeToken(s, 13502, a.pid); } } };
-FX[13029] = { resolve: (s, it) => addTM(heroOf(s, it.pl), { k: 'assault', v: 2, turn: s.turn }) };
+FX[13029] = { on: catOn, resolve: (s, it) => addTM(heroOf(s, it.pl), { k: 'assault', v: 2, turn: s.turn }) };
 FX[13030] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, ctrlForm(s, it.pl) ? 4 : 2, 'Melee'); } };
 FX[13031] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), addCost: (s, it) => removeCombos(s, it),
     entered: (s, c, pid, it) => { if (it && it.x > 0) addCounter(s, c, 'roar', it.x); },
