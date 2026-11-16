@@ -1114,7 +1114,8 @@ function showAttackAtk(node, c) {
     const shown = (c.atk || 0) + (c.tempAtkBonus || 0);
     const badge = node.querySelector('.cfx-stat-badge.lean'); if (!badge || v === shown) return;
     badge.style.opacity = '';
-    const t = document.createElement('b'); t.className = 'atk-att'; t.textContent = `(${v})`;
+    const t = document.createElement('b'); t.className = 'atk-att';
+    t.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor"><path d="M21.5 2.5l-1.2 4.6-9.6 9.6-3.4-3.4 9.6-9.6z"/><path d="M4.2 12.4l7.4 7.4-1.5 1.5-7.4-7.4z"/><path d="M6.4 16.2l1.4 1.4-3.9 3.9-1.4-1.4z"/></g></svg><i>${v}</i>`;
     badge.title = tr`Beim Angreifen: ${v} ATK`;
     badge.appendChild(t);
 }

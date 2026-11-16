@@ -150,6 +150,10 @@
     background: rgba(10,7,5,.85); border: 0.6cqw solid #c9a84c; box-shadow: 0 1cqw 3cqw rgba(0,0,0,.7); }
 .cfx-counter img { width: 13cqw; height: 13cqw; border-radius: 50%; object-fit: cover; display: block; }
 .cfx-counter span { color: #fde68a; font: 800 12cqw/1 Georgia, serif; text-shadow: 0 0.5cqw 1cqw #000; min-width: 6cqw; text-align: center; }
-/* ATK beim Angreifen (Vorschau, ui.js showAttackAtk): Wert in Klammern über dem ATK-Symbol */
-.cfx-stat-badge .atk-att { position: absolute; left: 42%; bottom: 92%; transform: translateX(-50%); padding: 1.5cqw 4cqw; border-radius: 99px; white-space: nowrap; pointer-events: none;
-    background: rgba(20, 14, 10, .92); border: 0.8cqw solid #ff9b3d; color: #ffb347; font: 900 13cqw/1 Impact, 'Arial Black', sans-serif; box-shadow: 0 1cqw 3cqw #000; }
+/* ATK beim Angreifen (Vorschau, ui.js showAttackAtk): glühendes Schwert-Abzeichen oben rechts am ATK-Symbol */
+.cfx-stat-badge .atk-att { position: absolute; left: 58%; top: -2cqw; z-index: 2; display: flex; align-items: center; gap: 1cqw; padding: 1.6cqw 4.5cqw 1.6cqw 3cqw;
+    border-radius: 99px; pointer-events: none; white-space: nowrap; color: #fff8e6;
+    background: linear-gradient(180deg, #ffcf6b 0%, #f07a1a 45%, #9c2a06 100%); border: 0.7cqw solid #ffe2a0;
+    box-shadow: 0 0 3.5cqw rgba(255, 140, 40, .85), inset 0 0.6cqw 0.8cqw rgba(255, 255, 255, .45), 0 1cqw 2cqw rgba(0, 0, 0, .8); }
+.cfx-stat-badge .atk-att svg { width: 10cqw; height: 10cqw; filter: drop-shadow(0 0.4cqw 0 #5a1500); }
+.cfx-stat-badge .atk-att i { font: normal 900 12cqw/1 Impact, 'Arial Black', sans-serif; text-shadow: 0 0.5cqw 0 #5a1500, 0 0 1.5cqw #5a1500; }
