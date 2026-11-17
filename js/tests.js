@@ -1747,6 +1747,25 @@ function runRuleTests() {
         }
         assert(!bad.length, 'nicht zerstört: ' + bad.join(', '));
     });
+    test(152, 'Darkmoon Faire: Silas (Werte der anderen Allies), Sayge (gegnerische Karte die ganze Partie spielbar), Madness (Gegner zerstört Karte dieser Art), Cannon (Ally zu Beginn des nächsten Zuges zerstört), The Darkmoon Faire (Kosten 1–8 = Sieg)', () => {
+        const run = s => { process(s); for (let i = 0; i < 20 && s.pending; i++) act(s, { type: 'CHOOSE', v: s.pending.opts[0].v }, s.pending.pid); };
+        const s = fresh(); const a = put(s, 1, 262), b = put(s, 1, 262); const si = put(s, 1, 3993);
+        assert(atkOf(s, si) === atkOf(s, a) + atkOf(s, b) && hpOf(s, si) === hpOf(s, a) + hpOf(s, b), 'Silas: Werte ≠ Summe der anderen Allies');
+        const ally = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique).id, abil = Object.values(CARDS).find(c => c.type === 'Ability' && !c.isToken).id;
+        const s2 = fresh(); P(s2, 2).deck.push(abil); FX[3992].k.go(s2, { pid: 1 });
+        const r = P(s2, 2).removed.find(c => c.id === abil); assert(r, 'Sayge: oberste Karte nicht entfernt');
+        s2.turn += 4; assert(canPlayFromRemoved(s2, 1, r, 2) && !canPlayFromRemoved(s2, 2, r, 2), 'Sayge: Karte nicht für die ganze Partie (nur für Sayges Spieler) spielbar');
+        const s3 = fresh(); const v = put(s3, 2, 262); P(s3, 2).deck.push(ally); FX[3994].powers[0].resolve(s3, { pl: 1, extra: {} }); run(s3);
+        assert(!P(s3, 2).allies.includes(v) && P(s3, 2).removed.some(c => c.id === ally), 'Madness: Gegner zerstört keinen Ally');
+        const s4 = fresh(); const hi = hand(s4, 1, ally), u = P(s4, 1).hand[hi].uid; FX[3991].k.put(s4, { pid: 1 }, u);
+        const inPlay = P(s4, 1).allies.find(c => c.uid === u); assert(inPlay, 'Cannon: Ally nicht ins Spiel gebracht');
+        s4.turn++; s4.activePlayer = 2; evt(s4, 'startOfTurn', { pid: 2 }); run(s4); assert(!P(s4, 1).allies.includes(inPlay), 'Cannon: Ally zu Beginn des nächsten Zuges nicht zerstört');
+        const s5 = fresh(); P(s5, 1).resources.push({ card: makeCardInst(3995, false, 1), faceUp: true, exhausted: false });
+        const byCost = n => Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && !c.isPet && !c.totem && c.cost === n && !(FX[c.id] || {}).aura && !(FX[c.id] || {}).on).id;
+        for (let n = 1; n <= 7; n++) put(s5, 1, byCost(n));
+        evt(s5, 'startOfTurn', { pid: 1 }); run(s5); assert(!s5.gameOver, 'Faire: Sieg ohne Karte mit Kosten 8');
+        put(s5, 1, byCost(8)); evt(s5, 'startOfTurn', { pid: 1 }); run(s5); assert(s5.gameOver && s5.winner === 1, 'Faire: Kosten 1–8 gewinnen nicht');
+    });
     LANG = prevLang;
     return results;
 }

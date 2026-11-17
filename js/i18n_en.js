@@ -4465,4 +4465,14 @@ var I18N_EN = {
     'Anzahlen übernommen: {0} Karten, {1} Kopien geändert.': 'Counts applied: {0} cards, {1} copies changed.',
     'Beim Angreifen: {0} ATK': 'When attacking: {0} ATK',
     'Zähler: {0} von {1}': 'Counters: {0} of {1}',
+    // Darkmoon Faire (cardfx15.js)
+    '🎪 {0}: {1} wird aus dem Spiel entfernt.': '🎪 {0}: {1} is removed from the game.',
+    'Ally aus der Hand ins Spiel (zu Beginn des nächsten Zuges zerstört)': 'Put an ally from your hand into play (destroyed at the start of the next turn)',
+    'Kein Ally auf der Hand': 'No ally in your hand',
+    'Blastenheimer 5000 Ultra Cannon: Ally aus der Hand ins Spiel bringen?': 'Blastenheimer 5000 Ultra Cannon: Put an ally from your hand into play?',
+    'Oberste Karte des Gegners entfernen: er zerstört eine Karte dieser Art': "Remove the opponent's top card: he destroys a card of that kind",
+    'Der Gegner kann nicht als Ziel gewählt werden': "The opponent can't be targeted",
+    'Karte abwerfen: Ziehe 1': 'Discard a card: draw 1',
+    'The Darkmoon Faire: Welche Karte abwerfen?': 'The Darkmoon Faire: Which card do you discard?',
+    '🎪 The Darkmoon Faire: {0} kontrolliert Karten mit den Kosten 1 bis 8 und gewinnt!': '🎪 The Darkmoon Faire: {0} controls cards with costs 1 to 8 and wins!',
 };

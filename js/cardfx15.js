@@ -844,3 +844,48 @@ FX[3990] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); q(s, { op: 'call
     k: { ask: (s, a) => { const l = me(s, a.pid).hand.filter(c => c.name === 'Gingerbread Cookie').map(c => c.uid); if (l.length) mayPick(s, a.pid, tr('Treats for Great-father Winter: Gingerbread Cookie abwerfen, um eine [Winter Veil]-Karte zu suchen?'), 'Treats for Great-father Winter', l, '3990:go', a, () => 1); },
         go: (s, a, u) => { if (!u) return; const p = me(s, a.pid); const c = p.hand.find(x => x.uid === u); if (!c) return; EK.discardDo(s, {}, u); if (p.hand.includes(c)) return; searchDeck(s, a.pid, 'Treats for Great-father Winter', 'winterVeil'); } } };
 CARD_ISSUES[3982] = '"All allies also have that type": Ein zusätzlicher Typ für alle Allies müsste in jede Typ-Prüfung der Engine (Rasse, Ally-Typ, Pet, Totem …) eingreifen – nicht umgesetzt.';
+
+// ============================================================================
+// DARKMOON FAIRE (darkmoon faire, IDs 3991–3995)
+// ============================================================================
+// Oberste Karte des gegnerischen Decks aus dem Spiel entfernen (Sayge, Darkmoon Card: Madness) – gibt die Karte zurück
+function dmfRemoveTop(s, pid, src) {
+    const o = foe(s, pid); if (!o.deck.length) return null;
+    const c = makeCardInst(o.deck.pop(), false, o.deckOwner || o.id); o.removed.push(c); s._hidden = true;
+    L(s, tr`🎪 ${src}: ${c.name} wird aus dem Spiel entfernt.`, '', pid); return c;
+}
+const dmfKind = c => c.type === 'Ability' ? 'ability' : c.type === 'Ally' ? 'ally' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equipment' : null;
+// Blastenheimer 5000 Ultra Cannon: "Ongoing: (3), [Activate] >>> You may put an ally from your hand into play. If you do, destroy it at the start of the next turn."
+FX[3991] = { powers: [actPow('cannon', tr('Ally aus der Hand ins Spiel (zu Beginn des nächsten Zuges zerstört)'), { cost: 3,
+        canUse: (s, pid) => me(s, pid).hand.some(c => c.type === 'Ally') || tr('Kein Ally auf der Hand'),
+        aiSkip: (s, pid) => s.activePlayer === pid,                                     // im eigenen Zug kann der Ally nicht angreifen und stirbt vor dem nächsten eigenen Zug
+        resolve: (s, it) => { const l = me(s, it.pl).hand.filter(c => c.type === 'Ally'); if (!l.length) return;
+            ask(s, { pid: it.pl, prompt: tr('Blastenheimer 5000 Ultra Cannon: Ally aus der Hand ins Spiel bringen?'), src: 'Blastenheimer 5000 Ultra Cannon',
+                opts: [...l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: c.cost || 0 })), { label: tr('Nein'), v: 0, ai: -1 }], k: '3991:put', a: { pid: it.pl }, auto: false }); } })],
+    k: { put: (s, a, v) => { if (!v) return; const p = me(s, a.pid), c = p.hand.find(x => x.uid === v); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); evt(s, 'handLeft', { pid: p.id, uid: c.uid });
+        putIntoPlay(s, c, p.id); addPE(s, a.pid, { k: 'cannon15', uid: c.uid, at: s.turn + 1, untilTurn: s.turn + 1 }); } } };
+onEvt('startOfTurn', (s) => { for (const m of (s.pe || []).filter(x => x.k === 'cannon15' && x.at === s.turn && !x.done)) { m.done = true; pushTrig(s, m.pid, 3991, [{ op: 'call', k: 'E:destroyUid', a: { uid: m.uid } }]); } });
+// Sayge: "At the start of your turn, remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, you may play it this game. (Pay costs as normal.)"
+FX[3992] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3992, k: 'go', a: { pid } }); } },
+    k: { go: (s, a) => { const o = oppPid(s, a.pid); if (playerUntargetable(s, o)) return; const c = dmfRemoveTop(s, a.pid, 'Sayge');
+        if (c && dmfKind(c)) addPE(s, a.pid, { k: 'rfgPlayUid', uid: c.uid, until: 'game' }); } } };
+// Silas Darkmoon: "additional ATK equal to the combined ATK of all other allies you control, and additional [Health] equal to the combined [Health] …"
+// Erst nach den Werten der anderen Allies (CR 719.2) – deren ATK/Health samt aller Modifikatoren
+const silasSum = (s, src, sp, f) => { if (src.silas15) return 0; src.silas15 = true; try { return alliesOf(me(s, sp)).filter(x => x !== src).reduce((n, x) => n + f(s, x), 0); } finally { delete src.silas15; } };
+FX[3993] = { aura: { atk: (s, src, sp, c) => c === src ? silasSum(s, src, sp, (s, x) => atkOf(s, x)) : 0, hp: (s, src, sp, c) => c === src ? silasSum(s, src, sp, hpOf) : 0 } };
+// Darkmoon Card: Madness: "On your turn: (2), [Activate] >>> Remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, he destroys a card of that kind he controls."
+FX[3994] = { powers: [actPow('madness', tr('Oberste Karte des Gegners entfernen: er zerstört eine Karte dieser Art'), { cost: 2, myTurn: true,
+        canUse: (s, pid) => !playerUntargetable(s, oppPid(s, pid)) || tr('Der Gegner kann nicht als Ziel gewählt werden'),
+        resolve: (s, it) => { const o = oppPid(s, it.pl); if (playerUntargetable(s, o)) return; const c = dmfRemoveTop(s, it.pl, 'Darkmoon Card: Madness'); const k = c && dmfKind(c);
+            if (k) playerDestroys(s, o, k, 'Darkmoon Card: Madness'); } })] };
+// The Darkmoon Faire: "(1), [Activate], Discard a card >>> Draw a card. <p> At the start of your turn, if you control cards in play with costs 1, 2, 3, 4, 5, 6, 7, and 8, you win the game."
+// Karten im Spiel (CR 415.8): Allies, Ausrüstung, laufende Fähigkeiten und offene Ressourcen – verdeckte Ressourcen sind leer (CR 1031) und haben keine Kosten
+const dmfCosts = (s, pid) => { const p = me(s, pid); const set = new Set();
+    [...nonHeroCards(s, p), ...p.resources.filter(r => r.faceUp).map(r => r.card)].forEach(c => { if (typeof c.cost === 'number') set.add(c.cost); }); return set; };
+const dmfWins = (s, pid) => { const k = dmfCosts(s, pid); return [1, 2, 3, 4, 5, 6, 7, 8].every(n => k.has(n)); };
+FX[3995] = { powers: [actPow('faire', tr('Karte abwerfen: Ziehe 1'), { cost: 1,
+        canUse: (s, pid) => me(s, pid).hand.length > 0 || tr('Keine Handkarte'),
+        payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('The Darkmoon Faire: Welche Karte abwerfen?'), src: 'The Darkmoon Faire', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: '278:pay', a: {} }); },
+        resolve: (s, it) => drawCards(s, me(s, it.pl), 1) })],
+    on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && dmfWins(s, pid)) trig(s, { id: 3995, k: 'win', a: { pid } }); } },
+    k: { win: (s, a) => { if (!dmfWins(s, a.pid)) return; L(s, tr`🎪 The Darkmoon Faire: ${me(s, a.pid).hero.name} kontrolliert Karten mit den Kosten 1 bis 8 und gewinnt!`, 'log-hit', a.pid); lose(s, oppPid(s, a.pid), 'The Darkmoon Faire:'); } } };

@@ -499,3 +499,23 @@ const OCR28 = {
 };
 Object.assign(OCR, OCR28);
 applyOCR(OCR28);
+
+// ============================================================================
+// KARTENDATEN – Darkmoon Faire (Set 29, Karten-IDs 3991–3995)
+// Aus der Official Card Reference (docs/wow_ocr_110329.txt): Werte, Typzeilen, Regeltexte. Verhalten in js/cardfx15.js.
+// ============================================================================
+Ab(3991,"Blastenheimer 5000 Ultra Cannon",7,null,null,"Ongoing: (3), [Activate] >>> You may put an ally from your hand into play. If you do, destroy it at the start of the next turn.",{set:29,num:1,rarity:'Rare',ongoing:true});
+A(3992,"Sayge",4,4,'Melee',4,'Neutral',"Gnoll","","At the start of your turn, remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, you may play it this game. (Pay costs as normal.)",{set:29,num:2,rarity:'Rare',allyTypes:["Gnoll","Fortuneteller"],unique:true});
+A(3993,"Silas Darkmoon",6,0,'Melee',0,'Neutral',"Gnome","","This ally has additional ATK equal to the combined ATK of all other allies you control, and additional [Health] equal to the combined [Health] of all other allies you control.",{set:29,num:3,rarity:'Rare',allyTypes:["Gnome","Ringleader"],unique:true});
+It(3994,"Darkmoon Card: Madness",4,'Trinket',2,'Dr,Hu,Ma,Pa,Pr,Ro,Sh,Lo,Wa',"On your turn: (2), [Activate] >>> Remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, he destroys a card of that kind he controls.",{set:29,num:4,rarity:'Rare'});
+Loc(3995,"The Darkmoon Faire",'Neutral',"(1), [Activate], Discard a card >>> Draw a card. <p> At the start of your turn, if you control cards in play with costs 1, 2, 3, 4, 5, 6, 7, and 8, you win the game.",{set:29,num:5,rarity:'Rare',locType:'Faire'});
+
+const OCR29 = {
+3991:["Ability","Ongoing: (3), [Activate] >>> You may put an ally from your hand into play. If you do, destroy it at the start of the next turn."],
+3992:["Ally—Gnoll Fortuneteller, Unique, 4 [Melee] / 4 Health","At the start of your turn, remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, you may play it this game. (Pay costs as normal.)"],
+3993:["Ally—Gnome Ringleader, Unique, 0 [Melee] / 0 Health","This ally has additional ATK equal to the combined ATK of all other allies you control, and additional [Health] equal to the combined [Health] of all other allies you control."],
+3994:["Equipment—Item, Trinket (2)","On your turn: (2), [Activate] >>> Remove the top card of target opponent's deck from the game. If it's an ability, ally, or equipment, he destroys a card of that kind he controls."],
+3995:["Location—Faire","(1), [Activate], Discard a card >>> Draw a card. <p> At the start of your turn, if you control cards in play with costs 1, 2, 3, 4, 5, 6, 7, and 8, you win the game."],
+};
+Object.assign(OCR, OCR29);
+applyOCR(OCR29);
