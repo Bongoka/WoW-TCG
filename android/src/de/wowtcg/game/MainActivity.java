@@ -104,14 +104,13 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Bildrate nach Bedarf: bei Berührung oder Bewegung im Spiel (Seite meldet über WTCG.active) die höchste Rate,
-     * sonst die niedrigste – ein stehendes Bild braucht keine 120 Hz (Akku).
+     * Bildrate: immer die höchste. Früher schaltete die App nach 2 s Ruhe herunter und bei Berührung wieder hoch –
+     * jeder Wechsel des Displaymodus hält das Bild kurz an, Tippen (Deck-Builder: Vorschau, +/−) reagierte dadurch verzögert.
      */
     boolean high = true;
     final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
-    final Runnable toLow = new Runnable() { @Override public void run() { setHigh(false); } };
 
-    void requestHighestRefreshRate() { setHigh(true); ui.removeCallbacks(toLow); ui.postDelayed(toLow, 2000); }
+    void requestHighestRefreshRate() { setHigh(true); }
 
     void setHigh(boolean h) {
         Display d = getDisplay();
@@ -130,23 +129,15 @@ public class MainActivity extends Activity {
         getWindow().setAttributes(lp);
     }
 
-    /** Berührung: sofort hoch, nach 2 s Ruhe wieder runter (sofern die Seite keine Bewegung meldet). */
-    @Override
-    public boolean dispatchTouchEvent(android.view.MotionEvent e) {
-        if (!high) setHigh(true);
-        ui.removeCallbacks(toLow); ui.postDelayed(toLow, 2000);
-        return super.dispatchTouchEvent(e);
-    }
-
-    /** Aufrufe aus der Seite (window.WTCG.active()): gerade bewegt sich etwas (Animation, CPU-Zug …). */
+    /** Aufrufe aus der Seite. active(): alte Meldung "gerade bewegt sich etwas" – ohne Wirkung, die Rate bleibt immer hoch. */
     public class Bridge {
         @android.webkit.JavascriptInterface
         public void active() {
-            ui.post(new Runnable() { @Override public void run() {
-                if (!high) setHigh(true);
-                ui.removeCallbacks(toLow); ui.postDelayed(toLow, 700);
-            } });
         }
+
+        /** Neue App: Bildrate bleibt immer hoch – die Seite braucht active() nicht mehr zu melden (main.js). */
+        @android.webkit.JavascriptInterface
+        public boolean alwaysHigh() { return true; }
 
         /** Deck-Sync (js/decksync.js): Anfrage an /__decks des PCs im WLAN, Antwort über deckSyncReply(id, status, text). */
         @android.webkit.JavascriptInterface

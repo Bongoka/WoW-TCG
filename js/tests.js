@@ -1766,6 +1766,11 @@ function runRuleTests() {
         evt(s5, 'startOfTurn', { pid: 1 }); run(s5); assert(!s5.gameOver, 'Faire: Sieg ohne Karte mit Kosten 8');
         put(s5, 1, byCost(8)); evt(s5, 'startOfTurn', { pid: 1 }); run(s5); assert(s5.gameOver && s5.winner === 1, 'Faire: Kosten 1–8 gewinnen nicht');
     });
+    test(153, 'Master Heroes im Deckbau: Paletress (Argent Crusade, nur Hero-Required-Bedingungen, die der Held erfüllt) darf Tirion Fordring aufnehmen, Kel\'Thuzad nicht', () => {
+        const p = CARDS[13002];
+        assert(cardMatchesPlayer(CARDS[12021], p) && talentReqOk(CARDS[12021], p), 'Paletress: Highlord Tirion Fordring ([Priest] Hero Required, Argent Crusade) nicht erlaubt');
+        assert(!cardMatchesPlayer(CARDS[11021], p), "Paletress: Kel'Thuzad (kein Priester) erlaubt");
+    });
     LANG = prevLang;
     return results;
 }

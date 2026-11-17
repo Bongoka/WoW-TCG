@@ -3,8 +3,8 @@
      /sdcard/Documents/WoWTCG (gleicher Ordner wie bin/tablet-sync.sh) und fordert die höchste Bildwiederholrate an. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="de.wowtcg.game"
-    android:versionCode="4"
-    android:versionName="1.3">
+    android:versionCode="5"
+    android:versionName="1.4">
 
     <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="35" />
 

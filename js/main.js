@@ -716,7 +716,8 @@ setInterval(() => {
 }, 250);
 // Tablet-App (android/, window.WTCG): Bildrate nach Bedarf. Solange sich etwas bewegt (Animationsschleifen über
 // requestAnimationFrame, CSS-Animationen/Übergänge), meldet die Seite das; steht das Bild, schaltet die App das Display herunter.
-if (window.WTCG && typeof window.WTCG.active === 'function') {
+// App ab 1.4 (WTCG.alwaysHigh): Rate bleibt immer hoch – kein Melden mehr (sparte das Umschalten, das beim Tippen hakte)
+if (window.WTCG && typeof window.WTCG.active === 'function' && typeof window.WTCG.alwaysHigh !== 'function') {
     let lastRaf = 0;
     const raf0 = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = cb => { lastRaf = performance.now(); return raf0(cb); };

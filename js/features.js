@@ -9,6 +9,7 @@ const DB_TYPES = [
     { k: 'Equipment', label: tr('Ausrüstung'), color: '#8f959b', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
     { k: 'Quest', label: 'Quests', color: '#c8642a', is: c => c.type === 'Quest' },
     { k: 'Location', label: 'Locations', color: '#3f8f5a', is: c => c.type === 'Location' },          // Set drums
+    { k: 'MasterHero', label: 'Master Heroes', color: '#d4a640', is: c => c.type === 'Master Hero' },     // CR 301.4: Master Heroes stehen im Deck (CR 100.1)
 ];
 const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
 // Kosten-Kugel je Karte (icons/cost/, ausgeschnitten aus den Kartenrahmen) und ihre Farbe (Mittelwert der Kugel)
@@ -276,7 +277,11 @@ function dbRenderRows(box, cards, hero, o = {}) {
                 const plus = row.querySelector('[data-a="+"]');
                 plus.disabled = counts[id] >= dbMax(c);                                    // 4 Kopien: + grau und ohne Wirkung
                 plus.onclick = (e) => { e.stopPropagation(); dbAdd(id); };
-                row.onmouseenter = () => dbHoverShow(id, row); row.onmouseleave = dbHoverHide;
+                // Touch: Antippen der Zeile zeigt die Zoom-Karte sofort (bis zur nächsten Berührung). mouseenter kommt auf Touch
+                // erst nach dem Loslassen und beim erneuten Antippen derselben Zeile gar nicht – die Maus-Ereignisse danach übergehen
+                row.onpointerup = (e) => { if (e.pointerType !== 'touch' || e.target.closest('button')) return; row._touchT = performance.now(); dbHoverShow(id, row); };
+                row.onmouseenter = () => { if (performance.now() - (row._touchT || -1e9) > 800) dbHoverShow(id, row); };
+                row.onmouseleave = () => { if (performance.now() - (row._touchT || -1e9) > 800) dbHoverHide(); };
                 row.oncontextmenu = (e) => e.preventDefault();                                // Touch: Gedrückthalten = Zoom-Karte, kein Browser-Menü
             }
             box.appendChild(row);

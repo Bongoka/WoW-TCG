@@ -44,6 +44,7 @@ body {
 
 /* ---------------- Deck Builder ---------------- */
 #deck-builder-modal .modal-box { width: 96vw; height: 92vh; display: flex; flex-direction: column; padding: 14px 16px; }
+#deck-builder-modal { touch-action: manipulation; }   /* Tablet: kein Warten auf einen möglichen Doppeltipp-Zoom – +/− und Karten reagieren sofort */
 #deck-builder-modal input, #deck-builder-modal select, #db-io-modal textarea { background: #0a0705; border: 1px solid var(--border); color: var(--text-main); padding: 6px 8px; border-radius: 4px; font-family: inherit; }
 #deck-builder-modal input:focus, #deck-builder-modal select:focus, #db-io-modal textarea:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,168,76,.25); }
 /* Kopf in einer Zeile: Titel · Deckname · Klassen-Icons · Aktionen (bei schmalem Fenster bricht er um) */
