@@ -4,14 +4,14 @@
 const DB_KEY = 'wow_tcg_custom_decks';
 // Farben wie die Titelleiste der Karten: Quests orange-braun, Ausrüstung grau
 const DB_TYPES = [
+    { k: 'MasterHero', label: 'Master Heroes', color: '#d4a640', is: c => c.type === 'Master Hero' },     // CR 301.4: Master Heroes stehen im Deck (CR 100.1)
     { k: 'Ally', label: 'Allies', color: '#1c78b4', is: c => c.type === 'Ally' },
     { k: 'Ability', label: tr('Fähigkeiten'), color: '#9b4fd1', is: c => c.type === 'Ability' },
     { k: 'Equipment', label: tr('Ausrüstung'), color: '#8f959b', is: c => ['Weapon', 'Armor', 'Item'].includes(c.type) },
     { k: 'Quest', label: 'Quests', color: '#c8642a', is: c => c.type === 'Quest' },
     { k: 'Location', label: 'Locations', color: '#3f8f5a', is: c => c.type === 'Location' },          // Set drums
-    { k: 'MasterHero', label: 'Master Heroes', color: '#d4a640', is: c => c.type === 'Master Hero' },     // CR 301.4: Master Heroes stehen im Deck (CR 100.1)
 ];
-const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES[1];
+const dbTypeOf = c => DB_TYPES.find(t => t.is(c)) || DB_TYPES.find(t => t.k === 'Ability');
 // Kosten-Kugel je Karte (icons/cost/, ausgeschnitten aus den Kartenrahmen) und ihre Farbe (Mittelwert der Kugel)
 const dbOrb = c => c.type === 'Ally' ? (c.faction === 'Alliance' ? 'alliance' : c.faction === 'Horde' ? 'horde' : 'neutral')
     : c.type === 'Quest' || c.type === 'Location' ? 'quest' : ['Weapon', 'Armor', 'Item'].includes(c.type) ? 'equip' : 'ability';
@@ -200,7 +200,7 @@ function renderDBDeck(highlightId) {
     const cards = currentDeckBuilder.cards, n = cards.length, hero = dbHero();
     // Fraktionsfarbe wie die Kosten-Kugel der Ally-Karten: Allianz blau, Horde rot (Ally-Gruppe, Kurve, Kosten-Kreise)
     const horde = !!hero && hero.faction === 'Horde';
-    DB_TYPES[0].color = horde ? '#c41e2a' : '#1c78b4';
+    DB_TYPES.find(t => t.k === 'Ally').color = horde ? '#c41e2a' : '#1c78b4';
     document.getElementById('db-deck-cards').classList.toggle('horde', horde);
     // Fortschritt bis 60: gelb darunter, grün genau 60, rot darüber (erlaubt)
     const fill = document.getElementById('db-progress-fill');
@@ -962,7 +962,7 @@ function deckPreview(deck, tile) {
         return;
     }
     const hero = CARDS[deck.hero];
-    DB_TYPES[0].color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
+    DB_TYPES.find(t => t.k === 'Ally').color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
     box.innerHTML = ``
         + `<div class="db-stats"><div class="db-stat-cols"><div class="db-curve-box"><div class="db-stat-title">${tr('Manakurve')}</div><div class="db-curve"></div></div>`
         + `<div class="db-types-box"><div class="db-stat-title">${tr('Verteilung')}</div><div class="db-typebar"></div><div class="db-typelegend"></div></div></div></div>`
