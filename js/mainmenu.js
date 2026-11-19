@@ -17,7 +17,7 @@ function mmBuild() {
                 <div class="mm-title"><img class="mm-logo" src="icons/logo.png" alt="World of Warcraft Trading Card Game" draggable="false"><i class="mm-logo-shine"></i></div>
                 <nav class="mm-nav">
                     <button class="mm-btn mm-continue" data-a="continue"><span>${tr('Spiel fortsetzen')}</span><small>${tr('Zurück in die laufende Partie')}</small></button>
-                    <button class="mm-btn mm-primary" data-a="quick"><span>${tr('Schnelles Spiel')}</span><small>${tr('Zufälliges Match gegen die CPU')}</small></button>
+                    <button class="mm-btn mm-primary" data-a="quick"><span>${tr('Spielen')}</span><small>${tr('Decks und Gegner wählen')}</small></button>
                     <button class="mm-btn" data-a="online"><span>${tr('Online-Spiel')}</span><small>${tr('1 gegen 1 mit Freunden')}</small></button>
                     <div class="mm-sep"></div>
                     <button class="mm-btn" data-a="learn"><span>${tr('Regeln lernen')}</span><small>${tr('Videos und Tutorial-Match')}</small></button>
@@ -29,7 +29,11 @@ function mmBuild() {
                 <button class="mm-prop mm-boosters" data-a="booster" title="${tr('Booster öffnen')}"><div class="mm-pile"></div><span class="mm-plate">${tr('Booster öffnen')}</span></button>
             </div>
         </div>
-        <div class="mm-options" hidden><div class="mm-opt-box"><h2>${tr('Optionen')}</h2><div class="mm-opt-body"></div><button class="mm-opt-close success">${tr('Fertig')}</button></div></div>`;
+        <div class="mm-options mm-play" hidden><div class="mm-opt-box mm-play-box"><h2>${tr('Neues Spiel')}</h2>
+            <div class="mp-versus"><div class="mp-side" data-seat="1"></div><div class="mp-vs"><span class="mp-vs-t">VS</span></div><div class="mp-side" data-seat="2"></div></div>
+            <div class="mm-play-mode"></div>
+            <div class="mm-play-btns"><button class="mm-play-back">${tr('Zurück')}</button><button class="mm-play-go success">${tr('Spiel starten')}</button></div></div></div>
+        <div class="mm-options mm-opt" hidden><div class="mm-opt-box"><h2>${tr('Optionen')}</h2><div class="mm-opt-body"></div><button class="mm-opt-close success">${tr('Fertig')}</button></div></div>`;
     document.body.appendChild(el);
     MM.el = el;
     el.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', e => mmAction(b, b.dataset.a, e)));
@@ -39,7 +43,10 @@ function mmBuild() {
         if (e.pointerType === 'touch') return;                                          // Touch: kein Neigen (jede Bewegung zeichnete die Booster mit Schatten-Filter neu → Ruckeln)
         const r = p.getBoundingClientRect(); p.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); p.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); }));
     el.querySelector('.mm-opt-close').onclick = mmCloseOptions;
-    el.querySelector('.mm-options').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseOptions(); });
+    el.querySelector('.mm-opt').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseOptions(); });
+    el.querySelector('.mm-play').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) closePlaySetup(); });
+    el.querySelector('.mm-play-back').onclick = closePlaySetup;
+    el.querySelector('.mm-play-go').onclick = () => { const m = playSetup(); confirmLeaveGame(() => { document.getElementById('log-area').innerHTML = ''; initGame(m.p || null, m.o || null, { 1: m.c1, 2: m.c2 }); }); };
     return el;
 }
 // Deck-Box zeigt ein eigenes Deck (sonst ein Turnier-Deck), der Stapel je Set einen Booster
@@ -64,7 +71,7 @@ function openMainMenu(boot) {
 }
 function mmHide() {
     if (!MM.el || MM.el.style.display === 'none') return;
-    mmCloseOptions();
+    mmCloseOptions(); closePlaySetup();
     MM.el.classList.remove('in'); MM.el.classList.add('out');
     clearInterval(MM.bgTimer); MM.bgTimer = 0;
     setTimeout(() => { if (MM.el.classList.contains('out')) { MM.el.style.display = 'none'; cancelAnimationFrame(MM.raf); MM.raf = 0; } }, 450);
@@ -77,7 +84,7 @@ function mmAction(btn, a, e) {
     mmBurst(e.clientX, e.clientY);
     const go = {
         continue: () => mmHide(),
-        quick: () => confirmLeaveGame(() => { document.getElementById("log-area").innerHTML = ""; initGame(); }),
+        quick: () => openPlaySetup(),
         online: () => openOnline(),
         learn: () => openLearnMenu(),
         options: () => mmOpenOptions(),
@@ -92,12 +99,54 @@ function mmOpenOptions() {
     const nodes = [...pool.children];
     MM.moved = { nodes, parent: pool };
     box.innerHTML = ''; nodes.forEach(x => box.appendChild(x));
-    const o = MM.el.querySelector('.mm-options'); o.hidden = false; void o.offsetWidth; o.classList.add('in');
+    const o = MM.el.querySelector('.mm-opt'); o.hidden = false; void o.offsetWidth; o.classList.add('in');
 }
 function mmCloseOptions() {
     if (!MM.el) return;
-    const o = MM.el.querySelector('.mm-options'); if (o.hidden) return;
+    const o = MM.el.querySelector('.mm-opt'); if (o.hidden) return;
     if (MM.moved) { MM.moved.nodes.forEach(x => MM.moved.parent.appendChild(x)); MM.moved = null; }
+    o.classList.remove('in'); o.hidden = true;
+}
+
+// ---------------------------------------------------------------- „Spielen“: Decks und Steuerung beider Plätze wählen
+// Je Platz eine große Deck-Box (Klick = Deck-Übersicht mit „Zufall“) und Spieler/CPU. Gemerkt in localStorage;
+// Standard: Zufall gegen Zufall, Spieler 1 = Mensch, Spieler 2 = CPU. Beide Mensch = Hotseat, beide CPU = Zuschauen.
+const PLAY_KEY = 'wow_tcg_play_setup';
+function playSetup() {
+    let v = {}; try { v = JSON.parse(localStorage.getItem(PLAY_KEY) || '{}') || {}; } catch (e) {}
+    const ok = id => !!id && String(id).startsWith('custom_') && !!pickDeck(id);           // gelöschte Decks → wieder Zufall
+    return { p: ok(v.p) ? v.p : '', o: ok(v.o) ? v.o : '', c1: v.c1 === 'cpu' ? 'cpu' : 'human', c2: v.c2 === 'human' ? 'human' : 'cpu' };
+}
+function setPlaySetup(patch) {
+    const m = { ...playSetup(), ...patch };
+    try { localStorage.setItem(PLAY_KEY, JSON.stringify(m)); } catch (e) {}
+    if (MM.el) renderPlaySetup();
+    return m;
+}
+function renderPlaySetup() {
+    const m = playSetup();
+    MM.el.querySelectorAll('.mm-play .mp-side').forEach(side => {
+        const seat = +side.dataset.seat, key = seat === 1 ? 'p' : 'o', ck = seat === 1 ? 'c1' : 'c2', d = pickDeck(m[key]);
+        side.innerHTML = `<b>${tr`Spieler ${seat}`}</b>`
+            + `<button class="mp-deckbox" title="${esc(tr('Deck wählen'))}">${d ? deckBoxHTML(d, 'big') : '<div class="dbox-special">?</div>'}</button>`
+            + `<span>${esc(d ? d.name : tr('Zufall'))}</span>`
+            + `<span class="mp-vis-tog mm-ctl"><button data-c="human" class="${m[ck] === 'human' ? 'on' : ''}">${tr('Spieler')}</button><button data-c="cpu" class="${m[ck] === 'cpu' ? 'on' : ''}">CPU</button></span>`;
+        side.querySelector('.mp-deckbox').onclick = () => openDeckOverview({ title: tr`Deck für Spieler ${seat}`, random: true, current: m[key], pick: deck => setPlaySetup({ [key]: deck ? deck.id : '' }) });
+        side.querySelectorAll('.mm-ctl button').forEach(b => b.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('draw'); setPlaySetup({ [ck]: b.dataset.c }); });
+    });
+    const both = m.c1 === 'human' && m.c2 === 'human', none = m.c1 === 'cpu' && m.c2 === 'cpu';
+    MM.el.querySelector('.mm-play-mode').textContent = both ? tr('Hotseat: Ihr spielt abwechselnd an diesem Gerät – zwischen den Zügen wird das Brett gedreht.')
+        : none ? tr('CPU gegen CPU: zum Zuschauen.') : tr('Du gegen die CPU.');
+}
+function openPlaySetup(patch) {
+    mmBuild();
+    if (patch) setPlaySetup(patch);
+    renderPlaySetup();
+    const o = MM.el.querySelector('.mm-play'); o.hidden = false; void o.offsetWidth; o.classList.add('in');
+}
+function closePlaySetup() {
+    if (!MM.el) return;
+    const o = MM.el.querySelector('.mm-play'); if (o.hidden) return;
     o.classList.remove('in'); o.hidden = true;
 }
 

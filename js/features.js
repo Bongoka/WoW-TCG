@@ -473,7 +473,10 @@ document.getElementById("db-save-only-btn").onclick = () => dbSave();
 document.getElementById("db-save-btn").onclick = () => {
     if (!currentDeckBuilder.cards.length) { dbFlash(tr('Das Deck ist leer.')); return; }
     const d = dbSave(); if (!d) return;
-    confirmLeaveGame(() => { document.getElementById("deck-builder-modal").style.display = "none"; initGame(d.id, null); });
+    // Ins Hauptmenü „Spielen“ mit diesem Deck für Spieler 1 – Gegner und Spieler/CPU wählt man dort
+    document.getElementById("deck-builder-modal").style.display = "none";
+    document.getElementById("deck-overview-modal").style.display = "none";
+    openMainMenu(); openPlaySetup({ p: d.id });
 };
 document.getElementById("db-new-btn").onclick = () => { if (!currentDeckBuilder.cards.length) { openDeckBuilder(); return; } uiConfirm(tr('Neues Deck'), tr('Aktuelles Deck verwerfen und neu beginnen?'), tr('Verwerfen'), () => openDeckBuilder()); };
 // Laden: Deck-Übersicht zur Auswahl; ungespeicherte Änderungen vorher speichern oder verwerfen

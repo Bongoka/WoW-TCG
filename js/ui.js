@@ -29,8 +29,8 @@ applyUiZoom();                                                                  
 
 // ---------------------------------------------------------------- Hilfen
 function myPending(kind) { return G && G.pending && G.pending.pid === 1 && (!kind || G.pending.kind === kind) ? G.pending : null; }
-function canMain() { return !!G && !UI.busy && !G.gameOver && canActMain(G, 1); }
-function canInstant() { return !!G && !UI.busy && !G.gameOver && !!myPending('priority'); }
+function canMain() { return !!G && !UI.busy && !G.gameOver && !G.spectate && canActMain(G, 1); }   // CPU gegen CPU: nur zuschauen
+function canInstant() { return !!G && !UI.busy && !G.gameOver && !G.spectate && !!myPending('priority'); }
 function isMine(uid) { const l = locate(G, uid); return !!l && l.pid === 1; }
 function choiceUids() {
     const d = myPending('choose'); if (!d) return new Set();
@@ -79,7 +79,7 @@ function renderDeckZone(player, prefix) {
 function openGraveyard(player) {
     const removed = player.removed || [];
     if (!player.graveyard.length && !removed.length) return;
-    document.getElementById("graveyard-title").textContent = tr`Friedhof – ${player.id === 1 ? tr('Du') : 'CPU'} (${player.graveyard.length} Karten)`;
+    document.getElementById("graveyard-title").textContent = tr`Friedhof – ${G.spectate ? tr`Spieler ${player.id}` : player.id === 1 ? tr('Du') : G.hotseat || G.online ? tr('Gegner') : 'CPU'} (${player.graveyard.length} Karten)`;
     const box = document.getElementById("graveyard-content"); box.innerHTML = "";
     // Set 2/3: Karten, die du gerade aus diesem Friedhof spielen darfst (Dramla Lifebender, Readiness, Greed Before Need)
     const playable = new Set(getLegalActions(G, 1).filter(a => a.type === 'PLAY_CARD' && a.gyUid).map(a => a.gyUid));
@@ -482,6 +482,7 @@ function render() {
     placeAttachments();
     renderOppThinking();
     checkGameOverScreen();
+    if (G.hotseat && typeof hotseatCheck === 'function') hotseatCheck();          // Hotseat: der andere Spieler ist dran → Zwischenbildschirm
 }
 // Online: der Gegner muss entscheiden (Reaktion, Wahl) – groß in der Mitte sagen, warum gerade nichts geht
 function renderOppThinking() {
@@ -504,11 +505,11 @@ function renderTurnIndicator() {
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
     ti.className = mine ? 'me' : 'cpu';
-    ti.firstElementChild.textContent = mine ? tr('DEIN ZUG') : G.online ? tr('ZUG DES GEGNERS') : tr('ZUG DER CPU');
+    ti.firstElementChild.textContent = G.spectate ? tr`ZUG VON SPIELER ${G.activePlayer}` : mine ? tr('DEIN ZUG') : G.online || G.hotseat ? tr('ZUG DES GEGNERS') : tr('ZUG DER CPU');
     const eb = document.getElementById('btn-end-turn');
     eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
     eb.classList.toggle('cpu-turn', !mine);
-    eb.style.visibility = mine || over ? '' : 'hidden';                                   // Gegnerzug steht schon links (turn-indicator)
+    eb.style.visibility = (mine && !G.spectate) || over ? '' : 'hidden';                                   // Gegnerzug steht schon links (turn-indicator)
     const done = nothingLeftToDo();
     document.getElementById('big-end-turn').style.display = done && (!autoEndTurn() || G._noAutoEnd === G.turn) ? 'block' : 'none';
     scheduleAutoEnd(done);
@@ -783,9 +784,9 @@ function screenShake(strength = 1) {
 
 // ---------------------------------------------------------------- CPU spielt eine Karte: groß in der Mitte zeigen
 const SHOWCASED = new Set();   // schon groß gezeigte Karten (driveCpu zeigt vor dem Ausspielen, playFxEvents den Rest)
-async function showcaseCpuCard(card, handIdx) {
+async function showcaseCpuCard(card, handIdx, pid = 2) {
     SHOWCASED.add(card.uid);
-    const th = document.getElementById('top-hand');
+    const th = document.getElementById(pid === 1 ? 'bot-hand' : 'top-hand');            // CPU gegen CPU: Spieler 1 spielt von unten
     const slot = th && th.children[handIdx];
     const from = slot ? slot.getBoundingClientRect() : { left: window.innerWidth / 2 - 50, top: -160, width: 100, height: 140 };
     if (slot) slot.style.visibility = 'hidden';
@@ -841,8 +842,8 @@ function showGameOver() {
     const ov = document.getElementById('gameover'); if (!ov || !G) return;
     const won = G.winner === 1, draw = !G.winner;
     const title = document.getElementById('go-title');
-    title.textContent = draw ? tr('UNENTSCHIEDEN') : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
-    title.className = draw ? '' : (won ? 'win' : 'lose');
+    title.textContent = draw ? tr('UNENTSCHIEDEN') : G.hotseat || G.spectate ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
+    title.className = draw ? '' : (won || G.hotseat || G.spectate ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
     const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
     document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
@@ -1076,13 +1077,13 @@ function decorateInPlay(node, c) {
         // Kraft mit Kosten X: Rahmen erst ab 1 bereiten Ressource (X = 0 wäre wirkungslos)
         const worth = pw => pw.cost !== 'X' || getReadyRes(G.p1) >= 1;
         const swing = weaponSwing(c);
-        if (canHit || swing || usablePowers(c).some(worth)) node.classList.add('can-act');
         const opts = cardActions(c);
+        if (canHit || swing || usablePowers(c).some(worth) || opts.some(o => o.ask)) node.classList.add('can-act');
         if (opts.length) {
             node.style.cursor = 'pointer';
             node.onclick = (e) => {
                 e.stopPropagation();
-                if (opts.length === 1) { opts[0].run(); return; }
+                if (opts.length === 1 && !opts[0].ask) { opts[0].run(); return; }   // ask: immer erst fragen (Gladiator's Maul)
                 openDecisionModal(c.name, tr('Was möchtest du tun?'), [...opts.map(o => ({ label: o.label, cls: o.cls || '', action: o.run })), { label: tr('Abbrechen'), action: () => {} }]);
             };
         }
@@ -1575,7 +1576,7 @@ function heroRace(p) {
 }
 // Sagt eine passende Zeile, wenn die letzte nicht zu kurz her ist (wichtige Anlässe immer)
 function cpuSay(kind, chance = 1) {
-    if (!G || !G.real || G.online) return false;                                        // online: kein CPU-Geplapper
+    if (!G || !G.real || G.online || isHuman(G, 2)) return false;                       // online/Hotseat: kein CPU-Geplapper
     const now = Date.now();
     if (!BANTER_ALWAYS.has(kind) && (now - _banter.last < 6000 || Math.random() > chance)) return false;
     const lines = BANTER[heroRace(G.p2)][kind]; if (!lines) return false;
@@ -1812,9 +1813,9 @@ function renderPendingPanel() {
     if (d || !chain.length) { panel.style.display = 'none'; return; }
     panel.style.display = 'flex';
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
-    ch.innerHTML = tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${it.pl === 1 ? tr('Du') : G.online ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('');
+    ch.innerHTML = tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${G.spectate ? tr`Spieler ${it.pl}` : it.pl === 1 ? tr('Du') : G.online || G.hotseat ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('');
     opts.innerHTML = '';
-    title.textContent = tr('Kette'); prompt.textContent = tr('Die CPU reagiert …');
+    title.textContent = tr('Kette'); prompt.textContent = G.hotseat || G.online ? '' : tr('Die CPU reagiert …');
 }
 // Optionen, die Karten auf dem Feld oder der eigenen Hand sind (die wählt man dort)
 const boardOpt = o => { const l = typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };

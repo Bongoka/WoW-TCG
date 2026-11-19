@@ -191,7 +191,7 @@ function canUndo() {
 function undoLastAction() {
     if (!canUndo()) return;
     const { snap, desc } = UNDO.stack.pop();
-    G = snap; G.real = true; G.humans = [1];
+    G = snap; G.real = true; G.humans = G.hotseat ? [1, 2] : [1];
     UI.reset();
     UI.handSeen = new Set(G.p1.hand.map(c => c.uid));   // zurückgenommene Karten nicht "anfliegen" lassen
     UI.oppSeen = new Set(G.p2.hand.map(c => c.uid));
@@ -236,29 +236,44 @@ function pickDeck(key) {
     }
     return d;
 }
-let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm
-function initGame(seedPlayerDeck = null, seedOppDeck = null) {
+let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm: [Deck 1, Deck 2, Steuerung]
+// Steuerung je Platz: { 1: 'human' | 'cpu', 2: 'human' | 'cpu' } (Hauptmenü „Spielen“, mainmenu.js)
+//  - Mensch gegen CPU (Standard): der Mensch ist immer Spieler 1 im Zustand (unten). Sitzt er auf Platz 2, tauschen die Decks.
+//  - Mensch gegen Mensch (Hotseat, G.hotseat): beide entscheiden selbst (G.humans = [1, 2]). Wer gerade handelt, ist immer
+//    Spieler 1 im Zustand – beim Wechsel wird der ganze Zustand gespiegelt (netMirror wie beim Online-Gast), davor ein
+//    schwarzer Zwischenbildschirm (hotseatCheck). G.hotseat.seat = Platz, der gerade unten sitzt.
+//  - CPU gegen CPU (G.spectate): niemand entscheidet, driveCpu spielt beide Seiten; Platz 1 bleibt unten.
+function initGame(seedPlayerDeck = null, seedOppDeck = null, ctl = null) {
     if (typeof mmHide === 'function') mmHide();                                         // ein Spiel startet: Hauptmenü weg
     if (typeof netLeaveGame === 'function') netLeaveGame();                             // neues Spiel beendet eine Online-Partie
     if (typeof tutStop === 'function') tutStop();                                       // neues Spiel beendet ein laufendes Tutorial
+    hotseatHide();
     UNDO.stack = [];
     if (typeof pickMatchBackground === 'function') pickMatchBackground();                // je Partie ein neuer Hintergrund
+    ctl = { 1: ctl && ctl[1] === 'cpu' ? 'cpu' : 'human', 2: ctl && ctl[2] === 'human' ? 'human' : 'cpu' };
     // Ohne festes Deck: Zufall aus eigenen und Turnier-Decks (Start-Decks nur für Tests)
     const keys = randomDeckPool().map(d => d.id);
     const pKey = seedPlayerDeck || keys[Math.floor(Math.random() * keys.length)];
     let oKey = seedOppDeck || keys[Math.floor(Math.random() * keys.length)];
     if (oKey === pKey && keys.length > 1 && !seedOppDeck) oKey = keys[(keys.indexOf(pKey) + 1) % keys.length];
-    const pDeck = pickDeck(pKey) || GAME_DECKS[0], oDeck = pickDeck(oKey) || GAME_DECKS[1];
-    _lastDecks = [pDeck.id, oDeck.id];
+    let pDeck = pickDeck(pKey) || GAME_DECKS[0], oDeck = pickDeck(oKey) || GAME_DECKS[1];
+    _lastDecks = [pDeck.id, oDeck.id, ctl];
+    const hot = ctl[1] === 'human' && ctl[2] === 'human', watch = ctl[1] === 'cpu' && ctl[2] === 'cpu';
+    if (ctl[1] === 'cpu' && ctl[2] === 'human') [pDeck, oDeck] = [oDeck, pDeck];       // der Mensch sitzt unten
     hideGameOver();
     G = newGameState(pDeck.hero, pDeck.cards, oDeck.hero, oDeck.cards);
-    G.real = true; G.humans = [1];
+    G.real = true; G.humans = hot ? [1, 2] : watch ? [] : [1];
+    if (hot) G.hotseat = { seat: 1 };
+    if (watch) G.spectate = true;
     UI.reset();
     dealOpeningHands(G);
-    if (aiWantsMulligan(G, 2)) doMulligan(G, 2);
+    if (!hot && aiWantsMulligan(G, 2)) doMulligan(G, 2);
+    if (watch && aiWantsMulligan(G, 1)) doMulligan(G, 1);
     refreshDisplay(G);
     resetBanter();
     const startPlay = () => {
+        if (hot) { G.hotseat.go = true; if (G.activePlayer === 1) showTurnBanner(tr("Dein Zug!")); hotseatCheck(); return; }   // go: erst nach beiden Starthänden wechseln
+        if (watch) { setTimeout(driveCpu, 900); return; }
         if (G.activePlayer === 2) { showTurnBanner(tr("CPU ist am Zug!")); setTimeout(driveCpu, 900); }
         else showTurnBanner(tr("Dein Zug!"));
         setTimeout(() => cpuSay('greet'), 1400);
@@ -266,31 +281,97 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
         let seen = true; try { seen = localStorage.getItem('wow_tcg_hint_seen') === '1'; localStorage.setItem('wow_tcg_hint_seen', '1'); } catch (e) {}
         if (!seen) setTimeout(() => showToast(matchMedia('(hover: none)').matches ? tr('Karten ziehen zum Ausspielen · gedrückt halten: Karte groß ansehen') : tr('Karten ziehen oder anklicken zum Ausspielen · Maus darüber: Karte groß ansehen'), false, 6000), 1800);
     };
-    const mulligan = () => {
+    const mulligan = (done) => {
         if (mulliganMode() === 'hs') {
             // Starthand erscheint im Mulligan-Fenster, nicht noch einmal auf der Hand
             UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
             render();
-            openHsMulligan(startPlay);
+            openHsMulligan(done);
             return;
         }
         render();
         // Mulligan (CR 101.2: einmal)
         openDecisionModal(tr("Starthand"), tr("Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?"), [
-            { label: tr("Behalten"), cls: "success", action: startPlay },
-            { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); startPlay(); } }
+            { label: tr("Behalten"), cls: "success", action: done },
+            { label: "Mulligan", action: () => { doMulligan(G, 1); refreshDisplay(G); done(); } }
         ]);
         document.getElementById('decision-modal').classList.add('peek');                    // die Starthand bleibt unten sichtbar
     };
     // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
     // wer beginnt, zeigt das Banner nach dem Mulligan
     if (Math.random() < 0.5) { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; }
-    mulligan();
+    if (watch) { render(); startPlay(); return; }
+    // Hotseat: erst Platz 1, dann (nach dem Zwischenbildschirm) Platz 2 – jeder sieht nur seine eigene Starthand
+    if (hot) { mulligan(() => hotseatHandoff(tr('Starthand'), () => mulligan(startPlay))); return; }
+    mulligan(startPlay);
+}
+
+// ---------------------------------------------------------------- Hotseat: Zwischenbildschirm und Brett-Flip
+// Platz (1/2 im Hauptmenü) des Spielers, der im Zustand pid ist
+function seatOf(pid) { return G && G.hotseat ? (pid === 1 ? G.hotseat.seat : 3 - G.hotseat.seat) : pid; }
+// Wer muss jetzt handeln? Offene Entscheidung, sonst (Ruhe) der Zugspieler
+function hotseatActor(s) { return s.gameOver ? 0 : s.pending ? s.pending.pid : isIdle(s) ? s.activePlayer : 0; }
+// Nach jeder Aktion: muss der andere Spieler ran, kommt der Zwischenbildschirm (erst nach den Animationen)
+const HOTSEAT = { el: null, open: false, timer: 0 };
+function hotseatCheck() {
+    if (!G || !G.hotseat || !G.hotseat.go || G.gameOver || HOTSEAT.open || HOTSEAT.timer) return;
+    if (hotseatActor(G) !== 2) return;
+    const g0 = G, t0 = Date.now();
+    const wait = () => {
+        HOTSEAT.timer = 0;
+        if (G !== g0 || !G.hotseat || G.gameOver || hotseatActor(G) !== 2) return;
+        if (UI.busy || UI.flipWait || Date.now() - t0 < 350) { HOTSEAT.timer = setTimeout(wait, 120); return; }
+        const turn = !G.pending && G.activePlayer === 2;
+        const sub = turn ? tr('ist am Zug') : G.pending.kind === 'priority' ? tr('kann reagieren') : tr('muss entscheiden');
+        hotseatHandoff(sub, () => { if (G.activePlayer === 1 && !G.pending) showTurnBanner(tr('Dein Zug!')); });
+    };
+    HOTSEAT.timer = setTimeout(wait, 120);
+}
+// Schwarzer Bildschirm „Spieler X“ – Tipp: Brett drehen (Spieler 2 ⇄ 1), dann ausblenden
+function hotseatHandoff(sub, after) {
+    let el = HOTSEAT.el;
+    if (!el) {
+        el = HOTSEAT.el = document.createElement('div'); el.id = 'hotseat';
+        el.innerHTML = `<button class="hs-menu">${tr('Hauptmenü')}</button><div class="hs-who"></div><div class="hs-hero"></div><div class="hs-sub"></div><div class="hs-tap">${tr('Tippen, wenn du bereit bist')}</div>`;
+        el.querySelector('.hs-menu').onclick = e => { e.stopPropagation(); if (typeof openMainMenu === 'function') openMainMenu(); };
+        document.body.appendChild(el);
+    }
+    const next = 3 - G.hotseat.seat;
+    el.querySelector('.hs-who').textContent = tr`Spieler ${next}`;
+    el.querySelector('.hs-hero').textContent = G.p2.hero.name;
+    el.querySelector('.hs-sub').textContent = sub;
+    HOTSEAT.open = true; el.classList.remove('out'); el.style.display = 'flex';
+    if (window.cardPreview) window.cardPreview.hide();
+    const g0 = G;
+    el.onclick = () => {
+        if (G !== g0) { hotseatHide(); return; }
+        el.onclick = null;
+        hotseatSwap();
+        if (typeof sfx !== 'undefined') sfx.play('draw');
+        el.classList.add('out');
+        setTimeout(() => { if (el.classList.contains('out')) { el.style.display = 'none'; HOTSEAT.open = false; } after && after(); }, 380);
+    };
+}
+function hotseatHide() { clearTimeout(HOTSEAT.timer); HOTSEAT.timer = 0; HOTSEAT.open = false; if (HOTSEAT.el) HOTSEAT.el.style.display = 'none'; }
+// Zustand spiegeln: der nächste Spieler wird Spieler 1 (unten). G bleibt dasselbe Objekt (driveCpu, Endbildschirm merken es sich)
+function hotseatSwap() {
+    const seat = 3 - G.hotseat.seat;
+    const s = netMirror({ ...G, _undo: null, fxq: [] });
+    s.real = true; s.humans = [1, 2]; s.hotseat = { ...G.hotseat, seat };
+    for (const k of Object.keys(G)) delete G[k];
+    Object.assign(G, s);
+    UNDO.stack = [];                                                                        // Rückgängig nur innerhalb der eigenen Sicht
+    UI.reset(); UI.destroyPick = null;
+    UI.handSeen = new Set(G.p1.hand.map(c => c.uid)); UI.oppSeen = new Set(G.p2.hand.map(c => c.uid));
+    UI.resPrev = {};
+    // Log-Farben aus Sicht des neuen Spielers
+    document.querySelectorAll('#log-area .log-entry').forEach(r => { const me = r.classList.contains('log-me'), op = r.classList.contains('log-opp'); r.classList.toggle('log-me', op); r.classList.toggle('log-opp', me); });
+    render();
 }
 
 // Menschliche Aktion ausführen; danach ggf. die CPU weiterlaufen lassen
 function humanAct(action) {
-    if (!G || G.gameOver || UI.busy) return false;
+    if (!G || G.gameOver || UI.busy || G.spectate) return false;                          // CPU gegen CPU: nur zuschauen
     if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
     // Karte würde ein Limit verletzen (Unique, zweite Waffe, Totem, Form …): keine Vorab-Warnung – danach fragt das Spielfeld
     // „Welche Karte willst du behalten?“ (ein Klick, daneben Rückgängig; CR 414.3).
@@ -324,10 +405,11 @@ function humanAct(action) {
     playEventAnimations();
     cpuReact(dmgBefore);
     if (ok) setTimeout(driveCpu, 30);
+    if (ok && G.hotseat) hotseatCheck();
     return ok;
 }
 function endTurn() {
-    if (!G || G.gameOver || UI.busy) return;
+    if (!G || G.gameOver || UI.busy || G.spectate) return;
     if (!canActMain(G, 1)) { const m = tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."); addLog(m, "log-hit"); showToast(m); return; }
     const err = validateAction(G, { type: 'END_TURN' }, 1);
     if (err) { addLog(err, "log-hit"); showToast(err); return; }
@@ -375,47 +457,50 @@ let _cpuRunning = false;
 async function driveCpu() {
     if (_cpuRunning || !G || G.gameOver || G.online) return;                               // online: kein CPU-Gegner
     _cpuRunning = true;
-    let steps = 0, announced = false;
+    let steps = 0, announced = false, turnOf = null;
+    const game = G;
     try {
-        while (!G.gameOver) {
+        while (!G.gameOver && G === game) {
             if (UI.flipWait) await UI.flipWait;                       // Flip eines Helden erst ganz zeigen (heroFlipAnim)
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
-            if (G.activePlayer !== 2) break;
-            if (!announced) { announced = true; CPU_SKIP.on = false; showTurnBanner(tr("CPU ist am Zug!")); UI.busy = true; render(); await cpuSleep(700); cpuSay('turn', 0.35); }
+            const pid = G.activePlayer;                               // CPU gegen CPU: beide Seiten, sonst nur Spieler 2
+            if (isHuman(G, pid)) break;
+            if (turnOf !== G.turn) { turnOf = G.turn; steps = 0; announced = false; }
+            if (!announced) { announced = true; CPU_SKIP.on = false; showTurnBanner(G.spectate ? tr`Spieler ${pid} ist am Zug!` : tr("CPU ist am Zug!")); UI.busy = true; render(); await cpuSleep(700); if (pid === 2) cpuSay('turn', 0.35); }
             updateCpuStatus(true, tr("CPU analysiert..."));
             await cpuSleep(250);
             // Ab und zu eine Denkpause mit Sprechblase
-            if (steps > 0 && cpuSpeed() === 'normal' && !CPU_SKIP.on && Math.random() < 0.25) { cpuSay('think'); await cpuSleep(900 + Math.random() * 900); }
+            if (steps > 0 && cpuSpeed() === 'normal' && !CPU_SKIP.on && Math.random() < 0.25 && pid === 2) { cpuSay('think'); await cpuSleep(900 + Math.random() * 900); }
             const g0 = G;
             const tutA = typeof TUT !== 'undefined' && TUT.active ? tutCpuAction(G) : undefined;   // Tutorial: festes Drehbuch statt KI
             const dec = tutA !== undefined ? (tutA ? { action: tutA, reason: tutA.type === 'PLACE_RESOURCE' ? tr('Ressource') : G.p2.hand[tutA.handIdx].name } : null)
-                : steps < 25 ? await cpuDecide(G, 2, document.getElementById("cfg-difficulty").value) : null;
+                : steps < 25 ? await cpuDecide(G, pid, document.getElementById("cfg-difficulty").value) : null;
             if (G !== g0 || G.gameOver) break;                                              // inzwischen neues Spiel / Spiel vorbei
             if (!dec || !dec.action) {
                 updateCpuStatus(true, tr("CPU beendet Zug."));
                 await cpuSleep(400);
-                applyAction(G, { type: 'END_TURN', actorId: 2 }, false, 2);
+                applyAction(G, { type: 'END_TURN', actorId: pid }, false, pid);
                 render(); playEventAnimations();
-                if (G.activePlayer === 1 && isIdle(G)) showTurnBanner(tr("Dein Zug!"));
+                if (G.activePlayer === 1 && isIdle(G) && isHuman(G, 1)) showTurnBanner(tr("Dein Zug!"));
                 continue;
             }
             updateCpuStatus(true, `CPU: ${dec.reason}`);
-            const played = dec.action.type === 'PLAY_CARD' ? G.p2.hand[dec.action.handIdx] : null;
-            if (dec.action.type === 'ATTACK') cpuSay('attack', 0.35);
-            else if (played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
+            const played = dec.action.type === 'PLAY_CARD' ? getPlayer(G, pid).hand[dec.action.handIdx] : null;
+            if (pid === 2 && dec.action.type === 'ATTACK') cpuSay('attack', 0.35);
+            else if (pid === 2 && played && (played.cost || 0) >= 5) cpuSay('big', 0.6);
             // Gespielte Karte groß in der Mitte zeigen, Angriffe mit Pfeil ankündigen
             let show = null;
-            if (played) { show = await showcaseCpuCard(played, dec.action.handIdx); await cpuSleep(950); }
+            if (played) { show = await showcaseCpuCard(played, dec.action.handIdx, pid); await cpuSleep(950); }
             else await cpuSleep(500);
             if (dec.action.type === 'ATTACK') { await flashArrow(dec.action.attackerUid, dec.action.defenderUid); await animateAttack(dec.action.attackerUid, dec.action.defenderUid); }
             const dmgBefore = G.p2.hero.damage;
-            applyAction(G, dec.action, false, 2);
+            applyAction(G, dec.action, false, pid);
             steps++;
             render();
             if (show) { await landShowcase(show, played.uid); if ((played.cost || 0) >= 7) screenShake(1.2); }
             playEventAnimations();
-            cpuReact(dmgBefore);
+            if (pid === 2) cpuReact(dmgBefore);
             await cpuSleep(350);
         }
     } catch (e) {
@@ -425,6 +510,7 @@ async function driveCpu() {
         updateCpuStatus(false);
         _cpuRunning = false;
         render();
+        if (G !== game && G && !G.gameOver) setTimeout(driveCpu, 50);                          // inzwischen ein neues Spiel: dort weiter
         if (!G.gameOver && G.activePlayer === 1 && isIdle(G) && G._turnBannerFor !== G.turn) { G._turnBannerFor = G.turn; }
     }
 }
@@ -626,7 +712,8 @@ function bootGame() {
         imgPathInput.onchange = (e) => { _cfgImgPath = e.target.value.trim() || "AZEROTH-{id}-EA.png"; render(); };
     }
     document.getElementById("go-again").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; initGame(..._lastDecks); };
-    document.getElementById("go-new").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; initGame(); };
+    // Neues Spiel: Auswahl im Hauptmenü (Decks, Spieler/CPU)
+    document.getElementById("go-new").onclick = () => { if (G && G.online) { netBackToRoom(); return; } hideGameOver(); if (typeof openPlaySetup === 'function') { openMainMenu(); openPlaySetup(); } else { document.getElementById("log-area").innerHTML = ""; initGame(); } };
     document.getElementById("go-close").onclick = hideGameOver;
     document.getElementById("btn-mulligan-mode").onclick = toggleMulliganMode;
     updateMulliganButton();
@@ -640,7 +727,7 @@ function bootGame() {
     document.getElementById("btn-cpu-speed").onclick = () => { try { localStorage.setItem(CPU_SPEED_KEY, cpuSpeed() === 'fast' ? 'normal' : 'fast'); } catch (e) {} updCpuSpeedBtn(); };
     updCpuSpeedBtn();
     // Klick/Tipp auf eine freie Stelle (nicht auf Karten – die will man während des CPU-Zugs lesen) überspringt die Pausen
-    document.getElementById("arena").addEventListener('click', (e) => { if (G && G.activePlayer === 2 && !e.target.closest('.card-wrapper, button')) skipCpuPauses(); });
+    document.getElementById("arena").addEventListener('click', (e) => { if (G && !isHuman(G, G.activePlayer) && !e.target.closest('.card-wrapper, button')) skipCpuPauses(); });
     updateRulesTextButton();
     const autoBtn = document.getElementById("btn-auto-end");
     const updAuto = () => { autoBtn.textContent = autoEndTurn() ? tr("Auto-Zugende: An") : tr("Auto-Zugende: Aus"); };

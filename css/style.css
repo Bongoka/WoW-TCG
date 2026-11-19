@@ -1639,3 +1639,26 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 /* Prioritätsfenster: jede Option spielbar (gelber Rand wie spielbare Handkarten) */
 #choice-modal .cm-play .card-visual { box-shadow: 0 0 0 0.7cqw #facc15, 0 0 3cqw rgba(250,204,21,.45); }
 #choice-modal .cm-play:hover .card-visual { box-shadow: 0 0 0 0.9cqw #fde047, 0 0 5cqw rgba(250,204,21,.85); }
+/* Hauptmenü „Spielen“: Decks und Spieler/CPU je Platz (Optik wie der Online-Raum: .mp-versus, .mp-deckbox) */
+.mm-play-box { width: min(620px, calc(100vw - 32px)); gap: 14px; }
+.mm-play .mp-side > b { font: bold 17px Georgia, serif; color: var(--gold-light); }
+.mm-play .mp-side > span { font-size: 13px; color: #e8dcc0; }
+.mm-play .mp-vs { cursor: default; }
+.mm-ctl.mp-vis-tog { overflow: hidden; margin-top: 2px; }
+.mm-ctl.mp-vis-tog button { padding: 7px 16px; font-size: 14px; min-width: 76px; }
+.mm-play-mode { text-align: center; font-size: 13px; color: var(--text-dim); min-height: 1.3em; }
+.mm-play-btns { display: flex; justify-content: center; gap: 12px; }
+.mm-play-btns button { padding: 9px 22px; font-size: 15px; }
+.mm-play-go { padding: 11px 38px !important; font-size: 18px !important; font-weight: bold; }
+@media (max-height: 520px) { .mm-play-box { padding: 12px 16px; gap: 8px; } .mm-play .mp-versus { padding: 6px; } }
+/* Hotseat: schwarzer Zwischenbildschirm beim Spielerwechsel (deckt Hände und Brett ab) */
+#hotseat { position: fixed; inset: 0; z-index: 98500; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #000; color: var(--gold-light);
+    font-family: Georgia, serif; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; animation: hsIn .3s ease; }
+#hotseat.out { opacity: 0; transition: opacity .35s ease; pointer-events: none; }
+#hotseat .hs-who { font-size: clamp(38px, 7vw, 76px); font-weight: 900; letter-spacing: 2px; text-shadow: 0 0 30px rgba(201,168,76,.45); }
+#hotseat .hs-hero { font-size: clamp(16px, 2.2vw, 24px); color: #e8dcc0; }
+#hotseat .hs-sub { font-size: clamp(15px, 2vw, 21px); color: var(--text-dim); }
+#hotseat .hs-tap { margin-top: 28px; font-size: 14px; color: #8a7b5c; animation: hsPulse 2s ease-in-out infinite; }
+#hotseat .hs-menu { position: absolute; top: 14px; left: 14px; padding: 6px 14px; font-size: 13px; background: transparent; color: #8a7b5c; border-color: #3a3020; }
+@keyframes hsIn { from { opacity: 0; } }
+@keyframes hsPulse { 50% { opacity: .4; } }
