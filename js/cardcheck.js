@@ -339,6 +339,32 @@ function ccCheckTriggers(c) {
     return { n: 1, out };
 }
 
+// ---------------------------------------------------------------- A3: "At the start of your turn" an angehängten Karten (Schaden/Heilung je Zug)
+// Angehängt an ein passendes Ziel, dann bis zum Beginn des nächsten eigenen Zuges gespielt: genau N Schaden bzw. Heilung am Ziel
+const CC_SOT = /^(?:Ongoing: )?At the start of your turn, your hero (deals (\d+) (?:\w+ )?damage to|heals (\d+) damage from) attached (character|hero|ally)\.?$/i;
+function ccCheckStartOfTurn(c) {
+    if (c.type !== 'Ability' || !c.attach) return { n: 0, out: [] };
+    const sen = ccSentences(c), m = sen.map(t => t.match(CC_SOT)).find(Boolean); if (!m) return { n: 0, out: [] };
+    if (sen.some(t => !CC_SOT.test(t) && !/^Attach to/i.test(t))) return { n: 0, out: [] };   // weitere Wirkungen: nicht in dieser Stufe
+    const heal = !!m[3], n = +(m[2] || m[3]), who = m[4].toLowerCase();
+    const s = ccSetup(c); s.humans = [];
+    const tgt = who === 'hero' ? (heal ? s.p1.hero : s.p2.hero) : ccPut(s, heal ? 1 : 2, ctVanilla(6).id);
+    if (heal) tgt.damage = 10;
+    s.p1.hand.unshift(makeCardInst(c.id, false, 1));
+    const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0 && (v.targets || []).flat().includes(tgt.uid));
+    if (!a) return { n: 0, out: [] };
+    applyAction(s, a, true, 1); autoResolve(s);
+    const d0 = tgt.damage || 0;
+    // bis zum nächsten eigenen Zug (Zug 8), dort nach den Auslösern zu Zugbeginn
+    ccDrive(s, t => t.turn >= 8 && t.activePlayer === 1 && isIdle(t) && !t.pending, 400);
+    if (s.turn < 8) return { n: 1, out: [{ sev: 'warn', msg: 'nächster eigener Zug nicht erreicht' }] };
+    const t1 = findCharacter(s, tgt.uid); if (!t1) return { n: 1, out: [] };       // Ziel gestorben (z. B. Gegner-Angriff) – nicht auswertbar
+    const got = heal ? d0 - (t1.damage || 0) : (t1.damage || 0) - d0, want = heal ? Math.min(n, d0) : n;
+    // Gegnerzug dazwischen: Schaden am Ziel durch Kampf möglich – nur Mindestwert prüfen, bei Heilung genau
+    if (heal ? got !== want : got < want) return { n: 1, out: [{ sev: 'fail', msg: `zu Zugbeginn ${got} ${heal ? 'geheilt' : 'Schaden'} statt ${want}` }] };
+    return { n: 1, out: [] };
+}
+
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
 // "up to N …" im Text, aber pickMany ohne Höchstzahl (9. Argument) – fand Ruthlessness und Volley (beliebig viele statt 5 bzw. 3)
 function ccArgs(src, at) {   // Argumente des Aufrufs, der bei src[at] = '(' beginnt (Klammertiefe beachten)
@@ -371,7 +397,7 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));
