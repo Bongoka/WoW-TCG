@@ -1771,6 +1771,94 @@ function runRuleTests() {
         assert(cardMatchesPlayer(CARDS[12021], p) && talentReqOk(CARDS[12021], p), 'Paletress: Highlord Tirion Fordring ([Priest] Hero Required, Argent Crusade) nicht erlaubt');
         assert(!cardMatchesPlayer(CARDS[11021], p), "Paletress: Kel'Thuzad (kein Priester) erlaubt");
     });
+    test(154, 'Shield Wall (Wall-Tokens beim Helden, verhindern Schaden), Surge of Adrenaline (Finisher senkt Kosten schon bei der Spielbarkeit), Burgle im Gegnerzug (bis Ende des eigenen Zuges), KI: A Final Sacrifice nicht auf den eigenen Helden ohne Sieg', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        const mk = (k, act = 1, nRes = 6) => { const s = newGameState(heroOf(k).id, fill, heroOf(k).id, fill); s.turn = 6; s.activePlayer = act; s.lastTurnOf = act === 1 ? { 1: 6, 2: 5 } : { 1: 5, 2: 6 };
+            s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [];
+            for (const p of [s.p1, s.p2]) for (let i = 0; i < nRes; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); return s; };
+        const playFirst = (s, pick = () => true) => { const a = getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0 && pick(x)); assert(a, 'keine Spielvariante für ' + s.p1.hand[0].name); applyAction(s, a, true, 1); autoResolve(s); };
+        const ally = (s, pid, cost) => { const x = makeCardInst(ctVanilla(cost).id, false, pid); x.joinedTurn = 1; getPlayer(s, pid).allies.push(x); return x; };
+        // Shield Wall: "Put three 1 [DEF] Wall armor tokens into play." (vorher landeten Ausrüstungs-Tokens in der Party)
+        const s1 = mk('Warrior'); s1.p1.hand.unshift(makeCardInst(8081, false, 1)); playFirst(s1);
+        const walls = s1.p1.hero.armors.filter(x => x.id === 9902);
+        assert(walls.length === 3 && !s1.p1.allies.some(x => x.id === 9902), `Shield Wall: ${walls.length} Walls beim Helden, ${s1.p1.allies.filter(x => x.id === 9902).length} in der Party`);
+        const att = ally(s1, 2, 4); s1.activePlayer = 2; s1.lastTurnOf = { 1: 5, 2: 6 }; const d0 = s1.p1.hero.damage, a0 = atkOf(s1, att);
+        applyAction(s1, { type: 'ATTACK', attackerUid: att.uid, defenderUid: s1.p1.hero.uid, actorId: 2 }, true, 2); autoResolve(s1);
+        assert(s1.p1.hero.damage - d0 === Math.max(0, a0 - 3), `Shield Wall: ${s1.p1.hero.damage - d0} Schaden bei ${a0} ATK (3 Walls)`);
+        // Surge of Adrenaline: 3 Ressourcen, 5 Combos im Friedhof → X = 5 kostet 0; X = 0/1 nicht bezahlbar
+        const s2 = mk('Rogue', 1, 3), combo = Object.values(CARDS).find(c => !c.isToken && (c.subtypes || []).includes('Combo'));
+        for (let i = 0; i < 5; i++) s2.p1.graveyard.push(makeCardInst(combo.id, false, 1));
+        s2.p1.hand.unshift(makeCardInst(7066, false, 1));
+        assert(!canPlayCard(s2, 1, s2.p1.hand[0]), 'Surge of Adrenaline: mit 3 Ressourcen und 5 Combos nicht spielbar – ' + canPlayCard(s2, 1, s2.p1.hand[0]));
+        const xs = getLegalActions(s2, 1).filter(x => x.type === 'PLAY_CARD' && x.handIdx === 0).map(x => x.x);
+        assert(!xs.includes(0) && !xs.includes(1) && xs.includes(5), 'Surge of Adrenaline: angebotene X ' + xs.join(','));
+        const h2 = s2.p1.hand.length; playFirst(s2, x => x.x === 5);
+        assert(getReadyRes(s2.p1) === 3 && s2.p1.hand.length === h2 + 2 && !combosInGy(s2, 1).length, `Surge of Adrenaline: ${getReadyRes(s2.p1)} Ressourcen übrig, ${s2.p1.hand.length - h2 + 1} gezogen`);
+        // ohne Ressourcen: X = 5 kostet 0 – spielbar, nur X = 5 angeboten
+        const s0 = mk('Rogue', 1, 0); for (let i = 0; i < 5; i++) s0.p1.graveyard.push(makeCardInst(combo.id, false, 1));
+        s0.p1.hand.unshift(makeCardInst(7066, false, 1));
+        assert(!canPlayCard(s0, 1, s0.p1.hand[0]), 'Surge of Adrenaline: mit 0 Ressourcen und 5 Combos nicht spielbar – ' + canPlayCard(s0, 1, s0.p1.hand[0]));
+        const x0 = getLegalActions(s0, 1).filter(x => x.type === 'PLAY_CARD' && x.handIdx === 0).map(x => x.x);
+        assert(x0.join() === '5', 'Surge of Adrenaline (0 Ressourcen): angebotene X ' + x0.join(','));
+        // Burgle im Gegnerzug: "You control them until the end of your turn" – im eigenen Zug kontrolliert und kann angreifen, danach zurück
+        const s3 = mk('Rogue', 2, 8), stolen = ally(s3, 2, 4);
+        FX[10054].resolve(s3, { pl: 1, targets: [[stolen.uid]] }); process(s3);
+        const ctl = () => (locate(s3, stolen.uid) || {}).pid; let mine7 = null;
+        for (let n = 0; n < 400 && !s3.gameOver && s3.turn <= 7; n++) {
+            if (s3.pending) { const d = s3.pending; s3.pending = null; if (d.kind === 'priority') passPriority(s3); else s3.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s3, d) }); process(s3); continue; }
+            if (isIdle(s3)) { if (s3.turn === 7 && mine7 === null) mine7 = ctl() === 1 && canAttackNow(s3, stolen, s3.p1); s3.phase = 'end'; s3.queue.push({ op: 'turn', step: 'endPhase' }); process(s3); continue; }
+            process(s3);
+        }
+        assert(mine7 === true, 'Burgle: im eigenen Zug nicht kontrolliert oder kann nicht angreifen');
+        assert(ctl() === 2, 'Burgle: nach dem eigenen Zug nicht zurückgegeben');
+        // KI: A Final Sacrifice zerstört zu Beginn des nächsten Zuges – nicht im Kampf auf den eigenen Helden, außer es gewinnt sofort
+        for (const [oppDmg, want] of [[0, false], [22, true]]) {
+            const s4 = mk('Warrior', 1, 4); s4.p1.hero.weapons.push(makeCardInst(ctPlain('Weapon').id, false, 1)); s4.p1.hand = [makeCardInst(8078, false, 1)]; s4.p2.hero.damage = oppDmg;
+            const need = hpOf(s4, s4.p2.hero) - oppDmg;
+            applyAction(s4, { type: 'ATTACK', attackerUid: s4.p1.hero.uid, defenderUid: s4.p2.hero.uid, actorId: 1 }, true, 1); autoResolve(s4);
+            const played = s4.p1.graveyard.some(c => c.id === 8078);
+            assert(played === want, `A Final Sacrifice (KI): bei ${need} gegnerischem Leben ${played ? 'gespielt' : 'nicht gespielt'}`);
+            if (want) assert(s4.gameOver && s4.winner === 1, 'A Final Sacrifice (KI): Lethal nicht genutzt');
+        }
+    });
+    test(156, "Serpent's Nest: ein gegnerischer Ally im gegnerischen Zug bringt genau eine Snake – eigene Snakes lösen nicht aus (vorher Endlosschleife)", () => {
+        const s = fresh(); s.humans = []; const nest = makeCardInst(3503, false, 2); nest.joinedTurn = 1; P(s, 2).ongoing.push(nest);
+        const ally = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && cardMatchesPlayer(c, P(s, 1)));
+        s.activePlayer = 1; const x = makeCardInst(ally.id, false, 1); x.joinedTurn = s.turn; P(s, 1).allies.push(x);
+        evt(s, 'allyEnters', { uid: x.uid, pid: 1 }); process(s); autoResolve(s);
+        const snakes = P(s, 2).allies.filter(c => c.id === 3655).length;
+        assert(snakes === 1, `Serpent's Nest: ${snakes} Snakes statt 1`);
+    });
+    test(157, 'KI: defensive Reaktionskarten (Power Word: Shield, Vanish) ohne Anlass halten, bei einem tödlichen Angriff als Antwort spielen', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set), fill = Array(40).fill(ctVanilla(2).id);
+        const mk = (k, act) => { const s = newGameState(heroOf(k).id, fill, heroOf('Rogue').id, fill); s.turn = 6; s.activePlayer = act; s.lastTurnOf = act === 1 ? { 1: 6, 2: 5 } : { 1: 5, 2: 6 };
+            s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [];
+            for (const p of [s.p1, s.p2]) for (let i = 0; i < 4; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); return s; };
+        const ally = (s, pid, c) => { const x = makeCardInst(ctVanilla(c).id, false, pid); x.joinedTurn = 1; getPlayer(s, pid).allies.push(x); return x; };
+        for (const [card, k, def] of [[1076, 'Priest', 'ally'], [1090, 'Rogue', 'hero']]) {
+            const h = mk(k, 1); ally(h, 1, 2); h.p1.hand = [makeCardInst(card, false, 1)];
+            const r = searchBestAction(h, 1, 'normal');
+            assert(!(r && r.action.type === 'PLAY_CARD'), `${CARDS[card].name}: ohne gegnerische Angreifer im eigenen Zug gespielt`);
+            const s = mk(k, 2), mine = ally(s, 1, 4), big = ally(s, 2, 6); s.p1.hand = [makeCardInst(card, false, 1)]; s.p1.hero.damage = 20; const d0 = s.p1.hero.damage;
+            applyAction(s, { type: 'ATTACK', attackerUid: big.uid, defenderUid: def === 'ally' ? mine.uid : s.p1.hero.uid, actorId: 2 }, true, 2); autoResolve(s);
+            assert(!s.p1.hand.length, `${CARDS[card].name}: beim Angriff auf ${def === 'ally' ? 'den Ally' : 'den Helden'} nicht gespielt`);
+            assert(def === 'ally' ? locate(s, mine.uid).zone === 'party' : s.p1.hero.damage === d0, `${CARDS[card].name}: Schaden nicht verhindert`);
+        }
+    });
+    test(158, '"up to N" begrenzt die Mehrfachauswahl: Ruthlessness höchstens fünf Combos, Volley höchstens drei Ziele (vorher beliebig viele); Auswahl meldet multi.max', () => {
+        const s = fresh(); s.humans = [1]; const combo = Object.values(CARDS).find(c => !c.isToken && (c.subtypes || []).includes('Combo'));
+        P(s, 1).removed = Array.from({ length: 7 }, () => makeCardInst(combo.id, false, 1));
+        FX[10060].resolve(s, { pl: 1 }); process(s);
+        assert(s.pending && s.pending.multi && s.pending.multi.max === 5, 'Ruthlessness: Auswahl ohne multi.max 5');
+        const h0 = P(s, 1).hand.length;
+        for (let i = 0; i < 7 && s.pending && s.pending.multi; i++) { const o = s.pending.opts.find(x => x.v !== '__done'); if (!o) break; const d = s.pending; s.pending = null; s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: o.v }); process(s); }
+        assert(P(s, 1).hand.length - h0 === 5, `Ruthlessness: ${P(s, 1).hand.length - h0} Combos auf die Hand statt höchstens 5`);
+        const v = fresh(); v.humans = []; for (let i = 0; i < 5; i++) { const a = makeCardInst(ctVanilla(6).id, false, 2); a.joinedTurn = 1; P(v, 2).allies.push(a); }
+        FX[8032].k.ask(v, { pid: 1 }); process(v); autoResolve(v);
+        const hit = P(v, 2).allies.filter(a => a.damage > 0).length + (P(v, 2).hero.damage > 0 ? 1 : 0);
+        assert(hit <= 3, `Volley: ${hit} Ziele getroffen statt höchstens 3`);
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];
@@ -1825,6 +1913,12 @@ function runCardTests(ids) {
                 if (!Number.isFinite(c.damage || 0)) return `${c.name}: Schaden ${c.damage}`;
             }
         for (const p of [s.p1, s.p2]) if (!Number.isFinite(p.hero.damage)) return 'Heldenschaden ' + p.hero.damage;
+        // Kartentyp passt zur Zone (CR 302.1/303.1/304/305.2c) – fand Ausrüstungs-Tokens in der Party (Shield Wall)
+        for (const p of [s.p1, s.p2]) {
+            const wrong = p.allies.find(c => !isAllyLike(c) && !c.allyRes6) || p.hero.weapons.find(c => c.type !== 'Weapon' && !c.allyItem9)
+                || p.hero.armors.find(c => c.type !== 'Armor' && c.type !== 'Item' && !c.allyItem9) || p.ongoing.find(c => c.type !== 'Ability' && !c.allyItem9);
+            if (wrong) return `${wrong.name} (${wrong.type}) liegt in der falschen Zone`;
+        }
         return null;
     };
     const setup = (c, h) => {

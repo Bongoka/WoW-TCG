@@ -4500,4 +4500,8 @@ var I18N_EN = {
     'Spieler {0} ist am Zug!': 'Player {0}\'s turn!',
     'ZUG VON SPIELER {0}': 'PLAYER {0}\'S TURN',
     'SPIELER {0} GEWINNT!': 'PLAYER {0} WINS!',
+    // Mehrfachauswahl (pickMany)
+    '{0}/{1} gewählt': '{0}/{1} selected',
+    'Bestätigen ({0})': 'Confirm ({0})',
+    'Keine wählen': 'Choose none',
 };

@@ -4812,3 +4812,6 @@ Tokens small/*
 # Deck-Sync-Ablage von bin/SyncServer.java (eigene Decks aller Geräte) und scrcpy (adb fürs Handy)
 /bin/decks-sync.json*
 /scrcpy-win64-*/
+
+# Kartenprüfung (bin/cardcheck.js): Berichte lokal
+/reports/

@@ -239,7 +239,7 @@ function pickManyAi(s, pid, u) { const l = locate(s, u); if (!l) return -1; if (
 function pickMany(s, pid, prompt, src, cands, k, a, aiFn, max) { q(s, { op: 'call', k: 'E:pickMany', a: { pid, prompt, src, cands, k, a, list: [], ai: !!aiFn, max: max || 0 } }); }
 EK.pickMany = (s, a) => { const left = a.cands.filter(u => !a.list.includes(u) && findCharacter(s, u));
     if (!left.length || (a.max && a.list.length >= a.max)) { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; }
-    ask(s, { pid: a.pid, prompt: a.max ? `${a.prompt} (${a.list.length}/${a.max})` : a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: a.ai ? pickManyAi(s, a.pid, u) : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false }); };
+    ask(s, { pid: a.pid, prompt: a.max ? `${a.prompt} (${a.list.length}/${a.max})` : a.prompt, src: a.src, opts: [...left.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: a.ai ? pickManyAi(s, a.pid, u) : -1 })), { label: tr('Fertig'), v: '__done', ai: 0 }], k: 'E:pickManyAdd', a, auto: false, multi: { max: a.max || left.length + a.list.length, picked: a.list.length } }); };
 EK.pickManyAdd = (s, a, v) => { if (v === '__done') { q(s, { op: 'call', k: a.k, a: a.a, v: a.list }); return; } q(s, { op: 'call', k: 'E:pickMany', a: { ...a, list: [...a.list, v] } }); };
 
 // ============================================================================

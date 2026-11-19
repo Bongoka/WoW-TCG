@@ -124,7 +124,7 @@ FX[8030] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const
 FX[8031] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1 + rangedAtk(s, it.pl), 'Ranged', { after: { k: '8031:lock', a: { uid: t } } }); },
     k: { lock: (s, a) => { const c = findCharacter(s, a.uid); if (c && c.type === 'Hero' && a.dealt > 0) addPE(s, ctrlOf(s, c), { k: 'noCards' }); } } };
 FX[8032] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 8032, k: 'ask', a: { pid } }); }, dmg: (s, c, d, pid) => { if (d.tgt === heroOf(s, pid).uid && d.amt > 0) trig(s, { id: 8032, k: 'die', a: { uid: c.uid } }); } },
-    k: { ask: (s, a) => pickMany(s, a.pid, tr('Volley: bis zu drei Ziele (je 1 Arkan)'), 'Volley', targetCands(s, a.pid, { char: true }), '8032:hit', a, true),
+    k: { ask: (s, a) => pickMany(s, a.pid, tr('Volley: bis zu drei Ziele (je 1 Arkan)'), 'Volley', targetCands(s, a.pid, { char: true }), '8032:hit', a, true, 3),
         hit: (s, a, list) => (list || []).slice(0, 3).forEach(u => heroDmg(s, a.pid, u, 1, 'Arcane')), die: (s, a) => { const c = findCharacter(s, a.uid); if (c) destroy(s, c); } } };
 FX[8033] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 8033, k: 'go', a: { pid, opp: d.pid } }); }, handLeft: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 8033, k: 'die', a: { uid: c.uid } }); } },
     k: { go: (s, a) => partyOf(me(s, a.opp)).forEach(c => heroDmg(s, a.pid, c.uid, 1, 'Frost', { after: { k: 'E:frozen', a: { uid: c.uid } } })), die: (s, a) => { const c = findCharacter(s, a.uid); if (c) destroy(s, c); } } };

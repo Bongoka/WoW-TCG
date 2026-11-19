@@ -395,7 +395,9 @@ FX[3502] = { slots: (s, pid) => [{ label: tr('Ally in einem Friedhof'), cands: [
         const o = me(s, l.c.owner || l.pid); o.resources.push({ card: l.c, faceUp: false, exhausted: true }); L(s, tr`${l.c.name} kommt verdeckt und erschöpft in die Ressourcenreihe.`, '', o.id);
         evt(s, 'resEnters', { pid: o.id, faceUp: false, uid: l.c.uid, id: l.c.id }); } };
 // Serpent's Nest: "Ongoing: When an ability, ally, or equipment enters play on an opponent's turn, you may put a 1 [Nature] / 1 [Health] snake ally token into play."
-const nest15 = (s, c, d, pid) => { if (s.activePlayer === pid) return; const t = findCharacter(s, d.uid); if (t && kind15(t)) trig(s, { id: 3503, k: 'ask', a: { pid } }); };
+// Nur Karten des Gegners lösen aus (Entscheidung des Nutzers) – die eigenen Snakes also nicht, sonst entstünde eine Endlosschleife
+const nest15 = (s, c, d, pid) => { if (s.activePlayer === pid) return; const t = findCharacter(s, d.uid); if (!t || !kind15(t) || ctrlOf(s, t) === pid) return;
+    trig(s, { id: 3503, k: 'ask', a: { pid } }); };
 FX[3503] = { on: { allyEnters: nest15, entersPlay: nest15 },
     k: { ask: (s, a) => yesNo(s, a.pid, tr("Serpent's Nest: Snake-Token ins Spiel bringen?"), "Serpent's Nest", '3503:go', a, true), go: (s, a, v) => { if (v) makeToken(s, 3655, a.pid); } } };
 // Nexus Link: "Ongoing: When you or a friendly player plays a fire or [Fire] card, your hero may deal 1 fire damage to target hero.

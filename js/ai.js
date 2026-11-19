@@ -6,22 +6,38 @@
 // Bewertung verändert den Zustand nicht: Dauereffekte und active() dabei nur einmal je Karte berechnen (readScope, engine.js)
 function evaluateState(s, pid) { return readScope(s, () => evaluateStateNow(s, pid)); }
 function evaluateStateNow(s, pid) {
-    if (s.gameOver) return s.winner === pid ? 100000 : (s.winner ? -100000 : 0);
+    if (s.gameOver) return s.winner === pid ? AI_WIN : (s.winner ? AI_LOSS : 0);
     const me = getPlayer(s, pid), opp = getOpponent(s, pid);
     const myHp = hpOf(s, me.hero) - me.hero.damage, oppHp = hpOf(s, opp.hero) - opp.hero.damage;
-    if (myHp <= 0 && !isIndestructible(s, me.hero)) return -100000;   // Spirit of Redemption (Set wrathgate): 0 Leben, aber nicht zerstörbar
-    if (oppHp <= 0 && !isIndestructible(s, opp.hero)) return 100000;
+    if (myHp <= 0 && !isIndestructible(s, me.hero)) return AI_LOSS;   // Spirit of Redemption (Set wrathgate): 0 Leben, aber nicht zerstörbar
+    if (oppHp <= 0 && !isIndestructible(s, opp.hero)) return AI_WIN;
+    // Sicher bevorstehende Zerstörung (A Final Sacrifice): eigener Held = verloren, Ally zählt schon nicht mehr
+    const doomed = aiDoomed(s);
+    if (doomed.has(me.hero.uid) && !isIndestructible(s, me.hero)) return AI_LOSS + 1;
+    if (doomed.has(opp.hero.uid) && !isIndestructible(s, opp.hero)) return AI_WIN - 1;
     let score = 0;
     score += myHp * AI_HP_W.me - oppHp * AI_HP_W.opp;
     if (myHp <= 6) score -= (7 - myHp) * 14; else if (myHp <= 12) score -= (13 - myHp) * 3;
     if (oppHp <= 6) score += (7 - oppHp) * 16; else if (oppHp <= 12) score += (13 - oppHp) * 3;
+    // Lage je Seite für die Schlüsselwörter: Angreifer, Protectors, mittlere ATK, Handkarten der Gegenseite
+    const sideInfo = p => { const al = alliesOf(p).filter(a => !a.isTotem && !doomed.has(a.uid)); let atk = 0, n = 0, prot = 0;
+        for (const a of al) { const x = atkOf(s, a, {}); if (x > 0) { n++; atk += x; } if (hasProtector(s, a) && !a.exhausted) prot++; }
+        if (p.hero.weapons.length) n++;
+        return { attackers: Math.min(n, 3), protectors: Math.min(prot, 2), avgAtk: n ? atk / n : 0, hand: Math.min(p.hand.length, 7) }; };
+    const infoMe = sideInfo(me), infoOpp = sideInfo(opp);
     const allyVal = (a, mine) => {
         const atk = a.isTotem ? 0 : atkOf(s, a, {}), rem = Math.max(0, hpOf(s, a) - (a.damage || 0));
         let v = 3.5 + atk * (mine ? 2.2 : 2.6) + rem * (mine ? 1.5 : 1.6);
         if (a.isTotem) v += 3 + (a.cost || 0);
+        // Schlüsselwörter nach Lage (Gegenseite = die, gegen die das Schlüsselwort wirkt): Protector/Elusive je Angreifer,
+        // Stealth je Protector, Long-Range nach der ATK der Verteidiger, Untargetable nach den Handkarten (mögliche Entfernung)
+        const o = mine ? infoOpp : infoMe;
         // Erschöpfte eigene Protectors schützen im Gegnerzug nicht (erst im eigenen Zug wieder bereit)
-        if (hasProtector(s, a)) v += mine ? (a.exhausted ? 1.5 : 4.5) : (a.exhausted ? 1 : 5);
-        if (hasElusive(s, a)) v += mine ? 2.5 : 3;
+        if (hasProtector(s, a)) { const pv = 1.5 + 1.5 * o.attackers; v += mine ? (a.exhausted ? pv / 3 : pv) : (a.exhausted ? pv / 4 : pv + 0.5); }
+        if (hasElusive(s, a)) v += (mine ? 1 : 1.3) + 0.8 * o.attackers;
+        if (atk > 0 && kwHas(s, a, 'stealth')) v += 0.5 + 1.5 * o.protectors;
+        if (atk > 0 && kwHas(s, a, 'longRange')) v += 0.3 * o.avgAtk;
+        if (kwHas(s, a, 'untargetable')) v += 0.25 * o.hand;
         if (mine && !a.exhausted) v += 0.6;
         // Bleibt im nächsten Bereitmachen erschöpft (Leeroy Jenkins, Gouge, Hammer of Justice …): greift im nächsten
         // eigenen Zug nicht an und schützt bis dahin nicht
@@ -29,8 +45,8 @@ function evaluateStateNow(s, pid) {
         return v;
     };
     let threat = 0;
-    alliesOf(me).forEach(a => score += allyVal(a, true));
-    alliesOf(opp).forEach(a => { score -= allyVal(a, false); if (!a.isTotem && (!a.exhausted || hasFerocity(s, a))) threat += atkOf(s, a, { attacking: true }); });
+    alliesOf(me).forEach(a => { if (!doomed.has(a.uid)) score += allyVal(a, true); });
+    alliesOf(opp).forEach(a => { if (doomed.has(a.uid)) return; score -= allyVal(a, false); if (!a.isTotem && (!a.exhausted || hasFerocity(s, a))) threat += atkOf(s, a, { attacking: true }); });
     const ow = opp.hero.weapons.find(w => !w.exhausted);
     if (ow) threat += weaponAtk(s, ow, { attacking: true });
     if (myHp <= threat) score -= 50;
@@ -56,8 +72,9 @@ function evaluateStateNow(s, pid) {
     opp.hero.weapons.forEach(w => { score -= 3.5 + weaponAtk(s, w, {}) * 1.8; });
     opp.hero.armors.forEach(a => { score -= 2 + defOf(s, a) * 1.2 + aiFxWorth(a, 0.9); });
     // Laufende Fähigkeiten zählen für ihren Controller (mit eigener Wirkung etwas mehr)
-    (me.ongoing || []).forEach(o => score += 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
-    (opp.ongoing || []).forEach(o => score -= 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
+    // Defensive Reaktionskarten (Power Word: Shield, Vanish …) wirken nur gegen Angriffe: im Spiel so viel wert wie die Angreifer der Gegenseite
+    (me.ongoing || []).forEach(o => score += aiDefensive(o) ? 1 + 1.2 * infoOpp.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
+    (opp.ongoing || []).forEach(o => score -= aiDefensive(o) ? 1 + 1.2 * infoMe.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     return score;
 }
 
@@ -66,6 +83,13 @@ function aiFxWorth(c, perCost) {
     // Kartentext = eigene Wirkung (auch die direkt in engine.js umgesetzten, z. B. Chromatic Cloak)
     return ((CARDS[c.id] || {}).text || '').trim() ? Math.min(c.cost || 0, 6) * perCost : 0;
 }
+// Endwerte: Sieg +2 Mio., Niederlage −1 Mio. – liegen über bzw. unter jeder anderen Bewertung
+const AI_WIN = 2e6, AI_LOSS = -1e6;
+// Karten, deren Zerstörung schon fest eingeplant ist (verzögerte Effekte in s.pe) – je Eintrag: s → Liste von uids
+const AI_DOOM = [
+    s => (s.pe || []).filter(m => m.k === 'sacrifice10' && !m.done).map(m => m.uid),   // A Final Sacrifice: "At the start of the next turn, destroy it."
+];
+function aiDoomed(s) { const out = new Set(); for (const f of AI_DOOM) for (const u of f(s)) out.add(u); return out; }
 // Leben linear (je Punkt); bei wenig Leben kommen oben die starken Zuschläge dazu
 const AI_HP_W = { me: 1.0, opp: 1.6 };
 const AI_FLIP_VALUE = 4;
@@ -97,8 +121,14 @@ function handCardValue(s, p, c) {
     let v = 2.6 + Math.min(cost, 8) * 0.18;
     if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4);        // noch lange nicht spielbar
     if (R >= 5 && cost <= 2) v -= 0.6;                                   // im Lategame wenig Wirkung
+    if (aiDefensive(c)) return Math.max(0.8, v) + AI_HOLD_DEF + cost * 0.8;   // Haltewert: lohnt sich erst als Antwort (Angriff, Schaden)
     return Math.max(0.8, v);
 }
+// Defensive Reaktionskarten: wirken gegen Angriffe/Schaden (Power Word: Shield, Vanish, Divine Shield …) – ausspielen nur,
+// wenn es jetzt mehr bringt als der Haltewert (z. B. einen Ally vor tödlichem Schaden retten, Angreifer entfernen)
+const AI_HOLD_DEF = 2.5;
+const AI_DEFENSIVE_RE = /\bprevent\b|remove (all )?attackers|would be dealt|\bElusive\b|\bStealth\b/i;
+function aiDefensive(c) { const d = c && CARDS[c.id]; return !!(d && d.instant && d.type === 'Ability' && AI_DEFENSIVE_RE.test(d.text || '')); }
 // Teuerste nützliche Karte in Hand und Deck (X-Kosten zählen wie 6): so viele Ressourcen braucht man höchstens
 function maxUsefulCost(p) {
     let m = 0;

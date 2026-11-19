@@ -1145,6 +1145,9 @@ function cardActions(c) {
         const cost = pw.cost === 'X' ? 'X' : (pw.cost || 0);
         out.push({ label: `${pw.flip ? '' : ''}${pw.label}${cost ? ` (${cost})` : ''}`, run: () => humanAct({ type: 'ACTIVATE', srcUid: c.uid, key: pw.key }) });
     });
+    // Gladiator's Maul: "You can place the top card of your deck face down (as your one resource per turn)" – Option an der Waffe
+    if (c.id === 10173 && isMine(c.uid)) { const a = { type: 'PLACE_RESOURCE', handIdx: -1, fromDeckTop: true, faceUp: false };
+        if (!validateAction(G, a, 1)) out.push({ label: tr('Oberste Deckkarte verdeckt als Ressource'), cls: 'success', ask: true, run: () => humanAct(a) }); }
     return out;
 }
 // Hauptkarte einer angelegten Karte (Polymorph, Gifte, Segen …), wenn sie im Spiel liegt
@@ -1362,9 +1365,11 @@ function renderPlayerHand(p) {
         const node = createCardDOM(card, false, null, sc || {});
         // Grüner Rahmen erst weiter unten: nur wenn die Karte günstiger ist UND jetzt spielbar (die Kosten-Plakette bleibt immer)
         // Finishing Move: Combo-Punkte wie in WoW oben auf der Karte (5 Kreise, gefüllte = Combos im Friedhof, höchstens 5)
-        const cp = typeof isComboFinisher === 'function' && isComboFinisher(card) ? combosInGy(G, p.id).length : 0;
+        // "remove X finishing move cards" (Overkill): zählt Finisher im Friedhof statt Combos – eigene Farbe
+        const byFm = typeof fmInGy === 'function' && /remove X finishing move cards/i.test(card.text || '');
+        const cp = typeof isComboFinisher === 'function' && isComboFinisher(card) ? (byFm ? fmInGy(G, p.id) : combosInGy(G, p.id)).length : 0;
         if (cp > 0) {
-            const cb = document.createElement("div"); cb.className = "card-combo";
+            const cb = document.createElement("div"); cb.className = "card-combo" + (byFm ? " fm" : "");
             cb.innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < cp ? 'on' : ''}"></i>`).join('');
             node.appendChild(cb);
         }
@@ -1820,7 +1825,7 @@ function renderPendingPanel() {
 // Optionen, die Karten auf dem Feld oder der eigenen Hand sind (die wählt man dort)
 const boardOpt = o => { const l = typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };
 function boardChoice(d) {
-    if (!d || d.kind !== 'choose') return false;
+    if (!d || d.kind !== 'choose' || d.multi) return false;   // Mehrfachauswahl: markieren und bestätigen im Auswahlfenster
     let cards = 0;
     for (const o of d.opts) {
         if (o.card !== undefined) return false;
@@ -2022,6 +2027,28 @@ function renderChoiceModal(d) {
         const picked = d.opts.find(o => o.v === UI.destroyPick);
         d.opts.forEach(o => { const card = cardOfRef(o.v); if (card) addChoice(card, o.label, () => { UI.destroyPick = o.v; renderChoiceModal(d); }, o.v === UI.destroyPick ? 'cm-picked' : ''); });
         if (picked) addButton(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
+        addUndoButton(d, addButton);
+        return;
+    }
+    // Mehrfachauswahl ("up to N", pickMany): wie beim Mulligan markieren und ändern, bis „Bestätigen“ – erst dann geht die
+    // Auswahl Karte für Karte an die Engine (KI und Online unverändert). Vorlage für alle solchen Auswahlen.
+    if (d.multi) {
+        const key = d.src + '|' + d.k; if (UI.multiKey !== key) { UI.multiKey = key; UI.multiSel = []; }
+        const sel = UI.multiSel = UI.multiSel.filter(v => d.opts.some(o => o.v === v)), left = d.multi.max - d.multi.picked;
+        prompt.textContent = d.prompt.replace(/\s*\(\d+\/\d+\)$/, '');
+        const cnt = document.createElement("div"); cnt.className = "cm-multi-count"; cnt.textContent = tr`${d.multi.picked + sel.length}/${d.multi.max} gewählt`; prompt.appendChild(cnt);
+        d.opts.forEach(o => {
+            if (o.v === '__done') return;
+            const ref = o.card !== undefined ? o.card : (typeof o.v === 'number' ? null : o.v), card = cardOfRef(ref);
+            const toggle = () => { const i = sel.indexOf(o.v); if (i >= 0) sel.splice(i, 1); else if (sel.length < left) sel.push(o.v); else return; renderChoiceModal(d); };
+            if (card) addChoice(card, optionCaption(o, card), toggle, sel.includes(o.v) ? 'cm-sel' : '');
+            else addButton((sel.includes(o.v) ? '✔ ' : '') + o.label, '', toggle);
+        });
+        addButton(sel.length ? tr`Bestätigen (${sel.length})` : tr('Keine wählen'), 'success', () => {
+            const list = sel.slice(); UI.multiSel = []; UI.multiKey = null;
+            for (const v of list) { const p = myPending('choose'); if (!p || !p.multi || !p.opts.some(o => o.v === v)) break; if (!humanAct({ type: 'CHOOSE', v })) break; }
+            const p = myPending('choose'); if (p && p.multi && p.opts.some(o => o.v === '__done')) humanAct({ type: 'CHOOSE', v: '__done' });
+        });
         addUndoButton(d, addButton);
         return;
     }

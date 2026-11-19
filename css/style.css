@@ -452,6 +452,10 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .cm-warn { margin-top: 8px; color: #f87171; font-weight: bold; }
 .cm-card.cm-picked .card-visual { box-shadow: 0 0 0 0.9cqw #ef4444, 0 0 4cqw rgba(239,68,68,.8); }
 .cm-card.cm-picked { transform: translateY(-6px); }
+/* Mehrfachauswahl (pickMany): markiert = grün, Zähler über den Karten */
+.cm-card.cm-sel .card-visual { box-shadow: 0 0 0 0.9cqw #22c55e, 0 0 4cqw rgba(34,197,94,.8); }
+.cm-card.cm-sel { transform: translateY(-6px); }
+.cm-multi-count { margin-top: 6px; font-weight: 700; color: #86efac; }
 .cm-caption { max-width: clamp(100px, 9vw, 150px); font-size: 11px; font-weight: bold; color: var(--gold-light); line-height: 1.3; }
 #cm-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 #cm-buttons button { padding: 8px 20px; font-size: 14px; }
@@ -556,6 +560,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
     border-radius: 999px; background: rgba(10, 6, 4, .85); border: 1px solid rgba(201, 168, 76, .6); box-shadow: 0 2px 6px rgba(0,0,0,.6); pointer-events: none; }
 .card-combo i { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #6b6b6b, #2e2e2e 70%); box-shadow: inset 0 0 0 1px rgba(0,0,0,.7); }
 .card-combo i.on { background: radial-gradient(circle at 35% 35%, #fff6a8, #f2c31b 55%, #9a6a05); box-shadow: 0 0 5px rgba(255, 210, 60, .9), inset 0 0 0 1px rgba(90,60,0,.6); }
+/* Overkill ("remove X finishing move cards"): Finisher im Friedhof statt Combos – rot statt gelb */
+.card-combo.fm { border-color: rgba(220, 70, 50, .7); }
+.card-combo.fm i.on { background: radial-gradient(circle at 35% 35%, #ffc2a8, #e0452b 55%, #7a1406); box-shadow: 0 0 5px rgba(255, 80, 50, .9), inset 0 0 0 1px rgba(90,10,0,.6); }
 #bot-hand { z-index: 700; }
 #bot-hand.hand-up { z-index: 900; }
 .bottom-row > .resource-tray, .bottom-row > .deck-zone, .bottom-row > .hero-dock { position: relative; z-index: 800; }

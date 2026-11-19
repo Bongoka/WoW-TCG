@@ -1224,9 +1224,12 @@ function canPlayCard(s, pid, card, opts = {}) {
     const f = fx(card);
     if (f.canPlay) { const e = f.canPlay(s, pid, card); if (e !== true && e) return e; }
     const minX = card.xCost ? ((f.xRange && f.xRange(s, pid, card).min) || 0) : 0;
-    if (!card.xCost && f.xRange && opts.x === undefined) { const xr = f.xRange(s, pid, card); if (xr.min > xr.max) return tr('Kein gültiger Wert für X'); }
+    // X ohne X-Kosten (Finishing Move, z. B. Surge of Adrenaline: "You pay (X) less"): bezahlbar, wenn irgendein erlaubtes X reicht
+    let costX = opts.x !== undefined ? opts.x : minX;
+    if (!card.xCost && f.xRange && opts.x === undefined) { const xr = f.xRange(s, pid, card); if (xr.min > xr.max) return tr('Kein gültiger Wert für X');
+        for (let x = xr.min; x <= xr.max; x++) if (getPlayCost(s, p, card, x) < getPlayCost(s, p, card, costX)) costX = x; }
     const altCost = (f.altCost && f.altCost(s, pid, card)) || !!altOf(s, pid, card);
-    if (!altCost && getReadyRes(p) < getPlayCost(s, p, card, minX)) return tr('Nicht genug Ressourcen');
+    if (!altCost && getReadyRes(p) < getPlayCost(s, p, card, costX)) return tr('Nicht genug Ressourcen');
     // Pflichtziele vorhanden? Bei X-Kosten ohne festes X: irgendein bezahlbares X mit Ziel genügt
     // (Mind Control: "target ally with cost X" – mit X = 0 gäbe es meist kein Ziel)
     let xs = [opts.x !== undefined ? opts.x : (card.xCost ? minX : undefined)];
@@ -1438,6 +1441,8 @@ EK.prepItem = (s) => {
             const base = it.kind === 'card' ? getPlayCost(s, p, card, 0) : 0;
             const maxAff = card.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max;
             const opts = []; for (let x = xr.min; x <= maxAff; x++) opts.push({ label: `X = ${x}`, v: x, ai: x });
+            // Kostensenkung über X (Surge of Adrenaline): nur bezahlbare X anbieten
+            if (it.kind === 'card' && !card.xCost && !(f.altCost && f.altCost(s, p.id, card)) && !altOf(s, p.id, card)) opts.splice(0, opts.length, ...opts.filter(o => getReadyRes(p) >= getPlayCost(s, p, card, o.v)));
             if (!opts.length) return abortPrep(s, tr('X nicht bezahlbar'));
             // Nur X anbieten, für die es Pflichtziele gibt (Mind Control: Ally mit Kosten X)
             const withTgt = opts.filter(o => targetsPossible(s, p.id, f, card, o.v, it.mode));
@@ -2306,6 +2311,16 @@ function putIntoPlay(s, c, pid, o = {}) {
 function makeToken(s, tokenId, pid, extra = {}) {
     const c = makeCardInst(tokenId, true, pid);
     Object.assign(c, extra);
+    // Ausrüstungs-Tokens (Wall von Shield Wall, Axe, Message) kommen zum Helden, nicht in die Party (CR 303.1/304: Ausrüstung kommt in die Heldenreihe)
+    if (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') {
+        const p = getPlayer(s, pid), f = FX[c.id] || {};
+        c.owner = c.owner || pid; c.joinedTurn = s.turn; c.exhausted = !!(extra.exhausted || f.entersExhausted); equipEnterCounters(c);
+        (c.type === 'Weapon' ? p.hero.weapons : p.hero.armors).push(c);
+        L(s, tr`✨ ${c.name}`, '', p.id);
+        evt(s, 'entersPlay', { uid: c.uid, pid });
+        if (f.enter) asTrigger(s, c, pid, () => f.enter(s, c, pid, null));
+        return c;
+    }
     putIntoPlay(s, c, pid, extra);
     return c;
 }
@@ -2897,7 +2912,8 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     if (canPlayCard(s, pid, c)) return out;
     const f = fx(c);
     const xs = [];
-    if (c.xCost || f.xRange) { const xr = f.xRange ? f.xRange(s, pid, c) : { min: 0, max: 9 }; const base = getPlayCost(s, p, c, 0); for (let x = xr.min; x <= (c.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max); x++) xs.push(x); if (!xs.length) return out; }
+    if (c.xCost || f.xRange) { const xr = f.xRange ? f.xRange(s, pid, c) : { min: 0, max: 9 }; const base = getPlayCost(s, p, c, 0); const alt = (f.altCost && f.altCost(s, pid, c)) || !!altOf(s, pid, c);
+        for (let x = xr.min; x <= (c.xCost ? Math.min(xr.max, getReadyRes(p) - base) : xr.max); x++) if (c.xCost || alt || getReadyRes(p) >= getPlayCost(s, p, c, x)) xs.push(x); if (!xs.length) return out; }   // Surge of Adrenaline: nur bezahlbare X
     else xs.push(undefined);
     // Nur X mit Pflichtzielen (Mind Control: Ally mit Kosten X), sonst fiele das passende X oft aus der Stichprobe
     if (xs[0] !== undefined && f.slots) { const ok = xs.filter(x => targetsPossible(s, pid, f, c, x)); xs.splice(0, xs.length, ...ok); if (!xs.length) return out; }
