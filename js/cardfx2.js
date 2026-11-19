@@ -22,7 +22,7 @@ function mayPick(s, pid, prompt, src, cands, k, a, aiFn) {
     ask(s, { pid, prompt, src, opts, k, a: a || {}, auto: false });
 }
 // Lolly the Unsuspecting (Set drums): "All targets are chosen at random." – auch Ziele ausgelöster Effekte (keine Kosten-/Auswahlfragen "Welche …")
-const lollyTarget = (s, prompt) => typeof lollyOn === 'function' && lollyOn(s) && !/^(Welche|Welchen|Welches|Wie|Which|How)/.test(String(prompt).replace(/^[^:]*: /, ''));
+const lollyTarget = (s, prompt) => typeof lollyOn === 'function' && lollyOn(s) && !/^(Welche|Welchen|Welches|Wie|Which|How)\b/.test(String(prompt).replace(/^[^:]*: /, ''));
 function mustPick(s, pid, prompt, src, cands, k, a, aiFn) {
     if (cands.length && lollyTarget(s, prompt)) { q(s, { op: 'call', k, a: a || {}, v: cands[Math.floor(Math.random() * cands.length)] }); return; }
     if (!cands.length) return;

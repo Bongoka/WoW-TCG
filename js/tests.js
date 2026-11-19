@@ -1859,6 +1859,15 @@ function runRuleTests() {
         const hit = P(v, 2).allies.filter(a => a.damage > 0).length + (P(v, 2).hero.damage > 0 ? 1 : 0);
         assert(hit <= 3, `Volley: ${hit} Ziele getroffen statt höchstens 3`);
     });
+    test(159, 'Dämonen-Helden über die Typzeile (Obliveron, Illidan, Metamorphosis) zählen als Dämon; Lolly: Fragen „Welche …“ werden nicht zufällig beantwortet (vorher Steuerzeichen statt \\b in den Regex)', () => {
+        const s = fresh();
+        for (const id of [6023, 3301, 13079]) assert(isDemonS7(s, CARDS[id]), `${CARDS[id].name}: kein Dämon`);
+        assert(!isDemonS7(s, P(s, 1).hero), `${P(s, 1).hero.name}: fälschlich Dämon`);
+        const l = makeCardInst(7134, false, 2); l.joinedTurn = 1; P(s, 2).allies.push(l);
+        assert(lollyOn(s), 'Lolly nicht aktiv');
+        assert(!lollyTarget(s, 'Karte: Welche Karte willst du behalten?') && !lollyTarget(s, 'X: Which card?'), 'Lolly: Frage „Welche …“ zufällig beantwortet');
+        assert(lollyTarget(s, 'Karte: Ziel wählen'), 'Lolly: Zielwahl nicht zufällig');
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

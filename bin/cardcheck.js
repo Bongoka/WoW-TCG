@@ -23,6 +23,11 @@ if (arg('--repro')) {
     exit(0);
 }
 const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGames: +arg('--focus', 3), probe: +arg('--ki', 3), progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });   // Fortschritt: welche Partie gerade läuft (hängt eine, steht sie hier)
+// Quelltext: Steuerzeichen (z. B. ein Backspace statt \b in einer Regex – so fanden isDemonS7 und Lolly nie einen Treffer)
+for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js'))) {
+    const lines = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').split('\n');
+    lines.forEach((t, i) => { const m = t.match(/[\x00-\x08\x0B\x0C\x0E-\x1F]/); if (m) res.findings.push({ check: 'Quelltext', id: 0, name: `js/${f}:${i + 1}`, sev: 'fail', msg: `Steuerzeichen ${m[0].charCodeAt(0)} im Code (meist \\b o. Ä. beim Ersetzen verloren): …${t.slice(Math.max(0, m.index - 30), m.index + 10)}…` }); });
+}
 const dir = path.join(ROOT, 'reports'); fs.mkdirSync(dir, { recursive: true });
 const keyOf = f => `${f.check}|${f.id}|${f.msg.replace(/\(Schritt.*$/, '').replace(/\d+(\.\d+)?/g, 'N')}`;
 const basePath = path.join(dir, 'cardcheck-baseline.json');
@@ -33,7 +38,7 @@ fs.writeFileSync(path.join(dir, 'cardcheck.json'), JSON.stringify({ stats: res.s
 
 // Lesbarer Bericht: je Prüfung, Fehler vor Warnungen, neue zuerst
 const st = res.stats, L = [];
-L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
+L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
 const groups = {}; res.findings.forEach(f => (groups[f.check] = groups[f.check] || []).push(f));
 for (const [check, fs_] of Object.entries(groups)) {
     fs_.sort((a, b) => (a.sev === 'fail' ? 0 : 1) - (b.sev === 'fail' ? 0 : 1) || (b.isNew - a.isNew));

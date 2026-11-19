@@ -295,6 +295,50 @@ function ccSimGame(seed, o = {}) {
     finally { Math.random = rnd0; statPlayed = sp0; }
 }
 
+// ---------------------------------------------------------------- A2: Ausgelöste Wirkungen (Quest-Belohnung, "When this … enters play")
+// Gemessen über Engine-Ereignisse (Schaden 'dmg', Verlassen des Spiels 'left') und die Handgröße – unabhängig vom gewählten Ziel.
+const CC_TRIG = /^(When this (?:ally|weapon|armor|item) enters play|Reward)(?::|,)\s+(you may\s+)?(.+?)\.?$/i;
+const CC_EFF = [
+    ['ziehen', /^draw (a|an|one|two|three|four|five|\d+) cards?$/i, (m, x) => { const n = ccNum(m[1]); return x.drawn >= n ? null : `zieht ${x.drawn} statt ${n}`; }],
+    ['Schaden', /^your hero deals (\d+) (?:\w+ )?damage to target (?:hero or ally|ally|hero)$/i, (m, x) => x.dmg >= +m[1] || x.left > 0 ? null : `${x.dmg} Schaden statt ${m[1]}`],
+    ['Zerstören', /^destroy target (?:opposing )?(?:ally|ability|equipment|armor|weapon|item)$/i, (m, x) => x.left > 0 ? null : 'nichts zerstört'],
+];
+function ccMeasure(s, run) {
+    const ev0 = evt; let dmg = 0, left = 0; const h0 = s.p1.hand.length;
+    evt = (st, k, d) => { if (st === s) { if (k === 'dmg' && d) dmg += d.amt || 0; if (k === 'left') left++; } return ev0(st, k, d); };
+    try { const e = run(); if (e) return { err: e }; } finally { evt = ev0; }
+    return { dmg, left, drawn: s.p1.hand.length - h0 };
+}
+function ccCheckTriggers(c) {
+    const checks = [];
+    for (const t of ccSentences(c)) {
+        const m = t.match(CC_TRIG); if (!m) continue;
+        for (const [name, re, fn] of CC_EFF) { const e = m[3].match(re); if (e && !(name === 'ziehen' && /\bdiscard/i.test(c.text || ''))) checks.push({ name, e, fn, may: !!m[2], reward: /^Reward/i.test(m[1]) }); }
+    }
+    if (!checks.length) return { n: 0, out: [] };
+    const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10;
+    ccPut(s, 2, ctVanilla(6).id); ccPut(s, 2, ctVanilla(3).id);
+    if (/ability/i.test(c.text || '')) ccPut(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
+    if (/equipment|armor|weapon|item/i.test(c.text || '')) { ccPut(s, 2, ctPlain('Weapon').id); ccPut(s, 2, ctPlain('Armor').id); }
+    let x;
+    if (c.type === 'Quest') {
+        s.p1.resources.push({ card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false });
+        try { checkQuestCondition(s, s.p1, s.p1.resources[s.p1.resources.length - 1]); } catch (e) { return { n: 0, out: [] }; }
+        const qa = getLegalActions(s, 1).find(a => a.type === 'COMPLETE_QUEST'); if (!qa) return { n: 0, out: [] };   // Bedingung auf dem Standardfeld nicht erfüllt
+        x = ccMeasure(s, () => { if (!applyAction(s, qa, true, 1)) return 'Abschließen abgelehnt'; autoResolve(s); });
+    } else if (['Ally', 'Weapon', 'Armor', 'Item'].includes(c.type)) {
+        s.p1.hand.unshift(makeCardInst(c.id, false, 1));
+        const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); if (!a) return { n: 0, out: [] };
+        x = ccMeasure(s, () => { if (!applyAction(s, a, true, 1)) return 'Spielen abgelehnt'; autoResolve(s); });
+        if (!x.err) x.drawn += 1;                                                        // die gespielte Karte selbst
+    } else return { n: 0, out: [] };
+    if (x.err) return { n: 1, out: [{ sev: 'fail', msg: x.err }] };
+    const out = [];
+    for (const k of checks) { const e = k.fn(k.e, x); if (e) out.push({ sev: k.may ? 'warn' : 'fail', msg: `${k.reward ? 'Belohnung' : 'Beim Eintreten'} – ${k.name}: ${e}${k.may ? ' (KI hat „may“ abgelehnt?)' : ''}` }); }
+    const inv = ccInvariants(s); if (inv) out.push({ sev: 'fail', msg: 'Invariante: ' + inv });
+    return { n: 1, out };
+}
+
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
 // "up to N …" im Text, aber pickMany ohne Höchstzahl (9. Argument) – fand Ruthlessness und Volley (beliebig viele statt 5 bzw. 3)
 function ccArgs(src, at) {   // Argumente des Aufrufs, der bei src[at] = '(' beginnt (Klammertiefe beachten)
@@ -327,7 +371,7 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));
@@ -350,7 +394,7 @@ function ccRun(o = {}) {
             if (o.progress) o.progress(`${c.id} ${c.name} Seed ${seed0 + 5000 + c.id * 7 + g}`);
             const r = ccSimGame(seed0 + 5000 + c.id * 7 + g, { focus: c.id, probe: o.probe || 0 });
             if (r.err) { simErr++; findings.push({ check: 'Simulation', id: c.id, name: c.name, sev: 'fail', msg: `${r.err} (Schritt ${r.step}, nach „${r.last}“)`, repro: { seed: seed0 + 5000 + c.id * 7 + g, focus: c.id }, stack: r.stack }); }
-            for (const p of r.probes || []) { t.pn = (t.pn || 0) + 1; if (p.played && !(/(Stealth|Elusive)/.test(c.text || "") && p.oppProt)) t.pw = (t.pw || 0) + 1; }
+            for (const p of r.probes || []) { t.pn = (t.pn || 0) + 1; if (p.played && !(/\b(Stealth|Elusive)\b/.test(c.text || "") && p.oppProt)) t.pw = (t.pw || 0) + 1; }
             for (const p of r.plays || []) { if (p.id !== c.id || p.pid !== 1) continue;
                 t.n++; if (p.turn <= 4) t.early++;
                 if (p.own && !p.battle && !p.chain && !(/\b(Stealth|Elusive)\b/.test(c.text || '') && p.oppProt)) t.waste++; }

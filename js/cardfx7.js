@@ -535,8 +535,10 @@ CARD_ISSUES[5209] = 'Einen Onyxia-Raid zu starten ist in diesem Spiel nicht mög
 // ============================================================================
 // NACHTRAG: Sonderregeln, die beim ersten Einbau gefehlt haben
 // ============================================================================
-// Dämon: gedruckter Typ oder Apocanon (5107) im Spiel – "Allies in all zones are also Demons"
-function isDemonS7(s, c) { return !!c && ((c.allyTypes || []).includes('Demon') || (c.type === 'Hero' && /Demon/.test(c.race || '')) || attachedTo(s, c.uid, 6116).length > 0 || (c.type === 'Ally' && [s.p1, s.p2].some(p => p.allies.some(a => a.id === 5107 && active(s, a))))); }
+// Dämon: gedruckter Typ oder Apocanon (5107) im Spiel – "Allies in all zones are also Demons".
+// Helden: Typzeile der offiziellen Kartenliste (OCR, z. B. "Hero—Pit Lord Demon, 25 Health"), sonst race
+const heroIsDemon = c => /\bDemon\b/.test(c.race || '') || /^(?:Master )?Hero—[^,]*\bDemon\b/.test(((typeof OCR !== 'undefined' && OCR[c.id]) || [])[0] || '');
+function isDemonS7(s, c) { return !!c && ((c.allyTypes || []).includes('Demon') || ((c.type === 'Hero' || c.type === 'Master Hero') && heroIsDemon(c)) || attachedTo(s, c.uid, 6116).length > 0 || (c.type === 'Ally' && [s.p1, s.p2].some(p => p.allies.some(a => a.id === 5107 && active(s, a))))); }
 // Ersatzeffekte beim Schaden (aus dmgStep): Umleiten auf Plague / auf einen Dämon, Blessed Life
 function s7DmgReplace(s, o, tl) {
     const t = tl.c, tp = me(s, tl.pid);
