@@ -1833,8 +1833,27 @@ function boardChoice(d) {
 // Klick auf eine wählbare Karte: Zerstören erst markieren und bestätigen, sonst sofort wählen
 function boardPick(uid) {
     const d = myPending('choose');
+    if (d && d.limit) { limitPick(uid); return; }
     if (d && d.destroy) { UI.destroyPick = uid; render(); return; }
     chooseV(uid);
+}
+// Einzigartigkeit (Unique, Legs (1), Pet (1), Totem, Form, Zweihänder + Off-Hand …): ein Klick genügt (CR 414.2/414.3).
+// Darf nur eine bleiben, ist die angeklickte Karte die, die bleibt – die übrigen werden nacheinander zerstört
+// ("You choose which one to keep", CR 414.3b); dürfen mehrere bleiben (Ring (2) …), wird die angeklickte zerstört.
+function limitPick(uid) {
+    const d = myPending('choose');
+    if (!d || !d.limit || d.limit.keep !== 1) { chooseV(uid); return; }
+    for (let n = 0; n < 12; n++) {
+        const p = myPending('choose');
+        if (!p || !p.limit || !p.opts.some(o => o.v === uid)) break;
+        const other = p.opts.find(o => o.v !== uid && typeof o.v === 'string'); if (!other) break;
+        if (!humanAct({ type: 'CHOOSE', v: other.v })) break;
+    }
+}
+// Rückgängig-Knopf in Entscheidungen (Hinweis in der Mitte, Auswahlfenster) – nur ohne eigenes „Abbrechen“
+function addUndoButton(d, add) {
+    if (typeof canUndo !== 'function' || !canUndo() || d.opts.some(o => o.v === '__cancel')) return;
+    add(tr('↶ Rückgängig'), '', () => undoLastAction());
 }
 // Zielmodus: gespielte Karte fliegt in die Mitte, darunter "Wähle ein Ziel!", Warnungen und Knöpfe (Abbrechen, Kein Ziel …);
 // der Pfeil geht von ihr (bzw. der Kraft-Quelle auf dem Feld) zum Mauszeiger. Klicks gehen durch auf das Feld.
@@ -1854,31 +1873,23 @@ function renderAimBanner(d) {
         const node = createCardDOM({ ...card, exhausted: false }, false); node.classList.add('no-fx'); node.style.setProperty('--cw', '100%');
         slot.appendChild(node); slot.classList.remove('fly-in'); void slot.offsetWidth; slot.classList.add('fly-in');
     }
-    el.querySelector('.ab-title').textContent = d.destroy ? tr('Wähle die Karte, die zerstört wird!') : d.protect ? tr('Protector einsetzen?') : d.target ? tr('Wähle ein Ziel!') : tr('Wähle eine Karte!');
-    el.querySelector('.ab-prompt').textContent = d.prompt || '';
+    el.querySelector('.ab-title').textContent = d.limit ? (d.limit.keep === 1 ? tr('Welche Karte willst du behalten?') : tr('Welche Karte willst du zerstören?'))
+        : d.destroy ? tr('Wähle die Karte, die zerstört wird!') : d.protect ? tr('Protector einsetzen?') : d.target ? tr('Wähle ein Ziel!') : tr('Wähle eine Karte!');
+    el.querySelector('.ab-prompt').textContent = (d.limit ? d.limit.rule : d.prompt) || '';
     const warn = [];
-    if (d.destroy) warn.push(tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'));
+    if (d.destroy && !d.limit) warn.push(tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'));
     if (d.k === 'E:strikeDo' && strikeFormRisk().length) warn.push(tr`Achtung: Ein Waffenschlag zerstört ${strikeFormRisk().join(', ')}.`);
     el.querySelector('.ab-warn').textContent = warn.join(' ');
     const btns = el.querySelector('.ab-btns'); btns.innerHTML = '';
     const add = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(b); };
-    const picked = d.destroy && d.opts.find(o => o.v === UI.destroyPick);
+    const picked = d.destroy && !d.limit && d.opts.find(o => o.v === UI.destroyPick);
     if (picked) add(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
     d.opts.filter(o => !boardOpt(o)).forEach(o => add(o.label, o.v === '__cancel' || (o.v === '__none' && d.protect) ? 'danger' : '', () => chooseV(o.v)));
+    // Rückgängig: bei der Einzigartigkeit direkt neben der Regel (darunter liegen die Karten), sonst bei den Knöpfen
+    if (d.limit) addUndoButton(d, (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'pointer-events:auto;margin-left:10px;padding:2px 10px;font-size:13px';
+        b.onclick = (e) => { e.stopPropagation(); fn(); }; el.querySelector('.ab-prompt').appendChild(b); });
+    else addUndoButton(d, add);
     el.classList.add('show');
-}
-// Würde diese Karte im Spiel ein Limit verletzen? Gleiche Prüfung wie die Engine (findLimitViolation) auf einer Kopie
-function limitWarning(card) {
-    const p = G.p1, h = p.hero, c = { ...card, uid: 'limit_probe' };
-    const t = { ...p, allies: [...p.allies], ongoing: [...(p.ongoing || [])], hero: { ...h, weapons: [...h.weapons], armors: [...h.armors] } };
-    if (card.type === 'Weapon') t.hero.weapons.push(c);
-    else if (card.type === 'Armor' || card.type === 'Item') t.hero.armors.push(c);
-    else if (card.type === 'Ally' || card.totem) t.allies.push(c);
-    else if (card.type === 'Ability' && card.limitTags) t.ongoing.push(c);
-    else return null;
-    const v = findLimitViolation(G, t);
-    if (!v || !v.cards.some(x => x.uid === 'limit_probe')) return null;
-    return { label: v.label, names: v.cards.map(x => x.name).join(', ') };
 }
 // Würde eine eigene Karte sich dadurch selbst zerstören (Formen, Mind Control, Shadowform, Tree of Life …)?
 // Die Ereignisse laufen in einer Kopie durch die Karteneffekte; gesammelt werden ausgelöste "destroy this"-Trigger.
@@ -1996,12 +2007,21 @@ function renderChoiceModal(d) {
     if (d.k === 'E:strikeDo' && strikeFormRisk().length) {
         const w = document.createElement("div"); w.className = "cm-warn"; w.textContent = tr`Achtung: Ein Waffenschlag zerstört ${strikeFormRisk().join(', ')}.`; prompt.appendChild(w);
     }
+    // Einzigartigkeit: Regel dazu, ein Klick auf die Karte, die bleibt (bzw. bei Ring (2) … die zerstört wird)
+    if (d.limit) {
+        title.textContent = d.limit.keep === 1 ? tr('Welche Karte willst du behalten?') : tr('Welche Karte willst du zerstören?');
+        prompt.textContent = d.limit.rule;
+        d.opts.forEach(o => { const card = cardOfRef(o.v); if (card) addChoice(card, o.label, () => limitPick(o.v)); });
+        addUndoButton(d, addButton);
+        return;
+    }
     // Karte zerstören (Unique, zweite Waffe, Totem …): rote Warnung, erst auswählen, dann bestätigen
     if (d.destroy) {
         const w = document.createElement("div"); w.className = "cm-warn"; w.textContent = tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'); prompt.appendChild(w);
         const picked = d.opts.find(o => o.v === UI.destroyPick);
         d.opts.forEach(o => { const card = cardOfRef(o.v); if (card) addChoice(card, o.label, () => { UI.destroyPick = o.v; renderChoiceModal(d); }, o.v === UI.destroyPick ? 'cm-picked' : ''); });
         if (picked) addButton(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
+        addUndoButton(d, addButton);
         return;
     }
     d.opts.forEach(o => {
@@ -2011,6 +2031,7 @@ function renderChoiceModal(d) {
         if (card) addChoice(card, optionCaption(o, card), () => chooseV(o.v));
         else addButton(o.label, (o.v === '__cancel' || (o.v === '__none' && d.protect)) ? 'danger' : '', () => chooseV(o.v));
     });
+    addUndoButton(d, addButton);
 }
 
 // Kurze Meldung mitten auf dem Spielfeld (wichtige Infos gehören ins Hauptfenster, nicht ins Log)

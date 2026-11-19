@@ -154,12 +154,16 @@ function getDamageIcon(card) {
 }
 
 // ============================================================================
-// RÜCKGÄNGIG (Undo): eigene Aktionen in der eigenen Aktionsphase zurücknehmen.
+// RÜCKGÄNGIG (Undo): eigene Aktionen im eigenen Zug Schritt für Schritt zurücknehmen – auch mitten in einer
+// eigenen Entscheidung (z. B. „Welche Karte willst du behalten?“: Karte zurück auf die Hand, Ressourcen erstattet).
 // Nicht möglich, sobald verdeckte Informationen aufgedeckt wurden (Karte gezogen,
-// Deck durchsucht/gemischt), Zufall im Spiel war oder der Gegner entschieden hat.
+// Deck durchsucht/gemischt), Zufall im Spiel war oder der Gegner entschieden hat (undoVerdict, engine.js).
 // ============================================================================
 const UNDO = { stack: [], max: 30 };
-function takeUndoSnapshot() { return structuredClone({ ...G, _undo: null }); }
+function takeUndoSnapshot() {
+    if (G._hidden || G._oppDecided) UNDO.stack = [];                                      // außerhalb einer Aktion aufgedeckt / Gegner entschied (driveCpu → process)
+    return structuredClone({ ...G, _undo: null, _hidden: false, _oppDecided: false });
+}
 function describeUndoAction(snap, action) {
     const p = snap.p1;
     if (action.type === 'PLACE_RESOURCE') { const c = p.hand[action.handIdx]; return c ? tr`Ressource (${c.name})` : tr('Ressource'); }
@@ -168,21 +172,22 @@ function describeUndoAction(snap, action) {
     if (action.type === 'COMPLETE_QUEST_ZONE') return action.desc || 'Quest';
     if (action.type === 'ATTACK') return tr('Angriff');
     if (action.type === 'ACTIVATE') return tr('Kraft');
+    if (action.type === 'CHOOSE') { const o = snap.pending && (snap.pending.opts || []).find(x => sameV(x.v, action.v)); return o ? tr`Auswahl (${o.label})` : tr('Auswahl'); }
     return tr('Aktion');
 }
 function commitUndoSnapshot(snap, action) {
-    const sig = pl => pl.deck.join(',');
-    const deckChanged = sig(snap.p1) !== sig(G.p1) || sig(snap.p2) !== sig(G.p2);
-    if (deckChanged || G._hidden || G._oppDecided || G.gameOver || action.type === 'END_TURN') {
-        UNDO.stack = [];
-        return;
-    }
-    // Nur abgeschlossene Aktionen der eigenen Aktionsphase landen im Verlauf
-    if (!isIdle(G)) return;
+    const v = undoVerdict(snap, G, action, 1);
+    if (v === 'clear') { UNDO.stack = []; return; }
+    // Abgeschlossene Aktionen der eigenen Aktionsphase und eigene offene Entscheidungen landen im Verlauf
+    if (v !== 'push') return;
     UNDO.stack.push({ snap, desc: describeUndoAction(snap, action) });
     if (UNDO.stack.length > UNDO.max) UNDO.stack.shift();
 }
-function canUndo() { if (typeof TUT !== 'undefined' && TUT.active) return false; if (G && G.online) return false; return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && isIdle(G); }
+function canUndo() {
+    if (typeof TUT !== 'undefined' && TUT.active) return false; if (!G || G.online) return false;
+    if (G._hidden || G._oppDecided) { UNDO.stack = []; return false; }
+    return UNDO.stack.length > 0 && G.activePlayer === 1 && !UI.busy && !G.gameOver && (isIdle(G) || !!(G.pending && G.pending.pid === 1));
+}
 function undoLastAction() {
     if (!canUndo()) return;
     const { snap, desc } = UNDO.stack.pop();
@@ -287,18 +292,16 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null) {
 function humanAct(action) {
     if (!G || G.gameOver || UI.busy) return false;
     if (typeof tutAllows === 'function' && !tutAllows(action)) return false;               // Tutorial: nur der erklärte Schritt
-    // Karte würde ein Limit verletzen (Unique, zweite Waffe, Totem, Form …): vorher nachfragen (CR 414.3)
-    // Ebenso, wenn sich eine eigene Karte dadurch selbst zerstört (Moonkin Form bei Innervate, Flight Form beim Angriff …)
+    // Karte würde ein Limit verletzen (Unique, zweite Waffe, Totem, Form …): keine Vorab-Warnung – danach fragt das Spielfeld
+    // „Welche Karte willst du behalten?“ (ein Klick, daneben Rückgängig; CR 414.3).
+    // Nachfragen nur, wenn sich eine eigene Karte dadurch selbst zerstört (Moonkin Form bei Innervate, Flight Form beim Angriff …)
     if ((action.type === 'PLAY_CARD' || action.type === 'ATTACK') && !action.limitOk) {
         const card = action.type === 'ATTACK' ? null : action.gyUid ? G.p1.graveyard.find(c => c.uid === action.gyUid) : G.p1.hand[action.handIdx];
-        const v = card && limitWarning(card);
         const lost = action.type === 'ATTACK'
             ? (action.attackerUid === G.p1.hero.uid ? selfDestroyWarning([['attacks', { att: action.attackerUid, def: action.defenderUid, apid: 1, first: true }]]) : [])
             : card ? selfDestroyWarning([['cardPlayed', { pid: 1, card }], ...(action.gyUid ? [] : [['handLeft', { pid: 1, uid: card.uid }]])]) : [];
-        if (v || lost.length) {
-            const lines = [];
-            if (v) lines.push(tr`Achtung: ${v.label} – danach musst du eine dieser Karten zerstören: ${v.names}.`);
-            if (lost.length) lines.push(tr`Achtung: Dadurch wird ${lost.join(', ')} zerstört.`);
+        if (lost.length) {
+            const lines = [tr`Achtung: Dadurch wird ${lost.join(', ')} zerstört.`];
             const title = card ? tr`${card.name} spielen?` : tr('Angreifen?'), yes = card ? tr('Trotzdem spielen') : tr('Trotzdem angreifen');
             uiConfirm(title, lines.join(' '), yes, () => humanAct({ ...action, limitOk: true }));
             return false;

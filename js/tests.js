@@ -1772,6 +1772,29 @@ function runRuleTests() {
         assert(!cardMatchesPlayer(CARDS[11021], p), "Paletress: Kel'Thuzad (kein Priester) erlaubt");
     });
     LANG = prevLang;
+    test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
+        const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];
+        const before = cloneState(s);
+        assert(applyAction(s, { type: 'PLAY_CARD', handIdx: hi, actorId: 1 }, true, 1), 'Fury nicht spielbar');
+        const d = s.pending;
+        assert(d && d.kind === 'choose' && d.limit && d.limit.keep === 1, 'keine Einzigartigkeits-Auswahl mit "behalten"');
+        assert(d.limit.rule === tr`Man darf nur eine Karte mit ${'Pet'} (${1}) im Spiel haben.`, 'Regeltext: ' + d.limit.rule);
+        assert(d.opts.some(o => o.v === old.uid) && d.opts.some(o => o.v === nu.uid), 'Auswahl ohne beide Pets');
+        assert(undoVerdict(before, s, { type: 'PLAY_CARD' }) === 'push', 'Ausspielen bis zur eigenen Auswahl nicht zurücknehmbar');
+        const opp = cloneState(s); opp._oppDecided = true; assert(undoVerdict(before, opp, { type: 'PLAY_CARD' }) === 'clear', 'Rückgängig trotz Gegner-Entscheidung');
+        const info = cloneState(s); info.p1.deck.pop(); assert(undoVerdict(before, info, { type: 'PLAY_CARD' }) === 'clear', 'Rückgängig trotz neuer Information (Deck)');
+        const hid = cloneState(s); hid._hidden = true; assert(undoVerdict(before, hid, { type: 'PLAY_CARD' }) === 'clear', 'Rückgängig trotz verdeckter Info');
+        const mid = cloneState(s);
+        assert(applyAction(s, { type: 'CHOOSE', v: old.uid, actorId: 1 }, true, 1), 'Auswahl nicht möglich');
+        assert(isIdle(s) && P(s, 1).allies.some(a => a.uid === nu.uid) && !P(s, 1).allies.some(a => a.uid === old.uid), 'neues Pet nicht behalten');
+        assert(undoVerdict(mid, s, { type: 'CHOOSE' }) === 'push', 'Auswahl nicht zurücknehmbar');
+        assert(undoVerdict(mid, s, { type: 'END_TURN' }) === 'clear', 'Zugende zurücknehmbar');
+        const rule = (ids) => { const t = fresh(); t.humans = [1]; ids.forEach(id => put(t, 1, id)); process(t); return t.pending && t.pending.limit; };
+        const legs = rule([284, 284]); assert(legs && legs.keep === 1 && legs.rule === tr`Man darf nur ein ${'Legs'} (${1}) Equipment angelegt haben.`, 'Legs: ' + (legs && legs.rule));
+        const ring = rule([307, 308, 307]); assert(ring && ring.keep === 2 && ring.rule === tr`Man darf nur ${2} ${'Ring'} (${2}) Equipment angelegt haben.`, 'Ring (2): ' + (ring && ring.rule));
+        const uq = rule([191, 191]); assert(uq && uq.keep === 1 && uq.rule === tr`${'King Magni Bronzebeard'} ist Unique: Man darf nur eine Karte mit diesem Namen im Spiel haben.`, 'Unique: ' + (uq && uq.rule));
+    });
+
     return results;
 }
 

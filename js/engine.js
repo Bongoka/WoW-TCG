@@ -868,7 +868,8 @@ function stateBased(s) {
     for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {   // Zugspieler repariert zuerst (CR 414.2)
         const v = findLimitViolation(s, p);
         if (v) {
-            ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label, destroy: true,
+            // limit: Regeltext + wie viele bleiben dürfen – die Oberfläche fragt „Welche Karte willst du behalten?“ (CR 414.3b: "You choose which one to keep")
+            ask(s, { pid: p.id, prompt: tr`${v.label}: Wähle, welche Karte zerstört wird.`, src: v.label, destroy: true, limit: { rule: limitRule(v), keep: v.keep },
                 opts: v.cards.map(c => ({ label: c.name, v: c.uid, ai: -(c.joinedTurn || 0) - cardValue(s, c) })), k: 'E:limitDestroy', a: {} });
             flushBatch(s); return true;
         }
@@ -889,7 +890,7 @@ function findLimitViolation(s, p) {
     // Unique (414.3a)
     const uniq = {};
     for (const c of all) if (c.unique || (c.limitTags && c.limitTags.Unique) || (UNIQUE_ALL.length && UNIQUE_ALL.some(f => f(s)))) (uniq[c.name] = uniq[c.name] || []).push(c);
-    for (const k in uniq) if (uniq[k].length > 1) return { label: `Unique (${k})`, cards: uniq[k] };
+    for (const k in uniq) if (uniq[k].length > 1) return { label: `Unique (${k})`, cards: uniq[k], unique: k, keep: 1 };
     // Tags mit Zahl, z. B. Pet (1), Form (1), Earth Totem (1), Head (1), Ring (2) (414.3b)
     const tags = {};
     for (const c of all) {
@@ -906,12 +907,20 @@ function findLimitViolation(s, p) {
         lim += auraSum(s, 'tagLimit', p.id, t, tags[t].cards);                             // Goldenmoon: ein zusätzliches Pet
         if (t === 'Melee' && sextupleWield(s, p.id)) lim = Math.max(lim, 6 - tags[t].cards.filter(w => w.twoHanded).length);   // Sextuple Wield: sechs Hände
         for (const f of TAG_LIMIT_EXTRA) lim += f(s, p.id, t) || 0;                         // Deuce (Set icecrown): im Friedhof
-        if (tags[t].cards.length > lim) return { label: `${t} (${tags[t].lim})`, cards: tags[t].cards };
+        if (tags[t].cards.length > lim) return { label: `${t} (${tags[t].lim})`, cards: tags[t].cards, tag: t, base: tags[t].lim, keep: Math.max(1, lim) };
     }
     // Zweihänder + Off-Hand (414.3c)
     const two = p.hero.weapons.filter(w => w.twoHanded), off = p.hero.armors.filter(a => a.limitTags && a.limitTags['Off-Hand']);
-    if (two.length && off.length && !titanGrip(s, p.id)) return { label: tr('Zweihänder + Off-Hand'), cards: [...two, ...off] };
+    if (two.length && off.length && !titanGrip(s, p.id)) return { label: tr('Zweihänder + Off-Hand'), cards: [...two, ...off], twoOff: true, keep: 1 };
     return null;
+}
+// Regel zu einer Einzigartigkeits-Verletzung als kurzer Satz (Auswahl „Welche Karte willst du behalten?“)
+function limitRule(v) {
+    if (v.unique) return tr`${v.unique} ist Unique: Man darf nur eine Karte mit diesem Namen im Spiel haben.`;   // CR 414.3a
+    if (v.twoOff) return tr('Man darf nicht zugleich eine Two-Handed-Waffe und Off-Hand-Equipment angelegt haben.');   // CR 414.3c
+    const equip = v.cards.every(c => c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item');            // CR 414.3b
+    if (v.keep === 1) return equip ? tr`Man darf nur ein ${v.tag} (${v.base}) Equipment angelegt haben.` : tr`Man darf nur eine Karte mit ${v.tag} (${v.base}) im Spiel haben.`;
+    return equip ? tr`Man darf nur ${v.keep} ${v.tag} (${v.base}) Equipment angelegt haben.` : tr`Man darf nur ${v.keep} Karten mit ${v.tag} (${v.base}) im Spiel haben.`;
 }
 
 // ---------------------------------------------------------------- Prioritätsfenster
@@ -1236,13 +1245,25 @@ function applyAction(s, action, isSim = false, actorId = null) {
     const pid = action.actorId || actorId || s.activePlayer;
     const err = validateAction(s, action, pid);
     if (err) return false;                                                                // Grund zeigt die Oberfläche (Meldung im Spielfeld)
-    const undoSnap = (isReal(s) && pid === 1 && typeof takeUndoSnapshot === 'function' && action.type !== 'CHOOSE') ? takeUndoSnapshot() : null;
+    const undoSnap = (isReal(s) && pid === 1 && typeof takeUndoSnapshot === 'function') ? takeUndoSnapshot() : null;   // auch Entscheidungen: Rückgängig Schritt für Schritt
     s._hidden = false; s._oppDecided = false;
     doAction(s, action, pid);
     process(s);
     refreshDisplay(s);
     if (undoSnap && typeof commitUndoSnapshot === 'function') commitUndoSnapshot(undoSnap, action);
     return true;
+}
+
+// Rückgängig (main.js): Was wird aus dem Zustand "before" (vor einer eigenen Aktion), nachdem sie zu s geführt hat?
+// 'clear' = neue Information (Deck verändert/gemischt, verdeckte Karten, Zufall) oder der Gegner hat entschieden (z. B. eine Antwort
+//           gespielt) bzw. Zugende → kein Weg mehr zurück, Verlauf löschen;
+// 'push'  = eigener Schritt, danach ist wieder der Spieler dran (Aktionsphase oder eigene Entscheidung, z. B. welche Karte bleibt);
+// 'skip'  = sonst (kein neuer Schritt)
+function undoVerdict(before, s, action, pid = 1) {
+    const sig = pl => pl.deck.join(',');
+    if (sig(before.p1) !== sig(s.p1) || sig(before.p2) !== sig(s.p2) || s._hidden || s._oppDecided || s.gameOver || action.type === 'END_TURN') return 'clear';
+    if (s.activePlayer !== pid || s.phase !== 'main') return 'skip';
+    return isIdle(s) || (s.pending && s.pending.pid === pid) ? 'push' : 'skip';
 }
 
 function validateAction(s, a, pid) {
