@@ -251,6 +251,20 @@ function dbRenderStats(cards, curve, tb, tl) {
     });
     if (!n) tb.innerHTML = tr('<div class="db-empty-bar">leer</div>');
 }
+// Kartenausschnitt einer Zeile: nur EIN Bild, immer die kleine Fassung ("<set> small"). Früher standen bis zu 4 Kandidaten
+// als Ebenen im background-image – der Browser lädt und dekodiert aber jede Ebene, auch die verdeckten (je Zeile 2 × 358 px
+// und 2 × 716 px). Auf dem Tablet staute das die Bild-Dekodierung (Ruckeln beim Scrollen, Zoom-Karte kam zu spät).
+// Scharf wird die Karte in der Zoom-Vorschau (cardPreview.show). Fehlt das Bild, die nächste Kandidatin (einmal je Adresse geprüft).
+const DB_ART_OK = new Set();
+function dbRowArt(art, id) {
+    const list = getImageCandidates(id, 'ea', 'small'); if (!list.length) return;
+    let k = 0; art.style.backgroundImage = `url("${list[0]}")`;
+    if (DB_ART_OK.has(list[0])) return;
+    const probe = new Image();
+    probe.onload = () => DB_ART_OK.add(list[k]);
+    probe.onerror = () => { imgFailed(list[k]); if (++k < list.length) { art.style.backgroundImage = `url("${list[k]}")`; probe.src = list[k]; } };
+    probe.src = list[0];
+}
 // Deckliste nach Typ gruppiert. edit: Zeilen mit − / + und Karten-Vorschau (Deck-Builder); sonst nur Anzahl (Deck-Vorschau der Übersicht)
 function dbRenderRows(box, cards, hero, o = {}) {
     const counts = {}; cards.forEach(id => counts[id] = (counts[id] || 0) + 1);
@@ -266,7 +280,7 @@ function dbRenderRows(box, cards, hero, o = {}) {
                 + (o.edit ? `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>` : `<span></span><span class="db-row-n">${counts[id]}</span><span></span>`);
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
             const art = document.createElement('div'); art.className = 'db-row-art';
-            art.style.backgroundImage = getImageCandidates(id, 'ea').slice(0, 4).map(u => `url("${u}")`).join(', ');
+            dbRowArt(art, id);
             row.prepend(art);
             // Kosten auf der Original-Kugel der Karte (Ally je Fraktion, Fähigkeit lila, Ausrüstung grau, Quest-Schild); Streifen links in derselben Farbe
             const orb = dbOrb(c, hero), cost = row.querySelector('.db-row-cost');

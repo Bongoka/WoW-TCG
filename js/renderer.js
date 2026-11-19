@@ -344,6 +344,10 @@
         const clone = tilt.cloneNode(true);
         const sb = clone.querySelector('.cfx-stats-bar'); if (sb) sb.remove();
         const pimg = clone.querySelector('.card-image-layer');
+        // Die Kopie erbt keinen onload-Handler: war das Bild der Karte beim Kopieren noch nicht geladen, fehlte ihr "has-img"
+        // und das Bild blieb unsichtbar (opacity 0) – die Zoom-Karte zeigte nur Text. Sichtbar schalten, sobald ein Bild da ist.
+        const cface = clone.querySelector('.card-visual');
+        if (pimg && cface) { const ok = () => { if (pimg.naturalWidth) cface.classList.add('has-img'); }; pimg.addEventListener('load', ok); ok(); }
         if (pimg && meta.cardId != null && typeof getImageCandidates === 'function') {
             // Vorschau in derselben Variante wie die kleine Karte (das tatsächlich geladene Bild entscheidet):
             // Extended Art → große Extended Art, sonst das normale Bild. Geflippte Helden zeigen hier die Vorderseite,
@@ -351,9 +355,13 @@
             const shown = decodeURI((tilt.querySelector('.card-image-layer') || {}).src || '');
             const list = meta.previewMode === 'ea' || / \(EA\)\.\w+$/.test(shown) ? getImageCandidates(meta.cardId, 'eaBig')
                 : getImageCandidates(meta.cardId, 'full').concat(getImageCandidates(meta.cardId, 'ea'));
-            let k = 0; const probe = new Image();
+            let k = 0; const probe = new Image(); probe.fetchPriority = 'high';
             if (/ \(Back\)\.\w+$/.test(shown)) pimg.style.visibility = 'hidden';            // Rückseite nicht kurz aufblitzen lassen
-            probe.onload = () => { pimg.src = probe.src; pimg.style.visibility = ''; };
+            // Erst fertig dekodieren, dann tauschen: bis dahin bleibt das kleine Bild stehen (die Karte wird „scharfgestellt“),
+            // statt dass das große Bild beim Zeichnen dekodiert wird und Vorschau samt Kippen hängt (Tablet)
+            const swap = () => { pimg.src = probe.src; pimg.style.visibility = ''; };
+            // (höchstens 300 ms warten: decode() kann in verborgenen Seiten liegen bleiben)
+            probe.onload = () => { if (probe.decode) Promise.race([probe.decode(), new Promise(r => setTimeout(r, 300))]).then(swap, swap); else swap(); };
             probe.onerror = () => { imgFailed(probe.src); k++; if (k < list.length) probe.src = list[k]; };
             probe.src = list[0];
         }
@@ -389,7 +397,9 @@
     window.cardPreview = {
         show(cardId, anchor) {
             if (!CARDS[cardId] || !anchor) return;
-            const node = createCardDOM({ ...CARDS[cardId], uid: 'pv_' + cardId }, false, null, { previewMode: 'ea' });
+            // Zuerst das kleine Bild – dasselbe wie im Zeilen-Ausschnitt der Deckliste, also meist schon geladen und dekodiert:
+            // die Zoom-Karte steht sofort, das große Bild ersetzt es, sobald es dekodiert ist (enter)
+            const node = createCardDOM({ ...CARDS[cardId], uid: 'pv_' + cardId }, false, null, { previewMode: 'ea', imgQ: 'small' });
             enter(node, anchor);
         },
         hide() { if (S.live && S.live.anchor) release(); }
