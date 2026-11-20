@@ -1053,6 +1053,7 @@ function decorateInPlay(node, c) {
         node.style.cursor = 'pointer';
         node.onclick = (e) => { e.stopPropagation(); boardPick(uid); };
         if (UI.destroyPick === uid) node.classList.add('destroy-picked');
+        if (pend.multi && (UI.multiSel || []).includes(uid)) node.classList.add('multi-picked');
         if (pend.protect) {
             node.draggable = true;
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'protect', uid }; e.dataTransfer.setData('text/plain', uid); hideDragImage(e); startDragAim(uid, e); markDropTargets(); });
@@ -1378,6 +1379,7 @@ function renderPlayerHand(p) {
         if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
             node.classList.add('choice-target'); node.style.cursor = 'pointer';
+            if ((myPending('choose') || {}).multi && (UI.multiSel || []).includes(card.uid)) node.classList.add('multi-picked');
             node.onclick = (e) => { e.stopPropagation(); boardPick(card.uid); };
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
@@ -1825,7 +1827,7 @@ function renderPendingPanel() {
 // Optionen, die Karten auf dem Feld oder der eigenen Hand sind (die wählt man dort)
 const boardOpt = o => { const l = typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };
 function boardChoice(d) {
-    if (!d || d.kind !== 'choose' || d.multi) return false;   // Mehrfachauswahl: markieren und bestätigen im Auswahlfenster
+    if (!d || d.kind !== 'choose') return false;   // Mehrfachauswahl: liegen alle Karten auf dem Feld/der Hand, dort markieren, sonst im Fenster
     let cards = 0;
     for (const o of d.opts) {
         if (o.card !== undefined) return false;
@@ -1839,6 +1841,7 @@ function boardChoice(d) {
 // Klick auf eine wählbare Karte: Zerstören erst markieren und bestätigen, sonst sofort wählen
 function boardPick(uid) {
     const d = myPending('choose');
+    if (d && d.multi) { multiToggle(d, uid); render(); return; }
     if (d && d.limit) { limitPick(uid); return; }
     if (d && d.destroy) { UI.destroyPick = uid; render(); return; }
     chooseV(uid);
@@ -1881,7 +1884,9 @@ function renderAimBanner(d) {
     }
     el.querySelector('.ab-title').textContent = d.limit ? (d.limit.keep === 1 ? tr('Welche Karte willst du behalten?') : tr('Welche Karte willst du zerstören?'))
         : d.destroy ? tr('Wähle die Karte, die zerstört wird!') : d.protect ? tr('Protector einsetzen?') : d.target ? tr('Wähle ein Ziel!') : tr('Wähle eine Karte!');
-    el.querySelector('.ab-prompt').textContent = (d.limit ? d.limit.rule : d.prompt) || '';
+    el.querySelector('.ab-prompt').textContent = (d.limit ? d.limit.rule : d.multi ? d.prompt.replace(/\s*\(\d+\/\d+\)$/, '') : d.prompt) || '';
+    if (d.multi) { el.querySelector('.ab-title').textContent = tr`Markiere bis zu ${d.multi.max - d.multi.picked} Karten!`;
+        const cnt = document.createElement('div'); cnt.className = 'cm-multi-count'; cnt.textContent = tr`${d.multi.picked + multiSel(d).length}/${d.multi.max} gewählt`; el.querySelector('.ab-prompt').appendChild(cnt); }
     const warn = [];
     if (d.destroy && !d.limit) warn.push(tr('Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.'));
     if (d.k === 'E:strikeDo' && strikeFormRisk().length) warn.push(tr`Achtung: Ein Waffenschlag zerstört ${strikeFormRisk().join(', ')}.`);
@@ -1890,7 +1895,8 @@ function renderAimBanner(d) {
     const add = (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; if (cls) b.className = cls; b.onclick = (e) => { e.stopPropagation(); fn(); }; btns.appendChild(b); };
     const picked = d.destroy && !d.limit && d.opts.find(o => o.v === UI.destroyPick);
     if (picked) add(tr`${picked.label} zerstören`, 'danger', () => { UI.destroyPick = null; chooseV(picked.v); });
-    d.opts.filter(o => !boardOpt(o)).forEach(o => add(o.label, o.v === '__cancel' || (o.v === '__none' && d.protect) ? 'danger' : '', () => chooseV(o.v)));
+    if (d.multi) add(multiSel(d).length ? tr`Bestätigen (${multiSel(d).length})` : tr('Keine wählen'), 'success', multiConfirm);
+    d.opts.filter(o => !boardOpt(o) && !(d.multi && o.v === '__done')).forEach(o => add(o.label, o.v === '__cancel' || (o.v === '__none' && d.protect) ? 'danger' : '', () => chooseV(o.v)));
     // Rückgängig: bei der Einzigartigkeit direkt neben der Regel (darunter liegen die Karten), sonst bei den Knöpfen
     if (d.limit) addUndoButton(d, (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'pointer-events:auto;margin-left:10px;padding:2px 10px;font-size:13px';
         b.onclick = (e) => { e.stopPropagation(); fn(); }; el.querySelector('.ab-prompt').appendChild(b); });
@@ -1985,6 +1991,14 @@ function optionCaption(o, card) {
     if (o.label.startsWith(name)) return o.label.slice(name.length).trim().replace(/^\((.*)\)$/, '$1');
     return o.label.replace(name, '').replace(/\s{2,}/g, ' ').trim();
 }
+// Mehrfachauswahl (pickMany): Auswahl je Entscheidung merken, umschalten (höchstens die erlaubte Zahl) und bestätigen
+function multiSel(d) { const key = d.src + '|' + d.k; if (UI.multiKey !== key) { UI.multiKey = key; UI.multiSel = []; } return UI.multiSel = UI.multiSel.filter(v => d.opts.some(o => o.v === v)); }
+function multiToggle(d, v) { const sel = multiSel(d), i = sel.indexOf(v); if (i >= 0) sel.splice(i, 1); else if (sel.length < d.multi.max - d.multi.picked) sel.push(v); }
+function multiConfirm() {
+    const list = (UI.multiSel || []).slice(); UI.multiSel = []; UI.multiKey = null;
+    for (const v of list) { const p = myPending('choose'); if (!p || !p.multi || !p.opts.some(o => o.v === v)) break; if (!humanAct({ type: 'CHOOSE', v })) break; }
+    const p = myPending('choose'); if (p && p.multi && p.opts.some(o => o.v === '__done')) humanAct({ type: 'CHOOSE', v: '__done' });
+}
 function renderChoiceModal(d) {
     const m = document.getElementById("choice-modal"); if (!m) return;
     if (!d || UI.busy) { m.style.display = 'none'; return; }
@@ -2033,22 +2047,17 @@ function renderChoiceModal(d) {
     // Mehrfachauswahl ("up to N", pickMany): wie beim Mulligan markieren und ändern, bis „Bestätigen“ – erst dann geht die
     // Auswahl Karte für Karte an die Engine (KI und Online unverändert). Vorlage für alle solchen Auswahlen.
     if (d.multi) {
-        const key = d.src + '|' + d.k; if (UI.multiKey !== key) { UI.multiKey = key; UI.multiSel = []; }
-        const sel = UI.multiSel = UI.multiSel.filter(v => d.opts.some(o => o.v === v)), left = d.multi.max - d.multi.picked;
+        const sel = multiSel(d);
         prompt.textContent = d.prompt.replace(/\s*\(\d+\/\d+\)$/, '');
         const cnt = document.createElement("div"); cnt.className = "cm-multi-count"; cnt.textContent = tr`${d.multi.picked + sel.length}/${d.multi.max} gewählt`; prompt.appendChild(cnt);
         d.opts.forEach(o => {
             if (o.v === '__done') return;
             const ref = o.card !== undefined ? o.card : (typeof o.v === 'number' ? null : o.v), card = cardOfRef(ref);
-            const toggle = () => { const i = sel.indexOf(o.v); if (i >= 0) sel.splice(i, 1); else if (sel.length < left) sel.push(o.v); else return; renderChoiceModal(d); };
+            const toggle = () => { multiToggle(d, o.v); renderChoiceModal(d); };
             if (card) addChoice(card, optionCaption(o, card), toggle, sel.includes(o.v) ? 'cm-sel' : '');
             else addButton((sel.includes(o.v) ? '✔ ' : '') + o.label, '', toggle);
         });
-        addButton(sel.length ? tr`Bestätigen (${sel.length})` : tr('Keine wählen'), 'success', () => {
-            const list = sel.slice(); UI.multiSel = []; UI.multiKey = null;
-            for (const v of list) { const p = myPending('choose'); if (!p || !p.multi || !p.opts.some(o => o.v === v)) break; if (!humanAct({ type: 'CHOOSE', v })) break; }
-            const p = myPending('choose'); if (p && p.multi && p.opts.some(o => o.v === '__done')) humanAct({ type: 'CHOOSE', v: '__done' });
-        });
+        addButton(sel.length ? tr`Bestätigen (${sel.length})` : tr('Keine wählen'), 'success', multiConfirm);
         addUndoButton(d, addButton);
         return;
     }

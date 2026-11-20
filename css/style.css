@@ -456,6 +456,9 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .cm-card.cm-sel .card-visual { box-shadow: 0 0 0 0.9cqw #22c55e, 0 0 4cqw rgba(34,197,94,.8); }
 .cm-card.cm-sel { transform: translateY(-6px); }
 .cm-multi-count { margin-top: 6px; font-weight: 700; color: #86efac; }
+/* Mehrfachauswahl auf dem Spielfeld: markierte Karten grün (statt des gelben Zielrands) */
+.multi-picked .card-visual, .multi-picked.card-visual { box-shadow: 0 0 0 3px #22c55e, 0 0 14px rgba(34,197,94,.9) !important; }
+.multi-picked { transform: translateY(-4px); }
 .cm-caption { max-width: clamp(100px, 9vw, 150px); font-size: 11px; font-weight: bold; color: var(--gold-light); line-height: 1.3; }
 #cm-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 #cm-buttons button { padding: 8px 20px; font-size: 14px; }

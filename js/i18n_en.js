@@ -4504,4 +4504,5 @@ var I18N_EN = {
     '{0}/{1} gewählt': '{0}/{1} selected',
     'Bestätigen ({0})': 'Confirm ({0})',
     'Keine wählen': 'Choose none',
+    'Markiere bis zu {0} Karten!': 'Mark up to {0} cards!',
 };
