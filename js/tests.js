@@ -2032,6 +2032,16 @@ function runRuleTests() {
         const sni = cpuMoments(7031, 'Hunter'); assert(sni[0] === 'Ally', 'Snipe (CPU): gespielt bei ' + sni.join(','));
         const bur = cpuMoments(10054, 'Rogue'); assert(bur[0] === 'proposal', 'Burgle (CPU): gespielt bei ' + bur.join(','));
     });
+    test(169, 'Kräfte ohne [Activate] im Text erschöpfen die Karte nicht (14 Scourgewar-Allies); Lord Jorach Ravenholdt erschöpft sein Ziel', () => {
+        for (const [id, f] of Object.entries(FX)) { const c = CARDS[id]; if (!c || !f || !Array.isArray(f.powers)) continue;
+            assert(!f.powers.some(pw => pw && pw.act) || /\[Activate\]/.test(c.text || ''), `${c.name}: Kraft erschöpft die Karte ohne [Activate] im Text`); }
+        // "(1), Exhaust a Rogue you control >>> Exhaust target hero or ally." – Jorach ist selbst Rogue und darf sich dafür erschöpfen
+        const s = freshH(9, 9); const j = put(s, 1, 11212), o = put(s, 2, ctVanilla(3).id);
+        for (let i = 0; i < 3; i++) P(s, 1).resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+        act(s, { type: 'ACTIVATE', srcUid: j.uid, key: 'exh', targets: [[o.uid]] }, 1);
+        assert(o.exhausted, 'Lord Jorach Ravenholdt: Ziel nicht erschöpft');
+        assert(j.exhausted, 'Lord Jorach Ravenholdt: Rogue (er selbst) als Kosten nicht erschöpft');
+    });
     return results;
 }
 

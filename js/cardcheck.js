@@ -1045,7 +1045,7 @@ function ccTimingMoment(s, pid) {
 }
 function ccTimingRun(c, kind) {
     const st = ccTimingSetup(c, kind); if (!st) return null;
-    const { s, key } = st, playable = [], offered = [];
+    const { s, key } = st, playable = [], offered = []; let effect = -Infinity, effAt = null;
     try {
         if (!applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1)) return null;
         for (let n = 0; n < 600; n++) {
@@ -1055,8 +1055,13 @@ function ccTimingRun(c, kind) {
                 if (d.kind === 'priority' && d.pid === 1) {
                     if (s.activePlayer === 2) {
                         const m = ccTimingMoment(s, 1);
-                        if (getPriorityActions(s, 1).some(a => key(respondKey(s, 1, a)))) playable.push(m);
+                        const mine = getPriorityActions(s, 1).filter(a => key(respondKey(s, 1, a)));
+                        if (mine.length) playable.push(m);
                         if ((d.good || []).some(key)) offered.push(m);
+                        // Wirkung jetzt (wie für den Menschen: ohne Haltewert der Handkarte), beste Variante über alle Fenster
+                        else if (mine.length && !offered.length) { s.pending = d; const vp = respondValue(s, 1, null, false);
+                            for (const a of mine.slice(0, 3)) { const v = respondValue(s, 1, a, false); if (v !== null && vp !== null && v - vp + respondHoldBonus(s, 1, a) > effect) { effect = v - vp + respondHoldBonus(s, 1, a); effAt = m; } }
+                            s.pending = null; }
                     }
                     passPriority(s);
                 } else if (d.kind === 'priority') passPriority(s);
@@ -1072,7 +1077,7 @@ function ccTimingRun(c, kind) {
             process(s);
         }
     } catch (e) { return { err: e.message, playable, offered }; }
-    return { playable: [...new Set(playable)], offered: [...new Set(offered)], cpu: ccTimingCpu(c, kind) };
+    return { playable: [...new Set(playable)], offered: [...new Set(offered)], cpu: ccTimingCpu(c, kind), effect: offered.length ? null : +effect.toFixed(1), effAt };
 }
 // Dieselbe Lage mit der CPU als Spieler 1 (wie in der echten Partie, volle Vorausschau): wo spielt sie die Karte?
 function ccTimingCpu(c, kind) {

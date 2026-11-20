@@ -28,12 +28,13 @@ if (arg('--zeitpunkt')) {
     for (const r of rows) {
         if (r.err) { grp.err.push(r); continue; }
         if (!r.playable.length) continue;
-        const k = (r.offered.length ? r.offered.join(', ') : 'nie') + ' · CPU: ' + (r.cpu && r.cpu.length ? r.cpu.join(', ') : 'nie');
+        // nie angeboten: ohne Wirkung in dieser Lage (richtig) oder mit Wirkung, aber nicht angeboten (Bewertung – prüfen)
+        const k = r.offered.length ? r.offered.join(', ') + ' · CPU: ' + (r.cpu && r.cpu.length ? r.cpu.join(', ') : 'nie') : r.effect > 0.5 ? 'nie, obwohl mit Wirkung (prüfen)' : 'nie – im Prüffeld ohne Wirkung';
         (grp[k] = grp[k] || []).push(r);
     }
     for (const [k, rs] of Object.entries(grp)) { if (!rs.length) continue;
         L.push(`## ${k === 'err' ? 'Absturz' : 'angeboten: ' + k} (${rs.length})`, '');
-        for (const r of rs) L.push(`- ${r.name} (${r.id}, ${r.kind})${r.err ? ' – ' + r.err : ''}: ${r.text.replace(/\s+/g, ' ').slice(0, 160)}  · spielbar: ${r.playable.join(', ')}`);
+        for (const r of rs) L.push(`- ${r.name} (${r.id}, ${r.kind})${r.err ? ' – ' + r.err : ''}${r.effect !== null && r.effect !== undefined && !r.offered.length ? ` [Wirkung ${r.effect} bei ${r.effAt}]` : ''}: ${r.text.replace(/\s+/g, ' ').slice(0, 160)}  · spielbar: ${r.playable.join(', ')}`);
         L.push(''); }
     fs.mkdirSync(path.join(ROOT, 'reports'), { recursive: true });
     fs.writeFileSync(path.join(ROOT, 'reports', 'zeitpunkt.md'), L.join('\n'));
@@ -63,6 +64,10 @@ for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.j
     for (const [k, ids] of keys) if (!MARKERS.has(k) && !new RegExp('\\.' + k + '\\b(?!\\s*=[^=])').test(allSrc))
         res.findings.push({ check: 'Quelltext', id: ids[0], name: CARDS[ids[0]].name, sev: 'fail', msg: `FX-Schlüssel „${k}“ wird nie gelesen (${ids.length} Karten) – Wirkung fehlt?` });
 }
+// Kräfte mit [Activate]-Kosten (act: Karte erschöpfen), deren Text kein [Activate] hat – 14 Scourgewar-Allies erschöpften sich
+// zusätzlich, Lord Jorach Ravenholdt konnte so seinen einzigen Rogue nicht mehr bezahlen und wirkte nie
+for (const [id, f] of Object.entries(FX)) { const c = CARDS[id]; if (!c || !f || !Array.isArray(f.powers) || CARD_ISSUES[id]) continue;
+    if (f.powers.some(pw => pw && pw.act) && !/[Activate]/.test(c.text || '')) res.findings.push({ check: 'Quelltext', id: +id, name: c.name, sev: 'fail', msg: 'Kraft erschöpft die Karte ([Activate]), der Text hat aber kein [Activate]' }); }
 const dir = path.join(ROOT, 'reports'); fs.mkdirSync(dir, { recursive: true });
 const keyOf = f => `${f.check}|${f.id}|${f.msg.replace(/\(Schritt.*$/, '').replace(/\d+(\.\d+)?/g, 'N')}`;
 const basePath = path.join(dir, 'cardcheck-baseline.json');
