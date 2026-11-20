@@ -3016,7 +3016,7 @@ function powerVariants(s, pid, instantOnly) {
                     const slots = targetSlots(s, pid, pw, e.c, { x, mode });
                     const combos = targetCombos(s, pid, slots, pw.distinct);
                     if (combos === null) continue;
-                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && !(!isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, true)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
+                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && !(!isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, true)) && !(!isHuman(s, pid) && slots.length && !tg.flat().length) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
                 }
             }
         }

@@ -512,7 +512,8 @@ function ccAiGame(seed, o = {}) {
                 const a = best.action, after = simApply(s, a, pid);
                 // verpasst nur, wenn die KI dann gar nicht angreift (eine Antwort des Gegners kann den Plan legitim verhindern)
                 if (lethalNow && a.type !== 'ATTACK' && a.type !== 'PLACE_RESOURCE') lethalTurn = s.turn;
-                for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, turn: s.turn, seed, pid });
+                // sicher verlorene Lage (jede Variante verliert laut Vorausschau): "Fehler" dort sind belanglos – nicht melden
+                if (!(best.score <= AI_LOSS + 1)) for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, msg: f.msg + ` [Wert ${Math.round(best.score)}]`, turn: s.turn, seed, pid });
                 if (!applyAction(s, a, true, pid)) break; autoResolve(s);
             }
             if (s.gameOver) break;

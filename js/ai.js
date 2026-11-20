@@ -245,6 +245,22 @@ function attackPlans(s, pid) {
     return plans;
 }
 
+// Wirkungslose Aktion (Fähigkeit oder Kraft, deren Ergebnis am Spiel nichts ändert – Strength of Battle ohne Shaman/Warrior,
+// Piana ohne Ziel): ein Mensch würde sie nie wählen. Vergleich über eine knappe Signatur ohne Hand, Friedhof und Bezahlen.
+function aiStateSig(s, skipUid) {
+    const card = c => c.uid === skipUid ? '' : `${c.id}:${c.damage || 0}:${c.exhausted ? 1 : 0}:${(c.tm || []).length}:${JSON.stringify(c.counters || {})}:${c.attachedTo || ''}`;
+    const side = p => [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].map(card).join(',') + `|h${p.hand.length}|d${p.deck.length}|r${p.resources.length}|f${p.resources.filter(r => r.faceUp).map(r => r.card.id + (r.exhausted ? 'x' : '')).join('.')}|${p.hero.flipped ? 'F' : ''}`;
+    return side(s.p1) + '#' + side(s.p2) + '#' + (s.pe || []).filter(m => m.k !== 'playedCard').length + '#' + (s.gameOver ? 1 : 0);
+}
+function aiUseless(s, sim, act, pid) {
+    if (!sim || !act) return false;
+    if (act.type === 'ACTIVATE') { const a = cloneState(s), src = findCharacter(a, act.srcUid), b = findCharacter(sim, act.srcUid); if (src && b) src.exhausted = b.exhausted; return aiStateSig(a) === aiStateSig(sim); }
+    if (act.type === 'PLAY_CARD') { const c = getPlayer(s, pid).hand[act.handIdx]; if (!c || c.type !== 'Ability' || CARDS[c.id].ongoing || /\b(reveal|look at|search)\b/i.test(CARDS[c.id].text || '')) return false;
+        // Hand: die gespielte Karte fehlt danach – in einer Kopie ebenfalls entfernen
+        const a = cloneState(s); getPlayer(a, pid).hand.splice(act.handIdx, 1);
+        return aiStateSig(a) === aiStateSig(sim); }
+    return false;
+}
 // Ermöglicher: ein Anhang, der eine Kraft erst nutzbar macht (Ziel "with an attachment"). Die Kraft allein sieht die Suche erst
 // eine Ebene später, und den Anhang auf einen gegnerischen Ally bewertet sie für sich schlecht – so fand sie Rembas Plan nie.
 // Ergebnis: [{ first: Anhang-Aktion, state: Zustand nach Anhang + bester neuer Kraft }]
@@ -288,6 +304,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         const sim = simApply(state, act, playerId);
         if (!sim) continue;
         if (sim.gameOver && sim.winner === playerId) return { action: act, score: 99999, reason: 'Lethal: ' + act.desc };
+        if (aiUseless(state, sim, act, playerId)) continue;                                // wirkungslos: nie wählen
         scored.push({ act, sim, score: evaluateState(sim, playerId) });
     }
     if (!scored.length) return null;
@@ -315,7 +332,8 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         beam = cands.slice(0, beamWidth);
         if (!beam.some(b => !b.firstAction)) beam.push(stay());
     }
-    let best = null;
+    let best = null, stayRes = null;
+    if (!beam.slice(0, finalists).some(b => !b.firstAction)) beam.splice(Math.min(beam.length, finalists - 1), 0, stay());   // Nichtstun immer als Vergleich
     for (const it of beam.slice(0, finalists)) {
         const s = cloneState(it.state);
         if (!s.gameOver) advanceTurn(s, true);
@@ -329,8 +347,14 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
             for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
         }
-        if (!best || score > best.score) best = { action: it.firstAction, score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') };
+        // Gleichstand (z. B. jede Variante verliert im nächsten Zug sicher): die jetzt beste Lage gewinnt – wie ein Mensch, der auf einen
+        // Fehler des Gegners hofft (Boris heilte sonst einen unverletzten Ally statt sich selbst)
+        if (!it.firstAction) stayRes = { score, now: it.score };
+        if (!best || score > best.score || (score === best.score && it.score > best.now)) best = { action: it.firstAction, score, now: it.score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') };
     }
+    // Ein Zug, der jetzt schlechter ist als Nichtstun, braucht in der Vorausschau einen klaren Vorteil (> 1) – kleine Unterschiede dort
+    // sind Rauschen der Gegner-Simulation (Piana heilte niemanden, Boris flippte für 1 Heilung an einem Unverletzten)
+    if (best && best.action && stayRes && best.now < stayRes.now && best.score < stayRes.score + 1 && best.score > AI_LOSS + 1) return null;
     return (best && best.action) ? best : null;
 }
 
@@ -348,6 +372,7 @@ function fastAiAction(state, pid, maxCands = 40) {
         const sim = simApply(state, act, pid);
         if (!sim) continue;
         if (sim.gameOver && sim.winner === pid) return { action: act, reason: 'Lethal' };
+        if (aiUseless(state, sim, act, pid)) continue;
         const v = evaluateState(sim, pid);
         if (v > bv) { bv = v; best = act; }
     }
