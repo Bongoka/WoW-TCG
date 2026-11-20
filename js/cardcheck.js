@@ -104,6 +104,7 @@ function ccSetup(c, opts = {}) {
         p.hand = [1, 2, 3].map(k => makeCardInst(ctVanilla(k).id, false, p.id));
     }
     if (CC_MUT && CC_MUT.board) CC_MUT.board(s);
+    if (CC_MUT && CC_MUT.once && !s._mut) { s._mut = 1; CC_MUT.once(s); }
     return s;
 }
 const ccPut = (s, pid, id, o = {}) => { const p = getPlayer(s, pid), x = makeCardInst(id, false, pid); x.joinedTurn = 1; Object.assign(x, o); if (CC_MUT && CC_MUT.card && CC_MUT.cardId === id) CC_MUT.card(s, x);
@@ -432,7 +433,7 @@ function ccRich(s) {
     return s;
 }
 function ccCheckNoop(c) {
-    if (c.type !== 'Ability' || c.ongoing || c.xCost || !(c.text || '').trim()) return { n: 0, out: [] };
+    if (c.type !== 'Ability' || c.ongoing || !(c.text || '').trim()) return { n: 0, out: [] };
     const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10; ccRich(s);
     const own = ccPut(s, 1, ctVanilla(4).id, { damage: 1 }); ccPut(s, 2, ctVanilla(6).id, { damage: 1 }); ccPut(s, 2, ctVanilla(3).id, { exhausted: true });
     ccPut(s, 2, ctPlain('Weapon').id); ccPut(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
@@ -809,7 +810,21 @@ const CC_MUTATORS = [
     ['wenig Ressourcen', { board: s => { s.p1.resources = s.p1.resources.slice(0, 3); } }],
     ['Held mit Stealth und Kampfschaden', { board: s => { addTM(s.p1.hero, { k: 'stealth' }); for (const a of s.p2.allies) addTM(a, { k: 'hitByHero', turn: s.turn, by: 1 }); addTM(s.p2.hero, { k: 'hitByHero', turn: s.turn, by: 1 }); } }],
     ['Gegnerzug', { board: s => { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; } }],
+    ['Bear/Cat Form', { board: s => { for (const pred of [c => c.bearForm, c => c.catForm]) { const id = (Object.values(CARDS).find(c => !c.isToken && c.type === 'Ability' && pred(c)) || {}).id; if (id && !s.p1.ongoing.some(o => o.id === id)) { const x = makeCardInst(id, false, 1); x.joinedTurn = 1; s.p1.ongoing.push(x); } } } }],
+    ['Kampf: Gegner greift den Helden an', { once: s => ccStopIn(s, 2, () => { const a = makeCardInst(ctVanilla(4).id, false, 2); a.joinedTurn = 1; s.p2.allies.push(a); return { type: 'ATTACK', attackerUid: a.uid, defenderUid: s.p1.hero.uid, actorId: 2 }; }, st => !!st.battle) }],
+    ['Kampf: eigener Ally greift an', { once: s => ccStopIn(s, 1, () => { const a = makeCardInst(ctVanilla(4).id, false, 1); a.joinedTurn = 1; s.p1.allies.push(a); return { type: 'ATTACK', attackerUid: a.uid, defenderUid: s.p2.hero.uid, actorId: 1 }; }, st => !!st.battle) }],
+    ['Kette: gegnerische Fähigkeit', { once: s => ccStopIn(s, 2, () => { for (const ab of Object.values(CARDS)) { if (ab.type !== 'Ability' || ab.ongoing || ab.isToken || (ab.cost || 0) > 3 || !cardMatchesPlayer(ab, s.p2)) continue;
+        s.p2.hand.unshift(makeCardInst(ab.id, false, 2)); const a = getLegalActions(s, 2).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0); if (a) return a; s.p2.hand.shift(); } return null; }, st => st.chain.length > 0) }],
 ];
+function ccStopIn(s, pid, mkAction, want) {
+    if (pid === 2) { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; }
+    s.humans = [1]; s.stopAll = true;
+    const a = mkAction(); if (!a || !applyAction(s, a, true, pid)) return;
+    for (let n = 0; n < 40 && s.pending; n++) {
+        const d = s.pending; if (d.kind === 'priority' && d.pid === 1 && want(s)) return;   // hier hält der Aufbau an: Spieler 1 darf antworten
+        s.pending = null; if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) }); process(s);
+    }
+}
 function ccProveConditional(c) {
     const out = []; let via = null;
     for (const [name, mut] of CC_MUTATORS) {
