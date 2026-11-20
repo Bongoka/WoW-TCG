@@ -82,7 +82,7 @@ function mmHide() {
 function mmVisible() { return !!(MM.el && MM.el.style.display !== 'none' && !MM.el.classList.contains('out')); }
 // Klick: kurzer Druck-Effekt + Lichtpuls an der Klickstelle, dann die Aktion
 function mmAction(btn, a, e) {
-    if (typeof sfx !== 'undefined') sfx.play('draw');
+    if (typeof sfx !== 'undefined') sfx.play('click');
     btn.classList.remove('mm-hit'); void btn.offsetWidth; btn.classList.add('mm-hit');
     mmBurst(e.clientX, e.clientY);
     const go = {
@@ -138,7 +138,7 @@ function renderPlaySetup() {
             + `<span>${esc(d ? d.name : tr('Zufall'))}</span>`
             + `<span class="mp-vis-tog mm-ctl"><button data-c="human" class="${m[ck] === 'human' ? 'on' : ''}">${tr('Spieler')}</button><button data-c="cpu" class="${m[ck] === 'cpu' ? 'on' : ''}">CPU</button></span>`;
         side.querySelector('.mp-deckbox').onclick = () => openDeckOverview({ title: tr`Deck für Spieler ${seat}`, random: true, current: m[key], pick: deck => setPlaySetup({ [key]: deck ? deck.id : '' }) });
-        side.querySelectorAll('.mm-ctl button').forEach(b => b.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('draw'); setPlaySetup({ [ck]: b.dataset.c }); });
+        side.querySelectorAll('.mm-ctl button').forEach(b => b.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); setPlaySetup({ [ck]: b.dataset.c }); });
     });
     const both = m.c1 === 'human' && m.c2 === 'human', none = m.c1 === 'cpu' && m.c2 === 'cpu';
     MM.el.querySelector('.mm-play-mode').textContent = both ? tr('Hotseat: Ihr spielt abwechselnd an diesem Gerät – zwischen den Zügen wird das Brett gedreht.')

@@ -861,6 +861,7 @@ function spxPlaySnd(key, delay = 0, vol = 1) {
 function spxPreload(s) {
     if (!s || SPX.game === s) return;
     SPX.game = s;
+    SPX_ATK_SND.forEach(spxLoad);                                                        // Kampf-Sounds (spxCombatFx) immer
     const ids = new Set();
     for (const p of [s.p1, s.p2]) if (p) [...(p.deck || []), ...(p.hand || [])].forEach(x => ids.add(x && typeof x === 'object' ? x.id : x));
     for (const id of ids) {
@@ -939,18 +940,96 @@ function playSpellFx(e, evs, prevRects) {
         if (Array.isArray(h)) return h[Math.min(occ, h.length - 1)] + (occ >= h.length ? (occ - h.length + 1) * 140 : 0);
         return (h != null ? h : fallback) + Math.min(k, 6) * 40 + occ * 140; };
 }
-// Schaden ohne Zauber, aber mit Quelle (Ally- und Heldenfähigkeiten, Auslöser wie Orlund, Flip-Kräfte): ein Geschoss von der Quelle
-// zum Ziel, je Treffer eins – leicht versetzt (idx) und auf leicht anderer Bahn. Rückgabe: ms bis zum Einschlag (oder null)
-function spxDmgBolt(e, prevRects, idx) {
-    if (!SPX.on || !e || !e.src || e.src === e.uid) return null;
-    const src = spxRect(e.src, prevRects), t = spxRect(e.uid, prevRects);
-    if (!src || !t) return null;
-    const pn = SPX_DT[e.dt] || 'steel', P = SPX_PAL[pn] || SPX_PAL.holy;
-    const at = () => idx * 140 + sRnd(0, 40);
-    const hits = SPX_T.bolt({ src, tg: [t], pal: P, pn, s: 0.6 + Math.min(0.5, (e.amt || 1) * 0.08), at });
-    const ms = Array.isArray(hits[t.uid]) ? hits[t.uid][0] : hits[t.uid];
-    const snd = SPX_SND_PAL[pn]; if (snd) spxPlaySnd(snd, Math.max(0, ms - 60), 0.45);
-    return ms;
+// ============================================================================
+// Angriffe und Schaden mit Quelle (Kampfschaden, Ally-/Heldenfähigkeiten, Auslöser wie Orlund, Flip-Kräfte):
+// Effekt und WoW-Sound passend zu Waffe und Schadensart – wie die Ability-Karten (Bogen = Pfeil wie Chimera Shot,
+// Feuer-Ally = Feuerball wie Fireball, Dolch = Backstab, Bestie = Krallen …). Nahkampf: Angreifer macht einen Ausfallschritt.
+// Der Klang kommt auch bei „Zauber-Effekte Aus“ (nur das Bild fehlt dann), stumm nur über „Sound Aus“.
+// ============================================================================
+// Elementarschaden: Geschoss und Einschlag der passenden Ability (Fireball, Frostbolt, Arcane Missiles, Shadow Bolt, Smite, Wrath)
+const SPX_ATK_ELEM = {
+    Fire:   { t: 'bolt', pn: 'fire',   hit: 'fireball_hit' },
+    Frost:  { t: 'bolt', pn: 'frost',  hit: 'frost_hit' },
+    Arcane: { t: 'bolt', pn: 'arcane', hit: 'arcane_missile_hit' },
+    Shadow: { t: 'bolt', pn: 'shadow', hit: 'shadow_hit' },
+    Holy:   { t: 'beam', pn: 'holy',   hit: 'smite' },
+    Nature: { t: 'bolt', pn: 'nature', hit: 'resto_hit' }
+};
+// Waffen: Vorlage, Farbe, Sound (Einschlag), Größe, Anzahl Hiebe
+const SPX_ATK_WPN = {
+    Bow:       { t: 'arrow', pn: 'steel', snd: 'arrow_hit' },                 // wie Chimera Shot / Steady Shot
+    Crossbow:  { t: 'arrow', pn: 'steel', snd: 'arrow_hit', s: 1.25 },        // schwerer Bolzen
+    Gun:       { t: 'arrow', pn: 'rage',  snd: 'arrow_hit', s: 0.85 },        // Leuchtspur
+    Shuriken:  { t: 'arrow', pn: 'steel', snd: 'fan_of_knives', s: 0.8 },
+    Knife:     { t: 'arrow', pn: 'steel', snd: 'fan_of_knives', s: 0.8 },
+    Thrown:    { t: 'arrow', pn: 'steel', snd: 'fan_of_knives', s: 0.8 },
+    Wand:      { t: 'bolt',  pn: 'arcane', snd: 'arcane_missile_hit', s: 0.7 },
+    Sword:     { t: 'slash', pn: 'steel', snd: 'sinister_strike' },
+    Axe:       { t: 'slash', pn: 'steel', snd: 'cleave', s: 1.1 },
+    Polearm:   { t: 'slash', pn: 'steel', snd: 'mortal_strike', s: 1.2 },
+    Mace:      { t: 'slash', pn: 'steel', snd: 'shield_bash', s: 1.1 },
+    Staff:     { t: 'slash', pn: 'steel', snd: 'swing' },
+    Dagger:    { t: 'slash', pn: 'steel', snd: 'backstab', s: 0.9, n: 2 },
+    Fist:      { t: 'slash', pn: 'steel', snd: 'kick', n: 2 },
+    'Warglaive Sword': { t: 'slash', pn: 'fel', snd: 'sinister_strike', n: 2 },
+    'Fishing Pole':    { t: 'slash', pn: 'steel', snd: 'swing', s: 0.8 }
+};
+// Bestien und Ungeheuer greifen ohne Waffe mit Klauen/Pranken an, schwere Wesen mit einem wuchtigen Schlag
+const SPX_ATK_BEAST = /^(Bear|Tiger|Cat|Wolf|Worg|Raptor|Boar|Gorilla|Owl|Scorpid|Dragonhawk|Turtle|Serpent|Beast|Ravager|Spider|Hyena|Felhunter|Bat|Crocolisk|Gryphon|Hippogryph|Wyvern|Dragon|Whelp|Ghoul|Nerubian|Gnoll|Crab)$/;
+const SPX_ATK_HEAVY = /^(Abomination|Infernal|Abyssal|Doomguard|Ogre|Ancient|Giant|Golem|Mechanical|Construct)$/;
+const SPX_ATK_SND = ['arrow_hit', 'fan_of_knives', 'arcane_missile_hit', 'sinister_strike', 'cleave', 'mortal_strike', 'shield_bash', 'swing', 'backstab', 'kick',
+    'strike', 'rend', 'swipe', 'fireball_hit', 'frost_hit', 'shadow_hit', 'smite', 'resto_hit', 'taunt', 'renew'];
+// Stil eines Angriffs/Schadens: { t: Vorlage, pn: Palette, snd: [Sounds beim Einschlag], s: Größe, n, melee }
+function spxAttackStyle(e) {
+    const card = e.sid != null ? CARDS[e.sid] : null, dt = e.dt || 'Melee', el = SPX_ATK_ELEM[dt];
+    const sz = 0.75 + Math.min(0.55, (e.amt || 1) * 0.07);
+    const w = e.wsub && SPX_ATK_WPN[e.wsub];
+    if (w) {
+        const ranged = w.t !== 'slash';
+        if (el && ranged) return { t: w.t === 'arrow' ? 'arrow' : el.t, pn: el.pn, snd: [el.hit], s: sz * (w.s || 1), melee: false };   // Zauberstab mit Element, Frostbogen
+        if (el) return { t: 'slash', pn: el.pn, snd: [w.snd, el.hit], s: sz * (w.s || 1), n: w.n, melee: true };   // Feuerschwert: Hieb + Element
+        return { t: w.t, pn: w.pn, snd: [w.snd], s: sz * (w.s || 1), n: w.n, melee: !ranged };
+    }
+    if (el) return { t: el.t, pn: el.pn, snd: [el.hit], s: sz, melee: false };
+    if (dt === 'Ranged' || e.wslot === 'Ranged') return { t: 'arrow', pn: 'steel', snd: ['arrow_hit'], s: sz, melee: false };
+    const kinds = card ? [card.race, ...(card.allyTypes || [])].filter(Boolean) : [];
+    if (kinds.some(k => SPX_ATK_BEAST.test(k))) return { t: 'claw', pn: 'blood', snd: [kinds.some(k => /Bear|Gorilla|Ravager|Dragon/.test(k)) ? 'swipe' : 'rend'], s: sz, melee: true };
+    if (kinds.some(k => SPX_ATK_HEAVY.test(k))) return { t: 'slash', pn: 'rage', snd: ['shield_bash'], s: sz * 1.25, melee: true };
+    return { t: 'slash', pn: 'steel', snd: ['strike'], s: sz, melee: true };
+}
+// Angreifer/Quelle macht einen kurzen Schritt zum Ziel (eigene CSS-Eigenschaft translate: verträgt sich mit dem Kippen erschöpfter Karten)
+function spxLunge(uid, t, delay, dur, k = 0.28) {
+    const n = uid && document.querySelector(`#arena [data-uid="${CSS.escape(uid)}"]`); if (!n || !n.animate || !t) return;
+    const r = n.getBoundingClientRect(), dx = (t.x - (r.left + r.width / 2)) * k, dy = (t.y - (r.top + r.height / 2)) * k;
+    try {
+        n.animate([{ translate: '0px 0px' }, { translate: `${dx}px ${dy}px`, offset: 0.4, easing: 'cubic-bezier(.2,.8,.3,1)' }, { translate: '0px 0px' }],
+            { duration: dur, delay, easing: 'cubic-bezier(.5,0,.75,0)' });
+    } catch (err) { }
+}
+// e: fxEvent dmg mit src; idx: wievielter Angriff in diesem Durchgang (Gegenschlag des Verteidigers etwas später)
+// Rückgabe: ms bis zum Einschlag (die Schadenszahl erscheint dann) oder null
+function spxCombatFx(e, prevRects, idx = 0) {
+    if (!e || !e.src || e.src === e.uid) return null;
+    const st = spxAttackStyle(e), t = spxRect(e.uid, prevRects), src = spxRect(e.src, prevRects);
+    if (!t) return null;
+    const d0 = idx * 190 + sRnd(0, 30);
+    let hitAt;
+    if (SPX.on && src) {
+        if (st.melee) spxLunge(e.src, t, Math.max(0, d0 - 60), 360);
+        else spxLunge(e.src, { x: src.x - (t.x - src.x), y: src.y - (t.y - src.y) }, d0, 220, 0.04);   // kleiner Rückstoß beim Schuss
+        const hits = SPX_T[st.t]({ src, tg: [t], pal: SPX_PAL[st.pn] || SPX_PAL.steel, pn: st.pn, s: st.s, n: st.n, at: () => d0 }) || {};
+        const h = hits[t.uid]; hitAt = Array.isArray(h) ? h[0] : h;
+    }
+    if (hitAt == null) hitAt = d0 + (st.melee ? 120 : 260);
+    st.snd.forEach((k, i) => spxPlaySnd(k, Math.max(0, hitAt - (i ? 20 : 70)), i ? 0.55 : 0.85));
+    return hitAt;
+}
+// Schaden ohne Zauber, aber mit Quelle (Ally- und Heldenfähigkeiten, Auslöser wie Orlund, Flip-Kräfte) – gleiche Zuordnung wie im Kampf
+function spxDmgBolt(e, prevRects, idx) { return spxCombatFx(e, prevRects, idx); }
+// Schaden/Heilung ohne Quelle und ohne Zauber-Effekt (oder Zauber-Effekte aus): nur der Einschlag-Sound der Schadensart
+function spxPlainSnd(e, delay) {
+    if (e.t === 'heal') return spxPlaySnd('renew', delay, 0.4);
+    const el = SPX_ATK_ELEM[e.dt]; spxPlaySnd(el ? el.hit : e.dt === 'Ranged' ? 'arrow_hit' : 'strike', Math.max(0, delay - 60), 0.6);
 }
 
 // ---------------------------------------------------------------- Einstellung "Zauber-Effekte An/Aus" (neben "Sound An")

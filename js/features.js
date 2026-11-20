@@ -599,13 +599,13 @@ document.getElementById('db-io-ok').onclick = () => {
 // Ablauf: Pack schwebt → Klick: Schütteln, Lichtblitz, Funken → Karten fliegen in einen Fächer → Klick deckt auf
 // (Funken und Klang je Seltenheit) → Klick auf eine offene Karte holt sie groß in die Mitte.
 const BOOSTER_RAR = {
-    common: { label: tr('Gewöhnlich'), n: 14, notes: [523] },
-    uncommon: { label: tr('Ungewöhnlich'), n: 22, notes: [523, 659] },
-    rare: { label: tr('Selten'), n: 40, notes: [523, 659, 784] },
-    epic: { label: tr('Episch'), n: 70, notes: [523, 659, 784, 1047], big: true },
-    hero: { label: tr('Held'), n: 22, notes: [440, 554] },                                        // jeder Booster hat einen Helden
-    herofoil: { label: 'Foil-Held', n: 60, notes: [392, 523, 659, 784], big: true },          // 10 % der Helden sind Foil
-    foil: { label: 'Foil', n: 60, notes: [587, 740, 880, 1175], big: true },                  // letzte Karte jedes Boosters
+    common: { label: tr('Gewöhnlich'), n: 14 },
+    uncommon: { label: tr('Ungewöhnlich'), n: 22, snd: 'buff', vol: 0.3 },
+    rare: { label: tr('Selten'), n: 40, snd: 'blessing', vol: 0.5 },
+    epic: { label: tr('Episch'), n: 70, snd: 'avenging_wrath', vol: 0.6, big: true },
+    hero: { label: tr('Held'), n: 22, snd: 'battle_shout', vol: 0.45 },                                        // jeder Booster hat einen Helden
+    herofoil: { label: 'Foil-Held', n: 60, snd: 'heroism', vol: 0.6, big: true },          // 10 % der Helden sind Foil
+    foil: { label: 'Foil', n: 60, snd: 'holy_hit', vol: 0.6, big: true },                  // letzte Karte jedes Boosters
 };
 // Booster je Set: nur Karten aus diesem Set
 const BOOSTER_SETS = [
@@ -625,17 +625,14 @@ const BOOSTER_SETS = [
 const BOOSTER = { busy: false, cards: [], focus: null, set: 1 };
 const BOOSTER_FALLBACK = 'booster/booster1.png';   // fehlendes Booster-Bild (neues Set)
 const bModal = () => document.getElementById("booster-modal");
-// Kleine Klänge (WebAudio, wie sfx in utils.js)
-function boosterTone(freq, dur = 0.25, type = 'sine', vol = 0.05, delay = 0) {
+// Kleine Klänge: Kartengeräusche (sfx, utils.js) und WoW-Sounds (spellfx.js)
+// Spannung beim Öffnen: Papier-Ticks, immer heller und lauter
+function boosterTick(i) {
     if (sfx.muted) return;
-    try {
-        sfx.init(); const ctx = sfx.ctx; if (!ctx) return;
-        const t = ctx.currentTime + delay, o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = type; o.frequency.setValueAtTime(freq, t);
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.02);
-    } catch (e) {}
+    try { sfx.init(); if (sfx.ctx) sfx.tick(sfx.ctx.currentTime, 0.05 + i * 0.015, 1800 + i * 320); } catch (e) {}
 }
+// Original-WoW-Sound (spellfx.js)
+function boosterWow(key, vol = 0.5) { if (typeof spxPlaySnd === 'function') spxPlaySnd(key, 0, vol); }
 function boosterWhoosh(vol = 0.06, dur = 0.35) {
     if (sfx.muted) return;
     try {
@@ -708,7 +705,7 @@ function boosterPicker() {
         const img = b.imgs[Math.floor(Math.random() * b.imgs.length)];
         const el = document.createElement('div'); el.className = 'bp-pack' + (b.set === BOOSTER.set ? ' last' : ''); el.style.animationDelay = (i * 0.12) + 's';
         el.innerHTML = `<img src="${encodeURI(img)}" alt="" draggable="false" onerror="this.onerror=null;this.src=BOOSTER_FALLBACK"><div class="bp-name">${esc(b.name)}</div>`;
-        el.onmouseenter = () => boosterTone(500 + i * 90, 0.06, 'triangle', 0.02);
+        el.onmouseenter = () => sfx.play('hover');
         el.onclick = (e) => { e.stopPropagation(); BOOSTER.set = b.set; pk.style.display = 'none'; boosterReset(img); };
         row.appendChild(el);
     });
@@ -741,12 +738,12 @@ document.getElementById("booster-pack-container").onclick = () => {
     document.getElementById('booster-hint').classList.remove('show');
     pack.classList.add('charging');
     // Spannung: immer schnellere, höhere Ticks
-    [0, 220, 400, 540, 650, 730, 790].forEach((t, i) => setTimeout(() => boosterTone(220 + i * 60, 0.08, 'triangle', 0.035), t));
+    [0, 220, 400, 540, 650, 730, 790].forEach((t, i) => setTimeout(() => boosterTick(i), t));
     setTimeout(() => {
         const r = pack.getBoundingClientRect();
         pack.classList.remove('charging'); pack.classList.add('burst');
         boosterFlash(); boosterShake(1.4); boosterWhoosh(0.09, 0.6);
-        [262, 330, 392, 523].forEach((f, i) => boosterTone(f, 0.6, 'sine', 0.04, i * 0.03));
+        boosterWow('arcane_explosion', 0.55);
         boosterBurst(r.left + r.width / 2, r.top + r.height / 2, '251,191,36', 120, 1.4);
         bModal().classList.add('opened');
         setTimeout(() => { pack.style.display = "none"; generateBoosterCards(); }, 380);
@@ -803,7 +800,7 @@ function generateBoosterCards() {
     });
     boosterLayout(true);
     // Austeilen: eine Karte nach der anderen fliegt aus der Mitte in den Fächer
-    BOOSTER.cards.forEach((c, i) => setTimeout(() => { c.wrap.classList.remove('dealing'); boosterTone(380 + i * 35, 0.09, 'triangle', 0.03); boosterWhoosh(0.02, 0.18); }, 120 + i * 95));
+    BOOSTER.cards.forEach((c, i) => setTimeout(() => { c.wrap.classList.remove('dealing'); sfx.play('deal'); }, 120 + i * 95));
     setTimeout(() => { document.getElementById('booster-actions').classList.add('show'); boosterActions(); BOOSTER.busy = false; }, 120 + BOOSTER.cards.length * 95 + 300);
 }
 // Fächer an die Fensterbreite anpassen (Kartengröße, Abstand, Bogen)
@@ -832,7 +829,7 @@ function boosterFlip(c) {
     setTimeout(() => {
         const r = w.getBoundingClientRect(), rgb = getComputedStyle(w).getPropertyValue('--gc').trim() || '255,255,255';
         boosterBurst(r.left + r.width / 2, r.top + r.height / 2, rgb, R.n, R.big ? 1.3 : 0.9);
-        R.notes.forEach((f, i) => boosterTone(f, R.big ? 0.7 : 0.35, 'sine', R.big ? 0.05 : 0.035, i * 0.07));
+        sfx.play('flip'); if (R.snd) boosterWow(R.snd, R.vol);
         if (R.big) { boosterShake(c.rk === 'epic' ? 1.1 : 0.7); boosterFlash(rgb, 380); w.classList.add('rays'); }
         c.node.classList.remove('no-fx');
         boosterActions();
@@ -849,7 +846,7 @@ function boosterFocus(c) {
         const cw = parseFloat(getComputedStyle(document.getElementById("booster-cards-container")).getPropertyValue('--bcw')) || 180;
         c.wrap.style.setProperty('--fs', Math.min(innerHeight * 0.78 / (cw * 1.4), innerWidth * 0.6 / cw).toFixed(3));
         c.wrap.classList.add('focus'); c.wrap.style.zIndex = 500; c.node.classList.add('no-fx');   // groß in der Mitte: keine zusätzliche Hover-Vorschau
-        boosterTone(660, 0.15, 'sine', 0.03);
+        sfx.play('draw');
     }
 }
 function boosterActions() {
@@ -1066,7 +1063,7 @@ function openDeckOverview(opts = {}) {
                  : `<div class="deck-tile-name">${f.key === 'dmf' ? 'Darkmoon Faire' : esc(tr('Weitere Turnier-Decks'))}</div><div class="deck-tile-sub">${tr`${n} Decks`}</div>`);
         el.dataset.q = f.decks.map(x => `${x.deck.name} ${x.deck.heroName || (CARDS[x.deck.hero] || {}).name || ''} ${x.deck.class || ''}`).join(' ').toLowerCase()
             + (w ? ` worlds world championship ${w.year} ${w.city} ${w.country}` : ' darkmoon faire dmf').toLowerCase();
-        el.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('draw'); folder = f.key; render(); };
+        el.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); folder = f.key; render(); };
         return el;
     };
     const render = () => {

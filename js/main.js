@@ -347,7 +347,7 @@ function hotseatHandoff(sub, after) {
         if (G !== g0) { hotseatHide(); return; }
         el.onclick = null;
         hotseatSwap();
-        if (typeof sfx !== 'undefined') sfx.play('draw');
+        if (typeof sfx !== 'undefined') sfx.play('flip');
         el.classList.add('out');
         setTimeout(() => { if (el.classList.contains('out')) { el.style.display = 'none'; HOTSEAT.open = false; } after && after(); }, 380);
     };
@@ -413,7 +413,7 @@ function endTurn() {
     if (!canActMain(G, 1)) { const m = tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."); addLog(m, "log-hit"); showToast(m); return; }
     const err = validateAction(G, { type: 'END_TURN' }, 1);
     if (err) { addLog(err, "log-hit"); showToast(err); return; }
-    sfx.play('play');
+    sfx.play('turn');
     UNDO.stack = [];
     humanAct({ type: 'END_TURN' });
 }

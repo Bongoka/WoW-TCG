@@ -519,8 +519,7 @@ function coachAwaken(slot, hero, grand) {
     // 1) Balken voll + golden, Klang
     const bar = document.querySelector('.db-progress');
     if (bar) { bar.classList.remove('coach-glow'); void bar.offsetWidth; bar.classList.add('coach-glow'); }
-    [523, 659, 784, 1047].forEach((f, i) => boosterTone(f, .5, 'triangle', .06, i * .09));
-    boosterTone(1568, .9, 'sine', .03, .4);
+    boosterWow('resurrection', 0.5);                                                    // Held erwacht (WoW-Sound)
     // 2) Karte → Kreis, Ausschnitt zoomt aufs Gesicht; der Kopf steigt zum Schluss aus dem „Loch“
     const r = card.getBoundingClientRect();
     ava.classList.add('waking');

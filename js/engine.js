@@ -2297,8 +2297,13 @@ function dmgApply(s, st) {
         t.damage = (t.damage || 0) + amt;
         t.dmgTurn = s.turn;
         L(s, tr`💥 ${t.name} −${amt}` + (st.src && st.src !== t.uid ? ` (${nameOf(s, st.src)})` : ''), "log-hit", tl.pid);
-        if (isReal(s) && typeof sfx !== 'undefined') sfx.play('hit');
-        fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero', src: st.src || null });   // src: Geschoss von der Quelle (spellfx.js)
+        if (isReal(s)) {
+            if (typeof sfx !== 'undefined') sfx.play('hit');                                // nur Vibration; Klang und Effekt: spxCombatFx/spxDmgBolt (spellfx.js)
+            // src: Geschoss/Hieb von der Quelle; sid/wsub/wslot: Karte der Quelle und Waffe für den passenden Sound (nur Anzeige)
+            const sc = st.src ? findCharacter(s, st.src) : null, wc = st.weapon ? findCharacter(s, st.weapon) : null;
+            fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero', src: st.src || null,
+                sid: sc ? sc.id : null, wsub: wc ? wc.wsub || null : null, wslot: wc ? wc.slot || null : null });
+        }
         if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; }
         const src = st.src ? findCharacter(s, st.src) : null;
         if (src && src.type === 'Hero' && st.dt === 'Fire') addPE(s, ctrlOf(s, src), { k: 'heroFire' });   // Eye of Flame

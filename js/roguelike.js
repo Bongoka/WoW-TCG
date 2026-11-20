@@ -1347,7 +1347,7 @@
         b.innerHTML = `<span>${tr("Roguelike: Schatten von Azeroth")}</span><small>${tr("4 Akte · Klassen · Artefakte · Aufwertungen")}</small>`;
         b.addEventListener('click', e => {
             e.preventDefault(); e.stopPropagation();
-            try { if (typeof sfx !== 'undefined') sfx.play('draw'); } catch (err) { }
+            try { if (typeof sfx !== 'undefined') sfx.play('click'); } catch (err) { }
             if (typeof mmHide === 'function') mmHide();
             setTimeout(() => { try { openClassSelect(); } catch (err) { console.error(err); } }, 180);
         });

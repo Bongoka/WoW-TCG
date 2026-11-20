@@ -21,22 +21,80 @@ function showFloatingText(x, y, text, type = 'hit') { const el = document.create
 function showTurnBanner(text) { const b = document.getElementById("turn-banner"); if (!b) return; b.textContent = text; b.classList.add("show"); setTimeout(() => b.classList.remove("show"), 1500); }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// Kartengeräusche (WebAudio, aus gefiltertem Rauschen statt Pieptönen): Karte gleitet, schnippt, landet auf dem Tisch.
+// Kampf und Schaden klingen über spellfx.js (WoW-Originalsounds, spxCombatFx) – 'hit' ist hier nur noch Vibration.
+//   hover  Papier-Tick (Deck-Builder, Vorschau; gedrosselt, leicht verstimmt)   click  Menüknopf (Karte schnippt)
+//   draw   Karte gleitet vom Stapel (mehrere gleichzeitig: nacheinander)        play   Karte gleitet und landet auf dem Tisch
+//   flip   Karte umdrehen                                                       deal   Karte austeilen (kurz)
+//   shuffle Karten mischen                                                      turn   Zugende (Karte klopft auf den Tisch)
 class SoundManager {
-    constructor() { this.ctx = null; this.muted = false; }
-    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+    constructor() { this.ctx = null; this.muted = false; this.noise = null; this.next = {}; this.last = {}; this.bus = null; }
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        if (this.ctx && !this.bus) {                                                     // sanfter Kompressor: viele Geräusche gleichzeitig übersteuern nicht
+            const c = this.ctx.createDynamicsCompressor(); c.threshold.value = -14; c.knee.value = 10; c.ratio.value = 4; c.attack.value = 0.003; c.release.value = 0.2;
+            c.connect(this.ctx.destination); this.bus = c;
+        }
+    }
+    noiseBuf() {
+        if (this.noise) return this.noise;
+        const n = Math.floor(this.ctx.sampleRate * 1.2), b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0);
+        let p = 0; for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; p = 0.82 * p + 0.18 * w; d[i] = w * 0.55 + p * 1.1; }   // weiß + etwas rosa: Papier statt Zischen
+        return (this.noise = b);
+    }
+    // gefiltertes Rauschen: f0 → f1 (Bandpass), Hüllkurve mit Anstieg att und exponentiellem Abklingen
+    nz(t, dur, o) {
+        const c = this.ctx, src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+        src.buffer = this.noiseBuf(); src.playbackRate.value = o.rate || 1;
+        f.type = o.type || 'bandpass'; f.Q.value = o.q || 1;
+        f.frequency.setValueAtTime(o.f0, t); if (o.f1 && o.f1 !== o.f0) f.frequency.exponentialRampToValueAtTime(o.f1, t + dur);
+        const att = o.att || 0.004;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(f); f.connect(g); g.connect(this.bus);
+        src.start(t, Math.random() * 0.8, dur + 0.05);
+    }
+    // kurzer tiefer Körper (Karte trifft den Tisch)
+    tone(t, f0, f1, dur, vol) {
+        const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+        o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(this.bus); o.start(t); o.stop(t + dur + 0.02);
+    }
+    tick(t, vol, f = 2800) { this.nz(t, 0.03, { f0: f, q: 1.6, vol, att: 0.002 }); }
+    slide(t, dur, vol, f0 = 700, f1 = 2600) { this.nz(t, dur, { f0, f1, q: 0.8, vol, att: dur * 0.35 }); }
+    thock(t, vol) { this.nz(t, 0.08, { type: 'lowpass', f0: 1400, f1: 500, q: 0.7, vol, att: 0.002 }); this.tone(t, 165, 80, 0.09, vol * 0.6); }
+    // Mehrere gleiche Geräusche im selben Augenblick (7 Karten ziehen) nacheinander statt übereinander
+    slot(type, gap) {
+        const now = this.ctx.currentTime, t = Math.max(now, Math.min(this.next[type] || 0, now + 0.6));
+        this.next[type] = t + gap; return t;
+    }
     play(type) {
         haptic(type);                                                                     // Vibration (Einstellung, Standard aus) – auch bei stummem Ton
         if (this.muted) return;
         try {
             this.init(); if (!this.ctx) return;
-            const t = this.ctx.currentTime, osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
-            osc.connect(gain); gain.connect(this.ctx.destination);
-            if (type === 'hover') { osc.type='triangle'; osc.frequency.setValueAtTime(450,t); osc.frequency.exponentialRampToValueAtTime(750,t+0.03); gain.gain.setValueAtTime(0.015,t); gain.gain.linearRampToValueAtTime(0.001,t+0.03); osc.start(t); osc.stop(t+0.03); }
-            else if (type === 'draw') { osc.type='sine'; osc.frequency.setValueAtTime(300,t); osc.frequency.exponentialRampToValueAtTime(600,t+0.1); gain.gain.setValueAtTime(0.05,t); gain.gain.linearRampToValueAtTime(0.001,t+0.1); osc.start(t); osc.stop(t+0.1); }
-            else if (type === 'play') { osc.type='sine'; osc.frequency.setValueAtTime(200,t); osc.frequency.exponentialRampToValueAtTime(50,t+0.3); gain.gain.setValueAtTime(0.1,t); gain.gain.linearRampToValueAtTime(0.001,t+0.3); osc.start(t); osc.stop(t+0.3); }
-            else if (type === 'hit') { osc.type='square'; osc.frequency.setValueAtTime(150,t); osc.frequency.exponentialRampToValueAtTime(40,t+0.2); gain.gain.setValueAtTime(0.15,t); gain.gain.linearRampToValueAtTime(0.001,t+0.2); osc.start(t); osc.stop(t+0.2); }
-            else if (type === 'heal') { osc.type='sine'; osc.frequency.setValueAtTime(400,t); osc.frequency.linearRampToValueAtTime(800,t+0.2); gain.gain.setValueAtTime(0.05,t); gain.gain.linearRampToValueAtTime(0.001,t+0.3); osc.start(t); osc.stop(t+0.3); }
-            else if (type === 'destroy') { osc.type='sawtooth'; osc.frequency.setValueAtTime(100,t); osc.frequency.exponentialRampToValueAtTime(10,t+0.4); gain.gain.setValueAtTime(0.1,t); gain.gain.linearRampToValueAtTime(0.001,t+0.4); osc.start(t); osc.stop(t+0.4); }
+            const now = this.ctx.currentTime, r = (a, b) => a + Math.random() * (b - a);
+            if (type === 'hover') {
+                const dt = now - (this.last.hover || 0); if (dt < 0.045) return;          // Maus fährt schnell über viele Karten: nicht jedes Mal
+                this.last.hover = now;
+                this.tick(now, dt < 0.15 ? 0.035 : 0.06, r(2300, 3600));
+            } else if (type === 'click') {
+                this.tick(now, 0.13, r(2000, 2500)); this.tone(now, 240, 150, 0.05, 0.06);
+            } else if (type === 'draw') {
+                const t = this.slot('draw', 0.085); this.slide(t, 0.15, 0.17, r(650, 800), r(2400, 3000)); this.tick(t + 0.13, 0.05, 3200);
+            } else if (type === 'deal') {
+                const t = this.slot('deal', 0.06); this.slide(t, 0.1, 0.12, 900, 3200);
+            } else if (type === 'play') {
+                const t = this.slot('play', 0.12); this.slide(t, 0.1, 0.12, 1000, 2600); this.thock(t + 0.085, 0.3);
+            } else if (type === 'flip') {
+                this.nz(now, 0.07, { f0: 1600, f1: 4200, q: 0.9, vol: 0.13, att: 0.02 }); this.tick(now + 0.075, 0.12, 3400); this.tone(now + 0.075, 300, 180, 0.04, 0.04);
+            } else if (type === 'turn') {
+                this.thock(now, 0.26); this.thock(now + 0.11, 0.18);
+            } else if (type === 'shuffle') {
+                for (let i = 0; i < 16; i++) this.tick(now + i * 0.028 + r(0, 0.01), 0.05 + Math.sin(i / 15 * Math.PI) * 0.05, r(2400, 3800));
+                this.thock(now + 0.5, 0.15);
+            }
         } catch(e) {}
     }
 }

@@ -797,7 +797,7 @@ async function showcaseCpuCard(card, handIdx, pid = 2) {
     ghost.appendChild(node); document.body.appendChild(ghost);
     const gr = ghost.getBoundingClientRect();
     const dx = from.left + from.width / 2 - (gr.left + gr.width / 2), dy = from.top + from.height / 2 - (gr.top + gr.height / 2);
-    if (typeof sfx !== 'undefined') sfx.play('play');
+    if (typeof sfx !== 'undefined') sfx.play('draw');
     await ghost.animate([
         { transform: `translate(${dx}px, ${dy}px) scale(${Math.max(0.2, from.width / gr.width)}) rotateY(90deg)`, opacity: 0.3 },
         { transform: 'translate(0,0) scale(1.06) rotateY(0deg)', opacity: 1, offset: 0.75 },
@@ -987,7 +987,7 @@ function heroFlipAnim(node, r, e) {
         { opacity: 1, offset: T.glow - 0.06 }, { opacity: 0, offset: T.glow + 0.04 }, { opacity: 0 }], opt);
     UI.flipWait = card.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: T.glow }, { transform: 'rotateY(180deg)', offset: T.turned }, { transform: 'rotateY(180deg)' }],
         { ...opt, easing: 'ease-in-out' }).finished.catch(() => {}).then(() => { box.remove(); UI.flipHide = null; UI.flipWait = null; document.querySelectorAll(`#arena [data-uid="${e.uid}"]`).forEach(n => { n.style.visibility = ''; }); });
-    if (typeof sfx !== 'undefined') { sfx.play('play'); setTimeout(() => sfx.play('play'), FLIP_MS * T.glow); }
+    if (typeof sfx !== 'undefined') setTimeout(() => sfx.play('flip'), FLIP_MS * T.glow);
 }
 function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
@@ -1014,7 +1014,8 @@ function playFxEvents(prevRects) {
         const ownBolt = e.t === 'dmg' && !e.combat && e.src && (!spellAt || (e.src !== spellSrc && e.src !== null));
         if (spellAt && !ownBolt) delay = spellAt(e.uid, k++, n);
         else if (ownBolt && typeof spxDmgBolt === 'function') { const b = spxDmgBolt(e, prevRects, bolts); if (b != null) { bolts++; delay = b; } }
-        if (delay == null) delay = Math.min(k++, 6) * 90 + n * 160;
+        else if (e.t === 'dmg' && e.combat && e.src && typeof spxCombatFx === 'function') { const b = spxCombatFx(e, prevRects, bolts); if (b != null) { bolts++; delay = b; } }   // Kampf: Hieb/Schuss je Waffe
+        if (delay == null) { delay = Math.min(k++, 6) * 90 + n * 160; if ((e.t === 'dmg' || e.t === 'heal') && !spellAt && typeof spxPlainSnd === 'function') spxPlainSnd(e, delay); }
         if (e.t === 'dmg') {
             const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
             burstParticles(r, st.c, 18, delay);
@@ -1635,7 +1636,7 @@ function openHsMulligan(onDone) {
     const slots = G.p1.hand.map(c => { const s = makeSlot(c); row.appendChild(s); return s; });
     const from = deckRect();
     slots.forEach((s, i) => flyFrom(s.firstChild, from, { delay: 150 + i * FLY_GAP }));
-    if (typeof sfx !== 'undefined') sfx.play('draw');
+    if (typeof sfx !== 'undefined') { sfx.play('shuffle'); slots.forEach((s, i) => setTimeout(() => sfx.play('deal'), 150 + i * FLY_GAP)); }
     keep.onclick = async () => {
         keep.disabled = true;
         const uids = [...marked];
@@ -1768,7 +1769,8 @@ function animateAttack(attUid, defUid) {
         if (!aEl || !dEl) return resolve();
         const aRect = aEl.getBoundingClientRect(), dRect = dEl.getBoundingClientRect();
         const dx = dRect.left - aRect.left, dy = dRect.top - aRect.top;
-        sfx.play('hit');
+        sfx.play('hit');                                                                 // Vibration
+        if (typeof spxPlaySnd === 'function') spxPlaySnd('swing', 60, 0.35);             // Angriff angesagt: Ausholen (der Treffer klingt beim Kampfschaden)
         aEl.animate([{ transform: `translate(0px, 0px) scale(1)` }, { transform: `translate(${dx * 0.7}px, ${dy * 0.7}px) scale(1.2)`, offset: 0.5 }, { transform: `translate(0px, 0px) scale(1)` }], { duration: 400, easing: 'ease-in-out' });
         setTimeout(() => { triggerShake(dEl); showFloatingText(dRect.left + dRect.width / 2, dRect.top + dRect.height / 2, ``, 'hit'); setTimeout(resolve, 250); }, 200);
     });
@@ -1803,7 +1805,8 @@ function playEventAnimations() {
     const lab = document.createElement('div'); lab.className = 'protect-label'; lab.textContent = 'PROTECTED';
     lab.style.left = (pr.left + pr.width / 2) + 'px'; lab.style.top = (pr.top + pr.height / 2) + 'px';
     document.body.appendChild(lab); setTimeout(() => lab.remove(), 1600);
-    sfx.play('hit');
+    sfx.play('hit');                                                                     // Vibration
+    if (typeof spxPlaySnd === 'function') spxPlaySnd('taunt', 0, 0.6);                   // Protector springt dazwischen
 }
 
 // ---------------------------------------------------------------- Entscheidungsfeld

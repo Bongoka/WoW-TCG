@@ -541,7 +541,7 @@ function netPopup(l) {
     join.onclick = () => { close(); netModal().style.display = 'flex'; netShowMenu(); netJoin(l.code); };
     x.onclick = close;
     p.append(join, x); document.body.appendChild(p);
-    if (typeof sfx !== 'undefined') sfx.play('draw');
+    if (typeof sfx !== 'undefined') sfx.play('deal');
     setTimeout(close, 20000);
 }
 function netPopupsOn() { try { return localStorage.getItem(NET_POPUP_KEY) !== 'off'; } catch (e) { return true; } }
