@@ -756,9 +756,10 @@ function ccCheckPowers(c) {
     // Ausrüstung/Unique/Frost-Karte auf der Hand, erschöpfte Location (Mounts)
     const V = Object.values(CARDS).filter(x => !x.isToken && !CARD_ISSUES[x.id]);
     for (const k of ['Death Knight', 'Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior']) { const a = V.find(x => x.type === 'Ally' && x.allyClass === k && !x.unique); if (a) base.p1.graveyard.push(makeCardInst(a.id, false, 1)); }
-    for (const el of ['Air', 'Earth', 'Fire', 'Water']) { const tt = V.find(x => x.totem && !x.unique && (x.subtypes || []).includes(el)); if (tt && !base.p1.ongoing.some(o => o.id === tt.id)) { const x = makeCardInst(tt.id, false, 1); x.joinedTurn = 1; base.p1.ongoing.push(x); x.isTotem = true; x.b = x.b || {}; x.b.hp = tt.totemHp; x.hp = tt.totemHp; } }
+    // Totems: Untertyp "Earth Totem" usw.; im Spiel liegen sie wie Allies in der Party (putIntoPlay)
+    for (const el of ['Air', 'Earth', 'Fire', 'Water']) { const tt = V.find(x => x.totem && !x.unique && (x.subtypes || []).includes(el + ' Totem') && !(FX[x.id] || {}).aura); if (tt) { const x = makeCardInst(tt.id, false, 1); x.joinedTurn = 1; putIntoPlay(base, x, 1); x.exhausted = false; } }
     const tok = Object.values(CARDS).find(x => x.isToken && x.type === 'Ally' && !x.text); if (tok) { const x = makeCardInst(tok.id, true, 1); x.joinedTurn = 1; base.p1.allies.push(x); }
-    for (const pred of [x => x.type === 'Weapon' && !x.text && !x.unique, x => x.type === 'Ally' && x.unique && !x.text, x => x.type === 'Ability' && x.school === 'Frost' && !x.ongoing]) { const h = V.find(pred); if (h) base.p1.hand.push(makeCardInst(h.id, false, 1)); }
+    for (const pred of [x => x.type === 'Weapon' && !x.text && !x.unique, x => x.type === 'Ally' && x.unique && (x.cost || 0) <= 3, x => x.type === 'Ally' && x.allyClass === 'Mage' && !x.unique, x => x.type === 'Ability' && x.school === 'Frost' && !x.ongoing]) { const h = V.find(pred); if (h) base.p1.hand.push(makeCardInst(h.id, false, 1)); }
     const loc = V.find(x => x.type === 'Location' && !(FX[x.id] || {}).aura); if (loc && !base.p1.resources.some(r => r.card.type === 'Location')) base.p1.resources.push({ card: makeCardInst(loc.id, false, 1), faceUp: true, exhausted: true });
     let src;
     if (c.type === 'Hero' || c.type === 'Master Hero') src = base.p1.hero;
@@ -891,7 +892,7 @@ const CC_MUTATORS = [
     ['Zähler auf der Karte', { card: (s, x) => { const names = new Set(['atk1', 'def']); for (const m of (CARDS[x.id].text || '').matchAll(/(\w+)(?: \[\w+\])? counters?/gi)) names.add(m[1].toLowerCase()); x.counters = { ...(x.counters || {}) }; for (const n of names) x.counters[n] = 3; } }],
     ['Gegner mit vielen Allies', { board: s => { for (let i = 0; i < 4; i++) { const a = makeCardInst(ctVanilla(2 + (i % 3)).id, false, 2); a.joinedTurn = 1; s.p2.allies.push(a); } } }],
     ['Kreaturentypen', { board: s => { for (const ty of ['Demon', 'Undead', 'Elemental', 'Dragonkin', 'Beast', 'Mechanical', 'Giant', 'Murloc']) { const id = ccTypeAlly(ty); if (id) for (const pid of [1, 2]) { const a = makeCardInst(id, false, pid); a.joinedTurn = 1; getPlayer(s, pid).allies.push(a); } } } }],
-    ['keine eigenen Allies', { board: s => { s.p1.allies = []; } }],
+    ['keine eigenen Allies', { board: s => { const gone = new Set(s.p1.allies.map(a => a.uid)); s.p1.allies = []; for (const p of [s.p1, s.p2]) p.ongoing = p.ongoing.filter(o => !gone.has(o.attachedTo)); } }],   // Anhänge mitnehmen (sonst Anhang ohne Träger)
     ['wenig Ressourcen', { board: s => { s.p1.resources = s.p1.resources.slice(0, 3); } }],
     ['Held mit Stealth und Kampfschaden', { board: s => { addTM(s.p1.hero, { k: 'stealth' }); for (const a of s.p2.allies) addTM(a, { k: 'hitByHero', turn: s.turn, by: 1 }); addTM(s.p2.hero, { k: 'hitByHero', turn: s.turn, by: 1 }); } }],
     ['Gegnerzug', { board: s => { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; } }],
