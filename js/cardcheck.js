@@ -784,13 +784,74 @@ function ccCheckAttach(c) {
     }
     return { n: 1, out: [{ sev: 'warn', msg: `Anhang ohne erkennbare Wirkung auf dem Prüffeld (${vars.length} Varianten)` }], proven: false };
 }
+// Ereignisse dieses Zuges, die Quest-Bedingungen erfüllen: Ally greift den Helden an, Held greift einen Ally an, Ally zerstört (beide
+// Seiten), Ausrüstung gespielt, viel Schaden am gegnerischen Helden
+function ccQuestEvents(s) {
+    const mk = (pid, id) => { const x = makeCardInst(id, false, pid); x.joinedTurn = 1; getPlayer(s, pid).allies.push(x); return x; };
+    s.p2.allies.forEach(a => { a.exhausted = true; });
+    const a1 = mk(1, ctVanilla(4).id); applyAction(s, { type: 'ATTACK', attackerUid: a1.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1); autoResolve(s);
+    // Ausrüstung, die zum Helden passt (ein Priester darf die Standardwaffe nicht spielen); zur Not direkt ausrüsten fürs Angreifen
+    const wid = (Object.values(CARDS).find(x => (x.type === 'Weapon' || x.type === 'Armor' || x.type === 'Item') && !x.isToken && !x.unique && !CARD_ISSUES[x.id] && (x.cost || 0) <= 3 && cardMatchesPlayer(x, s.p1) && talentReqOk(x, s.p1.hero) && !(FX[x.id] || {}).slots) || {}).id;
+    if (wid) { s.p1.hand.unshift(makeCardInst(wid, false, 1)); const pw = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); if (pw) { applyAction(s, pw, true, 1); autoResolve(s); } else s.p1.hand.shift(); }
+    if (!s.p1.hero.weapons.length) ccPut(s, 1, ctPlain('Weapon').id);
+    const d = mk(2, ctVanilla(5).id); d.exhausted = true; s.p1.hero.exhausted = false; s.p1.hero.weapons.forEach(x => { x.exhausted = false; });
+    if (getAttackActions(s, 1).some(x => x.attackerUid === s.p1.hero.uid && x.defenderUid === d.uid)) { applyAction(s, { type: 'ATTACK', attackerUid: s.p1.hero.uid, defenderUid: d.uid, actorId: 1 }, true, 1); autoResolve(s); }
+    const o = mk(1, ctVanilla(2).id); destroy(s, o); process(s); const e = mk(2, ctVanilla(2).id); destroy(s, e); process(s);
+    heroDmg(s, 1, s.p2.hero.uid, 5, 'Fire'); process(s); autoResolve(s);
+    s.p1.resources.forEach(r => { if (!r.faceUp) r.exhausted = false; });   // bezahlen können
+}
+// Bedingungen, die ccQuestCondSetup sicher herstellt – ist die Quest danach nicht abschließbar, ist das ein Fehler
+const CC_QUEST_TARGETED = /On an opponent's turn|no opposing allies|control a location|an armor, item, and weapon|ally with Inspire|ally with Sabotage|an ability was destroyed this turn|an equipment was destroyed this turn|an ally entered play and an ally left play|you played an ability this turn|you played an ally this turn|opponent played an ally this turn|opponent completed a quest this turn|dealt holy|hero was dealt 5 or more damage/i;
+// Gezielte Bedingungen je Wortlaut (nicht je Karte): mit echten Spielaktionen herstellen, damit die Quest-Bedingung selbst geprüft wird
+function ccQuestCondSetup(s, txt) {
+    const V = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id]);
+    const put = (pid, pred, o) => { const c = V.find(pred); return c ? ccPut(s, pid, c.id, o) : null; };
+    const playAs = (pid, pred) => { const p = getPlayer(s, pid); const c = V.find(x => pred(x) && cardMatchesPlayer(x, p) && talentReqOk(x, p.hero) && !(FX[x.id] || {}).slots && (x.cost || 0) <= 3);
+        if (!c) return; const act0 = s.activePlayer; if (pid === 2) { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; } p.resources.forEach(r => { r.exhausted = false; });
+        p.hand.unshift(makeCardInst(c.id, false, pid)); const a = getLegalActions(s, pid).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); if (a) { applyAction(s, a, true, pid); autoResolve(s); } else p.hand.shift();
+        if (pid === 2) { s.activePlayer = act0; s.lastTurnOf = { 1: 6, 2: 5 }; } };
+    if (/no opposing allies/i.test(txt)) { for (const a of [...s.p2.allies]) { destroy(s, a); process(s); autoResolve(s); } }   // regelgerecht zerstören (Anhänge gehen mit)
+    if (/control a location/i.test(txt)) { const l = V.find(c => c.type === 'Location'); if (l) s.p1.resources.push({ card: makeCardInst(l.id, false, 1), faceUp: true, exhausted: false }); }
+    if (/allies in your graveyard/i.test(txt)) for (let i = 0; i < 3; i++) s.p1.graveyard.push(makeCardInst(ctVanilla(2).id, false, 1));
+    if (/equipment in your graveyard/i.test(txt)) for (let i = 0; i < 3; i++) s.p1.graveyard.push(makeCardInst(ctPlain(i % 2 ? 'Armor' : 'Weapon').id, false, 1));
+    if (/an armor, item, and weapon/i.test(txt)) { put(1, c => c.type === 'Item' && !c.unique && !(FX[c.id] || {}).aura); if (!s.p1.hero.armors.some(a => a.type === 'Armor')) ccPut(s, 1, ctPlain('Armor').id); if (!s.p1.hero.weapons.length) ccPut(s, 1, ctPlain('Weapon').id); }
+    if (/ally with Inspire/i.test(txt)) put(1, c => c.type === 'Ally' && /\bInspire\b/.test(c.text || '') && !c.unique);
+    if (/ally with Sabotage/i.test(txt)) put(1, c => c.type === 'Ally' && /\bSabotage\b/.test(c.text || '') && !c.unique);
+    if (/another Aldor/i.test(txt)) put(1, c => c.type === 'Ally' && c.reputation === 'Aldor' && !c.unique);
+    if (/Unique ally you control/i.test(txt)) { put(1, c => c.type === 'Ally' && c.unique && !c.text); put(1, c => c.type === 'Ally' && c.unique && c.cost <= 3 && c.id !== (s.p1.allies.slice(-1)[0] || {}).id); }
+    if (/Name a Scourge ally/i.test(txt)) put(1, c => c.type === 'Ally' && c.scourge && !c.unique);
+    if (/an ability was destroyed this turn/i.test(txt)) { const o = put(2, c => c.type === 'Ability' && c.ongoing && !c.attach && !c.totem && !(FX[c.id] || {}).aura); if (o) { destroy(s, o); process(s); autoResolve(s); } }
+    if (/an equipment was destroyed this turn/i.test(txt)) { const w = ccPut(s, 2, ctPlain('Weapon').id); destroy(s, w); process(s); autoResolve(s); }
+    if (/an ally entered play and an ally left play/i.test(txt)) { playAs(1, c => c.type === 'Ally'); const a = s.p2.allies[0]; if (a) { destroy(s, a); process(s); autoResolve(s); } }
+    if (/you played an ability this turn/i.test(txt)) playAs(1, c => c.type === 'Ability' && !c.ongoing);
+    if (/you played an ally this turn/i.test(txt)) playAs(1, c => c.type === 'Ally');
+    if (/opponent played an ally this turn/i.test(txt)) playAs(2, c => c.type === 'Ally');
+    if (/opponent completed a quest this turn/i.test(txt)) { const q2 = V.find(c => c.type === 'Quest' && FX[c.id] && !FX[c.id].questCond && !FX[c.id].questExtra && !FX[c.id].questNoPay && (c.questCost || 0) <= 2);
+        if (q2) { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; s.p2.resources.forEach(r => { r.exhausted = false; }); s.p2.resources.push({ card: makeCardInst(q2.id, false, 2), faceUp: true, exhausted: false });
+            const a = getLegalActions(s, 2).find(v => v.type === 'COMPLETE_QUEST'); if (a) { applyAction(s, a, true, 2); autoResolve(s); } s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; } }
+    if (/dealt holy/i.test(txt)) { heroDmg(s, 1, s.p2.hero.uid, 1, 'Holy'); process(s); autoResolve(s); }
+    if (/hero was dealt 5 or more damage/i.test(txt)) { heroDmg(s, 2, s.p1.hero.uid, 5, 'Fire'); process(s); autoResolve(s); }
+    s.p1.resources.forEach(r => { if (!r.faceUp) r.exhausted = false; });
+    // "On an opponent's turn": im gegnerischen Zug mit Priorität für Spieler 1 (Gegner greift an, Spieler 1 darf antworten)
+    if (/On an opponent's turn/i.test(txt)) ccStopIn(s, 2, () => { const a = makeCardInst(ctVanilla(4).id, false, 2); a.joinedTurn = 1; s.p2.allies.push(a); return { type: 'ATTACK', attackerUid: a.uid, defenderUid: s.p1.hero.uid, actorId: 2 }; }, st => !!st.battle);
+}
 // Quests: auf dem reichen Feld abschließen (falls die Bedingung erfüllt ist) – ändert die Belohnung etwas?
 function ccCheckQuest(c) {
     if (c.type !== 'Quest') return { n: 0, out: [], proven: false };
-    const s = ccSetup(c); s.humans = []; ccRich(s);
-    const q = { card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false }; s.p1.resources.push(q);
+    let s = ccSetup(c); s.humans = []; ccRich(s);
+    let q = { card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false }; s.p1.resources.push(q);
     try { checkQuestCondition(s, s.p1, q); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Absturz – ' + e.message }], proven: false }; }
-    const a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && s.p1.resources[x.resIdx] === q); if (!a) return { n: 0, out: [], proven: false };
+    let a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && s.p1.resources[x.resIdx] === q);
+    // Bedingungen "this turn" (Schaden durch Ally/Held, Ally zerstört, Ausrüstung gespielt, 5+ Schaden …): typische Ereignisse vorher geschehen lassen
+    if (!a) { try { ccQuestEvents(s); checkQuestCondition(s, s.p1, q); a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && s.p1.resources[x.resIdx] === q); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest (Ereignisse): Absturz – ' + e.message }], proven: false }; } }
+    // dritter Versuch: Bedingung gezielt nach Wortlaut herstellen (frisches Feld); ist sie hergestellt, MUSS die Quest abschließbar sein
+    let targeted = false;
+    if (!a) { try { const s2 = ccSetup(c); s2.humans = []; ccRich(s2); const q2 = { card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false }; s2.p1.resources.push(q2);
+        ccQuestCondSetup(s2, c.text || ''); checkQuestCondition(s2, s2.p1, q2); const a2 = getLegalActions(s2, 1).find(x => x.type === 'COMPLETE_QUEST' && s2.p1.resources[x.resIdx] === q2);
+        if (a2) { s = s2; q = q2; a = a2; targeted = true; }
+        else if (CC_QUEST_TARGETED.test(c.text || '')) return { n: 1, out: [{ sev: 'fail', msg: `Quest: Bedingung hergestellt, aber nicht abschließbar – ${checkQuestCondition(s2, s2.p1, q2) || '?'}` }], proven: false };
+    } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest (gezielt): Absturz – ' + e.message }], proven: false }; } }
+    if (!a) return { n: 0, out: [], proven: false };
     try {
         const A = cloneState(s), B = simApply(s, a, 1); if (!B) return { n: 0, out: [], proven: false };
         const inv = ccInvariants(B); if (inv) return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Invariante – ' + inv }], proven: false };
