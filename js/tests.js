@@ -2081,6 +2081,42 @@ function runRuleTests() {
         assert(vs.length && !vs.some(a => a.targets.flat().includes(e.uid)), 'Sudden Reversal (KI): Variante auf gegnerischen Ally');
         s.humans = [1]; assert(getLegalActions(s, 1).some(a => a.type === 'PLAY_CARD' && a.targets.flat().includes(e.uid)), 'Sudden Reversal (Mensch): gegnerischer Ally muss wählbar bleiben');
     });
+    test(174, 'Mensch: einmal pro Situation fragen – nach Passen kommt dieselbe Karte für denselben Link/Angriff/Zugbeginn nicht noch einmal', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        const s = newGameState(heroOf('Rogue').id, fill, heroOf('Warrior').id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 };
+        s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [1];
+        for (const p of [s.p1, s.p2]) for (let i = 0; i < 8; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+        const mine = makeCardInst(10054, false, 1); s.p1.hand = [mine];                   // Burgle: bei jedem Angriff sinnvoll
+        s.p2.hand = [3, 4].map(c => makeCardInst(ctVanilla(c).id, false, 2));
+        for (const c of [3, 4, 5]) { const x = makeCardInst(ctVanilla(c).id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); }
+        applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+        const seen = {}; let asked = 0;
+        for (let n = 0; n < 400 && !s.gameOver && !(s.activePlayer === 1 && s.turn > 6); n++) {
+            if (s.pending) { const d = s.pending;
+                if (d.kind === 'priority' && d.pid === 1) { if ((d.good || []).includes(mine.uid)) { asked++; assert(!seen[d.ctx], 'zweimal gefragt in ' + d.ctx); seen[d.ctx] = 1; } applyAction(s, { type: 'PASS', actorId: 1 }, true, 1); continue; }
+                s.pending = null; s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) }); process(s); continue; }
+            if (isIdle(s)) { if (s.activePlayer !== 2) break; const dec = fastAiAction(s, 2); if (dec && dec.action && applyAction(s, dec.action, true, 2)) continue; applyAction(s, { type: 'END_TURN', actorId: 2 }, true, 2); continue; }
+            process(s);
+        }
+        assert(asked >= 2, 'Burgle: nur ' + asked + '× angeboten (je Angriff erwartet)');
+    });
+    test(175, 'Burgle im End-Fenster des eigenen Zugs: Kontrolle endet im Wrap-up-Schritt (CR 503.2a) – vorher bekam der Gegner die Karten nie zurück', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        const s = newGameState(heroOf('Rogue').id, fill, heroOf('Warrior').id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 };
+        s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [1]; s.stopAll = true;
+        for (const p of [s.p1, s.p2]) for (let i = 0; i < 8; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+        const mine = makeCardInst(10054, false, 1); s.p1.hand = [mine];
+        const e = makeCardInst(ctVanilla(4).id, false, 2); e.joinedTurn = 1; s.p2.allies.push(e);
+        applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+        assert(s.pending && s.pending.kind === 'priority' && s.win && s.win.reason === 'end', 'kein End-Fenster');
+        // Kontrolle direkt vor dem Wrap-up messen (Burgle löst sich auf, der Zug läuft ohne weiteres Fenster durch)
+        let mid = null; const w0 = EK.wrapExpire; EK.wrapExpire = (s2) => { if (s2 === s && mid === null) mid = (locate(s, e.uid) || {}).pid; w0(s2); };
+        try { applyAction(s, getPriorityActions(s, 1).find(x => respondKey(s, 1, x) === mine.uid), true, 1); autoResolve(s); } finally { EK.wrapExpire = w0; }
+        assert(mid === 1, 'Burgle: im End-Fenster nicht unter eigener Kontrolle (' + mid + ')');
+        assert((locate(s, e.uid) || {}).pid === 2, 'Burgle: nach dem Zug nicht zurückgegeben');
+    });
     return results;
 }
 

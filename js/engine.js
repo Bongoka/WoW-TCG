@@ -962,12 +962,16 @@ function priorityStep(s) {
         passPriority(s); return true;
     }
     // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
-    const opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    let opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    // Einmal pro Situation fragen: was der Mensch für diesen Link, diesen Angriff bzw. diesen Zugbeginn schon gepasst hat, kommt
+    // dort nicht noch einmal (im Browser: 25 Fragen in einem Gegnerzug, dieselbe viermal je Angriff)
+    const ctx = isHuman(s, pid) ? respondCtx(s, pid) : null;
+    if (ctx && !s.stopAll && s.declinedTurn === s.turn) { const no = (s.declined || {})[ctx] || []; opts = opts.filter(o => !no.includes(respondKey(s, pid, o.a))); }
     if (!opts.length) { passPriority(s); return true; }
     if (isHuman(s, pid)) {
         // Sinnvolle Antworten (beste zuerst) merken: die Oberfläche zeigt sie vorn und hebt sie hervor
         const good = (s.stopAll ? respondOptions(s, pid) : opts).map(o => respondKey(s, pid, o.a));
-        s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason, good: [...new Set(good)] }; return false;
+        s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason, good: [...new Set(good)], ctx }; return false;
     }
     if (isReal(s)) s._oppDecided = true;
     doAction(s, opts[0].a, pid);
@@ -1069,6 +1073,7 @@ function respondOptions(s, pid) {
 // Counterspell oder Quests, die Karten ziehen, warten auf ihre Gelegenheit.
 const RESPOND_HALTS = 4;
 const RESPOND_EDGE = 0.25;        // "jetzt besser als später": die Varianten sind deterministisch (gleicher Plan, gleicher Zufall), Gleichstand ist exakt
+const RESPOND_CANDS = 12;        // Zugwahl des Gegners in der Vorausschau: 12 statt 40 Kandidaten (88 statt 234 ms je Entscheidung auf einem großen Feld)
 const RESPOND_BUDGET_MS = 900;    // Rechenzeit je Fenster für die Zug-Vorausschau (echte Partie, Mensch; KI 300 ms)          // höchstens so viele gegnerische Links als spätere Gelegenheit (das Zugende zählt immer)
 let _respondHalt = null;          // { s, pid }: nur genau diese Kopie hält an (Kopien darin – Vorausschau der KI – nicht)
 function respondHaltAt(s, pid) {
@@ -1108,6 +1113,8 @@ function respondHoldBonus(s, pid, a) {
 // statt eines Allies – das sah schlechter aus als Passen). Der bessere der beiden Werte zählt.
 function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
     if (!acts.length) return [];
+    // Zeitgrenze für das ganze Fenster (große Felder: im Browser dauerte eine Abfrage 4,5 s); gilt ab hier, inkl. Vorausschau
+    const t0 = performance.now(), budget = isHuman(s, pid) ? RESPOND_BUDGET_MS : 300, late = () => performance.now() - t0 > budget;
     // Echte Partie und Simulation gleich (Simulationen dürfen langsamer sein – die CPU soll dort genauso spielen wie im Spiel)
     const full = true, maxLinks = RESPOND_HALTS;
     const per = {}, sig0 = sigFilter ? respondOppSig(s, pid, null) : null;
@@ -1122,14 +1129,15 @@ function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
     };
     const A = order(null); if (A.vPass === null) return [];
     const orders = [A];
-    if (full) {
+    if (full && performance.now() - t0 < budget / 2) {   // zweite Reihenfolge nur, wenn die Zeit reicht
         const re = [...A.plan.filter(r => r.a.type !== 'ATTACK'), ...A.plan.filter(r => r.a.type === 'ATTACK')];
         if (re.some((r, i) => r !== A.plan[i])) { const B = order(re); if (B.vPass !== null) orders.push(B); }
     }
-    // Zeitgrenze (große Felder): was nicht mehr geprüft wird, bekommt der Mensch trotzdem angeboten (er kann passen), die KI nicht
-    const out = [], t0 = performance.now(), budget = isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
+    // Zeit abgelaufen: der Mensch bekommt nur noch angeboten, was sofort nachweislich wirkt (vorher: alles – Kick auf einen
+    // bloßen Auslöser), die KI nichts mehr
+    const out = [];
     for (const a of pre) {
-        if (performance.now() - t0 > budget) { if (isHuman(s, pid) && !out.some(o => respondKey(s, pid, o.a) === respondKey(s, pid, a))) out.push({ a, gain: 0 }); continue; }
+        if (late()) { if (isHuman(s, pid) && vShort0 !== undefined && !out.some(o => respondKey(s, pid, o.a) === respondKey(s, pid, a))) { const vs = respondValue(s, pid, a, false); if (vs !== null && vs > vShort0 + 0.5 - respondHoldBonus(s, pid, a)) out.push({ a, gain: vs - vShort0 }); } continue; }
         const key = respondKey(s, pid, a), bonus = respondHoldBonus(s, pid, a);
         const same = b => JSON.stringify([b.targets, b.mode, b.x]) === JSON.stringify([a.targets, a.mode, a.x]);
         let best = -Infinity, gain = null;
@@ -1203,7 +1211,7 @@ function respondPlayout(c, pid, onHalt, rec, plan) {
             if (steps < 30) {
                 let act = null;
                 if (plan && c.rpIdx >= 0 && c.rpIdx < plan.length) { act = respondReplay(c, opp, plan[c.rpIdx]); c.rpIdx = act ? c.rpIdx + 1 : -1; }
-                if (!act) { const h = _respondHalt; _respondHalt = null; const dec = fastAiAction(c, opp); _respondHalt = h; act = dec && dec.action; }
+                if (!act) { const h = _respondHalt; _respondHalt = null; const dec = fastAiAction(c, opp, RESPOND_CANDS); _respondHalt = h; act = dec && dec.action; }
                 if (act && rec) rec.push(respondRecOf(c, opp, act));
                 if (act && applyAction(c, act, true, opp)) { steps++; continue; }
             }
@@ -1274,6 +1282,20 @@ function respondRelocate(s, c, pid, a) {
     if (a.type === 'PLAY_CARD' && !a.gyUid) { const u = p0.hand[a.handIdx].uid; b.handIdx = p.hand.findIndex(x => x.uid === u); if (b.handIdx < 0) return null; }
     if (a.type === 'COMPLETE_QUEST') { const u = p0.resources[a.resIdx].card.uid; b.resIdx = p.resources.findIndex(r => r.card.uid === u); if (b.resIdx < 0) return null; }
     return b;
+}
+// Situation einer Frage an den Menschen: derselbe Angriff (Vorschlag und Kampffenster), derselbe Link, derselbe Zugbeginn
+// (Ready und Draw) bzw. dasselbe Zugende. Gemerkt nur für den laufenden Zug (s.declined wird beim Zugwechsel geleert).
+function respondCtx(s, pid) {
+    const top = s.chain[s.chain.length - 1];
+    if (top && top.kind === 'proposal') return pid + ':P:' + top.att;   // Vorschlag und Kampffenster getrennt (Regeltest #43: erst nach Protector antworten)
+    if (top) return pid + ':L:' + top.id;
+    if (s.battle) return pid + ':B:' + s.battle.att;
+    const r = (s.win || {}).reason; return pid + ':W:' + (r === 'ready' || r === 'draw' ? 'start' : r || s.phase);
+}
+function respondDecline(s, pend) {
+    if (!pend.ctx || !(pend.good || []).length) return;
+    if (s.declinedTurn !== s.turn) { s.declined = {}; s.declinedTurn = s.turn; }
+    s.declined[pend.ctx] = [...new Set([...(s.declined[pend.ctx] || []), ...pend.good])];
 }
 function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = w.prio === 1 ? 2 : 1; }
 function priorityPrompt(s, pid) {
@@ -1594,7 +1616,7 @@ function doAction(s, a, pid) {
         if (pend.kind === 'choose' && a.type === 'CHOOSE') { s.pending = null; s.queue.unshift({ op: 'call', k: pend.k, a: pend.a, v: a.v }); return; }
         if (pend.kind === 'priority') {
             s.pending = null;
-            if (a.type === 'PASS') { passPriority(s); return; }
+            if (a.type === 'PASS') { respondDecline(s, pend); passPriority(s); return; }
         }
     } else if (s.win && s.win.prio === pid && a.type === 'PASS') { passPriority(s); return; }
     switch (a.type) {
@@ -2977,6 +2999,9 @@ function removeAttackers(s, alliesOnly) {
 }
 
 // ---------------------------------------------------------------- Zugablauf
+// Wrap-up-Schritt (CR 503.2a): "Modifiers that last until end of turn expire" – ohne Kette, nach dem Abwerfen aufs Handlimit
+const WRAPUP = [];   // (s) => void
+EK.wrapExpire = (s) => { for (const f of WRAPUP) f(s); };
 function ashtongueOn(s) { return [s.p1, s.p2].some(p => p.hero.weapons.some(w => w.id === 6229)); }
 function turnStep(s, step) {
     const p = getPlayer(s, s.activePlayer);
@@ -2998,6 +3023,7 @@ function turnStep(s, step) {
     if (step === 'wrapUp') {
         const over = p.hand.length - maxHandSize(s, p);
         if (over > 0) q(s, { op: 'call', k: 'E:discard', a: { pid: p.id, n: over, src: 'Handlimit' } });
+        q(s, { op: 'call', k: 'E:wrapExpire', a: {} });                                   // danach: "until end of turn" endet (CR 503.2a)
         flushBatch(s);
         s.queue.push({ op: 'turn', step: 'start' });
         return;
