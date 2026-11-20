@@ -59,6 +59,9 @@ function evaluateStateNow(s, pid) {
     score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
     // Ungenutztes Mana ist nichts wert – außer man hält es im eigenen Zug für ein Instant im gegnerischen Zug bereit
     if (s.activePlayer === pid) score += aiHoldValue(s, me);
+    // Gleichstand brechen: bereite Ressourcen (und offene Locations) sind ein klein wenig wert – so verliert eine Kraft ohne Wirkung
+    // (Kallas Sunflame ohne andere [Fire]-Allies, Tanks for Everything ohne erschöpfte Plattenrüstung) knapp gegen Nichtstun
+    score += 0.05 * getReadyRes(me);
     // Ein noch nicht genutzter Helden-Flip (einmal pro Spiel) ist etwas wert – verschwendet man ihn ohne Wirkung
     // (z. B. Gorebelly ohne Waffe), sinkt die Bewertung; genutzt wird er nur, wenn er mehr bringt
     if (heroFlipLeft(me.hero)) score += AI_FLIP_VALUE;

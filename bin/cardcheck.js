@@ -27,6 +27,8 @@ const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGame
 for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js'))) {
     const lines = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').split('\n');
     lines.forEach((t, i) => { const m = t.match(/[\x00-\x08\x0B\x0C\x0E-\x1F]/); if (m) res.findings.push({ check: 'Quelltext', id: 0, name: `js/${f}:${i + 1}`, sev: 'fail', msg: `Steuerzeichen ${m[0].charCodeAt(0)} im Code (meist \\b o. Ä. beim Ersetzen verloren): …${t.slice(Math.max(0, m.index - 30), m.index + 10)}…` }); });
+    // canUse "(A || msg) === true && (B || msg)": bei verfehltem A kommt false heraus, und false gilt als erlaubt → firstErr(A || msg, B || msg)
+    lines.forEach((t, i) => { const code = t.replace(/\/\/.*$/, ''); if (/\) === true && \(/.test(code) && /canUse/.test(code)) res.findings.push({ check: 'Quelltext', id: 0, name: `js/${f}:${i + 1}`, sev: 'fail', msg: 'canUse mit „=== true &&“: verfehlte erste Bedingung ergibt false = erlaubt – firstErr(…) verwenden' }); });
 }
 const dir = path.join(ROOT, 'reports'); fs.mkdirSync(dir, { recursive: true });
 const keyOf = f => `${f.check}|${f.id}|${f.msg.replace(/\(Schritt.*$/, '').replace(/\d+(\.\d+)?/g, 'N')}`;
