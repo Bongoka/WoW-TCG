@@ -240,6 +240,28 @@ function attackPlans(s, pid) {
     return plans;
 }
 
+// Ermöglicher: ein Anhang, der eine Kraft erst nutzbar macht (Ziel "with an attachment"). Die Kraft allein sieht die Suche erst
+// eine Ebene später, und den Anhang auf einen gegnerischen Ally bewertet sie für sich schlecht – so fand sie Rembas Plan nie.
+// Ergebnis: [{ first: Anhang-Aktion, state: Zustand nach Anhang + bester neuer Kraft }]
+function enablerPlans(s, pid, legal) {
+    const sig = a => a.srcUid + '|' + a.key + '|' + JSON.stringify(a.targets || []);
+    const before = new Set(legal.filter(a => a.type === 'ACTIVATE').map(sig));
+    const out = [];
+    for (const a of legal) {
+        if (a.type !== 'PLAY_CARD' || !aiTimeLeft()) continue;
+        const c = getPlayer(s, pid).hand[a.handIdx]; if (!c || !c.attach) continue;
+        const ns = simApply(s, a, pid); if (!ns) continue;
+        let best = null;
+        for (const b of getLegalActions(ns, pid)) {
+            if (b.type !== 'ACTIVATE' || before.has(sig(b))) continue;
+            const ns2 = simApply(ns, b, pid); if (!ns2) continue;
+            const v = evaluateState(ns2, pid); if (!best || v > best.v) best = { v, state: ns2 };
+        }
+        if (best) out.push({ first: a, state: best.state });
+        if (out.length >= 3) break;
+    }
+    return out;
+}
 function searchBestAction(state, playerId, difficulty = 'normal') {
     let legal = getLegalActions(state, playerId);
     if (legal.length === 0) return null;
@@ -271,6 +293,8 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
     beam.push(stay());
     // Angriffspläne (mehrere Angriffe hintereinander) als eigene Kandidaten – der Gegnerzug wird unten mitbewertet
     if (aiTimeLeft()) for (const pl of attackPlans(state, playerId)) beam.push({ state: pl.state, firstAction: pl.first, score: evaluateState(pl.state, playerId), plan: true });
+    // Ermöglicher-Pläne (Anhang → neue Kraft, z. B. Power Word: Shield auf gegnerischen Ally → Remba übernimmt ihn): beide Schritte zusammen
+    if (aiTimeLeft()) for (const pl of enablerPlans(state, playerId, legal)) beam.push({ state: pl.state, firstAction: pl.first, score: evaluateState(pl.state, playerId), plan: true });
     for (let d = 1; d < maxDepth; d++) {
         const cands = beam.slice();
         for (const it of beam) {

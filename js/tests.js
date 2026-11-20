@@ -1881,6 +1881,14 @@ function runRuleTests() {
             assert(locate(s, z.uid).zone === want, `Escape Artist (${mk === 'psy' ? 'Buff' : 'Zerstören'}): Zumbly in ${locate(s, z.uid).zone} statt ${want}`);
         }
     });
+    test(161, 'KI-Plan Remba, Abbess of Ash: Power Word: Shield auf großen gegnerischen Ally, dann Flip übernimmt ihn (Ermöglicher-Plan)', () => {
+        const rog = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Rogue' && !c.set), fill = Array(40).fill(ctVanilla(2).id);
+        const s = newGameState(5018, fill, rog.id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [];
+        for (const p of [s.p1, s.p2]) for (let i = 0; i < 5; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+        const big = makeCardInst(ctVanilla(6).id, false, 2); big.joinedTurn = 1; s.p2.allies.push(big); s.p1.hand = [makeCardInst(1076, false, 1)];
+        for (let n = 0; n < 4; n++) { const r = searchBestAction(s, 1, 'normal'); if (!r) break; applyAction(s, r.action, true, 1); autoResolve(s); }
+        assert(locate(s, big.uid).pid === 1 && s.p1.hero.flipped, `Remba: Ally gehört Spieler ${locate(s, big.uid).pid}, Remba ${s.p1.hero.flipped ? '' : 'nicht '}umgedreht`);
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

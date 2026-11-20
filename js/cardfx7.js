@@ -54,7 +54,7 @@ FX[5016] = { powers: [flipPow(tr('Ziel-Spieler zerstört eine eigene Ausrüstung
 FX[5017] = { powers: [flipPow(tr('Eigenen Ally zerstören: Fernkampf = sein ATK'), 2, { slots: slotAlly(tr('Ziel-Ally'), true), canUse: (s, pid) => alliesOf(me(s, pid)).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
     payExtra: payPick(5017, tr('Nally: Welchen eigenen Ally zerstören?'), (s, pid) => alliesOf(me(s, pid)).filter(a => a.type === 'Ally').map(a => a.uid)),
     resolve: (s, it) => { const t = T(it)[0]; if (t && it.extra.x) heroDmg(s, it.pl, t, it.extra.x, 'Ranged', { ability: false }); } })], k: { pay: payDo((s, c, it) => { it.extra.x = atkOf(s, c); destroy(s, c); }) } };
-FX[5018] = { powers: [flipPow(tr('Kontrolle über Ally mit Anhang'), 4, { myTurn: true, slots: (s, pid) => [{ label: tr('Ally mit Anhang'), cands: targetCands(s, pid, { ally: true, side: 'enemy', filter: c => attachedTo(s, c.uid).length > 0 }), harm: true }],
+FX[5018] = { powers: [flipPow(tr('Kontrolle über Ally mit Anhang'), 4, { myTurn: true, needsAttach: true, slots: (s, pid) => [{ label: tr('Ally mit Anhang'), cands: targetCands(s, pid, { ally: true, side: 'enemy', filter: c => attachedTo(s, c.uid).length > 0 }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t && attachedTo(s, t.uid).length) changeControl(s, t, it.pl); } })] };
 FX[5019] = { powers: [flipPow(tr('Eigenen Ally erschöpfen: er macht Schaden = ATK'), 3, { slots: slotAlly(tr('Ziel-Ally'), true), canUse: (s, pid) => alliesOf(me(s, pid)).some(a => !a.exhausted && a.type === 'Ally') || tr('Kein bereiter Ally'),
     payExtra: payPick(5019, tr('Jonas White: Welchen eigenen Ally erschöpfen?'), (s, pid) => alliesOf(me(s, pid)).filter(a => !a.exhausted && a.type === 'Ally').map(a => a.uid)),

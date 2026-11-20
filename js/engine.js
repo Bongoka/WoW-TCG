@@ -2911,6 +2911,8 @@ const AI_NO_OWN_TARGET = new Set([7040, 58, 11057, 5064, 12050, 6052]);
 // (side: 'friendly' / 'enemy', z. B. Opfer), bleiben erlaubt. helpful: auch die Hilfe-Regel prüfen
 function aiBadTargets(s, pid, slots, tg, helpful) {
     const own = u => { const l = locate(s, u); return !!l && l.pid === pid; };
+    // Kräfte, die einen Anhang am Ziel verlangen (Remba, Abbess of Ash: Kontrolle über Ally mit Anhang): Hilfe-Regel aus
+    if (helpful && [getPlayer(s, pid).hero, ...getPlayer(s, pid).allies].some(c => getPowers(s, c).some(pw => pw.needsAttach))) helpful = false;
     return slots.some((sl, i) => sl && ((sl.harm === true && sl.side !== 'friendly' && (tg[i] || []).some(own)) || (helpful && sl.harm === false && sl.side !== 'enemy' && (tg[i] || []).some(u => !own(u) && !!locate(s, u)))));
 }
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
