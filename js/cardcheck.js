@@ -458,7 +458,9 @@ function ccJudge(s, pid, a, after) {
             if (sl.harm === false && !mine && t.type !== 'Ability' && !/each player/i.test(CARDS[info.card.id].text || '')) add('Hilfe für den Gegner', `${info.card.name} hilft gegnerischem ${t.name}`, info.card.id);
             // nur ein Fehler, wenn ein beschädigtes eigenes Ziel wählbar gewesen wäre (sonst ist die Heilung erzwungen, z. B. Grennan)
             const hurtOwn = (sl.cands || []).some(v => { const x = findCharacter(s, v); return x && ctrlOf(s, x) === pid && x.damage > 0; });
-            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && hurtOwn && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
+            // mehrere Ziele ("up to two"): ein unverletztes Zusatzziel neben einem verletzten kostet nichts – nur melden, wenn kein gewähltes verletzt ist
+            const anyHurtChosen = (ts || []).some(v => { const x = findCharacter(s, v); return x && x.damage > 0; });
+            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && hurtOwn && !anyHurtChosen && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
                 add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden, obwohl ein beschädigtes eigenes Ziel wählbar war`, info.card.id); } });
     // Entfernen verschwendet: "Destroy target …" auf ein gegnerisches Ziel, obwohl ein mindestens doppelt so wertvolles gegnerisches wählbar war
     if (info && /^Destroy target (?!.*each)/i.test(CARDS[info.card.id].text || '')) (a.targets || []).forEach((ts, i) => {
@@ -469,7 +471,8 @@ function ccJudge(s, pid, a, after) {
     });
     // Wirkungslos: Karte gespielt / Kraft genutzt, aber außer Bezahlen ändert sich nichts (Quelle selbst ausgenommen)
     // nur Fähigkeiten (nicht Ongoing) und Kräfte: bei Allies/Ausrüstung ist das Eintreten selbst die Wirkung
-    if (after && info && (a.type === 'ACTIVATE' || (a.type === 'PLAY_CARD' && info.card.type === 'Ability' && !CARDS[info.card.id].ongoing))) {
+    // Karten, die das Deck ansehen/umordnen (Reveal, look at, search), ändern Unsichtbares – nicht als wirkungslos werten
+    if (after && info && !/\b(reveal|look at|search|bottom of|top of your deck)\b/i.test(CARDS[info.card.id].text || '') && (a.type === 'ACTIVATE' || (a.type === 'PLAY_CARD' && info.card.type === 'Ability' && !CARDS[info.card.id].ongoing))) {
         // Kraft: die Quelle zählt mit (Jezbella: +1 ATK auf sich selbst), nur ihr Erschöpfen (Kosten) wird angeglichen
         let A = s, B = after, skip = info.card.uid;
         if (a.type === 'ACTIVATE') { A = cloneState(s); B = cloneState(after); skip = '__none'; const x = findCharacter(A, a.srcUid), y = findCharacter(B, a.srcUid); if (x && y) y.exhausted = x.exhausted; }
@@ -489,11 +492,14 @@ function ccJudge(s, pid, a, after) {
 function ccAiGame(seed, o = {}) {
     const rnd0 = Math.random; Math.random = seededRandom(seed);
     const b0 = AI_BUDGET.normal; AI_BUDGET.normal = o.budget || 300;
+    const ro0 = respondOptions;
     const found = []; let s = null;
     try {
         const hs = ctHeroes(); const heroes = [hs[Math.floor(Math.random() * hs.length)].id, hs[Math.floor(Math.random() * hs.length)].id];
         const dA = randomLegalDeck(heroes[0]), dB = randomLegalDeck(heroes[1]);
         s = newGameState(dA.hero, dA.cards, dB.hero, dB.cards); s.real = false; s.humans = [];
+        // Antworten in Prioritätsfenstern (Instants, Kräfte im Kampf/auf der Kette) mit denselben Detektoren prüfen
+        respondOptions = (st, pid) => { const r = ro0(st, pid); if (st === s && r.length) { const a = r[0].a; let after = null; try { after = simApply(st, a, pid); } catch (e) {} for (const f of ccJudge(st, pid, a, after)) found.push({ ...f, kind: f.kind + ' (Antwort)', turn: st.turn, seed, pid }); } return r; };
         dealOpeningHands(s); for (const pid of [1, 2]) if (aiWantsMulligan(s, pid)) doMulligan(s, pid);
         const tEnd = Date.now() + (o.maxMs || 60000);
         let turns = 0, lethalTurn = null;
@@ -518,7 +524,7 @@ function ccAiGame(seed, o = {}) {
         }
         return { found, turns, winner: s.winner };
     } catch (e) { return { found, err: 'Absturz: ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 3).join(' | ') }; }
-    finally { Math.random = rnd0; AI_BUDGET.normal = b0; }
+    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; }
 }
 
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext

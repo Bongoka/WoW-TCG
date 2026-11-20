@@ -1201,7 +1201,14 @@ function canActMain(s, pid) { return isIdle(s) && s.activePlayer === pid; }
 function canActInstant(s, pid) { return canActMain(s, pid) || hasPriority(s, pid) || (s.phase === 'end' && s.win && s.win.prio === pid); }
 
 // Ziel-Slots einer Karte/Kraft: [{label, cands:[uid], min, max}]
-function targetSlots(s, pid, f, card, ctx) { return f && f.slots ? f.slots(s, pid, card, ctx || {}) : []; }
+function targetSlots(s, pid, f, card, ctx) {
+    const sl = f && f.slots ? f.slots(s, pid, card, ctx || {}) : [];
+    // KI: Heil-Ziele (Text "heals", Ziel ohne harm und ohne eigene Bewertung) nach geheiltem Schaden ordnen – sonst wählte sie
+    // den wertvollsten eigenen Charakter, auch unverletzt (Soothing Wave, Piana, Tribemother Torra, Boris Brightbeard)
+    const txt = (card && CARDS[card.id] && CARDS[card.id].text) || '';
+    if (/\bheals?\b/i.test(txt) && !/\bdeals?\b/i.test(txt)) for (const x of sl) if (x && x.harm === false && !x.ai) x.ai = (u, st) => healValue(st || s, pid, u, 99);
+    return sl;
+}
 // Gibt es überhaupt legale Ziele? Bei "Choose one" reicht ein möglicher Modus (CR 707.1c),
 // bei X-abhängigen Zielen (z. B. "Destroy target ability with cost X") reicht ein mögliches X.
 function targetsPossible(s, pid, f, card, x, mode) {
