@@ -1002,7 +1002,7 @@ function respondOptions(s, pid) {
     if (!acts.length) return [];
     const vPass = respondValue(s, pid, null, false);
     if (vPass === null) return [];
-    if (moment === 'start') return respondTurnOptions(s, pid, acts, true);
+    if (moment === 'start') return respondTurnOptions(s, pid, acts, true, vPass);
     // Der Mensch entscheidet selbst, ob sich ein teurer Konter lohnt: Antworten auf den Link selbst (Counterspell)
     // halten immer an, sonst reicht beim Reagieren "kaum schlechter als Passen" (die Bewertung ist nur eine Schätzung)
     const human = isHuman(s, pid), top = s.chain[s.chain.length - 1];
@@ -1012,7 +1012,9 @@ function respondOptions(s, pid) {
         const vNow = respondValue(s, pid, a, false);
         if (vNow === null) continue;
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
-        if (vNow <= vPass + (human && moment === 'react' ? 0.5 - Math.max(2.5, respondHoldBonus(s, pid, a)) : 0.5)) continue;
+        // Mensch: Haltewert der Handkarte zählt nicht; sonst kleine Toleranz (Schätzung) – aber keine Kraft ohne Wirkung
+        // (Staff of the Ruins im Gegnerzug: "next ability this turn costs less" war 1,4 schlechter als Passen und wurde angeboten)
+        if (vNow <= vPass + (human && moment === 'react' ? 0.5 - Math.max(1, respondHoldBonus(s, pid, a)) : 0.5)) continue;
         // Gegnerischer Angriffsvorschlag (CR 601.1/601.3): der Mensch entscheidet selbst, ob er jetzt (Angriff verhindern)
         // oder erst im Kampf antwortet – das spätere Fenster kann wegfallen (der Gegner tötet den Verteidiger vorher)
         const proposal = human && moment === 'react' && top && top.kind === 'proposal' && stopsProposal(s, pid, a, top);
@@ -1024,7 +1026,7 @@ function respondOptions(s, pid) {
     // Nur für den Menschen: die KI entscheidet dort über den Haltewert (aiHoldValue/handCardValue) und soll nicht spürbar rechnen
     if (moment === 'react' && human && (isReal(s) || s.deepRespond) && s.activePlayer !== pid) {   // deepRespond: Prüfungen ohne Oberfläche
         const have = new Set(out.map(o => respondKey(s, pid, o.a)));
-        out.push(...respondTurnOptions(s, pid, acts.filter(a => !have.has(respondKey(s, pid, a))), false));
+        out.push(...respondTurnOptions(s, pid, acts.filter(a => !have.has(respondKey(s, pid, a))), false, vPass));
     }
     return out.sort((x, y) => y.gain - x.gain);
 }
@@ -1036,6 +1038,7 @@ function respondOptions(s, pid) {
 // So gehören Pin ("Target player can't play allies this turn") an den Zugbeginn und Burgle vor die Angriffe; Snipe,
 // Counterspell oder Quests, die Karten ziehen, warten auf ihre Gelegenheit.
 const RESPOND_HALTS = 4;
+const RESPOND_EDGE = 0.25;        // "jetzt besser als später": die Varianten sind deterministisch (gleicher Plan, gleicher Zufall), Gleichstand ist exakt
 const RESPOND_BUDGET_MS = 900;    // Rechenzeit je Fenster für die Zug-Vorausschau (echte Partie, Mensch; KI 300 ms)          // höchstens so viele gegnerische Links als spätere Gelegenheit (das Zugende zählt immer)
 let _respondHalt = null;          // { s, pid }: nur genau diese Kopie hält an (Kopien darin – Vorausschau der KI – nicht)
 function respondHaltAt(s, pid) {
@@ -1067,7 +1070,10 @@ function respondHoldBonus(s, pid, a) {
 // wird deshalb zusätzlich mit "erst alle Karten/Kräfte, dann die Angriffe" geprüft (nur echte Partie): angeboten wird, wenn
 // die Antwort jetzt in einer der Reihenfolgen mehr bringt als jede spätere Gelegenheit. So kommt Pin an den Zugbeginn (der
 // Gegner könnte als Erstes einen Ally legen), Divine Shield und Burgle aber erst zum Angriff (davor gibt es immer ein Fenster).
-function respondTurnOptions(s, pid, acts, sigFilter) {
+// Wirkt die Antwort überhaupt? Ausgespielt (Pin wirkt erst dort) oder direkt (respondValue bis zur nächsten Entscheidung):
+// ein anderer Gegnerzug nach kleiner Änderung schwankt in der Bewertung (Brain Freeze: eine Karte weniger, er legt eine Waffe
+// statt eines Allies – das sah schlechter aus als Passen). Der bessere der beiden Werte zählt.
+function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
     if (!acts.length) return [];
     const full = isReal(s) || s.deepRespond, maxLinks = full ? RESPOND_HALTS : 2;   // Simulationen: weniger Haltepunkte/Varianten (Laufzeit)
     const per = {}, sig0 = sigFilter ? respondOppSig(s, pid, null) : null;
@@ -1098,8 +1104,18 @@ function respondTurnOptions(s, pid, acts, sigFilter) {
             try { doAction(c, a, pid); } catch (e) { break; }
             const vNow = respondPlayout(c, pid, null, null, o.plan);
             if (vNow === null) continue;
-            if (o === A) { gain = vNow - A.vPass; if (vNow <= A.vPass + 0.5 - bonus) break; }   // wirkt jetzt nicht (genug)
-            let later = o.vPass;
+            if (o === A) {
+                gain = vNow - A.vPass;
+                if (vNow <= A.vPass + 0.5 - bonus) {                                     // wirkt jetzt nicht (genug)?
+                    const vs = vShort0 === undefined ? null : respondValue(s, pid, a, false);
+                    if (vs === null || vs <= vShort0 + 0.5 - bonus) break;
+                    gain = vs - vShort0;
+                }
+            }
+            // Zeitpunkt: jetzt gegen jede spätere Gelegenheit. Die KI vergleicht auch mit "nie spielen"; für den Menschen ist die
+            // Wirkung oben schon festgestellt – er soll erfahren, wann sie am größten ist (Brain Freeze: im Ready-Fenster, auch wenn
+            // der ausgespielte Zug danach anders verläuft)
+            let later = isHuman(s, pid) ? -Infinity : o.vPass;
             for (const h of o.halts) {
                 // dieselben Ziele/Modi wie jetzt (Pin: der Gegner) und die nach KI-Wert besten
                 const all = respondCandidates(h, pid, getPriorityActions(h, pid)).filter(b => respondKey(h, pid, b) === key);
@@ -1109,12 +1125,12 @@ function respondTurnOptions(s, pid, acts, sigFilter) {
                     const v = respondPlayout(c2, pid, null, null, o.plan);
                     if (v !== null && v > later) later = v;
                 }
-                if (vNow <= later + 0.5) break;
+                if (vNow <= later + RESPOND_EDGE) break;
             }
             best = Math.max(best, vNow - later);
-            if (best > 0.5) break;
+            if (best > RESPOND_EDGE) break;
         }
-        if (gain !== null && best > 0.5) out.push({ a, gain });
+        if (gain !== null && best > RESPOND_EDGE) out.push({ a, gain });
     }
     return out.sort((x, y) => y.gain - x.gain);
 }
