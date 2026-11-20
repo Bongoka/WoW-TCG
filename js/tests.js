@@ -2128,6 +2128,18 @@ function runRuleTests() {
         const alive = [a, b].filter(x => [...P(s, 1).allies, ...P(s, 2).allies].some(y => y.uid === x.uid)).length;
         assert(alive < 2, 'Hin und Her endete ohne Zerstörung (' + alive + ' leben noch)');
     });
+    test(177, 'Yoink! beider Spieler an derselben Ausrüstung: der zuletzt angehängte bestimmt die Kontrolle (CR 401.3b, 718.2b) – vorher Endlosschleife', () => {
+        const s = freshH(9, 9); s.humans = [];
+        const ar = put(s, 1, ctPlain('Armor').id);
+        const y1 = makeCardInst(8060, false, 2); y1.attachedTo = ar.uid; y1.attachTs = 1; y1.joinedTurn = 1; P(s, 2).ongoing.push(y1);
+        const y2 = makeCardInst(8060, false, 1); y2.attachedTo = ar.uid; y2.attachTs = 2; y2.joinedTurn = 1; P(s, 1).ongoing.push(y2);
+        let loops = 0; const ce0 = console.error; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) loops++; else ce0(...m); };
+        try { process(s); } finally { console.error = ce0; }
+        assert(!loops, 'Endlosschleife');
+        assert(ctrlOf(s, ar) === 1, 'jüngerer Yoink! (Spieler 1) kontrolliert nicht: ' + ctrlOf(s, ar));
+        P(s, 1).ongoing = P(s, 1).ongoing.filter(o => o !== y2); process(s);
+        assert(ctrlOf(s, ar) === 2, 'nach Entfernen des jüngeren Yoink! nicht beim älteren: ' + ctrlOf(s, ar));
+    });
     return results;
 }
 

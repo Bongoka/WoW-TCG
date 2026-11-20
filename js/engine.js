@@ -1940,7 +1940,7 @@ EK.placeAbility = (s, a) => {
             const host = it.attachTo ? findCharacter(s, it.attachTo) : null;
             const hl = host ? locate(s, host.uid) : null;
             if (!host || !hl || !isInPlayZone(hl.zone)) { L(s, tr`${c.name}: Ziel nicht mehr im Spiel.`); leaveChain(s, it, 'graveyard'); return; }
-            c.attachedTo = host.uid;
+            c.attachedTo = host.uid; c.attachTs = s.attachSeq = (s.attachSeq || 0) + 1;   // Zeitstempel des Anhängens (CR 718.2b)
         }
         p.ongoing.push(c);
         

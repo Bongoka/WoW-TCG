@@ -38,9 +38,15 @@ EK.skipAsk10 = (s, a) => { const srcs = a.srcs.filter(u => findCharacter(s, u));
 EK.skipDraw10 = (s, a, v) => { const p = me(s, a.pid); if (!v) { p.skipAsk10 = true; drawCards(s, p, 1); p.skipAsk10 = false; return; }
     const c = findCharacter(s, v); if (!c) return; L(s, tr`${p.hero.name} überspringt das Ziehen (${c.name}).`, '', a.pid); evt(s, 'skippedDraw', { pid: a.pid, src: v }); pushTrig(s, a.pid, c.id, [{ op: 'trig', id: c.id, k: 'skip', a: { pid: a.pid, uid: v } }]); };
 // Kontrolle durch Anhang (Splinter Mind, Yoink!): solange die Fähigkeit angehängt ist; danach zurück
+// Mehrere solche Anhänge an derselben Karte: es gilt der zuletzt angehängte (CR 401.3b, 718.2b) – vorher zogen zwei Yoink!
+// beider Spieler die Kontrolle bei jeder Zustandsprüfung hin und her (Endlosschleife)
 STATE_FIX.push(s => { let ch = false;
-    for (const p of [s.p1, s.p2]) for (const o of p.ongoing) { if ((o.id !== 8053 && o.id !== 8060) || !o.attachedTo || !active(s, o)) continue; const t = findCharacter(s, o.attachedTo); if (!t) continue;
-        const tp = ctrlOf(s, t); if (tp === p.id) continue; t.ctrlBy10 = { src: o.uid, from: tp, to: p.id }; if (isEquip(t)) moveEquip(s, t, p.id); else changeControl(s, t, p.id); ch = true; }
+    const win = {};
+    for (const p of [s.p1, s.p2]) for (const o of p.ongoing) { if ((o.id !== 8053 && o.id !== 8060) || !o.attachedTo || !active(s, o)) continue;
+        const w = win[o.attachedTo]; if (!w || (o.attachTs || 0) > (w.o.attachTs || 0)) win[o.attachedTo] = { o, pid: p.id }; }
+    for (const [tu, w] of Object.entries(win)) { const t = findCharacter(s, tu); if (!t) continue;
+        const tp = ctrlOf(s, t); if (tp === w.pid) { if (t.ctrlBy10) { t.ctrlBy10.src = w.o.uid; t.ctrlBy10.to = w.pid; } continue; }
+        t.ctrlBy10 = { src: w.o.uid, from: t.ctrlBy10 ? t.ctrlBy10.from : tp, to: w.pid }; if (isEquip(t)) moveEquip(s, t, w.pid); else changeControl(s, t, w.pid); ch = true; }
     for (const p of [s.p1, s.p2]) for (const t of [...p.allies, ...p.hero.weapons, ...p.hero.armors]) { const m = t.ctrlBy10; if (!m) continue; const o = findCharacter(s, m.src);
         if (o && o.attachedTo === t.uid && active(s, o) && ctrlOf(s, o) === m.to) continue; delete t.ctrlBy10; if (ctrlOf(s, t) === m.to && m.from !== m.to) { if (isEquip(t)) moveEquip(s, t, m.from); else changeControl(s, t, m.from); ch = true; } }
     return ch; });
