@@ -61,7 +61,7 @@ function newGameState(heroId1, deck1, heroId2, deck2) {
 
 // Kopie für KI-Suche: niemals echt, niemand ist Mensch
 // Statische Kartenlisten (aus CARDS) werden geteilt statt kopiert – sie dürfen nie verändert werden.
-// Sonst reines JSON ohne Mehrfach-Referenzen: eine einfache Tiefenkopie ist gleichwertig zu structuredClone, aber deutlich schneller.
+// Sonst reines JSON ohne Mehrfach-Referenzen (Ausnahme Noali, siehe cloneState): eine einfache Tiefenkopie ist gleichwertig zu structuredClone, aber deutlich schneller.
 const CLONE_SHARED = { limitTags: 1, allowedClasses: 1, allowedFactions: 1, subtypes: 1, allyTypes: 1 };
 function deepCopy(v) {
     if (v === null || typeof v !== 'object') return v;
@@ -73,6 +73,9 @@ function deepCopy(v) {
 function cloneState(s) {
     const c = deepCopy({ ...s, _undo: null, fxq: null });
     c.real = false; c.humans = []; c.look = true;   // Vorausschau: in Kopien antwortet niemand in Prioritätsfenstern
+    // Einzige Mehrfach-Referenz: Imp Mistress Noali (Set 6) – verdeckte Ressource und Imp-Ally sind dasselbe Objekt. Die
+    // Tiefenkopie macht daraus zwei; ohne Neuverknüpfung entfernte der Zustandsabgleich die Imps in jeder Vorausschau
+    for (const p of [c.p1, c.p2]) for (const a of p.allies) if (a.allyRes6) { const r = p.resources.find(x => x.card.uid === a.uid); if (r) r.card = a; }
     return c;
 }
 

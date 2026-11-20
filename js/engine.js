@@ -78,7 +78,9 @@ function locate(s, uid) {
     // Zuerst die Spielzonen beider Spieler (häufigster Fall, z. B. ctrlOf in hpOf/atkOf), dann Hand, Friedhof, Ressourcen
     for (const p of [s.p1, s.p2]) {
         if (p.hero.uid === uid) return { c: p.hero, pid: p.id, zone: 'hero' };
-        let c = p.allies.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'party' };
+        // Imp Mistress Noali (Set 6): verdeckte Ressourcen sind zugleich Imp-Allies in der Party – res trotzdem mitgeben
+        // (Ziele "Ressource erschöpfen/bereit machen" lasen sonst locate(...).res und stürzten ab)
+        let c = p.allies.find(x => x.uid === uid); if (c) return c.allyRes6 ? { c, pid: p.id, zone: 'party', res: p.resources.find(r => r.card.uid === uid) } : { c, pid: p.id, zone: 'party' };
         c = p.hero.weapons.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'equip' };
         c = p.hero.armors.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'equip' };
         c = (p.ongoing || []).find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'ongoing' };

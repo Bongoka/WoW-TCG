@@ -2049,6 +2049,17 @@ function runRuleTests() {
         assert(v1 - v0 >= 1.9, `Everlasting Cold: Angriff spart nur ${(v1 - v0).toFixed(2)}`);
         s.activePlayer = 2; h.lastAtk11 = 0; const w0 = evaluateState(s, 1); h.lastAtk11 = s.turn; assert(evaluateState(s, 1) === w0, 'Everlasting Cold: im Gegnerzug bewertet');
     });
+    test(171, 'Imp Mistress Noali: verdeckte Ressourcen als Imp-Allies bleiben in Kopien (Vorausschau) erhalten; Ressourcen-Ziele finden die Ressource (vorher Absturz)', () => {
+        const s = freshH(9, 9);
+        for (let i = 0; i < 3; i++) P(s, 1).resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+        put(s, 1, 4189); process(s);
+        const imps = c => P(c, 1).allies.filter(a => a.allyRes6).length;
+        assert(imps(s) === 3, 'Noali: ' + imps(s) + ' Imps im Original');
+        const c = cloneState(s); process(c);
+        assert(imps(c) === 3, 'Noali: ' + imps(c) + ' Imps in der Kopie');
+        const u = P(c, 1).resources[0].card.uid, l = locate(c, u);
+        assert(l && l.res && l.res.card.uid === u, 'Noali: locate liefert die Ressource nicht mit');
+    });
     return results;
 }
 
