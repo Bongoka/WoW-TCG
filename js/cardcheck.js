@@ -1032,6 +1032,15 @@ function ccTimingSetup(c, kind, rich) {
     for (const p of [s.p1, s.p2]) { for (let i = 0; i < 10; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); p.hero.damage = 6; p.hand = []; }
     ccPut(s, 1, ctVanilla(3).id); ccPut(s, 2, ctVanilla(3).id); ccPut(s, 2, ctVanilla(4).id);
     if (rich) { ccRich(s); const R = ccRichIds(); if (R.prot) ccPut(s, 1, R.prot); const w0 = ctPlain('Weapon'); if (w0) ccPut(s, 1, w0.id); s.p1.hero.damage = 0; }   // unverletzt: sonst stirbt der Held vor dem Zugende, und was man dort spielt, kommt nie vor
+    // rich === 2: dritte Lage – ein lohnendes eigenes Angriffsziel (hohe ATK, wenig Leben), weitere Waffen (Fern, Dolch) und
+    // ein Schild, Combos im Friedhof, laufende Fähigkeiten des Gegners
+    if (rich === 2) {
+        const V = Object.values(CARDS).filter(x => !x.isToken && !CARD_ISSUES[x.id] && !x.unique && !(x.text || '').trim());
+        const bait = V.find(x => x.type === 'Ally' && (x.atk || 0) >= 4 && (x.hp || 0) <= 2); if (bait) ccPut(s, 1, bait.id);
+        for (const pred of [x => x.type === 'Weapon' && x.slot === 'Ranged', x => x.type === 'Weapon' && (x.wsub || x.subtypes || []).toString().includes('Dagger'), x => x.type === 'Armor' && (x.asub || x.subtypes || []).toString().includes('Shield')]) { const w = V.find(pred); if (w) ccPut(s, 1, w.id); }
+        const R = ccRichIds(); if (R.combo) for (let i = 0; i < 4; i++) s.p1.graveyard.push(makeCardInst(R.combo, false, 1));
+        if (R.ongo) ccPut(s, 2, R.ongo);
+    }
     const w = ctPlain('Weapon');
     s.p2.hand = [ctVanilla(2).id, ctVanilla(3).id, ctVanilla(5).id, w && w.id, 165].filter(Boolean).map(id => makeCardInst(id, false, 2));   // 165 Quick Strike: eine Fähigkeit des Gegners
     let key;
@@ -1116,7 +1125,7 @@ function ccTimingSweep(o = {}) {
         for (const kind of kinds) {
             if (o.progress) o.progress(`Zeitpunkt ${c.id} ${c.name} (${kind})`);
             const loops = ccWatchLoops(); let r;
-            try { r = ccTimingRun(c, kind); if (r && !r.err && r.playable.length && !r.offered.length && !(r.effect > 0.5)) { const r2 = ccTimingRun(c, kind, true); if (r2 && (r2.err || r2.offered.length || r2.effect > 0.5)) r.rich = r2; } } finally { loops.restore(); }
+            try { r = ccTimingRun(c, kind); if (r && !r.err && r.playable.length && !r.offered.length && !(r.effect > 0.5)) { for (const lv of [true, 2]) { const r2 = ccTimingRun(c, kind, lv); if (r2 && (r2.err || r2.offered.length || r2.effect > 0.5)) { r.rich = r2; r2.lage = lv === 2 ? 3 : 2; break; } } } } finally { loops.restore(); }
             if (r) out.push({ id: c.id, name: c.name, kind, text: c.text || '', ...r });
         }
     }
