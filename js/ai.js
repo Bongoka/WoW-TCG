@@ -247,10 +247,11 @@ function attackPlans(s, pid) {
 
 // Wirkungslose Aktion (Fähigkeit oder Kraft, deren Ergebnis am Spiel nichts ändert – Strength of Battle ohne Shaman/Warrior,
 // Piana ohne Ziel): ein Mensch würde sie nie wählen. Vergleich über eine knappe Signatur ohne Hand, Friedhof und Bezahlen.
-function aiStateSig(s, skipUid) {
+// noPay: Erschöpfen offener Ressourcen ignorieren (beim Ausspielen ist das Bezahlen, keine Wirkung – Healing Touch mit Locations bezahlt)
+function aiStateSig(s, skipUid, noPay) {
     const card = c => c.uid === skipUid ? '' : `${c.id}:${c.damage || 0}:${c.exhausted ? 1 : 0}:${(c.tm || []).length}:${JSON.stringify(c.counters || {})}:${c.attachedTo || ''}`;
-    const side = p => [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].map(card).join(',') + `|h${p.hand.length}|d${p.deck.length}|r${p.resources.length}|f${p.resources.filter(r => r.faceUp).map(r => r.card.id + (r.exhausted ? 'x' : '')).join('.')}|${p.hero.flipped ? 'F' : ''}`;
-    return side(s.p1) + '#' + side(s.p2) + '#' + (s.pe || []).filter(m => m.k !== 'playedCard').length + '#' + (s.gameOver ? 1 : 0);
+    const side = p => [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].map(card).join(',') + `|h${p.hand.length}|d${p.deck.length}|r${p.resources.length}|f${p.resources.filter(r => r.faceUp).map(r => r.card.id + (r.exhausted && !noPay ? 'x' : '')).join('.')}|${p.hero.flipped ? 'F' : ''}`;
+    return side(s.p1) + '#' + side(s.p2) + '#' + (s.pe || []).filter(m => m.k !== 'playedCard').length + '#' + (s.gameOver ? 1 : 0) + '#' + (s.battle ? s.battle.att + '>' + s.battle.def : '');   // Kampf: "aus dem Kampf entfernen" ist eine Wirkung
 }
 function aiUseless(s, sim, act, pid) {
     if (!sim || !act) return false;
@@ -258,7 +259,7 @@ function aiUseless(s, sim, act, pid) {
     if (act.type === 'PLAY_CARD') { const c = getPlayer(s, pid).hand[act.handIdx]; if (!c || c.type !== 'Ability' || CARDS[c.id].ongoing || /\b(reveal|look at|search)\b/i.test(CARDS[c.id].text || '')) return false;
         // Hand: die gespielte Karte fehlt danach – in einer Kopie ebenfalls entfernen
         const a = cloneState(s); getPlayer(a, pid).hand.splice(act.handIdx, 1);
-        return aiStateSig(a) === aiStateSig(sim); }
+        return aiStateSig(a, null, true) === aiStateSig(sim, null, true); }
     return false;
 }
 // Ermöglicher: ein Anhang, der eine Kraft erst nutzbar macht (Ziel "with an attachment"). Die Kraft allein sieht die Suche erst
@@ -332,7 +333,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         beam = cands.slice(0, beamWidth);
         if (!beam.some(b => !b.firstAction)) beam.push(stay());
     }
-    let best = null, stayRes = null;
+    let best = null; const results = [];
     if (!beam.slice(0, finalists).some(b => !b.firstAction)) beam.splice(Math.min(beam.length, finalists - 1), 0, stay());   // Nichtstun immer als Vergleich
     for (const it of beam.slice(0, finalists)) {
         const s = cloneState(it.state);
@@ -347,14 +348,14 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
             for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
         }
-        // Gleichstand (z. B. jede Variante verliert im nächsten Zug sicher): die jetzt beste Lage gewinnt – wie ein Mensch, der auf einen
-        // Fehler des Gegners hofft (Boris heilte sonst einen unverletzten Ally statt sich selbst)
-        if (!it.firstAction) stayRes = { score, now: it.score };
-        if (!best || score > best.score || (score === best.score && it.score > best.now)) best = { action: it.firstAction, score, now: it.score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') };
+        results.push({ action: it.firstAction, score, now: it.score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') });
     }
-    // Ein Zug, der jetzt schlechter ist als Nichtstun, braucht in der Vorausschau einen klaren Vorteil (> 1) – kleine Unterschiede dort
-    // sind Rauschen der Gegner-Simulation (Piana heilte niemanden, Boris flippte für 1 Heilung an einem Unverletzten)
-    if (best && best.action && stayRes && best.now < stayRes.now && best.score < stayRes.score + 1 && best.score > AI_LOSS + 1) return null;
+    // Rausch-Toleranz: Unterschiede unter 1 Punkt in der Vorausschau sind Rauschen der Gegner-Simulation. Unter allen Kandidaten
+    // nahe am besten zählt die jetzige Lage – wie ein Mensch (Healing Touch heilte sonst einen Unverletzten, Boris flippte für
+    // 1 Heilung, Piana heilte niemanden; bei sicherem Verlust hofft man so auf einen Fehler des Gegners)
+    const top = Math.max(...results.map(r => r.score));
+    const near = results.filter(r => r.score >= top - (top > AI_LOSS + 1 && top < 99999 ? 1 : 0));
+    best = near.sort((a, b) => b.now - a.now || b.score - a.score)[0] || null;
     return (best && best.action) ? best : null;
 }
 

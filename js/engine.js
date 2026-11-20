@@ -1206,7 +1206,8 @@ function targetSlots(s, pid, f, card, ctx) {
     // KI: Heil-Ziele (Text "heals", Ziel ohne harm und ohne eigene Bewertung) nach geheiltem Schaden ordnen – sonst wählte sie
     // den wertvollsten eigenen Charakter, auch unverletzt (Soothing Wave, Piana, Tribemother Torra, Boris Brightbeard)
     const txt = (card && CARDS[card.id] && CARDS[card.id].text) || '';
-    if (/\bheals?\b/i.test(txt) && !/\bdeals?\b/i.test(txt)) for (const x of sl) if (x && x.harm === false && !x.ai) x.ai = (u, st) => healValue(st || s, pid, u, 99);
+    // Anhänge ausgenommen (Priest Training: das Ziel trägt nur die verliehene Heil-Kraft – dort zählt ein guter Träger, nicht sein Schaden)
+    if (/\bheals?\b/i.test(txt) && !/\bdeals?\b/i.test(txt) && !(card && CARDS[card.id] && CARDS[card.id].attach)) for (const x of sl) if (x && x.harm === false && !x.ai) x.ai = (u, st) => healValue(st || s, pid, u, 99);
     return sl;
 }
 // Gibt es überhaupt legale Ziele? Bei "Choose one" reicht ein möglicher Modus (CR 707.1c),

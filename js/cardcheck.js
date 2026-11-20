@@ -377,7 +377,8 @@ function ccCheckStartOfTurn(c) {
 const CC_SKIP_KEYS = new Set(['log', 'fx', 'fxQ', '_batch', 'lastProtect', 'undo', 'resolvingCard', 'seq', 'nextUid', 'uidSeq', 'stats', 'chainLog', 'hist', 'history', 'events', 'look', '_hidden', '_oppDecided', 'pending', 'win', 'queue', 'chain', 'played', 'cardsPlayed', 'playedThisTurn', 'abilitiesPlayed', 'lastPlayed', 'dmn15', 'dr12', 'protector', 'elusive', 'stealth', 'tempAtkBonus']);   // abgeleitete Anzeige-Werte: echte Wirkungen stehen in tm/Auren
 const CC_PE_BOOK = new Set(['playedCard']);   // Buchhaltung in s.pe: zählt nicht als Wirkung
 const ccEmpty = v => v === undefined || v === null || v === false || v === 0 || v === '' || (Array.isArray(v) && !v.length) || (v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
-function ccFingerprint(s, skipUid) {
+// noPay: Erschöpfen offener Ressourcen ignorieren (beim Ausspielen = Bezahlen, keine Wirkung)
+function ccFingerprint(s, skipUid, noPay) {
     const seen = new WeakSet();
     const walk = v => {
         if (Array.isArray(v)) return v.filter(x => !(x && x.uid === skipUid) && !(x && x.card && x.card.uid === skipUid)).map(walk);
@@ -385,8 +386,10 @@ function ccFingerprint(s, skipUid) {
         return v;
     };
     // offene Ressourcen (Locations, Quests) mit Zustand: Bereitmachen einer Location ist eine Wirkung (Blazing Hippogryph)
-    const open = p => p.resources.filter(r => r && r.faceUp).map(r => r.card.id + (r.exhausted ? 'x' : ''));
-    const t = walk({ resCount: [s.p1.resources.length, s.p2.resources.length], open: [open(s.p1), open(s.p2)], p1: s.p1, p2: s.p2, pe: (s.pe || []).filter(m => !CC_PE_BOOK.has(m.k)), gameOver: s.gameOver });
+    const open = p => p.resources.filter(r => r && r.faceUp).map(r => r.card.id + (r.exhausted && !noPay ? 'x' : ''));
+    // Kampf (Angreifer/Verteidiger): "aus dem Kampf entfernen" (Boots of the Whirling Mist, Avanthera) ist eine Wirkung
+    const battle = s.battle ? [s.battle.att, s.battle.def, s.battle.step] : null;
+    const t = walk({ resCount: [s.p1.resources.length, s.p2.resources.length], open: [open(s.p1), open(s.p2)], battle, p1: s.p1, p2: s.p2, pe: (s.pe || []).filter(m => !CC_PE_BOOK.has(m.k)), gameOver: s.gameOver });
     for (const p of [t.p1, t.p2]) { if (p) { p.resLen = (p.resources || []).length; delete p.resources; p.deckLen = (p.deck || []).length; delete p.deck; } }   // Ressourcen = Bezahlen; Deck nur als Anzahl (Mischen)
     return JSON.stringify(t);
 }
@@ -458,13 +461,14 @@ function ccJudge(s, pid, a, after) {
     const info = ccSlotsOf(s, pid, a);
     if (info) (a.targets || []).forEach((ts, i) => { const sl = info.slots[i]; if (!sl) return;
         for (const u of ts || []) { const t = findCharacter(s, u), lz = locate(s, u); if (!t || !lz || !isInPlayZone(lz.zone)) continue; const mine = ctrlOf(s, t) === pid;   // nur Karten im Spiel (nicht Friedhof)
-            if (sl.harm === true && mine) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
+            // Schaden an Eigenem: nur bei Karten ohne weiteren Nutzen (Reforestation zerstört die eigene Waffe für drei Treants – legitim)
+            if (sl.harm === true && mine && ccSentences(CARDS[info.card.id]).length <= 1) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
             if (sl.harm === false && !mine && t.type !== 'Ability' && !/each player/i.test(CARDS[info.card.id].text || '')) add('Hilfe für den Gegner', `${info.card.name} hilft gegnerischem ${t.name}`, info.card.id);
             // nur ein Fehler, wenn ein beschädigtes eigenes Ziel wählbar gewesen wäre (sonst ist die Heilung erzwungen, z. B. Grennan)
             const hurtOwn = (sl.cands || []).some(v => { const x = findCharacter(s, v); return x && ctrlOf(s, x) === pid && x.damage > 0; });
             // mehrere Ziele ("up to two"): ein unverletztes Zusatzziel neben einem verletzten kostet nichts – nur melden, wenn kein gewähltes verletzt ist
             const anyHurtChosen = (ts || []).some(v => { const x = findCharacter(s, v); return x && x.damage > 0; });
-            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && hurtOwn && !anyHurtChosen && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
+            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && !CARDS[info.card.id].attach && sl.harm === false && !(t.damage > 0) && hurtOwn && !anyHurtChosen && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
                 add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden, obwohl ein beschädigtes eigenes Ziel wählbar war`, info.card.id); } });
     // Entfernen verschwendet: "Destroy target …" auf ein gegnerisches Ziel, obwohl ein mindestens doppelt so wertvolles gegnerisches wählbar war
     if (info && /^Destroy target (?!.*each)/i.test(CARDS[info.card.id].text || '')) (a.targets || []).forEach((ts, i) => {
@@ -480,7 +484,8 @@ function ccJudge(s, pid, a, after) {
         // Kraft: die Quelle zählt mit (Jezbella: +1 ATK auf sich selbst), nur ihr Erschöpfen (Kosten) wird angeglichen
         let A = s, B = after, skip = info.card.uid;
         if (a.type === 'ACTIVATE') { A = cloneState(s); B = cloneState(after); skip = '__none'; const x = findCharacter(A, a.srcUid), y = findCharacter(B, a.srcUid); if (x && y) y.exhausted = x.exhausted; }
-        if (ccFingerprint(A, skip) === ccFingerprint(B, skip)) add('Wirkungslos', `${info.card.name}${a.type === 'ACTIVATE' ? ' (Kraft)' : ''} ohne jede Wirkung`, info.card.id);
+        const noPay = a.type === 'PLAY_CARD';
+        if (ccFingerprint(A, skip, noPay) === ccFingerprint(B, skip, noPay)) add('Wirkungslos', `${info.card.name}${a.type === 'ACTIVATE' ? ' (Kraft)' : ''} ohne jede Wirkung`, info.card.id);
     }
     if (a.type === 'ATTACK' && after) {
         const att = findCharacter(after, a.attackerUid), defBefore = findCharacter(s, a.defenderUid), la = locate(after, a.attackerUid), ld = locate(after, a.defenderUid);
