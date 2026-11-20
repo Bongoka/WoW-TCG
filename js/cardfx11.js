@@ -178,7 +178,9 @@ FX[10048] = { modes: (s, pid) => [['Ability', tr('Fähigkeit')], ['Ally', 'Ally'
 const searingAi11 = (s, pid, c, tg) => { const t = tg[0] && findCharacter(s, tg[0][0]); return !!t && t.type === 'Hero' && hpOf(s, t) - (t.damage || 0) > 6; };
 FX[10049] = { powers: [{ key: 'searing', label: tr('Fähigkeit abwerfen: 3 unverhinderbarer Heiligschaden'), cost: 2, slots: slotChar(tr('Ziel'), true), canUse: (s, pid) => me(s, pid).hand.some(c => c.type === 'Ability') || tr('Keine Fähigkeit auf der Hand'),
         payExtra: (s, it) => { const p = me(s, it.pl); ask(s, { pid: it.pl, prompt: tr('Searing Light: Fähigkeit abwerfen'), src: 'Searing Light', opts: p.hand.filter(c => c.type === 'Ability').map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -(c.cost || 0) })), k: 'E:discardCostDo', a: {} }); },
-        aiSkipT: searingAi11, resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } },
+        // wiederholbar (Ongoing): kein Schonen – vorher galt searingAi11 auch hier, ohne gegnerische Allies nutzte die CPU Searing
+        // Light nie, auch nicht für 3 + 3 Schaden zum Sieg
+        resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } },
     { key: 'searing2', label: tr('Zerstören: 3 unverhinderbarer Heiligschaden'), selfCost: selfDestroyCost, aiSkipT: searingAi11, slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Holy', { unprev: true }); } }] };
 FX[10050] = { backToHand: true, slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Holy', { unprev: true, after: { k: '10050:back', a: { pid: it.pl, uid: t, card: it.card.uid } } }); },
     k: { back: (s, a) => { const t = findCharacter(s, a.uid); if (t && (t.damage || 0) < hpOf(s, t)) s.tasteBack11 = a.card; } } };

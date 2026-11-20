@@ -720,7 +720,7 @@ FX[4275] = thirsty(4275);
 const hasFormCard = (s, pid) => (me(s, pid).ongoing || []).some(o => !o.attachedTo && o.limitTags && o.limitTags.Form);
 FX[4276] = { aura: { atk: (s, src, sp, c) => c.uid === heroOf(s, sp).uid && hasFormCard(s, sp) && heroAttacking(s, sp) ? 2 : 0,
     def: (s, src, sp, a) => a.type === 'Armor' && ctrlOf(s, a) === sp && hasFormCard(s, sp) ? 2 : 0 } };
-FX[4277] = { powers: [{ key: 'bringer', label: tr('Zerstören: alle Fähigkeiten, Allies und Ausrüstung zerstören'), cost: 3, act: true, myTurn: true, selfCost: selfDestroyThen, aiSkip: () => true,
+FX[4277] = { powers: [{ key: 'bringer', label: tr('Zerstören: alle Fähigkeiten, Allies und Ausrüstung zerstören'), cost: 3, act: true, myTurn: true, selfCost: selfDestroyThen,   // KI: Bewertung entscheidet (vorher nie genutzt) – lohnt bei mehr gegnerischem Feld
     resolve: (s) => [s.p1, s.p2].forEach(p => [...p.allies, ...(p.ongoing || []), ...p.hero.weapons, ...p.hero.armors].forEach(c => destroy(s, c))) }] };
 FX[4278] = { enter: (s, c, pid) => trig(s, { id: 4278, k: 'ask', a: { pid } }),
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Crimson Shocker: 2 Feuerschaden an Ziel?'), 'Crimson Shocker', targetCands(s, a.pid, { char: true }), '4278:do', a),

@@ -2140,6 +2140,15 @@ function runRuleTests() {
         P(s, 1).ongoing = P(s, 1).ongoing.filter(o => o !== y2); process(s);
         assert(ctrlOf(s, ar) === 2, 'nach Entfernen des jüngeren Yoink! nicht beim älteren: ' + ctrlOf(s, ar));
     });
+    test(178, 'KI: Searing Light – die wiederholbare Kraft ("(2), Discard an ability") nutzt die CPU auch auf den Helden; 9 Leben = Sieg mit 3 + 3 + 3 (vorher nie genutzt ohne gegnerische Allies)', () => {
+        const h = ctHeroFor(CARDS[10049]); const opp = Object.values(CARDS).find(c => c.type === 'Hero' && c.class === 'Warrior' && !c.set);
+        const s = newGameState(opp.id, Array(40).fill(ctVanilla(2).id), h.id, Array(40).fill(ctVanilla(2).id)); s.turn = 7; s.activePlayer = 2; s.lastTurnOf = { 1: 6, 2: 7 }; s.phase = 'main'; s.real = false; s.humans = [1]; s.placedResource = true;
+        for (let i = 0; i < 6; i++) s.p2.resources.push({ card: makeCardInst(ctVanilla(1).id, false, 2), faceUp: false, exhausted: false });
+        const sl = makeCardInst(10049, false, 2); sl.joinedTurn = 1; s.p2.ongoing.push(sl); s.p2.hand = [makeCardInst(49, false, 2), makeCardInst(49, false, 2)];
+        s.p1.hero.damage = hpOf(s, s.p1.hero) - 9;
+        for (let i = 0; i < 4 && !s.gameOver; i++) { const d = fastAiAction(s, 2); if (!d || !d.action) break; applyAction(s, d.action, true, 2); autoResolve(s); }
+        assert(s.gameOver && s.winner === 2, 'Searing Light: kein Sieg, Gegner hat noch ' + (hpOf(s, s.p1.hero) - s.p1.hero.damage) + ' Leben');
+    });
     return results;
 }
 
