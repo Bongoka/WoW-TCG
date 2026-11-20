@@ -47,11 +47,16 @@ function evaluateStateNow(s, pid) {
         if (a.exhausted && (a.tm || []).some(m => m.k === 'noReady')) v -= atk * (mine ? 1.4 : 1.6) + (hasProtector(s, a) ? 2.5 : 0);
         return v;
     };
-    let threat = 0;
+    const hits = [];
     alliesOf(me).forEach(a => { if (!doomed.has(a.uid)) score += allyVal(a, true); });
-    alliesOf(opp).forEach(a => { if (doomed.has(a.uid)) return; score -= allyVal(a, false); if (!a.isTotem && (!a.exhausted || hasFerocity(s, a))) threat += atkOf(s, a, { attacking: true }); });
+    alliesOf(opp).forEach(a => { if (doomed.has(a.uid)) return; score -= allyVal(a, false); if (!a.isTotem && (!a.exhausted || hasFerocity(s, a))) hits.push(atkOf(s, a, { attacking: true })); });
     const ow = opp.hero.weapons.find(w => !w.exhausted);
-    if (ow) threat += weaponAtk(s, ow, { attacking: true });
+    if (ow) hits.push(weaponAtk(s, ow, { attacking: true }));
+    // Eigene bereite Protectors fangen je einen Angreifer ab (die stärksten; Stealth-Angreifer bleiben unberücksichtigt) –
+    // vorher zählte die ganze gegnerische ATK, auch wenn eigene Protectors bereitstanden
+    hits.sort((x, y) => y - x);
+    const prot = aiOld(pid, 'lethalprot') ? 0 : alliesOf(me).filter(a => !a.isTotem && !a.exhausted && hasProtector(s, a) && !doomed.has(a.uid)).length;
+    const threat = hits.slice(prot).reduce((x, y) => x + y, 0);
     if (myHp <= threat) score -= aw(pid, 'lethal');
     // Eigene Handkarten nach Nutzen (spielbare, gute Karten mehr wert als tote); gegnerische Hand ist verdeckt: pauschal
     me.hand.forEach(c => score += handCardValue(s, me, c));
