@@ -326,7 +326,8 @@ FX[4108] = { resolve: (s, it) => [s.p1, s.p2].forEach(p => [...p.allies].forEach
 FX[4110] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.attachedTo) heroDmg(s, pid, c.attachedTo, 2, 'Shadow', { abilityId: c.id, abilityUid: c.uid, after: { k: '4110:heal', a: { pid } } }); } },
     k: { heal: (s, a) => { if (a.dealt > 0) { const h = heroOf(s, a.pid); heal(s, h.uid, h.uid, a.dealt); } } } };
-FX[4111] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { it.attachTo = T(it)[0]; },
+// Soul Inversion (+2 / -2): zweischneidig – eigener Angreifer oder gegnerischer 2-Leben-Ally, die Bewertung entscheidet (kein harm)
+FX[4111] = { slots: slotAlly(tr('Ziel-Ally')), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { atk: (s, src, sp, c) => c.uid === src.attachedTo ? 2 : 0, hp: (s, src, sp, c) => c.uid === src.attachedTo ? -2 : 0 } };
 FX[4112] = { slots: (s, pid) => [{ label: tr('Ally auf der Kette'), cands: chainCards(s, c => c.type === 'Ally'), harm: true, ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 5 : -10; } }],
     resolve: (s, it) => { const u = T(it)[0]; const x = u && s.chain.find(i => i.card && i.card.uid === u); if (x && interruptUid(s, u)) x.interruptTo = 'removed'; } };

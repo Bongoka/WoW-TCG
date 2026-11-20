@@ -2155,6 +2155,7 @@ function runCardTextTests() {
         const d = CARDS[id]; (d.type === 'Weapon' ? p.hero.weapons : d.type === 'Armor' || d.type === 'Item' ? p.hero.armors : d.type === 'Ally' ? p.allies : p.ongoing).push(x); return x; };
     // Karte von der Hand spielen; pick wählt die Variante (Standard: die erste), Ergebnis: Fehlertext oder null
     const play = (s, c, pick) => {
+        s.humans = [1];                                                                   // Mechanik prüfen: alle Ziele (die KI meidet z. B. schädliche Anhänge auf Eigenem)
         s.p1.hand.unshift(makeCardInst(c.id, false, 1));
         const why = canPlayCard(s, 1, s.p1.hand[0]); if (why) return 'nicht spielbar: ' + why;
         const vars = getLegalActions(s, 1).filter(a => a.type === 'PLAY_CARD' && a.handIdx === 0);

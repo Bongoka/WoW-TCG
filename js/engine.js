@@ -2906,6 +2906,13 @@ function gyPlayables(s, pid) {
 // (z. B. Inspiring Presence), zählt die eigene laufende Fähigkeit aber als Plus – so landete Spell Suppression auf dem eigenen Ally.
 // Spell Suppression, Polymorph, Polymorph: Penguin, Metalmorph, Scald, Smoke or Croak
 const AI_NO_OWN_TARGET = new Set([7040, 58, 11057, 5064, 12050, 6052]);
+// KI: Ziele, die ein Mensch nie wählen würde – Schädliches (harm) auf Eigenes, Hilfreiches (harm: false) auf Gegnerisches.
+// Gilt für Anhänge und Kräfte (deren Wirkung sieht die Bewertung oft nicht); Ziele, die ausdrücklich eine Seite verlangen
+// (side: 'friendly' / 'enemy', z. B. Opfer), bleiben erlaubt. helpful: auch die Hilfe-Regel prüfen
+function aiBadTargets(s, pid, slots, tg, helpful) {
+    const own = u => { const l = locate(s, u); return !!l && l.pid === pid; };
+    return slots.some((sl, i) => sl && ((sl.harm === true && sl.side !== 'friendly' && (tg[i] || []).some(own)) || (helpful && sl.harm === false && sl.side !== 'enemy' && (tg[i] || []).some(u => !own(u) && !!locate(s, u)))));
+}
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     const out = [];
     const p = getPlayer(s, pid);
@@ -2926,6 +2933,10 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
             for (const tg of combos) {
                 if (f.aiSkip && f.aiSkip(s, pid, c, { x, mode, targets: tg })) continue;
                 if (AI_NO_OWN_TARGET.has(c.id) && tg.flat().some(u => { const l = locate(s, u); return l && l.pid === pid; })) continue;
+                // Schädliche Anhänge (Ziel mit harm, z. B. Reclusion "Prevent all damage that attached ally would deal") nie auf Eigenes:
+                // ihre Wirkung sieht die Bewertung oft nicht, die eigene laufende Fähigkeit zählt aber als Plus
+                // … und hilfreiche Anhänge (harm: false, z. B. Blessing of the Martyr) nie auf gegnerische Karten
+                if (c.attach && !isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, true)) continue;
                 const act = { type: 'PLAY_CARD', handIdx: idx, x, mode, targets: tg, actorId: pid, desc: `${c.name}${gyUid ? tr(tr(tr(tr(' (aus dem Friedhof)')))) : ''}${x !== undefined ? ' X=' + x : ''}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` };
                 if (gyUid) act.gyUid = gyUid;
                 out.push(act);
@@ -2991,7 +3002,7 @@ function powerVariants(s, pid, instantOnly) {
                     const slots = targetSlots(s, pid, pw, e.c, { x, mode });
                     const combos = targetCombos(s, pid, slots, pw.distinct);
                     if (combos === null) continue;
-                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
+                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && !(!isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, false)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
                 }
             }
         }
