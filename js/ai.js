@@ -62,6 +62,8 @@ function evaluateStateNow(s, pid) {
     // Gleichstand brechen: bereite Ressourcen (und offene Locations) sind ein klein wenig wert – so verliert eine Kraft ohne Wirkung
     // (Kallas Sunflame ohne andere [Fire]-Allies, Tanks for Everything ohne erschöpfte Plattenrüstung) knapp gegen Nichtstun
     score += 0.05 * getReadyRes(me);
+    // … ebenso bereite eigene Kraftquellen ohne Mana-Kosten ([Activate]: Galvanize, Optimize, Blazing Hippogryph …)
+    for (const c of [...(me.ongoing || []), ...me.hero.armors, ...me.hero.weapons, ...alliesOf(me)]) if (!c.exhausted && FX[c.id] && FX[c.id].powers) score += 0.05;
     // Ein noch nicht genutzter Helden-Flip (einmal pro Spiel) ist etwas wert – verschwendet man ihn ohne Wirkung
     // (z. B. Gorebelly ohne Waffe), sinkt die Bewertung; genutzt wird er nur, wenn er mehr bringt
     if (heroFlipLeft(me.hero)) score += AI_FLIP_VALUE;

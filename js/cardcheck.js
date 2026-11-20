@@ -125,19 +125,21 @@ const CC_VERBS = [
         return d >= n ? null : `zieht ${d} statt ${n}`; }],
     ['Tokens ins Spiel', /^Put (a|an|one|two|three|four|five|\d+) (.+?) tokens? into play\.?$/i, (m, x) => { const n = ccNum(m[1]); const d = x.after.tokens - x.before.tokens;
         return d >= n ? (x.after.misplacedTokens ? 'Token in falscher Zone' : null) : `${d} statt ${n} Tokens im Spiel`; }],
-    ['Direktschaden', /^Your hero deals (\d+) (?:\w+ )?damage to target (hero or ally|ally|hero)\.?$/i, (m, x) => { if (!x.tgt) return null; const n = +m[1];
+    ['Direktschaden', /^Your hero deals (\d+) (?:unpreventable )?(?:\w+ )?damage to target (hero or ally|ally|hero)\.?$/i, (m, x) => { if (!x.tgt) return null; const n = +m[1];
         const t = x.tgtAfter; return !t || !x.tgtInPlay ? null : (t.damage - x.tgt.damage === n ? null : `${t.damage - x.tgt.damage} Schaden statt ${n}`); }],
     ['Heilung', /^Your hero heals (\d+) damage from target (hero or ally|ally|hero)\.?$/i, (m, x) => { if (!x.tgt) return null; const n = +m[1];
         const t = x.tgtAfter; return !t ? 'Ziel verschwunden' : (x.tgt.damage - t.damage === Math.min(n, x.tgt.damage) ? null : `heilt ${x.tgt.damage - t.damage} statt ${n}`); }],
     ['Zerstören', /^Destroy target (?:exhausted |damaged )?(ally|equipment|armor|weapon|ability|item)(?: with cost \d+ or (?:more|less))?\.?$/i, (m, x) => !x.tgt ? null : (x.tgtInPlay ? 'Ziel nicht zerstört' : null)],
     ['Kontrolle', /^Gain control of target (?:opposing )?ally\.?$/i, (m, x) => !x.tgt ? null : (x.tgtCtrl === 1 ? null : 'keine Kontrolle über das Ziel')],
+    ['Zerstören (Fähigkeit oder Ausrüstung)', /^Destroy target ability or equipment\.?$/i, (m, x) => !x.tgt ? null : (x.tgtInPlay ? 'Ziel nicht zerstört' : null)],
+    ['Gegner wirft ab', /^Target (?:player|opponent) discards (a|one|two|three|\d+) cards?\.?$/i, (m, x) => { const n = ccNum(m[1]); return x.after.oppHand <= x.before.oppHand - n || x.after.oppHand === 0 ? null : `Gegner wirft ${x.before.oppHand - x.after.oppHand} statt ${n} ab`; }],
 ];
 // Kleine Zustands-Kennzahlen für den Vergleich
 function ccMetrics(s) {
     const p = s.p1; let tokens = 0, misplaced = 0;
     for (const c of p.allies) if (c.isToken) { tokens++; if (!isAllyLike(c)) misplaced++; }
     for (const c of [...p.hero.weapons, ...p.hero.armors, ...p.ongoing]) if (c.isToken) tokens++;
-    return { hand: p.hand.length, tokens, misplacedTokens: misplaced };
+    return { hand: p.hand.length, oppHand: s.p2.hand.length, tokens, misplacedTokens: misplaced };
 }
 const ccSentences = c => (c.text || '').split(/\s*<p>\s*/).flatMap(p => p.split(/(?<=\.)\s+(?=[A-Z])/)).map(t => t.trim()).filter(Boolean);
 function ccCheckVerbs(c) {
@@ -378,7 +380,9 @@ function ccFingerprint(s, skipUid) {
         if (v && typeof v === 'object') { if (seen.has(v)) return '@'; seen.add(v); const o = {}; for (const k of Object.keys(v).sort()) { if (CC_SKIP_KEYS.has(k) || k === 'exhausted' && 'faceUp' in v) continue; const w = walk(v[k]); if (!ccEmpty(w)) o[k] = w; } return o; }
         return v;
     };
-    const t = walk({ resCount: [s.p1.resources.length, s.p2.resources.length], p1: s.p1, p2: s.p2, pe: (s.pe || []).filter(m => !CC_PE_BOOK.has(m.k)), gameOver: s.gameOver });
+    // offene Ressourcen (Locations, Quests) mit Zustand: Bereitmachen einer Location ist eine Wirkung (Blazing Hippogryph)
+    const open = p => p.resources.filter(r => r && r.faceUp).map(r => r.card.id + (r.exhausted ? 'x' : ''));
+    const t = walk({ resCount: [s.p1.resources.length, s.p2.resources.length], open: [open(s.p1), open(s.p2)], p1: s.p1, p2: s.p2, pe: (s.pe || []).filter(m => !CC_PE_BOOK.has(m.k)), gameOver: s.gameOver });
     for (const p of [t.p1, t.p2]) { if (p) { p.resLen = (p.resources || []).length; delete p.resources; p.deckLen = (p.deck || []).length; delete p.deck; } }   // Ressourcen = Bezahlen; Deck nur als Anzahl (Mischen)
     return JSON.stringify(t);
 }
@@ -456,6 +460,13 @@ function ccJudge(s, pid, a, after) {
             const hurtOwn = (sl.cands || []).some(v => { const x = findCharacter(s, v); return x && ctrlOf(s, x) === pid && x.damage > 0; });
             if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && hurtOwn && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
                 add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden, obwohl ein beschädigtes eigenes Ziel wählbar war`, info.card.id); } });
+    // Entfernen verschwendet: "Destroy target …" auf ein gegnerisches Ziel, obwohl ein mindestens doppelt so wertvolles gegnerisches wählbar war
+    if (info && /^Destroy target (?!.*each)/i.test(CARDS[info.card.id].text || '')) (a.targets || []).forEach((ts, i) => {
+        const sl = info.slots[i]; if (!sl || sl.harm !== true || (ts || []).length !== 1) return;
+        const t = findCharacter(s, ts[0]); if (!t || ctrlOf(s, t) === pid) return;
+        const best = (sl.cands || []).map(u => findCharacter(s, u)).filter(x => x && ctrlOf(s, x) !== pid && isInPlayZone((locate(s, x.uid) || {}).zone)).sort((x, y) => cardValue(s, y) - cardValue(s, x))[0];
+        if (best && best.uid !== t.uid && cardValue(s, best) >= 2 * Math.max(1, cardValue(s, t))) add('Entfernen verschwendet', `${info.card.name} zerstört ${t.name} statt ${best.name}`, info.card.id);
+    });
     // Wirkungslos: Karte gespielt / Kraft genutzt, aber außer Bezahlen ändert sich nichts (Quelle selbst ausgenommen)
     // nur Fähigkeiten (nicht Ongoing) und Kräfte: bei Allies/Ausrüstung ist das Eintreten selbst die Wirkung
     if (after && info && (a.type === 'ACTIVATE' || (a.type === 'PLAY_CARD' && info.card.type === 'Ability' && !CARDS[info.card.id].ongoing))) {

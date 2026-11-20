@@ -2916,7 +2916,9 @@ function aiBadTargets(s, pid, slots, tg, helpful) {
     const own = u => { const l = locate(s, u); return !!l && l.pid === pid; };
     // Kräfte, die einen Anhang am Ziel verlangen (Remba, Abbess of Ash: Kontrolle über Ally mit Anhang): Hilfe-Regel aus
     if (helpful && [getPlayer(s, pid).hero, ...getPlayer(s, pid).allies].some(c => getPowers(s, c).some(pw => pw.needsAttach))) helpful = false;
-    return slots.some((sl, i) => sl && ((sl.harm === true && sl.side !== 'friendly' && (tg[i] || []).some(own)) || (helpful && sl.harm === false && sl.side !== 'enemy' && (tg[i] || []).some(u => !own(u) && !!locate(s, u)))));
+    // Hilfe-Regel nur für Karten auf dem Feld (nicht Ressourcen – Optimize darf gegnerische Ressourcen erschöpfen)
+    const enemyOnField = u => { const l = locate(s, u); return !!l && l.pid !== pid && isInPlayZone(l.zone); };
+    return slots.some((sl, i) => sl && ((sl.harm === true && sl.side !== 'friendly' && (tg[i] || []).some(own)) || (helpful && sl.harm === false && sl.side !== 'enemy' && (tg[i] || []).some(enemyOnField))));
 }
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     const out = [];
@@ -3007,7 +3009,7 @@ function powerVariants(s, pid, instantOnly) {
                     const slots = targetSlots(s, pid, pw, e.c, { x, mode });
                     const combos = targetCombos(s, pid, slots, pw.distinct);
                     if (combos === null) continue;
-                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && !(!isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, false)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
+                    combos.forEach(tg => !(pw.aiSkipT && !isHuman(s, pid) && pw.aiSkipT(s, pid, e.c, tg)) && !(!isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, true)) && out.push({ type: 'ACTIVATE', srcUid: e.c.uid, key: pw.key, x, mode, targets: tg, actorId: pid, desc: `${e.c.name}: ${pw.label}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` }));
                 }
             }
         }
