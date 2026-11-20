@@ -506,7 +506,7 @@ FX[2226] = { aura: { kw: (s, src, sp, c, k) => k === 'dualWield' && c.uid === he
 // QUESTS
 // ============================================================================
 FX[2227] = { questExtra: (s, pid) => { const p = me(s, pid); const r = p.resources.find(x => x.card.uid === s.questPrep.uid);
-        if (!payRes(p, 2)) { s.questPrep = null; return; } if (r) { p.resources.splice(p.resources.indexOf(r), 1); resetInst(r.card); me(s, r.card.owner || pid).hand.push(r.card); L(s, tr("Corki's Ransom geht auf die Hand.")); }
+        if (!payRes(p, 2, r)) { s.questPrep = null; return; } if (r) { p.resources.splice(p.resources.indexOf(r), 1); resetInst(r.card); me(s, r.card.owner || pid).hand.push(r.card); L(s, tr("Corki's Ransom geht auf die Hand.")); }   // bezahlt zuerst mit sich selbst (geht ohnehin auf die Hand)
         const uid = s.questPrep.uid; s.questPrep = null; statCompleted(s, pid, 2227); L(s, tr`📜 [${p.hero.name}] Quest erfüllt: Corki's Ransom`, 'log-heal'); addPE(s, pid, { k: 'questDone', id: 2227 }); evt(s, 'questDone', { pid, uid, id: 2227 });
         s.chain.push({ kind: 'reward', id: newUid('rw_'), pl: pid, src: uid, srcId: 2227, srcName: "Corki's Ransom", label: tr('Belohnung') }); s.win = linkWindow(s, pid, s.win); },
     reward: Qd(1) };

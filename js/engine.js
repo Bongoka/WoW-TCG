@@ -1367,10 +1367,12 @@ function extraPayers(p) {
     return [...out].filter(c => !c.exhausted);
 }
 function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length + extraPayers(p).length; }
-function payRes(p, n) {
+// first: Ressource, die zuerst erschöpft wird, falls bereit (Corki's Ransom bezahlt mit sich selbst – sie geht ohnehin auf die Hand)
+function payRes(p, n, first) {
     if (n <= 0) return true;
     if (getReadyRes(p) < n) return false;
     let paid = 0;
+    if (first && !first.exhausted && p.resources.includes(first)) { first.exhausted = true; paid++; }   // CR 412.2: auch offene Ressourcen
     // Erst verdeckte Ressourcen, dann offene Quests, offene Locations zuletzt (ihre [Activate]-Kräfte brauchen sie bereit)
     const isLoc = r => r.card && r.card.type === 'Location';
     for (const r of p.resources) if (!r.exhausted && !r.faceUp && paid < n) { r.exhausted = true; paid++; }

@@ -2149,6 +2149,15 @@ function runRuleTests() {
         for (let i = 0; i < 4 && !s.gameOver; i++) { const d = fastAiAction(s, 2); if (!d || !d.action) break; applyAction(s, d.action, true, 2); autoResolve(s); }
         assert(s.gameOver && s.winner === 2, 'Searing Light: kein Sieg, Gegner hat noch ' + (hpOf(s, s.p1.hero) - s.p1.hero.damage) + ' Leben');
     });
+    test(179, "Corki's Ransom bezahlt zuerst mit sich selbst (CR 412.2: auch offene Ressourcen) – sie geht ohnehin auf die Hand", () => {
+        const s = freshH(ctHeroFor(CARDS[2227]).id, 9); s.humans = [];
+        for (let i = 0; i < 2; i++) P(s, 1).resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+        const q = makeCardInst(2227, false, 1); P(s, 1).resources.push({ card: q, faceUp: true, exhausted: false });
+        const a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST'); assert(a, 'nicht abschließbar');
+        act(s, a, 1);
+        assert(P(s, 1).hand.some(c => c.uid === q.uid), "Corki's Ransom nicht auf der Hand");
+        assert(getReadyRes(P(s, 1)) === 1, 'bereite Ressourcen übrig: ' + getReadyRes(P(s, 1)) + ' (erwartet 1: Corki + eine verdeckte bezahlt)');
+    });
     return results;
 }
 
