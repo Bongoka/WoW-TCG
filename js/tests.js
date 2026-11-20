@@ -2295,6 +2295,42 @@ function runCardTextTests() {
     return { groups, fails };
 }
 
+// ============================================================================
+// ANZEIGE-ABGLEICH (nur im Browser): Zufallspartien CPU gegen CPU, nach jedem Schritt render() und Vergleich mit dem Zustand –
+// jede Karte im Spiel (Allies, Ausrüstung, Fähigkeiten, Held) hat ein Element, Zähler werden angezeigt, Handgröße stimmt.
+// Aufruf in der Konsole: runUiCheck(25) → { games, steps, problems }. Die laufende Partie wird dabei ersetzt.
+// ============================================================================
+function uiStateProblems() {
+    const bad = [];
+    for (const p of [G.p1, G.p2]) for (const c of [...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || []), p.hero]) {
+        const el = document.querySelector(`[data-uid="${c.uid}"]`);
+        if (!el) { bad.push(`P${p.id} fehlt auf dem Feld: ${c.name} (${c.type}${c.attachedTo ? ', angehängt' : ''})`); continue; }
+        const n = Object.entries(c.counters || {}).filter(([k, v]) => typeof v === 'number' && v > 0 && k !== 'atk1' && k !== 'def');
+        if (n.length && !el.querySelector('.cfx-counters')) bad.push(`P${p.id} Zähler nicht angezeigt: ${c.name} ${JSON.stringify(c.counters)}`);
+    }
+    const hc = document.querySelectorAll('#bot-hand .hand-card-slot').length;
+    if (hc !== G.p1.hand.length) bad.push(`Hand: ${hc} angezeigt, ${G.p1.hand.length} im Zustand`);
+    return bad;
+}
+function runUiCheck(seconds = 25) {
+    const problems = new Map(), t0 = Date.now(), hs = Object.values(CARDS).filter(c => c.type === 'Hero');
+    let games = 0, steps = 0;
+    while (Date.now() - t0 < seconds * 1000) {
+        const dA = randomLegalDeck(hs[Math.floor(Math.random() * hs.length)].id), dB = randomLegalDeck(hs[Math.floor(Math.random() * hs.length)].id);
+        G = newGameState(dA.hero, dA.cards, dB.hero, dB.cards); G.real = false; G.humans = []; dealOpeningHands(G); games++;
+        for (let i = 0; i < 200 && !G.gameOver && Date.now() - t0 < seconds * 1000; i++) {
+            if (G.pending) autoResolve(G);
+            const pid = G.activePlayer, dec = fastAiAction(G, pid);
+            if (dec && dec.action && applyAction(G, dec.action, true, pid)) autoResolve(G);
+            else { if (!applyAction(G, { type: 'END_TURN', actorId: pid }, true, pid)) advanceTurn(G, true); autoResolve(G); }
+            try { render(); } catch (e) { problems.set('render:' + e.message, 'Absturz in render(): ' + e.message); }
+            steps++;
+            for (const b of uiStateProblems()) { const k = b.replace(/\d+/g, 'N'); if (!problems.has(k)) problems.set(k, b); }
+        }
+    }
+    return { games, steps, problems: [...problems.values()] };
+}
+
 function runAutomatedTests() {
     const results = runRuleTests();
     let sum = "=== REGEL- & KARTEN-TESTS ===\n\n", ok = 0;
