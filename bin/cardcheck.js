@@ -50,7 +50,8 @@ fs.writeFileSync(path.join(dir, 'cardcheck.json'), JSON.stringify({ stats: res.s
 
 // Lesbarer Bericht: je Prüfung, Fehler vor Warnungen, neue zuerst
 const st = res.stats, L = [];
-L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · „tut nichts“ geprüft: ${st.noopChecked || 0} · Menschenweg (zufällige Antworten) geprüft: ${st.humanChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
+const proven = (st.provenIds || []).length;
+L.push(`# Kartenprüfung`, '', `**Wirkung nachgewiesen: ${proven} von ${st.cards} Karten (${(100 * proven / st.cards).toFixed(1)} %)** – übrige Karten sind gespielt (Rauch- und Menschenweg-Test), ihre Wirkung aber nicht gegen das Ergebnis geprüft`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · „tut nichts“ geprüft: ${st.noopChecked || 0} · Menschenweg (zufällige Antworten) geprüft: ${st.humanChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
 const groups = {}; res.findings.forEach(f => (groups[f.check] = groups[f.check] || []).push(f));
 for (const [check, fs_] of Object.entries(groups)) {
     fs_.sort((a, b) => (a.sev === 'fail' ? 0 : 1) - (b.sev === 'fail' ? 0 : 1) || (b.isNew - a.isNew));
@@ -60,5 +61,5 @@ for (const [check, fs_] of Object.entries(groups)) {
 }
 fs.writeFileSync(path.join(dir, 'cardcheck.md'), L.join('\n'));
 const fails = res.findings.filter(f => f.sev === 'fail'), neu = res.findings.filter(f => f.isNew);
-out(`${st.cards} Karten, ${st.classes} Klassen, ${fails.length} Fehler, ${res.findings.length - fails.length} Warnungen${base ? `, ${neu.length} neu` : ''} – ${(st.ms / 1000).toFixed(0)} s → reports/cardcheck.md`);
+out(`Wirkung nachgewiesen: ${(st.provenIds || []).length}/${st.cards} (${(100 * (st.provenIds || []).length / st.cards).toFixed(1)} %) · ${st.cards} Karten, ${st.classes} Klassen, ${fails.length} Fehler, ${res.findings.length - fails.length} Warnungen${base ? `, ${neu.length} neu` : ''} – ${(st.ms / 1000).toFixed(0)} s → reports/cardcheck.md`);
 exit(base && neu.some(f => f.sev === 'fail') ? 1 : 0);

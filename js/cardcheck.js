@@ -397,9 +397,41 @@ function ccFingerprint(s, skipUid, noPay) {
     for (const p of [t.p1, t.p2]) { if (p) { p.resLen = (p.resources || []).length; delete p.resources; p.deckLen = (p.deck || []).length; delete p.deck; } }   // Ressourcen = Bezahlen; Deck nur als Anzahl (Mischen)
     return JSON.stringify(t);
 }
+// Reiches Feld für bedingte Texte: Anhänge auf beiden Seiten, Friedhöfe mit allen Kartenarten, beide Fraktionen, Protector,
+// Pet/Totem, offene Quests, Zähler, Kombos – so lösen "if …", "for each …", "attached …", "from your graveyard" auch aus
+let _ccRichIds = null;
+function ccRichIds() {
+    if (_ccRichIds) return _ccRichIds;
+    const V = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id]);
+    const find = p => (V.find(p) || {}).id;
+    _ccRichIds = {
+        buff: find(c => c.type === 'Ability' && c.attach && /^Attach to target ally\. Ongoing: Attached ally has \+\d+ ATK\.?$/.test(c.text || '')),
+        poison: find(c => c.type === 'Ability' && c.attach && (c.subtypes || []).includes('Poison')),
+        alli: find(c => c.type === 'Ally' && !c.text && c.faction === 'Alliance' && !c.unique), horde: find(c => c.type === 'Ally' && !c.text && c.faction === 'Horde' && !c.unique),
+        prot: find(c => c.type === 'Ally' && c.text === 'Protector' && !c.unique), pet: find(c => c.isPet && !(c.text || '').trim()),
+        combo: find(c => (c.subtypes || []).includes('Combo')), quest: find(c => c.type === 'Quest' && !FX[c.id] || (c.type === 'Quest' && !FX[c.id].questCond)),
+        abil: find(c => c.type === 'Ability' && !c.ongoing && !c.attach), ongo: find(c => c.type === 'Ability' && c.ongoing && !c.attach && !c.totem),
+        totem: find(c => c.totem && !(c.unique)), demon: find(c => c.type === 'Ally' && (c.allyTypes || []).includes('Demon') && !c.unique),
+    };
+    return _ccRichIds;
+}
+function ccRich(s) {
+    const R = ccRichIds(), put = (pid, id, o) => id ? ccPut(s, pid, id, o) : null;
+    const o1 = put(1, R.alli, { damage: 1 }), o2 = put(1, R.horde, { exhausted: true }); put(1, R.pet);
+    const e1 = put(2, R.alli, { damage: 1 }), e2 = put(2, R.horde, { exhausted: true }); put(2, R.prot); put(2, R.demon);
+    const att = (pid, id, host) => { if (!id || !host) return; const a = makeCardInst(id, false, pid); a.joinedTurn = 1; a.attachedTo = host.uid; getPlayer(s, pid).ongoing.push(a); };
+    att(1, R.buff, o1); att(2, R.buff, e1); att(1, R.poison, e2);
+    for (const pid of [1, 2]) { const p = getPlayer(s, pid);
+        for (const id of [R.abil, R.combo, R.alli, ctPlain('Weapon').id, ctPlain('Armor').id, R.ongo]) if (id) p.graveyard.push(makeCardInst(id, false, pid));
+        if (R.quest) p.resources.push({ card: makeCardInst(R.quest, false, pid), faceUp: true, exhausted: false });
+        p.hero.damage = Math.max(p.hero.damage, 5); }
+    if (R.totem) put(1, R.totem);
+    s.p2.hand.push(makeCardInst(ctVanilla(2).id, false, 2));
+    return s;
+}
 function ccCheckNoop(c) {
     if (c.type !== 'Ability' || c.ongoing || c.xCost || !(c.text || '').trim()) return { n: 0, out: [] };
-    const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10;
+    const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10; ccRich(s);
     const own = ccPut(s, 1, ctVanilla(4).id, { damage: 1 }); ccPut(s, 2, ctVanilla(6).id, { damage: 1 }); ccPut(s, 2, ctVanilla(3).id, { exhausted: true });
     ccPut(s, 2, ctPlain('Weapon').id); ccPut(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
     // eigene bereite Waffe (Heroic Strike, Frost Strike, Divine Storm …) und beschädigter gegnerischer Held (Taste for Blood)
@@ -554,8 +586,8 @@ function ccAiGame(seed, o = {}) {
 const CC_EVENTS = [
     ['Angriff', /^When this ally attacks,/i, c => c.type === 'Ally', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); return applyAction(s, { type: 'ATTACK', attackerUid: x.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1); }],
     ['Zerstört', /^When this (?:ally|weapon|armor|item) is destroyed,/i, c => ['Ally', 'Weapon', 'Armor', 'Item'].includes(c.type), (s, x) => { destroy(s, x); process(s); return true; }],
-    ['Zugbeginn', /^(?:Ongoing: )?At the start of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 8 && t.activePlayer === 1 && isIdle(t) && !t.pending, 400)],
-    ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 7 && t.activePlayer === 2 && isIdle(t) && !t.pending, 400)],
+    ['Zugbeginn', /^(?:Ongoing: )?At the start of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => { advanceTurn(s, true); autoResolve(s); advanceTurn(s, true); autoResolve(s); return s.activePlayer === 1; }],   // Zugwechsel ohne Aktionen des Gegners (sonst stört sein Angriff)
+    ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => { advanceTurn(s, true); autoResolve(s); return s.activePlayer === 2; }],
     // Eintreten: die Karte (bzw. ihre textlose Kopie) kommt aus dem Spiel auf die Hand und wird ausgespielt
     ['Eintreten', /^When this (?:ally|weapon|armor|item|ability) enters play,/i, c => ['Ally', 'Weapon', 'Armor', 'Item', 'Ability'].includes(c.type) && !c.attach, (s, x) => {
         const l = locate(s, x.uid); if (!l) return false; const p = s.p1; for (const z of [p.allies, p.hero.weapons, p.hero.armors, p.ongoing]) { const i = z.indexOf(x); if (i >= 0) z.splice(i, 1); }
@@ -576,6 +608,7 @@ function ccCheckTriggerFires(c) {
     for (const [name, re, ok, run] of CC_EVENTS) {
         const sen = ccSentences(c).find(t => re.test(t)); if (!sen || !ok(c)) continue;
         const base = ccSetup(c); base.humans = []; base.p1.hero.damage = 8;
+        if (name !== 'Zugbeginn' && name !== 'Zugende') ccRich(base);   // Zugwechsel: das reiche Feld bringt eigene Zugbeginn-Auslöser mit, die das Ergebnis überdecken
         ccPut(base, 1, ctVanilla(3).id, { damage: 1 }); ccPut(base, 2, ctVanilla(4).id, { damage: 1 });
         ccPut(base, 2, ctPlain('Weapon').id); ccPut(base, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
         if (c.type !== 'Weapon') ccPut(base, 1, ctPlain('Weapon').id, { exhausted: true }); if (c.type !== 'Armor' && c.type !== 'Item') ccPut(base, 1, ctPlain('Armor').id, { exhausted: true });   // eigene (erschöpfte) Ausrüstung
@@ -606,6 +639,74 @@ function ccCheckTriggerFires(c) {
         }
     }
     return { n, out };
+}
+
+// ---------------------------------------------------------------- A6: Dauereffekte, Kräfte, Quests
+// Abgeleitete Werte (Dauereffekte verändern nichts im Zustand, nur was atkOf/hpOf/defOf/Schlüsselwörter/Kosten liefern)
+function ccDerived(s) {
+    const kws = c => [hasProtector(s, c), hasElusive(s, c), hasFerocity(s, c), kwHas(s, c, 'stealth'), kwHas(s, c, 'untargetable'), kwHas(s, c, 'longRange')].map(x => x ? 1 : 0).join('');
+    const side = p => [
+        ...[p.hero, ...p.allies].map(c => `${c.uid}:${atkOf(s, c, {})}:${atkOf(s, c, { attacking: true })}:${hpOf(s, c)}:${kws(c)}`),
+        ...p.hero.weapons.map(w => `${w.uid}:${weaponAtk(s, w, {})}`), ...p.hero.armors.map(a => `${a.uid}:${defOf(s, a)}`),
+        ...p.hand.map(c => `${c.uid}:${getPlayCost(s, p, c, 0)}:${canPlayCard(s, p.id, c) ? 0 : 1}`),
+        `res${getReadyRes(p)}`, `max${maxHandSize(s, p)}`];
+    return [s.p1, s.p2].map(p => side(p).join(',')).join('#');
+}
+// Dauereffekt: Karte im Spiel gegen textlose Kopie – ändert sie abgeleitete Werte (oder den Zustand nach einem Zugwechsel)?
+function ccCheckStatic(c) {
+    if (!['Ally', 'Weapon', 'Armor', 'Item', 'Ability', 'Location'].includes(c.type) || c.attach || !(c.text || '').trim()) return { n: 0, out: [], proven: false };
+    if (c.type === 'Ability' && !c.ongoing) return { n: 0, out: [], proven: false };
+    const base = ccSetup(c); base.humans = []; ccRich(base);
+    for (let i = 0; i < 2; i++) base.p1.hand.push(makeCardInst(Object.values(CARDS).find(x => x.type === 'Ability' && !x.isToken && cardMatchesPlayer(x, base.p1)).id || ctVanilla(2).id, false, 1));
+    let card;
+    if (c.type === 'Location') { card = makeCardInst(c.id, false, 1); base.p1.resources.push({ card, faceUp: true, exhausted: false }); }
+    else card = ccPut(base, 1, c.id);
+    CARDS[CC_VAN] = { ...CARDS[c.id], id: CC_VAN, name: 'Kontrolle', text: '' }; for (const k of ['protector', 'elusive', 'ferocity', 'stealth', 'longRange', 'untargetable', 'unique']) delete CARDS[CC_VAN][k]; delete FX[CC_VAN];
+    try {
+        const d = [];
+        for (const ctl of [false, true]) { const s = cloneState(base); const l = locate(s, card.uid); const x = l && l.c; if (ctl && x) { x.id = CC_VAN; x.name = 'Kontrolle'; x.text = ''; } d.push(ccDerived(s)); }
+        return { n: 1, out: [], proven: d[0] !== d[1] };
+    } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Dauereffekt: Absturz – ' + e.message }], proven: false }; }
+    finally { delete CARDS[CC_VAN]; }
+}
+// Kräfte: jede Kraft auf dem reichen Feld nutzen – ändert sie etwas (Quelle erschöpft/Held umgedreht zählen nicht)?
+function ccCheckPowers(c) {
+    if (!FX[c.id] || !(FX[c.id].powers || []).length) return { n: 0, out: [], proven: false };
+    const base = ccSetup(c); base.humans = []; ccRich(base);
+    let src;
+    if (c.type === 'Hero' || c.type === 'Master Hero') src = base.p1.hero;
+    else if (c.type === 'Location' || c.type === 'Quest') { src = makeCardInst(c.id, false, 1); src.counters = { capture: 9, honor: 9 }; base.p1.resources.push({ card: src, faceUp: true, exhausted: false }); }
+    else src = ccPut(base, 1, c.id);
+    if (!src || src.id !== c.id) return { n: 0, out: [], proven: false };
+    let acts; try { acts = getLegalActions(base, 1).filter(a => a.type === 'ACTIVATE' && a.srcUid === src.uid); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Kraft: Absturz – ' + e.message }], proven: false }; }
+    if (!acts.length) return { n: 0, out: [], proven: false };
+    for (const a of acts.slice(0, 4)) {
+        try {
+            const A = cloneState(base), B = simApply(base, a, 1); if (!B) continue;
+            const inv = ccInvariants(B); if (inv) return { n: 1, out: [{ sev: 'fail', msg: `Kraft „${a.desc}“: Invariante – ${inv}` }], proven: false };
+            const x = findCharacter(A, src.uid) || (locate(A, src.uid) || {}).c, y = findCharacter(B, src.uid) || (locate(B, src.uid) || {}).c;
+            if (x && y) { y.exhausted = x.exhausted; } A.p1.hero.flipped = B.p1.hero.flipped;
+            const ra = A.p1.resources.find(r => r.card.uid === src.uid), rb = B.p1.resources.find(r => r.card.uid === src.uid); if (ra && rb) rb.exhausted = ra.exhausted;
+            if (ccFingerprint(A, '__none', true) !== ccFingerprint(B, '__none', true) || ccDerived(A) !== ccDerived(B)) return { n: 1, out: [], proven: true };
+        } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: `Kraft „${a.desc}“: Absturz – ${e.message}` }], proven: false }; }
+    }
+    return { n: 1, out: [{ sev: 'warn', msg: `Kraft ohne erkennbare Wirkung auf dem Prüffeld (${acts.length} Varianten)` }], proven: false };
+}
+// Quests: auf dem reichen Feld abschließen (falls die Bedingung erfüllt ist) – ändert die Belohnung etwas?
+function ccCheckQuest(c) {
+    if (c.type !== 'Quest') return { n: 0, out: [], proven: false };
+    const s = ccSetup(c); s.humans = []; ccRich(s);
+    const q = { card: makeCardInst(c.id, false, 1), faceUp: true, exhausted: false }; s.p1.resources.push(q);
+    try { checkQuestCondition(s, s.p1, q); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Absturz – ' + e.message }], proven: false }; }
+    const a = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && s.p1.resources[x.resIdx] === q); if (!a) return { n: 0, out: [], proven: false };
+    try {
+        const A = cloneState(s), B = simApply(s, a, 1); if (!B) return { n: 0, out: [], proven: false };
+        const inv = ccInvariants(B); if (inv) return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Invariante – ' + inv }], proven: false };
+        // Bezahlen und das Umdrehen/Erschöpfen der Quest selbst zählen nicht
+        for (const st of [A, B]) st.p1.resources = st.p1.resources.filter(r => r.card.uid !== q.card.uid);
+        const changed = ccFingerprint(A, q.card.uid, true) !== ccFingerprint(B, q.card.uid, true);
+        return { n: 1, out: changed ? [] : [{ sev: 'warn', msg: 'Belohnung ohne erkennbare Wirkung auf dem Prüffeld' }], proven: changed };
+    } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Absturz – ' + e.message }], proven: false }; }
 }
 
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
@@ -640,7 +741,11 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); const hf = ccHumanFuzz(c); stats.humanChecked = (stats.humanChecked || 0) + hf.n; add('Menschenweg', c, hf.out); const tf = ccCheckTriggerFires(c); stats.trigChecked += tf.n; add('Auslöser (Kontroll-Lauf)', c, tf.out); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); const hf = ccHumanFuzz(c); stats.humanChecked = (stats.humanChecked || 0) + hf.n; add('Menschenweg', c, hf.out); const tf = ccCheckTriggerFires(c); stats.trigChecked += tf.n; add('Auslöser (Kontroll-Lauf)', c, tf.out);
+            const sta = ccCheckStatic(c), pw = ccCheckPowers(c), qu = ccCheckQuest(c); add('Dauereffekt', c, sta.out); add('Kraft', c, pw.out); add('Quest', c, qu.out);
+            // Abdeckung: Wirkung je Karte nachgewiesen (irgendeine Prüfung hat eine passende Änderung gesehen) bzw. Karte ohne Text
+            const ok = r => r && r.n && !r.out.length;
+            if (!(c.text || '').trim() || ok(v) || ok(tg) || ok(st2) || ok(no) || ok(tf) || sta.proven || pw.proven || qu.proven) (stats.provenIds = stats.provenIds || []).push(c.id); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));
