@@ -503,6 +503,8 @@ function ccAiGame(seed, o = {}) {
     const rnd0 = Math.random; Math.random = seededRandom(seed);
     const b0 = AI_BUDGET.normal; AI_BUDGET.normal = o.budget || 300;
     const ro0 = respondOptions, loops = ccWatchLoops();
+    // Deterministische Uhr: das Zeitbudget der Suche zählt Aufrufe statt Millisekunden – gleicher Seed = gleiche Partie (Repro)
+    const pn0 = performance.now; let clock = 0; if (!o.realClock) performance.now = () => (clock += 10);
     const found = []; let s = null;
     try {
         const hs = ctHeroes(); const heroes = [hs[Math.floor(Math.random() * hs.length)].id, hs[Math.floor(Math.random() * hs.length)].id];
@@ -537,7 +539,7 @@ function ccAiGame(seed, o = {}) {
         if (loops.hits) return { found, turns, err: `Endlosschleife in der Engine (${loops.hits}× Schleifen-Sicherung)` };
         return { found, turns, winner: s.winner };
     } catch (e) { return { found, err: 'Absturz: ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 3).join(' | ') }; }
-    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; loops.restore(); }
+    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; loops.restore(); performance.now = pn0; }
 }
 
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext

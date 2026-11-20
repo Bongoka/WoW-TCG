@@ -356,6 +356,13 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
     const top = Math.max(...results.map(r => r.score));
     const near = results.filter(r => r.score >= top - (top > AI_LOSS + 1 && top < 99999 ? 1 : 0));
     best = near.sort((a, b) => b.now - a.now || b.score - a.score)[0] || null;
+    // Ziel verfeinern: unter den Geschwister-Varianten (gleiche Karte/Kraft, gleiches X und gleicher Modus, nur andere Ziele) zählt die
+    // jetzige Lage – die Vorausschau entscheidet, ob gespielt wird, nicht worauf (Boris heilte sonst einen Unverletzten statt sich)
+    if (best && best.action && best.action.targets && (best.action.type === 'PLAY_CARD' || best.action.type === 'ACTIVATE')) {
+        const a = best.action, same = b => b.type === a.type && b.handIdx === a.handIdx && b.srcUid === a.srcUid && b.key === a.key && b.x === a.x && b.mode === a.mode && b.gyUid === a.gyUid;
+        const sib = scored.filter(x => same(x.act)).sort((p, q) => q.score - p.score)[0], mine = scored.find(x => x.act === a);
+        if (sib && mine && sib.act !== a && sib.score > mine.score + 0.01) best = { ...best, action: sib.act, reason: sib.act.desc };
+    }
     return (best && best.action) ? best : null;
 }
 
