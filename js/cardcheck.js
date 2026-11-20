@@ -402,6 +402,69 @@ function ccCheckNoop(c) {
     return { n: 1, out: [{ sev: cond ? 'warn' : 'fail', msg: `Ausspielen ändert nichts am Spiel (${vars.length} Variante${vars.length > 1 ? 'n' : ''} geprüft)${cond ? ' – Text ist bedingt/zeitlich, evtl. legitim' : ''}` }] };
 }
 
+// ---------------------------------------------------------------- KI: dumme Fehler, die ein Mensch nie machen würde
+// Partie, in der beide Seiten mit der echten Spiel-KI (große Suche) entscheiden; jede Entscheidung wird geprüft.
+// Ergebnis: Liste { kind, msg, turn, seed, card }
+function ccSlotsOf(s, pid, a) {
+    try {
+        if (a.type === 'PLAY_CARD') { const c = getPlayer(s, pid).hand[a.handIdx]; if (!c) return null; return { card: c, slots: targetSlots(s, pid, fx(c), c, { x: a.x, mode: a.mode }) || [] }; }
+        if (a.type === 'ACTIVATE') { const src = findCharacter(s, a.srcUid); const pw = src && getPower(s, src, a.key); if (!pw) return null; return { card: src, slots: pw.slots ? pw.slots(s, pid, src, { x: a.x, mode: a.mode }) || [] : [] }; }
+    } catch (e) { return null; }
+    return null;
+}
+function ccJudge(s, pid, a, after) {
+    const out = [], add = (kind, msg, card) => out.push({ kind, msg, card });
+    const info = ccSlotsOf(s, pid, a);
+    if (info) (a.targets || []).forEach((ts, i) => { const sl = info.slots[i]; if (!sl) return;
+        for (const u of ts || []) { const t = findCharacter(s, u); if (!t) continue; const mine = ctrlOf(s, t) === pid;
+            if (sl.harm === true && mine) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
+            if (sl.harm === false && !mine && t.type !== 'Ability' && !/each player/i.test(CARDS[info.card.id].text || '')) add('Hilfe für den Gegner', `${info.card.name} hilft gegnerischem ${t.name}`, info.card.id);
+            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
+                add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden`, info.card.id); } });
+    if (a.type === 'ATTACK' && after) {
+        const att = findCharacter(after, a.attackerUid), defBefore = findCharacter(s, a.defenderUid), la = locate(after, a.attackerUid), ld = locate(after, a.defenderUid);
+        const attDead = !att || !la || !isInPlayZone(la.zone), defAlive = ld && isInPlayZone(ld.zone);
+        const attBefore = findCharacter(s, a.attackerUid);
+        // nur vorhersehbar: laut Kampfwerten vorher stirbt der Angreifer und macht keinen Schaden (sonst: Antwort des Gegners)
+        const foresee = attBefore && defBefore && defBefore.type !== 'Hero' && atkOf(s, defBefore, {}) >= hpOf(s, attBefore) - (attBefore.damage || 0) && atkOf(s, attBefore, { attacking: true }) === 0;
+        if (foresee && attDead && defAlive && !(findCharacter(after, a.defenderUid).damage > (defBefore.damage || 0)))
+            add('Selbstmord-Angriff', `${(findCharacter(s, a.attackerUid) || {}).name} stirbt an ${defBefore.name}, ohne Schaden zu machen`, (findCharacter(s, a.attackerUid) || {}).id);
+    }
+    return out;
+}
+function ccAiGame(seed, o = {}) {
+    const rnd0 = Math.random; Math.random = seededRandom(seed);
+    const b0 = AI_BUDGET.normal; AI_BUDGET.normal = o.budget || 300;
+    const found = []; let s = null;
+    try {
+        const hs = ctHeroes(); const heroes = [hs[Math.floor(Math.random() * hs.length)].id, hs[Math.floor(Math.random() * hs.length)].id];
+        const dA = randomLegalDeck(heroes[0]), dB = randomLegalDeck(heroes[1]);
+        s = newGameState(dA.hero, dA.cards, dB.hero, dB.cards); s.real = false; s.humans = [];
+        dealOpeningHands(s); for (const pid of [1, 2]) if (aiWantsMulligan(s, pid)) doMulligan(s, pid);
+        const tEnd = Date.now() + (o.maxMs || 60000);
+        let turns = 0, lethalTurn = null;
+        while (!s.gameOver && turns < (o.maxTurns || 30) && Date.now() < tEnd) {
+            const pid = s.activePlayer;
+            for (let n = 0; n < 25 && !s.gameOver && Date.now() < tEnd; n++) {
+                if (s.pending) { autoResolve(s); continue; }
+                if (lethalTurn === null && attackPlans(s, pid).some(pl => pl.state.gameOver && pl.state.winner === pid)) lethalTurn = s.turn;
+                const best = searchBestAction(s, pid, 'normal'); if (!best || !best.action) break;
+                const a = best.action, after = simApply(s, a, pid);
+                for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, turn: s.turn, seed, pid });
+                if (!applyAction(s, a, true, pid)) break; autoResolve(s);
+            }
+            if (s.gameOver) break;
+            if (lethalTurn === s.turn) found.push({ kind: 'Lethal verpasst', msg: `Spieler ${pid} hätte mit einem Angriffsplan gewonnen`, turn: s.turn, seed, pid });
+            lethalTurn = null;
+            const t = s.turn;
+            if (!applyAction(s, { type: 'END_TURN', actorId: pid }, true, pid)) { const forced = getAttackActions(s, pid)[0]; if (forced && applyAction(s, forced, true, pid)) { autoResolve(s); continue; } advanceTurn(s, true); }
+            autoResolve(s); if (s.turn !== t) turns++;
+        }
+        return { found, turns, winner: s.winner };
+    } catch (e) { return { found, err: 'Absturz: ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 3).join(' | ') }; }
+    finally { Math.random = rnd0; AI_BUDGET.normal = b0; }
+}
+
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
 // "up to N …" im Text, aber pickMany ohne Höchstzahl (9. Argument) – fand Ruthlessness und Volley (beliebig viele statt 5 bzw. 3)
 function ccArgs(src, at) {   // Argumente des Aufrufs, der bei src[at] = '(' beginnt (Klammertiefe beachten)

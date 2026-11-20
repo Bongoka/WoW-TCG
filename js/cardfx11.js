@@ -5,8 +5,15 @@
 
 // ---------------------------------------------------------------- Hilfen
 // Escape Artist: "When this card becomes targeted by an opposing link, you may put it into its owner's hand."
+function escapeWorth(s, a) {
+    if (typeof evaluateState !== 'function') return true;
+    const after = yes => { const c = cloneState(s); try { const x = findCharacter(c, a.uid); if (yes && x) bounce(c, x); process(c); autoResolve(c); } catch (e) { return null; } return evaluateState(c, a.pid); };
+    const y = after(true), n = after(false);
+    return y === null || n === null ? true : y > n;
+}
 const escapeArtist = id => ({ on: { targeted: (s, c, d, pid) => { if (d.uids.includes(c.uid) && d.pl !== pid) trig(s, { id, k: 'escape', a: { pid, uid: c.uid } }); } },
-    k: { escape: (s, a) => { const c = findCharacter(s, a.uid); if (c) yesNo(s, a.pid, tr`${c.name}: Escape Artist – auf die Hand nehmen?`, c.name, `${id}:esc`, a, true); },
+    // KI: beide Ausgänge durchrechnen (bleiben und die Kette auflösen vs. auf die Hand) – flieht vor Entfernen, nicht vor einem Buff
+    k: { escape: (s, a) => { const c = findCharacter(s, a.uid); if (c) yesNo(s, a.pid, tr`${c.name}: Escape Artist – auf die Hand nehmen?`, c.name, `${id}:esc`, a, isHuman(s, a.pid) || s.look ? true : escapeWorth(s, a)); },
         esc: (s, a, v) => { const c = findCharacter(s, a.uid); if (v && c) bounce(s, c); } } });
 // Find Treasure: "When this card enters play, you may draw a card. If you do, discard a card."
 const findTreasure = id => fxMix(onEnter(id, 'treasure'), { k: { treasure: (s, a) => yesNo(s, a.pid, tr`${CARDS[id].name}: Find Treasure – eine Karte ziehen und dann eine abwerfen?`, CARDS[id].name, `${id}:ft`, a, true),

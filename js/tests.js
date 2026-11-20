@@ -1868,6 +1868,19 @@ function runRuleTests() {
         assert(!lollyTarget(s, 'Karte: Welche Karte willst du behalten?') && !lollyTarget(s, 'X: Which card?'), 'Lolly: Frage „Welche …“ zufällig beantwortet');
         assert(lollyTarget(s, 'Karte: Ziel wählen'), 'Lolly: Zielwahl nicht zufällig');
     });
+    test(160, 'KI: Escape Artist nur bei schädlichem Ziel (Zumbly bleibt bei +3 ATK vom Gegner, flieht vor Zerstören) – vorher immer auf die Hand, das nutzte der Gegner aus', () => {
+        const kill = Object.values(CARDS).find(c => /^Destroy target ally\.$/.test(c.text || '') && !c.isToken);
+        for (const [mk, want] of [['psy', 'party'], ['kill', 'hand']]) {
+            const s = fresh(); s.humans = []; s.activePlayer = 1; P(s, 1).resources.forEach(r => { r.exhausted = false; });
+            const z = makeCardInst(10120, false, 2); z.joinedTurn = 1; P(s, 2).allies.push(z);
+            let a;
+            if (mk === 'psy') { const p = makeCardInst(7122, false, 1); p.joinedTurn = 1; P(s, 1).allies.push(p); a = getLegalActions(s, 1).find(v => v.type === 'ACTIVATE' && v.srcUid === p.uid && (v.targets || []).flat().includes(z.uid)); }
+            else { P(s, 1).hand.unshift(makeCardInst(kill.id, false, 1)); a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0 && (v.targets || []).flat().includes(z.uid)); }
+            if (!a) continue;                                                              // Testaufbau: Karte passt nicht zum Helden
+            applyAction(s, a, true, 1); autoResolve(s);
+            assert(locate(s, z.uid).zone === want, `Escape Artist (${mk === 'psy' ? 'Buff' : 'Zerstören'}): Zumbly in ${locate(s, z.uid).zone} statt ${want}`);
+        }
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];
