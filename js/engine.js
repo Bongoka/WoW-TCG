@@ -1014,7 +1014,7 @@ function respondOptions(s, pid) {
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
         // Mensch: Haltewert der Handkarte zählt nicht; sonst kleine Toleranz (Schätzung) – aber keine Kraft ohne Wirkung
         // (Staff of the Ruins im Gegnerzug: "next ability this turn costs less" war 1,4 schlechter als Passen und wurde angeboten)
-        if (vNow <= vPass + (human && moment === 'react' ? 0.5 - Math.max(1, respondHoldBonus(s, pid, a)) : 0.5)) continue;
+        if (vNow <= vPass + (human && moment === 'react' ? 0.5 - Math.max(1, respondHoldBonus(s, pid, a)) : 0.5)) continue;   // KI hier ohne Bonus
         // Gegnerischer Angriffsvorschlag (CR 601.1/601.3): der Mensch entscheidet selbst, ob er jetzt (Angriff verhindern)
         // oder erst im Kampf antwortet – das spätere Fenster kann wegfallen (der Gegner tötet den Verteidiger vorher)
         const proposal = human && moment === 'react' && top && top.kind === 'proposal' && stopsProposal(s, pid, a, top);
@@ -1022,11 +1022,17 @@ function respondOptions(s, pid) {
         out.push({ a, gain: vNow - vPass });
     }
     // Wirkungen "this turn" reichen über den laufenden Kampf hinaus (Divine Shield: "Prevent all damage that would be dealt to
-    // your hero this turn" gegen alle folgenden Angriffe): in der echten Partie für die übrigen Karten den Gegnerzug ausspielen
-    // Nur für den Menschen: die KI entscheidet dort über den Haltewert (aiHoldValue/handCardValue) und soll nicht spürbar rechnen
-    if (moment === 'react' && human && (isReal(s) || s.deepRespond) && s.activePlayer !== pid) {   // deepRespond: Prüfungen ohne Oberfläche
+    // your hero this turn" gegen alle folgenden Angriffe): für die übrigen Karten den Gegnerzug ausspielen – für Mensch und KI
+    // (die KI vergleicht dabei auch mit "nie spielen", also mit dem Haltewert der Karte). In Simulationen mit knapper Zeitgrenze.
+    if (moment === 'react' && s.activePlayer !== pid) {
         const have = new Set(out.map(o => respondKey(s, pid, o.a)));
-        out.push(...respondTurnOptions(s, pid, acts.filter(a => !have.has(respondKey(s, pid, a))), false, vPass));
+        let rest = acts.filter(a => !have.has(respondKey(s, pid, a)));
+        // Simulationen (Laufzeit): nur Karten, deren Wirkung über den Moment hinausreicht, und höchstens RESPOND_SIM_MS je Zug
+        if (!isReal(s) && !s.deepRespond) {
+            const b = s.rpBudget && s.rpBudget.turn === s.turn ? s.rpBudget : (s.rpBudget = { turn: s.turn, ms: 0 });
+            rest = b.ms < RESPOND_SIM_MS ? rest.filter(a => RESPOND_LASTING.test(respondText(s, pid, a))) : [];
+            if (rest.length) { const t0 = performance.now(); out.push(...respondTurnOptions(s, pid, rest, false, vPass)); b.ms += performance.now() - t0; }
+        } else out.push(...respondTurnOptions(s, pid, rest, false, vPass));
     }
     return out.sort((x, y) => y.gain - x.gain);
 }
@@ -1038,6 +1044,14 @@ function respondOptions(s, pid) {
 // So gehören Pin ("Target player can't play allies this turn") an den Zugbeginn und Burgle vor die Angriffe; Snipe,
 // Counterspell oder Quests, die Karten ziehen, warten auf ihre Gelegenheit.
 const RESPOND_HALTS = 4;
+const RESPOND_SIM_MS = 60;        // Simulation: Rechenzeit je Zug für die Zug-Vorausschau bei Reaktionen
+const RESPOND_LASTING = /this turn|this combat|next time|next|until|Ongoing|can't attack/i;
+// Kartentext der Antwort (Handkarte, Kraftquelle oder Quest)
+function respondText(s, pid, a) {
+    const p = getPlayer(s, pid);
+    const c = a.type === 'PLAY_CARD' ? (a.gyUid ? p.graveyard.find(x => x.uid === a.gyUid) : p.hand[a.handIdx]) : a.type === 'ACTIVATE' ? (findCharacter(s, a.srcUid) || (locate(s, a.srcUid) || {}).c) : a.type === 'COMPLETE_QUEST' ? (p.resources[a.resIdx] || {}).card : null;
+    return (c && CARDS[c.id] && CARDS[c.id].text) || '';
+}
 const RESPOND_EDGE = 0.25;        // "jetzt besser als später": die Varianten sind deterministisch (gleicher Plan, gleicher Zufall), Gleichstand ist exakt
 const RESPOND_BUDGET_MS = 900;    // Rechenzeit je Fenster für die Zug-Vorausschau (echte Partie, Mensch; KI 300 ms)          // höchstens so viele gegnerische Links als spätere Gelegenheit (das Zugende zählt immer)
 let _respondHalt = null;          // { s, pid }: nur genau diese Kopie hält an (Kopien darin – Vorausschau der KI – nicht)
@@ -1062,9 +1076,12 @@ function respondOppSig(s, pid, act) {
 // Der Mensch entscheidet selbst, ob sich eine Karte lohnt: der Haltewert der Handkarte (evaluateState: "lieber behalten",
 // bei Reaktionskarten hoch) zählt für ihn nicht – gefragt wird, wo die Karte am meisten wirkt. Sonst würde z. B. Divine
 // Shield nie angeboten und wäre im Gegnerzug gar nicht spielbar. Am Zugende gilt das nicht (dort sonst jede Karte jedes Mal).
+// Die KI rechnet den Haltewert zur Hälfte an (nur in der Zug-Vorausschau, respondTurnOptions): ist jetzt der beste Moment
+// dieses Zugs, wäre volles Zurückhalten oft "für immer" – Pin, Brain Freeze & Co. wirken nur zu genau diesem Zeitpunkt.
 function respondHoldBonus(s, pid, a) {
-    if (!isHuman(s, pid) || a.type !== 'PLAY_CARD' || a.gyUid || typeof handCardValue !== 'function') return 0;
-    const p = getPlayer(s, pid); return handCardValue(s, p, p.hand[a.handIdx]) || 0;
+    if (a.type !== 'PLAY_CARD' || a.gyUid || typeof handCardValue !== 'function') return 0;
+    const p = getPlayer(s, pid), v = handCardValue(s, p, p.hand[a.handIdx]) || 0;
+    return isHuman(s, pid) ? v : v * 0.5;
 }
 // Reihenfolgen: der Gegner kann seine Schritte auch anders ordnen, als die Vorausschau es gerade tut. Ob Warten sicher ist,
 // wird deshalb zusätzlich mit "erst alle Karten/Kräfte, dann die Angriffe" geprüft (nur echte Partie): angeboten wird, wenn
@@ -1093,7 +1110,7 @@ function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
         if (re.some((r, i) => r !== A.plan[i])) { const B = order(re); if (B.vPass !== null) orders.push(B); }
     }
     // Zeitgrenze (große Felder): was nicht mehr geprüft wird, bekommt der Mensch trotzdem angeboten (er kann passen), die KI nicht
-    const out = [], t0 = performance.now(), budget = !full ? 120 : isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
+    const out = [], t0 = performance.now(), budget = !full ? 60 : isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
     for (const a of pre) {
         if (performance.now() - t0 > budget) { if (isHuman(s, pid) && !out.some(o => respondKey(s, pid, o.a) === respondKey(s, pid, a))) out.push({ a, gain: 0 }); continue; }
         const key = respondKey(s, pid, a), bonus = respondHoldBonus(s, pid, a);
@@ -1112,10 +1129,10 @@ function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
                     gain = vs - vShort0;
                 }
             }
-            // Zeitpunkt: jetzt gegen jede spätere Gelegenheit. Die KI vergleicht auch mit "nie spielen"; für den Menschen ist die
-            // Wirkung oben schon festgestellt – er soll erfahren, wann sie am größten ist (Brain Freeze: im Ready-Fenster, auch wenn
-            // der ausgespielte Zug danach anders verläuft)
-            let later = isHuman(s, pid) ? -Infinity : o.vPass;
+            // Zeitpunkt: jetzt gegen jede spätere Gelegenheit. Ob sich die Karte überhaupt lohnt, ist oben entschieden (Mensch:
+            // Wirkung, KI: Wirkung gegen den halben Haltewert) – hier nur noch, wann sie am meisten bringt (Brain Freeze: im
+            // Ready-Fenster, auch wenn der ausgespielte Zug danach anders verläuft)
+            let later = -Infinity;
             for (const h of o.halts) {
                 // dieselben Ziele/Modi wie jetzt (Pin: der Gegner) und die nach KI-Wert besten
                 const all = respondCandidates(h, pid, getPriorityActions(h, pid)).filter(b => respondKey(h, pid, b) === key);

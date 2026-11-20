@@ -28,7 +28,7 @@ if (arg('--zeitpunkt')) {
     for (const r of rows) {
         if (r.err) { grp.err.push(r); continue; }
         if (!r.playable.length) continue;
-        const k = r.offered.length ? r.offered.join(', ') : 'nie';
+        const k = (r.offered.length ? r.offered.join(', ') : 'nie') + ' · CPU: ' + (r.cpu && r.cpu.length ? r.cpu.join(', ') : 'nie');
         (grp[k] = grp[k] || []).push(r);
     }
     for (const [k, rs] of Object.entries(grp)) { if (!rs.length) continue;

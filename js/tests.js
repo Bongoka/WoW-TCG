@@ -2005,6 +2005,33 @@ function runRuleTests() {
         assert(sp.hit && sp.s.p2.graveyard.some(c => c.uid === sp.hit) && !sp.s.p2.allies.some(c => c.uid === sp.hit), 'Snipe: Ally nicht zerstört');
     });
 
+    test(168, 'CPU antwortet im Gegnerzug zur selben Zeit wie der Mensch gefragt wird: Pin zu Zugbeginn, Snipe auf den Ally, Burgle beim Angriff', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        // Spieler 1 = CPU (wie in der echten Partie: volle Vorausschau); protokolliert wird, wo sie die Karte spielt
+        const cpuMoments = (cardId, cls) => {
+            const s = newGameState(heroOf(cls).id, fill, heroOf('Warrior').id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 };
+            s.placedResource = true; s.phase = 'main'; s.real = false; s.deepRespond = true; s.humans = [];
+            for (const p of [s.p1, s.p2]) for (let i = 0; i < 8; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+            const mine = makeCardInst(cardId, false, 1); s.p1.hand = [mine];
+            s.p2.hand = [3, 4, 2].map(c => makeCardInst(ctVanilla(c).id, false, 2)).concat([makeCardInst(165, false, 2)]);
+            for (const c of [3, 4]) { const x = makeCardInst(ctVanilla(c).id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); }
+            const out = [], d0 = doAction;
+            doAction = function (st, a, pid) { if (st === s && pid === 1 && s.activePlayer === 2 && respondKey(s, 1, a) === mine.uid) { const t = s.chain[s.chain.length - 1]; out.push(t ? (t.kind === 'card' ? t.card.type : t.kind) : s.battle ? 'combat' : s.win.reason); } return d0.apply(this, arguments); };
+            try {
+                applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+                for (let n = 0; n < 400 && !s.gameOver && !(s.activePlayer === 1 && s.turn > 6); n++) {
+                    if (s.pending) { const d = s.pending; s.pending = null; if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) }); process(s); continue; }
+                    if (isIdle(s)) { if (s.activePlayer !== 2) break; const dec = fastAiAction(s, 2); if (dec && dec.action && applyAction(s, dec.action, true, 2)) continue; applyAction(s, { type: 'END_TURN', actorId: 2 }, true, 2); continue; }
+                    process(s);
+                }
+            } finally { doAction = d0; }
+            return out;
+        };
+        const pin = cpuMoments(10088, 'Hunter'); assert(pin[0] === 'draw' || pin[0] === 'ready', 'Pin (CPU): gespielt bei ' + pin.join(','));
+        const sni = cpuMoments(7031, 'Hunter'); assert(sni[0] === 'Ally', 'Snipe (CPU): gespielt bei ' + sni.join(','));
+        const bur = cpuMoments(10054, 'Rogue'); assert(bur[0] === 'proposal', 'Burgle (CPU): gespielt bei ' + bur.join(','));
+    });
     return results;
 }
 

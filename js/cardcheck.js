@@ -1072,7 +1072,30 @@ function ccTimingRun(c, kind) {
             process(s);
         }
     } catch (e) { return { err: e.message, playable, offered }; }
-    return { playable: [...new Set(playable)], offered: [...new Set(offered)] };
+    return { playable: [...new Set(playable)], offered: [...new Set(offered)], cpu: ccTimingCpu(c, kind) };
+}
+// Dieselbe Lage mit der CPU als Spieler 1 (wie in der echten Partie, volle Vorausschau): wo spielt sie die Karte?
+function ccTimingCpu(c, kind) {
+    const st = ccTimingSetup(c, kind); if (!st) return null;
+    const { s, key } = st, used = [], d0 = doAction;
+    s.humans = []; s.stopAll = false;
+    doAction = function (st2, a, pid) { if (st2 === s && pid === 1 && s.activePlayer === 2 && key(respondKey(s, 1, a))) used.push(ccTimingMoment(s, 1)); return d0.apply(this, arguments); };
+    try {
+        if (!applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1)) return null;
+        for (let n = 0; n < 600; n++) {
+            if (s.gameOver || (s.activePlayer === 1 && s.turn > 6)) break;
+            if (s.pending) { const d = s.pending; s.pending = null; if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) }); process(s); continue; }
+            if (isIdle(s)) {
+                if (s.activePlayer !== 2) break;
+                const dec = fastAiAction(s, 2);
+                if (dec && dec.action && applyAction(s, dec.action, true, 2)) continue;
+                applyAction(s, { type: 'END_TURN', actorId: 2 }, true, 2); continue;
+            }
+            process(s);
+        }
+    } catch (e) { return ['Absturz: ' + e.message]; }
+    finally { doAction = d0; }
+    return used;
 }
 function ccTimingSweep(o = {}) {
     const out = [];
