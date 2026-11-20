@@ -539,7 +539,7 @@ function ccJudge(s, pid, a, after) {
 }
 function ccAiGame(seed, o = {}) {
     const rnd0 = Math.random; Math.random = seededRandom(seed);
-    const b0 = AI_BUDGET.normal; AI_BUDGET.normal = o.budget || 300;
+    const diff = o.diff || 'normal', b0 = AI_BUDGET[diff]; AI_BUDGET[diff] = o.budget || (diff === 'hard' ? 600 : 300);   // Schwierigkeit: normal oder hard
     const ro0 = respondOptions, loops = ccWatchLoops();
     // Deterministische Uhr: das Zeitbudget der Suche zählt Aufrufe statt Millisekunden – gleicher Seed = gleiche Partie (Repro)
     const pn0 = performance.now; let clock = 0; if (!o.realClock) performance.now = () => (clock += 10);
@@ -558,7 +558,7 @@ function ccAiGame(seed, o = {}) {
             for (let n = 0; n < 25 && !s.gameOver && Date.now() < tEnd; n++) {
                 if (s.pending) { autoResolve(s); continue; }
                 const lethalNow = lethalTurn === null && attackPlans(s, pid).some(pl => pl.state.gameOver && pl.state.winner === pid);
-                const best = searchBestAction(s, pid, 'normal'); if (!best || !best.action) break;
+                const best = searchBestAction(s, pid, diff); if (!best || !best.action) break;
                 const a = best.action, after = simApply(s, a, pid);
                 // verpasst nur, wenn die KI dann gar nicht angreift (eine Antwort des Gegners kann den Plan legitim verhindern)
                 if (lethalNow && a.type !== 'ATTACK' && a.type !== 'PLACE_RESOURCE') lethalTurn = s.turn;
@@ -577,7 +577,7 @@ function ccAiGame(seed, o = {}) {
         if (loops.hits) return { found, turns, err: `Endlosschleife in der Engine (${loops.hits}× Schleifen-Sicherung)` };
         return { found, turns, winner: s.winner };
     } catch (e) { return { found, err: 'Absturz: ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 3).join(' | ') }; }
-    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; loops.restore(); performance.now = pn0; }
+    finally { Math.random = rnd0; AI_BUDGET[diff] = b0; respondOptions = ro0; loops.restore(); performance.now = pn0; }
 }
 
 // ---------------------------------------------------------------- A5: Auslöser feuern (Kontroll-Lauf mit textloser Kopie)
