@@ -396,8 +396,10 @@ function ccFingerprint(s, skipUid, noPay) {
 function ccCheckNoop(c) {
     if (c.type !== 'Ability' || c.ongoing || c.xCost || !(c.text || '').trim()) return { n: 0, out: [] };
     const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10;
-    const own = ccPut(s, 1, ctVanilla(4).id, { damage: 1 }); ccPut(s, 2, ctVanilla(6).id); ccPut(s, 2, ctVanilla(3).id, { exhausted: true });
+    const own = ccPut(s, 1, ctVanilla(4).id, { damage: 1 }); ccPut(s, 2, ctVanilla(6).id, { damage: 1 }); ccPut(s, 2, ctVanilla(3).id, { exhausted: true });
     ccPut(s, 2, ctPlain('Weapon').id); ccPut(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
+    // eigene bereite Waffe (Heroic Strike, Frost Strike, Divine Storm …) und beschädigter gegnerischer Held (Taste for Blood)
+    if (c.type !== 'Weapon') ccPut(s, 1, ctPlain('Weapon').id); s.p2.hero.damage = 3;
     s.p1.graveyard.push(makeCardInst(ctVanilla(3).id, false, 1));
     const card = makeCardInst(c.id, false, 1); s.p1.hand.unshift(card);
     if (canPlayCard(s, 1, card)) return { n: 0, out: [] };
