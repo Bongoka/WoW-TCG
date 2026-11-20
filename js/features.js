@@ -247,7 +247,7 @@ function dbRenderStats(cards, curve, tb, tl) {
     DB_TYPES.forEach(t => {
         const k = cards.filter(id => t.is(CARDS[id])).length;
         if (k) { const seg = document.createElement('div'); seg.style.flex = k; seg.style.background = t.color; seg.title = `${t.label}: ${k}`; tb.appendChild(seg); }
-        tl.insertAdjacentHTML('beforeend', `<div><i style="background:${t.color}"></i>${t.label}<b>${k}</b><span>${n ? Math.round(k / n * 100) : 0}%</span></div>`);
+        if (k) tl.insertAdjacentHTML('beforeend', `<div><i style="background:${t.color}"></i>${t.label}<b>${k}</b><span>${n ? Math.round(k / n * 100) : 0}%</span></div>`);
     });
     if (!n) tb.innerHTML = tr('<div class="db-empty-bar">leer</div>');
 }
@@ -629,7 +629,7 @@ const bModal = () => document.getElementById("booster-modal");
 // Spannung beim Öffnen: Papier-Ticks, immer heller und lauter
 function boosterTick(i) {
     if (sfx.muted) return;
-    try { sfx.init(); if (sfx.ctx) sfx.tick(sfx.ctx.currentTime, 0.05 + i * 0.015, 1800 + i * 320); } catch (e) {}
+    try { sfx.init(); if (sfx.ctx) { sfx.v = { p: 1, d: 1, g: SFX_CARD_VOL * 1.4 }; } if (sfx.ctx) sfx.tick(sfx.ctx.currentTime, 0.05 + i * 0.015, 1800 + i * 320); } catch (e) {}
 }
 // Original-WoW-Sound (spellfx.js)
 function boosterWow(key, vol = 0.5) { if (typeof spxPlaySnd === 'function') spxPlaySnd(key, 0, vol); }
@@ -978,8 +978,8 @@ function deckPreview(deck, tile) {
     const hero = CARDS[deck.hero];
     DB_TYPES.find(t => t.k === 'Ally').color = hero && hero.faction === 'Horde' ? '#c41e2a' : '#1c78b4';    // Ally-Farbe nach Fraktion (wie renderDBDeck)
     box.innerHTML = ``
-        + `<div class="db-stats"><div class="db-stat-cols"><div class="db-curve-box"><div class="db-stat-title">${tr('Manakurve')}</div><div class="db-curve"></div></div>`
-        + `<div class="db-types-box"><div class="db-stat-title">${tr('Verteilung')}</div><div class="db-typebar"></div><div class="db-typelegend"></div></div></div></div>`
+        + `<div class="db-stats"><div class="db-stat-cols"><div class="db-curve-box"><div class="db-curve"></div></div>`
+        + `<div class="db-types-box"><div class="db-typebar"></div><div class="db-typelegend"></div></div></div></div>`
         + `<div class="db-deck-list" id="dp-cards"></div>`;
     dbRenderStats(deck.cards, box.querySelector('.db-curve'), box.querySelector('.db-typebar'), box.querySelector('.db-typelegend'));
     dbRenderRows(box.querySelector('#dp-cards'), deck.cards, hero);

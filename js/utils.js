@@ -27,8 +27,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 //   draw   Karte gleitet vom Stapel (mehrere gleichzeitig: nacheinander)        play   Karte gleitet und landet auf dem Tisch
 //   flip   Karte umdrehen                                                       deal   Karte austeilen (kurz)
 //   shuffle Karten mischen                                                      turn   Zugende (Karte klopft auf den Tisch)
+const SFX_CARD_VOL = 0.5;   // Grundlautstärke der Kartengeräusche (subtil unter den WoW-Sounds)
 class SoundManager {
-    constructor() { this.ctx = null; this.muted = false; this.noise = null; this.next = {}; this.last = {}; this.bus = null; }
+    constructor() { this.ctx = null; this.muted = false; this.noise = null; this.next = {}; this.last = {}; this.bus = null; this.v = { p: 1, d: 1, g: 1 }; }
     init() {
         if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
@@ -46,19 +47,19 @@ class SoundManager {
     // gefiltertes Rauschen: f0 → f1 (Bandpass), Hüllkurve mit Anstieg att und exponentiellem Abklingen
     nz(t, dur, o) {
         const c = this.ctx, src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-        src.buffer = this.noiseBuf(); src.playbackRate.value = o.rate || 1;
+        const V = this.v; dur *= V.d; src.buffer = this.noiseBuf(); src.playbackRate.value = (o.rate || 1) * V.p;
         f.type = o.type || 'bandpass'; f.Q.value = o.q || 1;
-        f.frequency.setValueAtTime(o.f0, t); if (o.f1 && o.f1 !== o.f0) f.frequency.exponentialRampToValueAtTime(o.f1, t + dur);
-        const att = o.att || 0.004;
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.vol, t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        f.frequency.setValueAtTime(o.f0 * V.p, t); if (o.f1 && o.f1 !== o.f0) f.frequency.exponentialRampToValueAtTime(o.f1 * V.p, t + dur);
+        const att = (o.att || 0.004) * V.d;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, o.vol * V.g), t + att); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
         src.connect(f); f.connect(g); g.connect(this.bus);
         src.start(t, Math.random() * 0.8, dur + 0.05);
     }
     // kurzer tiefer Körper (Karte trifft den Tisch)
     tone(t, f0, f1, dur, vol) {
-        const c = this.ctx, o = c.createOscillator(), g = c.createGain();
-        o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        const c = this.ctx, o = c.createOscillator(), g = c.createGain(), V = this.v; dur *= V.d;
+        o.type = 'sine'; o.frequency.setValueAtTime(f0 * V.p, t); o.frequency.exponentialRampToValueAtTime(f1 * V.p, t + dur);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol * V.g), t + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
         o.connect(g); g.connect(this.bus); o.start(t); o.stop(t + dur + 0.02);
     }
     tick(t, vol, f = 2800) { this.nz(t, 0.03, { f0: f, q: 1.6, vol, att: 0.002 }); }
@@ -75,10 +76,12 @@ class SoundManager {
         try {
             this.init(); if (!this.ctx) return;
             const now = this.ctx.currentTime, r = (a, b) => a + Math.random() * (b - a);
+            // Jedes Mal etwas anders: Tonhöhe ±20 %, Tempo ±15 %, Lautstärke 65–100 % – und insgesamt leise (SFX_CARD_VOL)
+            this.v = { p: r(0.8, 1.22), d: r(0.85, 1.18), g: r(0.65, 1) * SFX_CARD_VOL };
             if (type === 'hover') {
-                const dt = now - (this.last.hover || 0); if (dt < 0.045) return;          // Maus fährt schnell über viele Karten: nicht jedes Mal
+                const dt = now - (this.last.hover || 0); if (dt < 0.07) return;          // Maus fährt schnell über viele Karten: nicht jedes Mal
                 this.last.hover = now;
-                this.tick(now, dt < 0.15 ? 0.035 : 0.06, r(2300, 3600));
+                this.v.g *= 0.6; this.tick(now, dt < 0.2 ? 0.03 : 0.055, r(2300, 3600));
             } else if (type === 'click') {
                 this.tick(now, 0.13, r(2000, 2500)); this.tone(now, 240, 150, 0.05, 0.06);
             } else if (type === 'draw') {
@@ -92,7 +95,7 @@ class SoundManager {
             } else if (type === 'turn') {
                 this.thock(now, 0.26); this.thock(now + 0.11, 0.18);
             } else if (type === 'shuffle') {
-                for (let i = 0; i < 16; i++) this.tick(now + i * 0.028 + r(0, 0.01), 0.05 + Math.sin(i / 15 * Math.PI) * 0.05, r(2400, 3800));
+                for (let i = 0; i < 16; i++) this.v.p = r(0.85, 1.15), this.tick(now + i * 0.028 + r(0, 0.01), 0.05 + Math.sin(i / 15 * Math.PI) * 0.05, r(2400, 3800));
                 this.thock(now + 0.5, 0.15);
             }
         } catch(e) {}
