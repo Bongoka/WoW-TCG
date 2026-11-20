@@ -250,9 +250,12 @@ const CC_REACTIVE = c => !!c.instant && c.type === 'Ability' && (AI_REACTIVE.tes
 const CC_DEFENSIVE = c => !!c.instant && c.type === 'Ability' && /\bprevent\b|remove (all )?attackers|\bInterrupt\b|\bElusive\b|\bStealth\b|would be dealt/i.test(c.text || '');
 // Eine Partie mit festem Seed: CPU gegen CPU (fastAiAction), nach jedem Schritt Invarianten. Ergebnis: { err?, plays }
 // o.focus: Spieler 1 spielt einen Helden, der die Karte nutzen darf, mit 4 Kopien davon im Deck (gezielte Timing-Partien)
+// Schleifen-Sicherung der Engine ("Engine-Schleife abgebrochen", 50 000 Schritte) zählen statt nur ausgeben – das ist immer ein Fehler
+function ccWatchLoops() { const ce0 = console.error; const st = { hits: 0, restore: () => { console.error = ce0; } }; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) st.hits++; else ce0(...m); }; return st; }
 function ccSimGame(seed, o = {}) {
     const maxSteps = o.maxSteps || 4000, tEnd = Date.now() + (o.maxMs || 8000);   // Zeitgrenze wie SIM_MAX_MS: festgefahrene Riesen-Boards
     const rnd0 = Math.random; Math.random = seededRandom(seed);
+    const loops = ccWatchLoops();
     const plays = [], probes = [], sp0 = statPlayed;
     let s = null, step = 0, last = "", heroes = null, fc = null;
     try {
@@ -292,9 +295,10 @@ function ccSimGame(seed, o = {}) {
             const e = chk(); if (e) return e;
             if (s.turn !== t) turns++;
         }
+        if (loops.hits) return { err: `Endlosschleife in der Engine (${loops.hits}× Schleifen-Sicherung)`, step, last, heroes, plays, probes, turns };
         return { plays, probes, turns, winner: s.winner, heroes, timeout: !s.gameOver && Date.now() >= tEnd };
     } catch (e) { return { err: 'Absturz: ' + e.message, stack: (e.stack || '').split('\n').slice(0, 4).join(' | '), step, last, heroes, plays }; }
-    finally { Math.random = rnd0; statPlayed = sp0; }
+    finally { Math.random = rnd0; statPlayed = sp0; loops.restore(); }
 }
 
 // ---------------------------------------------------------------- A2: Ausgelöste Wirkungen (Quest-Belohnung, "When this … enters play")
@@ -492,7 +496,7 @@ function ccJudge(s, pid, a, after) {
 function ccAiGame(seed, o = {}) {
     const rnd0 = Math.random; Math.random = seededRandom(seed);
     const b0 = AI_BUDGET.normal; AI_BUDGET.normal = o.budget || 300;
-    const ro0 = respondOptions;
+    const ro0 = respondOptions, loops = ccWatchLoops();
     const found = []; let s = null;
     try {
         const hs = ctHeroes(); const heroes = [hs[Math.floor(Math.random() * hs.length)].id, hs[Math.floor(Math.random() * hs.length)].id];
@@ -513,7 +517,8 @@ function ccAiGame(seed, o = {}) {
                 // verpasst nur, wenn die KI dann gar nicht angreift (eine Antwort des Gegners kann den Plan legitim verhindern)
                 if (lethalNow && a.type !== 'ATTACK' && a.type !== 'PLACE_RESOURCE') lethalTurn = s.turn;
                 // sicher verlorene Lage (jede Variante verliert laut Vorausschau): "Fehler" dort sind belanglos – nicht melden
-                if (!(best.score <= AI_LOSS + 1)) for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, msg: f.msg + ` [Wert ${Math.round(best.score)}]`, turn: s.turn, seed, pid });
+                // … ebenso der Siegzug (Lethal): wie er nebenbei zielt, ist egal
+                if (!(best.score <= AI_LOSS + 1) && !(best.score >= 99999)) for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, msg: f.msg + ` [Wert ${Math.round(best.score)}]`, turn: s.turn, seed, pid });
                 if (!applyAction(s, a, true, pid)) break; autoResolve(s);
             }
             if (s.gameOver) break;
@@ -523,9 +528,10 @@ function ccAiGame(seed, o = {}) {
             if (!applyAction(s, { type: 'END_TURN', actorId: pid }, true, pid)) { const forced = getAttackActions(s, pid)[0]; if (forced && applyAction(s, forced, true, pid)) { autoResolve(s); continue; } advanceTurn(s, true); }
             autoResolve(s); if (s.turn !== t) turns++;
         }
+        if (loops.hits) return { found, turns, err: `Endlosschleife in der Engine (${loops.hits}× Schleifen-Sicherung)` };
         return { found, turns, winner: s.winner };
     } catch (e) { return { found, err: 'Absturz: ' + e.message + ' | ' + (e.stack || '').split('\n').slice(1, 3).join(' | ') }; }
-    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; }
+    finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; loops.restore(); }
 }
 
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext

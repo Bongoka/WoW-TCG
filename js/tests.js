@@ -1899,6 +1899,21 @@ function runRuleTests() {
         st.counters = { surge: 2 }; assert(pw.canUse(s, 1, st) === true, 'Stormtip: bereiter Held mit Zählern nicht nutzbar');
         assert(firstErr(true, 'Fehler B') === 'Fehler B' && firstErr('Fehler A', true) === 'Fehler A' && firstErr(true, true) === true, 'firstErr falsch');
     });
+    test(163, 'Gobloz (KI): Gegenschlag nur gegen gegnerische Quellen – eigene Quelle löste vorher eine Endlosschleife aus (Engine-Schleife)', () => {
+        const s = fresh(); s.humans = [];
+        const gob = makeCardInst(5113, false, 2); gob.joinedTurn = 1; P(s, 2).allies.push(gob);
+        const mine = makeCardInst(ctVanilla(6).id, false, 2); mine.joinedTurn = 1; P(s, 2).allies.push(mine);
+        const foe = makeCardInst(ctVanilla(6).id, false, 1); foe.joinedTurn = 1; P(s, 1).allies.push(foe);
+        const ce0 = console.error; let loop = 0; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) loop++; else ce0(...m); };
+        try {
+            const h0 = P(s, 2).hero.damage;
+            dealDamage(s, { src: P(s, 2).hero.uid, tgt: mine.uid, amt: 1, dt: 'Fire' }); process(s); autoResolve(s);
+            assert(!loop && P(s, 2).hero.damage === h0, `Gobloz: eigene Quelle getroffen (Schleife ${loop}, Heldenschaden +${P(s, 2).hero.damage - h0})`);
+            const f0 = foe.damage || 0;
+            dealDamage(s, { src: foe.uid, tgt: mine.uid, amt: 1, dt: 'Melee' }); process(s); autoResolve(s);
+            assert((foe.damage || 0) === f0 + 1, `Gobloz: gegnerische Quelle nicht getroffen (${(foe.damage || 0) - f0} Schaden)`);
+        } finally { console.error = ce0; }
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];
