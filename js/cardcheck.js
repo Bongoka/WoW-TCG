@@ -84,6 +84,8 @@ function ccInvariants(s) {
         if (p.deck.some(id => !CARDS[id])) return 'ungültige Karte im Deck';
         // Angehängte Fähigkeit ohne Wirt im Spiel (CR 400.6: Anhang ohne passenden Wirt wird im PPP von der Partie zerstört)
         if (isIdle(s) && !s.pending) for (const o of p.ongoing || []) if (o.attachedTo) { const l = locate(s, o.attachedTo); if (!l || !isInPlayZone(l.zone)) return `${o.name}: angehängt an eine Karte, die nicht mehr im Spiel ist`; }
+        // Einzigartigkeit (CR 414.3a): zwei Unique-Karten gleichen Namens unter einem Spieler im Spiel – im Ruhezustand nie
+        if (isIdle(s) && !s.pending) { const seen = new Set(); for (const c of [...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])]) if (CARDS[c.id] && CARDS[c.id].unique && !c.isToken) { if (seen.has(c.name)) return `Einzigartigkeit verletzt: ${c.name} doppelt im Spiel`; seen.add(c.name); } }
     }
     if (s.pending && s.pending.kind !== 'priority' && !(s.pending.opts || []).length && !s.pending.multi) return 'Abfrage ohne Optionen: ' + s.pending.prompt;
     return null;
