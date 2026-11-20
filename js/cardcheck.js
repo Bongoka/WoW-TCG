@@ -592,6 +592,18 @@ const CC_EVENTS = [
     ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => { advanceTurn(s, true); autoResolve(s); return s.activePlayer === 2; }],
     ['Mend', /^Mend \d+/i, c => c.type === 'Ally', (s) => { advanceTurn(s, true); autoResolve(s); advanceTurn(s, true); autoResolve(s); return s.activePlayer === 1; }],
     ['Bereitmachen', /^When this ally readies,/i, c => c.type === 'Ally', (s, x) => { x.exhausted = true; advanceTurn(s, true); autoResolve(s); advanceTurn(s, true); autoResolve(s); return s.activePlayer === 1; }],
+    // Ressource offen legen (Mounts u. a.: "When you place a resource face up into your resource row")
+    ['Ressource offen', /^When you place a resource face up/i, c => c.type !== 'Hero', (s) => { s.placedResource = false; s.p1.hand.unshift(makeCardInst(ctVanilla(2).id, false, 1));
+        const a = getLegalActions(s, 1).find(v => v.type === 'PLACE_RESOURCE' && v.handIdx === 0 && v.faceUp); return !!a && applyAction(s, a, true, 1); }],
+    // Inspire (CR-Glossar): zu Beginn des Bereitmachens jedes anderen Spielers ein erschöpftes eigenes … bereit machen
+    ['Inspire', /\bInspire:/, c => c.type === 'Ally' || c.type === 'Armor' || c.type === 'Item' || c.type === 'Weapon', (s) => {
+        // erschöpfte Kandidaten jeder Art: Protector, Ally mit [Activate]-Kraft, Ally mit Inspire, offene Quest
+        const V = Object.values(CARDS).filter(c => !c.isToken && !c.unique && !CARD_ISSUES[c.id]);
+        for (const pred of [c => c.type === 'Ally' && c.text === 'Protector', c => c.type === 'Ally' && FX[c.id] && (FX[c.id].powers || []).length, c => c.type === 'Ally' && /\bInspire: Ally\b/.test(c.text || '')]) { const id = (V.find(pred) || {}).id; if (id) ccPut(s, 1, id); }
+        const q = V.find(c => c.type === 'Quest'); if (q) s.p1.resources.push({ card: makeCardInst(q.id, false, 1), faceUp: true, exhausted: true });
+        s.p1.allies.forEach(a => { a.exhausted = true; }); s.p1.hero.weapons.forEach(w => { w.exhausted = true; }); s.p1.hero.armors.forEach(w => { w.exhausted = true; }); s.p1.hero.exhausted = true; advanceTurn(s, true); autoResolve(s); return s.activePlayer === 2; }],
+    // Sabotage (CR-Glossar): Sabotage-Kampf gegen ein passendes Ziel
+    ['Sabotage', /\bSabotage\b/, c => c.type === 'Ally', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); const a = getLegalActions(s, 1).find(v => v.type === 'ATTACK' && v.attackerUid === x.uid && v.sabotage); return !!a && applyAction(s, a, true, 1); }],
     // Eintreten: die Karte (bzw. ihre textlose Kopie) kommt aus dem Spiel auf die Hand und wird ausgespielt
     ['Eintreten', /^When this (?:ally|weapon|armor|item|ability) enters play,/i, c => ['Ally', 'Weapon', 'Armor', 'Item', 'Ability'].includes(c.type) && !c.attach, (s, x) => {
         const l = locate(s, x.uid); if (!l) return false; const p = s.p1; for (const z of [p.allies, p.hero.weapons, p.hero.armors, p.ongoing]) { const i = z.indexOf(x); if (i >= 0) z.splice(i, 1); }
