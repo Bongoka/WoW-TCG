@@ -82,6 +82,8 @@ function ccInvariants(s) {
         // Gestorbene Allies bleiben nicht liegen (CR 703: zerstört bei Schaden ≥ Leben)
         for (const a of p.allies) if (!a.isTotem && hpOf(s, a) > 0 && (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a) && isIdle(s) && !s.pending) return `${a.name}: ${a.damage} Schaden bei ${hpOf(s, a)} Leben, liegt noch im Spiel`;
         if (p.deck.some(id => !CARDS[id])) return 'ungültige Karte im Deck';
+        // Angehängte Fähigkeit ohne Wirt im Spiel (CR 400.6: Anhang ohne passenden Wirt wird im PPP von der Partie zerstört)
+        if (isIdle(s) && !s.pending) for (const o of p.ongoing || []) if (o.attachedTo) { const l = locate(s, o.attachedTo); if (!l || !isInPlayZone(l.zone)) return `${o.name}: angehängt an eine Karte, die nicht mehr im Spiel ist`; }
     }
     if (s.pending && s.pending.kind !== 'priority' && !(s.pending.opts || []).length && !s.pending.multi) return 'Abfrage ohne Optionen: ' + s.pending.prompt;
     return null;
