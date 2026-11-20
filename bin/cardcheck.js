@@ -4,6 +4,7 @@
 //   --baseline   aktuellen Stand als Baseline speichern (danach gelten nur neue Funde als neu)
 //   --repro S    nur die Partie mit Seed S spielen und den Fehler ausgeben (gezielte Partie: zusätzlich --card ID)
 //   --focus N    gezielte Partien je defensiver Reaktionskarte (Standard 3; 0 = aus)
+//   --tief       zusätzlich Szenario-Varianten für Karten ohne Nachweis (bedingte Texte; langsam, ca. 30–60 min)
 //   --dumm N     Partien mit der Spiel-KI auf beiden Seiten, jede Entscheidung auf dumme Fehler geprüft (Standard 10)
 //   --ki N       je gezielter Partie bis zu N Entscheidungsproben der Spiel-KI (große Suche; Standard 3; 0 = aus)
 // Ausgabe: reports/cardcheck.json und reports/cardcheck.md (nicht in Git)
@@ -23,7 +24,7 @@ if (arg('--repro')) {
     out(r.err ? `FEHLER: ${r.err}\n  Schritt ${r.step}, nach „${r.last}“\n  ${r.heroes.map(h => CARDS[h].name).join(' vs ')}\n  ${r.stack || ''}` : `ok: ${r.turns} Züge, Sieger ${r.winner}`);
     exit(0);
 }
-const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGames: +arg('--focus', 3), probe: +arg('--ki', 3), aiGames: +arg('--dumm', 10), progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });   // Fortschritt: welche Partie gerade läuft (hängt eine, steht sie hier)
+const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGames: +arg('--focus', 3), probe: +arg('--ki', 3), aiGames: +arg('--dumm', 10), deep: !!arg('--tief', false), progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });   // Fortschritt: welche Partie gerade läuft (hängt eine, steht sie hier)
 // Quelltext: Steuerzeichen (z. B. ein Backspace statt \b in einer Regex – so fanden isDemonS7 und Lolly nie einen Treffer)
 for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js'))) {
     const lines = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').split('\n');

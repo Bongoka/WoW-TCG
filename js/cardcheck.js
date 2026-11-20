@@ -667,6 +667,22 @@ function ccDerived(s) {
         `res${getReadyRes(p)}`, `max${maxHandSize(s, p)}`];
     return [s.p1, s.p2].map(p => side(p).join(',')).join('#');
 }
+// Feste Folge typischer Ereignisse (gleicher Zufall in beiden Läufen): löst ausgelöste Dauereffekte aus, die keine Werte ändern
+function ccBattery(s) {
+    const rnd0 = Math.random; Math.random = seededRandom(4242);
+    try {
+        const att = s.p1.allies.find(a => !a.exhausted && canAttackNow(s, a, s.p1) && atkOf(s, a, { attacking: true }) > 0), def = s.p2.allies.find(a => !a.isTotem);
+        if (att && def) { applyAction(s, { type: 'ATTACK', attackerUid: att.uid, defenderUid: def.uid, actorId: 1 }, true, 1); autoResolve(s); }
+        const foe = s.p2.allies.find(a => !a.isTotem); if (foe) { heroDmg(s, 1, foe.uid, 1, 'Fire'); process(s); autoResolve(s); }
+        heroDmg(s, 1, s.p2.hero.uid, 1, 'Shadow'); process(s); autoResolve(s);
+        const mine = s.p1.allies.find(a => !a.isTotem); if (mine) { heroDmg(s, 2, mine.uid, 1, 'Frost'); process(s); autoResolve(s); }
+        heroHeal(s, 1, s.p1.hero.uid, 2); process(s); autoResolve(s);
+        const f = Object.values(CARDS).find(a => a.type === 'Ability' && !a.ongoing && !a.isToken && (a.cost || 0) <= 2 && !(FX[a.id] || {}).slots && !CARD_ISSUES[a.id] && cardMatchesPlayer(a, s.p1));
+        if (f && isIdle(s)) { s.p1.hand.unshift(makeCardInst(f.id, false, 1)); const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); if (a) { applyAction(s, a, true, 1); autoResolve(s); } }
+        if (!s.gameOver) { advanceTurn(s, true); autoResolve(s); }
+        if (!s.gameOver) { advanceTurn(s, true); autoResolve(s); }
+    } finally { Math.random = rnd0; }
+}
 // Dauereffekt: Karte im Spiel gegen textlose Kopie – ändert sie abgeleitete Werte (oder den Zustand nach einem Zugwechsel)?
 function ccCheckStatic(c) {
     if (!['Ally', 'Weapon', 'Armor', 'Item', 'Ability', 'Location'].includes(c.type) || c.attach || !(c.text || '').trim()) return { n: 0, out: [], proven: false };
@@ -689,7 +705,10 @@ function ccCheckStatic(c) {
                 const t2 = findCharacter(p, tgt.uid), z2 = locate(p, tgt.uid); probe += dt[0] + (t2 && z2 && (isInPlayZone(z2.zone) || t2.type === 'Hero') ? (t2.damage || 0) - d0 : 'x');
                 if (foeAlly) { const f0 = foeAlly.damage || 0; try { heroDmg(p, 1, foeAlly.uid, 1, dt); process(p); autoResolve(p); } catch (e) {} const f2 = findCharacter(p, foeAlly.uid), fz = locate(p, foeAlly.uid); probe += '/' + (f2 && fz && isInPlayZone(fz.zone) ? (f2.damage || 0) - f0 : 'x'); }
             }
-            d.push(ccDerived(s) + '|' + probe); }
+            // Ereignis-Batterie: Kampf, Fähigkeitsschaden, Heilung, Karte spielen, zwei Zugwechsel – Endzustand vergleichen (Karte selbst zählt mit)
+            let bat = '';
+            try { const b = cloneState(s); ccBattery(b); const y = (locate(b, card.uid) || {}).c; if (ctl && y) ccFromVanilla(y, c); bat = ccFingerprint(b, '__none') + ccDerived(b); if (ctl && y) ccToVanilla(y, c); } catch (e) { bat = 'Absturz:' + e.message; }
+            d.push(ccDerived(s) + '|' + probe + '|' + bat); }
         return { n: 1, out: [], proven: d[0] !== d[1] };
     } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Dauereffekt: Absturz – ' + e.message }], proven: false }; }
     finally { delete CARDS[CC_VAN]; }
@@ -831,6 +850,15 @@ function ccRun(o = {}) {
             const ok = r => r && r.n && !r.out.length;
             if (!(c.text || '').trim() || ok(v) || ok(tg) || ok(st2) || ok(no) || ok(tf) || sta.proven || pw.proven || qu.proven || at.proven) (stats.provenIds = stats.provenIds || []).push(c.id); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
+    }
+    // Tiefenlauf (--tief): Karten ohne Nachweis in Szenario-Varianten (bedingte Texte) – langsam, deshalb optional
+    if (o.deep) {
+        const have = new Set(stats.provenIds || []);
+        for (const c of all) { if (have.has(c.id) || !(c.text || '').trim()) continue;
+            if (o.progress) o.progress(`Tiefenlauf ${c.id} ${c.name}`);
+            const loops = ccWatchLoops(); let r; try { r = ccProveConditional(c); } finally { loops.restore(); }
+            if (loops.hits) r.out.push({ sev: 'fail', msg: `Endlosschleife in einer Szenario-Variante (${loops.hits}×)` });
+            add('Szenario-Varianten', c, r.out); if (r.proven) { (stats.provenIds = stats.provenIds || []).push(c.id); stats.deepProven = (stats.deepProven || 0) + 1; } }
     }
     findings.push(...ccCheckAiValues(classes));
     // Simulationen: Wächter + Timing reaktiver Karten
