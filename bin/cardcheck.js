@@ -31,6 +31,15 @@ for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.j
     // canUse "(A || msg) === true && (B || msg)": bei verfehltem A kommt false heraus, und false gilt als erlaubt → firstErr(A || msg, B || msg)
     lines.forEach((t, i) => { const code = t.replace(/\/\/.*$/, ''); if (/\) === true && \(/.test(code) && /canUse/.test(code)) res.findings.push({ check: 'Quelltext', id: 0, name: `js/${f}:${i + 1}`, sev: 'fail', msg: 'canUse mit „=== true &&“: verfehlte erste Bedingung ergibt false = erlaubt – firstErr(…) verwenden' }); });
 }
+// FX-Schlüssel, die Karten setzen, die aber nirgends gelesen werden (Nether Fissure: noInterrupt wirkte nie; "entered" bei Ausrüstung)
+{
+    const allSrc = fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js')).map(x => fs.readFileSync(path.join(ROOT, 'js', x), 'utf8')).join('\n');
+    const MARKERS = new Set(['engine', 'engineImpl', 'endStop', 'revealTop', 'canProtectSelf']);   // reine Hinweise bzw. anderswo umgesetzt (geprüft)
+    const keys = new Map();
+    for (const [id, f] of Object.entries(FX)) if (f && typeof f === 'object' && CARDS[id]) for (const k of Object.keys(f)) { if (!keys.has(k)) keys.set(k, []); keys.get(k).push(+id); }
+    for (const [k, ids] of keys) if (!MARKERS.has(k) && !new RegExp('\\.' + k + '\\b(?!\\s*=[^=])').test(allSrc))
+        res.findings.push({ check: 'Quelltext', id: ids[0], name: CARDS[ids[0]].name, sev: 'fail', msg: `FX-Schlüssel „${k}“ wird nie gelesen (${ids.length} Karten) – Wirkung fehlt?` });
+}
 const dir = path.join(ROOT, 'reports'); fs.mkdirSync(dir, { recursive: true });
 const keyOf = f => `${f.check}|${f.id}|${f.msg.replace(/\(Schritt.*$/, '').replace(/\d+(\.\d+)?/g, 'N')}`;
 const basePath = path.join(dir, 'cardcheck-baseline.json');

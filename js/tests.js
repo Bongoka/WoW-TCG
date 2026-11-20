@@ -1923,6 +1923,16 @@ function runRuleTests() {
         const s2 = mk('Paladin'); const n = s2.p1.hand.length; const sw = play(s2, 12198); assert(sw && ((sw.counters || {}).atk1 || 0) === n, `Sword of Justice: ${((sw || {}).counters || {}).atk1 || 0} Zähler statt ${n}`);
         let rx = 0; const s3 = mk('Paladin'), r = play(s3, 11242, v => v.x > 0 && (rx = v.x)); assert(r && ((r.counters || {}).atk1 || 0) === rx, `Reaper of Dark Souls: ${((r || {}).counters || {}).atk1 || 0} Zähler statt ${rx}`);
     });
+    test(165, 'Nether Fissure: "This ability can\'t be interrupted" – trotz Unterbrechung löst sie aus und unterbricht ihr Ziel (Flag wurde nie gelesen)', () => {
+        const s = fresh(); s.humans = [];
+        const victim = makeCardInst(Object.values(CARDS).find(c => c.type === 'Ability' && !c.ongoing && !c.isToken).id, false, 2);
+        s.chain.push({ kind: 'card', card: victim, pl: 2, targets: [] });
+        const nf = makeCardInst(10037, false, 1);
+        s.chain.push({ kind: 'card', card: nf, pl: 1, targets: [[victim.uid]], interrupted: true });
+        resolveTop(s);                                                                   // nur Nether Fissure auflösen (process() würde auch das Ziel abarbeiten)
+        const top = s.chain.find(x => x.card && x.card.uid === victim.uid);
+        assert(top && top.interrupted, 'Nether Fissure: wurde unterbrochen und hat ihr Ziel nicht unterbrochen');
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

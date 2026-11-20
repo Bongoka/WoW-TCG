@@ -1618,6 +1618,8 @@ function resolveTop(s) {
     // Interrupt oder alle Ziele illegal -> unterbrochen
     // Barkskin (Set 6): "Your abilities, allies, and equipment can't be interrupted" – gilt für Unterbrechungen durch Effekte
     let interrupted = !!it.interrupted && !(it.kind === 'card' && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(it.card.type) && (unattachedOngoing(p, 4019).length || (it.kind === 'card' && it.card.type === 'Ability' && !!auraAny(s, 'noInterruptAbility', p.id))));
+    // Karte mit "This ability can't be interrupted" (Nether Fissure, FX.noInterrupt) – das Flag wurde bisher nie gelesen
+    if (interrupted && it.kind === 'card' && fx(it.card).noInterrupt) interrupted = false;
     if (!interrupted && it.targets && it.targets.length) {
         const f = it.kind === 'card' ? fx(it.card) : powerDef(it);
         const card = it.kind === 'card' ? it.card : (findCharacter(s, it.src) || { uid: it.src, id: it.srcId, name: it.srcName });
