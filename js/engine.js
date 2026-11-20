@@ -999,11 +999,21 @@ const RESPOND_MAX = 8;
 // Tempo am gegnerischen Zugende: die Ressourcen werden im eigenen Ready-Schritt ohnehin bereit – was jetzt bezahlt wird,
 // fehlt im eigenen Zug nicht (Cat Form, Blessing of Might, Battle Shout am Ende des Gegnerzugs). Je ausgegebene Ressource.
 // Reaktionskarten bleiben über ihren Haltewert (handCardValue/AI_HOLD_DEF) trotzdem eher auf der Hand.
+// Nur für den Menschen (er entscheidet selbst): bei der KI drehte es im Vergleich 18 Partien zur Niederlage, 7 zum Sieg – sie
+// verbrauchte am Zugende Karten, die später mehr gebracht hätten.
 const RESPOND_TEMPO = 0.6;
 function respondSpent(s, pid, a) {
-    const c = cloneState(s);
-    try { doAction(c, a, pid); } catch (e) { return 0; }
-    return Math.max(0, getReadyRes(getPlayer(s, pid)) - getReadyRes(getPlayer(c, pid)));
+    // Gemessen, sobald die Antwort auf der Kette liegt (bezahlt ist) – später im eigenen Ready-Schritt wären die Ressourcen
+    // schon wieder bereit (so maß es vorher immer 0, das Tempo wirkte nie)
+    const c = cloneState(s), n0 = c.chain.length, before = getReadyRes(getPlayer(s, pid));
+    try {
+        doAction(c, a, pid);
+        for (let g = 0; g < 300 && c.queue.length && c.chain.length <= n0; g++) {
+            if (c.pending) { const d = c.pending; c.pending = null; c.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(c, d) }); }
+            execStep(c, c.queue.shift());
+        }
+    } catch (e) { return 0; }
+    return Math.max(0, before - getReadyRes(getPlayer(c, pid)));
 }
 // Vergleich alte gegen neue CPU (Simulation, bin/aicompare.js): AI_LEGACY[pid] = true schaltet für diesen Spieler die
 // Antwort-Zeitpunkte ab (Zugbeginn, Zug-Vorausschau bei Reaktionen, halber Haltewert) und in ai.js das Mana-Zurückhalten für
@@ -1029,7 +1039,7 @@ function respondOptions(s, pid) {
     for (const a of acts) {
         let vNow = respondValue(s, pid, a, false);
         if (vNow === null) continue;
-        if (moment === 'end' && !aiOld(pid, 'tempo')) vNow += RESPOND_TEMPO * respondSpent(s, pid, a);
+        if (moment === 'end' && human) vNow += RESPOND_TEMPO * respondSpent(s, pid, a);
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
         // Mensch: Haltewert der Handkarte zählt nicht; sonst kleine Toleranz (Schätzung) – aber keine Kraft ohne Wirkung
         // (Staff of the Ruins im Gegnerzug: "next ability this turn costs less" war 1,4 schlechter als Passen und wurde angeboten)
@@ -1223,9 +1233,18 @@ function respondKey(s, pid, a) {
     return a.gyUid || (p.hand[a.handIdx] || {}).uid;
 }
 // Je Karte/Kraft/Quest höchstens drei Varianten (Ziele sind schon nach KI-Wert sortiert), insgesamt RESPOND_MAX
+// Liegt ein Link auf der Kette, kommen Varianten mit Bezug zu ihm immer dazu: Ziel ist der Link, seine Karte oder der Held
+// seines Spielers (Kick: "If you targeted a hero, you may interrupt an ability played by its controller" – die drei nach
+// KI-Wert besten Ziele waren Allies, das Unterbrechen wurde nie bewertet)
 function respondCandidates(s, pid, acts) {
     const p = getPlayer(s, pid), per = {}, out = [];
+    const top = s.chain[s.chain.length - 1];
+    if (top && top.pl !== pid) {
+        const rel = new Set([top.id, top.card && top.card.uid, getPlayer(s, top.pl).hero.uid].filter(Boolean));
+        for (const a of acts) if ((a.targets || []).flat().some(u => rel.has(u)) && out.length < RESPOND_MAX) out.push(a);
+    }
     for (const a of acts) {
+        if (out.includes(a)) continue;
         const k = a.type === 'ACTIVATE' ? a.srcUid + ':' + a.key : a.type === 'COMPLETE_QUEST' ? 'q' + a.resIdx : a.type === 'COMPLETE_QUEST_ZONE' ? 'z' + a.uid : 'c' + (a.gyUid || (p.hand[a.handIdx] || {}).id);
         if ((per[k] = (per[k] || 0) + 1) > 3) continue;
         out.push(a); if (out.length >= RESPOND_MAX) break;

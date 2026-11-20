@@ -1031,7 +1031,7 @@ function ccTimingSetup(c, kind, rich) {
     s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false; s.deepRespond = true; s.humans = [1]; s.stopAll = true;
     for (const p of [s.p1, s.p2]) { for (let i = 0; i < 10; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); p.hero.damage = 6; p.hand = []; }
     ccPut(s, 1, ctVanilla(3).id); ccPut(s, 2, ctVanilla(3).id); ccPut(s, 2, ctVanilla(4).id);
-    if (rich) { ccRich(s); const R = ccRichIds(); if (R.prot) ccPut(s, 1, R.prot); const w0 = ctPlain('Weapon'); if (w0) ccPut(s, 1, w0.id); }
+    if (rich) { ccRich(s); const R = ccRichIds(); if (R.prot) ccPut(s, 1, R.prot); const w0 = ctPlain('Weapon'); if (w0) ccPut(s, 1, w0.id); s.p1.hero.damage = 0; }   // unverletzt: sonst stirbt der Held vor dem Zugende, und was man dort spielt, kommt nie vor
     const w = ctPlain('Weapon');
     s.p2.hand = [ctVanilla(2).id, ctVanilla(3).id, ctVanilla(5).id, w && w.id, 165].filter(Boolean).map(id => makeCardInst(id, false, 2));   // 165 Quick Strike: eine Fähigkeit des Gegners
     let key;

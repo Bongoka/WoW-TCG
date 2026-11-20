@@ -2060,6 +2060,19 @@ function runRuleTests() {
         const u = P(c, 1).resources[0].card.uid, l = locate(c, u);
         assert(l && l.res && l.res.card.uid === u, 'Noali: locate liefert die Ressource nicht mit');
     });
+    test(172, 'Antworten: Tempo misst die bezahlten Ressourcen (vorher immer 0); Zielvariante mit Bezug zum Link wird immer geprüft (Kick auf den Helden)', () => {
+        const s = freshH(ctHeroFor(CARDS[3001]).id, 9);
+        for (let i = 0; i < 5; i++) P(s, 1).resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+        P(s, 1).hand = [makeCardInst(3001, false, 1)];                                    // Arcane Revelation (3)
+        const a = getLegalActions(s, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === 0);
+        assert(a, 'Arcane Revelation nicht spielbar');
+        assert(respondSpent(s, 1, a) === CARDS[3001].cost, 'respondSpent: ' + respondSpent(s, 1, a));
+        // Gegnerische Karte auf der Kette: Varianten auf den Helden ihres Spielers kommen trotz Grenze von drei je Karte dazu
+        const t = makeCardInst(165, false, 2); s.chain.push({ kind: 'card', id: 'L1', pl: 2, card: t });
+        const k = makeCardInst(1082, false, 1); P(s, 1).hand = [k];
+        const acts = [1, 2, 3, 4].map(i => ({ type: 'PLAY_CARD', handIdx: 0, targets: [['ally' + i]] })).concat([{ type: 'PLAY_CARD', handIdx: 0, targets: [[P(s, 2).hero.uid]] }]);
+        assert(respondCandidates(s, 1, acts).some(x => x.targets[0][0] === P(s, 2).hero.uid), 'Kick: Ziel Held fehlt in den Kandidaten');
+    });
     return results;
 }
 
