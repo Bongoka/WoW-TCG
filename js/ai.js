@@ -82,7 +82,7 @@ function evaluateStateNow(s, pid) {
     // Defensive Reaktionskarten (Power Word: Shield, Vanish …) wirken nur gegen Angriffe: im Spiel so viel wert wie die Angreifer der Gegenseite
     (me.ongoing || []).forEach(o => score += aiDefensive(o) ? 1 + 1.2 * infoOpp.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     (opp.ongoing || []).forEach(o => score -= aiDefensive(o) ? 1 + 1.2 * infoMe.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
-    if (!AI_LEGACY[pid]) score += aiColdTerm(s, pid, myHp, oppHp);
+    if (!aiOld(pid, 'cold')) score += aiColdTerm(s, pid, myHp, oppHp);
     return score;
 }
 // Everlasting Cold (Set honor): "At the start of your turn, your hero deals 1 frost damage to attached character, or 2 if that
@@ -130,7 +130,7 @@ function aiHoldValue(s, p) {
     const ready = getReadyRes(p); if (!ready) return 0;
     let best = 0;
     for (const c of p.hand) {
-        if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !(AI_LEGACY[p.id] ? AI_REACTIVE_OLD : AI_REACTIVE).test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
+        if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !(aiOld(p.id, 'reactive') ? AI_REACTIVE_OLD : AI_REACTIVE).test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
         const cost = getPlayCost(s, p, c); if (cost > ready) continue;
         best = Math.max(best, 3 + cost * 1.2);
     }

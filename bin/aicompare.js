@@ -34,7 +34,10 @@ for (let i = 0; i < N; i++) {
     const sd = seed0 + i, rnd = seededRandom(sd * 7919);
     const h = heroes[Math.floor(rnd() * heroes.length)].id, deck = deckFor(h, rnd);
     const legacySeat = sd % 2 ? 1 : 2;
-    AI_LEGACY[1] = legacySeat === 1; AI_LEGACY[2] = legacySeat === 2;
+    // --nur MERKMAL: die "neue" Seite hat nur dieses Merkmal (alle anderen alt) – zeigt, was es allein bringt
+    const FEATS = ['start', 'react', 'tempo', 'noHold', 'half', 'reactive', 'cold'], only = arg('--nur');
+    const newSide = only ? Object.fromEntries(FEATS.filter(f => !only.split(',').includes(f)).map(f => [f, true])) : false;
+    AI_LEGACY[1] = legacySeat === 1 ? true : newSide; AI_LEGACY[2] = legacySeat === 2 ? true : newSide;
     Math.random = seededRandom(sd);
     let r; try { r = simulateOneGame(deck, deck); } catch (e) { res.push({ sd, err: e.message }); continue; }
     res.push({ sd, hero: h, nTimed: deck.nTimed, newWon: r.winner !== legacySeat, turns: r.turns, timeout: r.timeout });

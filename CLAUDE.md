@@ -111,7 +111,7 @@ r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));
 
 Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit festem Seed ersetzen und prüfen, dass `simulateOneGame` vorher und nachher identische Ergebnisse liefert.
 
-Alte gegen neue CPU: `node bin/aicompare.js --n N [--seed S]` (Spiegelmatches mit Decks aus zeitkritischen Instants/Kräften laut `reports/zeitpunkt.json`, alte CPU über `AI_LEGACY[pid]` in engine.js, Plätze wechseln ab).
+Alte gegen neue CPU: `node bin/aicompare.js --n N [--seed S]` (Spiegelmatches mit Decks aus zeitkritischen Instants/Kräften laut `reports/zeitpunkt.json`, alte CPU über `AI_LEGACY[pid]` in engine.js, Plätze wechseln ab; `--nur MERKMAL` misst ein einzelnes Merkmal: start, react, tempo, noHold, half, reactive, cold). Stand 11/2026: neu gegen alt 49,0 % ± 2,0 (2400 Partien) – die Änderungen drehen nur 2–8 % der Partien, etwa gleich oft in beide Richtungen.
 
 Kartenprüfung (alle Karten + KI): `node bin/cardcheck.js` → `reports/cardcheck.md` (nicht in Git). Optionen: `--sims N` Wächter-Partien, `--focus N`/`--ki N` gezielte Partien und Spiel-KI-Proben je Reaktionskarte, `--dumm N` Partien Spiel-KI gegen Spiel-KI mit Prüfung jeder Entscheidung (Schaden an Eigenem, Hilfe für den Gegner, wirkungslos, verpasstes Lethal …), `--baseline` (danach nur neue Funde), `--repro SEED [--card ID]`, `--zeitpunkt [--card ID]` (wann jede Karte/Quest/Kraft im Gegnerzug spielbar ist, wo der Mensch gefragt wird und wo die CPU sie spielt → `reports/zeitpunkt.md`). Funde der Art „tut nichts“ bei bedingten Texten sind Warnungen. Neue KI-Regeln: `aiBadTargets` (engine.js), `aiUseless`/Rausch-Toleranz/`enablerPlans` (ai.js).
 
