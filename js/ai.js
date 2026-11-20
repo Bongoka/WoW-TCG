@@ -58,7 +58,9 @@ function evaluateStateNow(s, pid) {
     const nRes = me.resources.length;
     score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
     // Ungenutztes Mana ist nichts wert – außer man hält es im eigenen Zug für ein Instant im gegnerischen Zug bereit
-    if (s.activePlayer === pid) score += aiHoldValue(s, me);
+    // (nicht in den Vergleichen der Antworten im Gegnerzug: deren Endpunkt ist der eigene Zugbeginn, die Karte zählte sonst doppelt –
+    // Cat Form "+1 ATK while attacking" war auf der Hand 5,4 mehr wert als im Spiel)
+    if (s.activePlayer === pid && !s.noHold) score += aiHoldValue(s, me);
     // Gleichstand brechen: bereite Ressourcen (und offene Locations) sind ein klein wenig wert – so verliert eine Kraft ohne Wirkung
     // (Kallas Sunflame ohne andere [Fire]-Allies, Tanks for Everything ohne erschöpfte Plattenrüstung) knapp gegen Nichtstun
     score += 0.05 * getReadyRes(me);
@@ -80,7 +82,25 @@ function evaluateStateNow(s, pid) {
     // Defensive Reaktionskarten (Power Word: Shield, Vanish …) wirken nur gegen Angriffe: im Spiel so viel wert wie die Angreifer der Gegenseite
     (me.ongoing || []).forEach(o => score += aiDefensive(o) ? 1 + 1.2 * infoOpp.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     (opp.ongoing || []).forEach(o => score -= aiDefensive(o) ? 1 + 1.2 * infoMe.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
+    if (!AI_LEGACY[pid]) score += aiColdTerm(s, pid, myHp, oppHp);
     return score;
+}
+// Everlasting Cold (Set honor): "At the start of your turn, your hero deals 1 frost damage to attached character, or 2 if that
+// character didn't attack on its controller's last turn." – im Zug des Betroffenen kostet "noch nicht angegriffen" einen
+// Schaden mehr. So greift die KI mit dem verfluchten Charakter an, wenn der Angriff sonst nichts kostet; ob er schadet
+// (starke Verteidiger, Gegner, die gegen Erschöpfte mehr Schaden machen), entscheidet die Suche über den Angriff selbst.
+function aiColdTerm(s, pid, myHp, oppHp) {
+    let v = 0;
+    for (const p of [s.p1, s.p2]) for (const o of p.ongoing || []) {
+        if (o.id !== 10034 || !o.attachedTo) continue;
+        const t = findCharacter(s, o.attachedTo); if (!t) continue;
+        const tc = ctrlOf(s, t); if (s.activePlayer !== tc || t.lastAtk11 === s.turn) continue;
+        let w;
+        if (t.type === 'Hero') { const hp = tc === pid ? myHp : oppHp; w = Math.max(2, hp <= 8 ? 10 : hp <= 14 ? 3 : 1); }
+        else { const rem = hpOf(s, t) - (t.damage || 0); w = rem === 2 ? 3.5 + atkOf(s, t, {}) * 2.2 + 1.5 : 1.6; }   // 2 statt 1 Schaden tötet
+        v += tc === pid ? -w : w;
+    }
+    return v;
 }
 
 // Zusatzwert einer Karte im Spiel, die eine eigene Wirkung hat (Dauereffekt, Auslöser, Kraft): je Kostenpunkt (bis 6)
@@ -105,11 +125,12 @@ const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).s
 // gegnerischen Zugende (respondOptions). Nur im eigenen Zug: dort entscheidet sich, ob Mana übrig bleibt.
 // Auch Karten für den Beginn des Gegnerzugs (Pin: "can't play allies this turn", Brain Freeze, Burgle: "You control them")
 const AI_REACTIVE = /\bInterrupt\b|\bprevent\b|remove (all )?attackers|\battacking\b|\bdefending\b|in combat|would be dealt|can't attack|\bexhaust target\b|can't (play|draw)\b|you control them\b/i;
+const AI_REACTIVE_OLD = /\bInterrupt\b|\bprevent\b|remove (all )?attackers|\battacking\b|\bdefending\b|in combat|would be dealt|can't attack|\bexhaust target\b/i;   // vor den Antwort-Zeitpunkten (Vergleich)
 function aiHoldValue(s, p) {
     const ready = getReadyRes(p); if (!ready) return 0;
     let best = 0;
     for (const c of p.hand) {
-        if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !AI_REACTIVE.test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
+        if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !(AI_LEGACY[p.id] ? AI_REACTIVE_OLD : AI_REACTIVE).test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
         const cost = getPlayCost(s, p, c); if (cost > ready) continue;
         best = Math.max(best, 3 + cost * 1.2);
     }

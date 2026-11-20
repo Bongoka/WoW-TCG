@@ -985,7 +985,7 @@ function respondMoment(s, pid) {
     if (top) return top.pl !== pid && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
     if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
     if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
-    if (s.win && (s.win.reason === 'draw' || s.win.reason === 'ready') && s.activePlayer !== pid) return 'start';
+    if (s.win && (s.win.reason === 'draw' || s.win.reason === 'ready') && s.activePlayer !== pid && !AI_LEGACY[pid]) return 'start';
     return null;
 }
 // Sinnvolle Antworten für pid, beste zuerst: [{a, gain}]. Der Mensch wird nur gefragt, wenn es eine gibt; die KI
@@ -994,6 +994,19 @@ function respondMoment(s, pid) {
 //    (Counterspell, Schaden verhindern, Kampftricks). Was danach genauso gut geht (Innervate), hält nicht an.
 //  - 'end': die Antwort muss mehr bringen als Passen (die Ressourcen wären sonst verschenkt).
 const RESPOND_MAX = 8;
+// Tempo am gegnerischen Zugende: die Ressourcen werden im eigenen Ready-Schritt ohnehin bereit – was jetzt bezahlt wird,
+// fehlt im eigenen Zug nicht (Cat Form, Blessing of Might, Battle Shout am Ende des Gegnerzugs). Je ausgegebene Ressource.
+// Reaktionskarten bleiben über ihren Haltewert (handCardValue/AI_HOLD_DEF) trotzdem eher auf der Hand.
+const RESPOND_TEMPO = 0.6;
+function respondSpent(s, pid, a) {
+    const c = cloneState(s);
+    try { doAction(c, a, pid); } catch (e) { return 0; }
+    return Math.max(0, getReadyRes(getPlayer(s, pid)) - getReadyRes(getPlayer(c, pid)));
+}
+// Vergleich alte gegen neue CPU (Simulation, bin/aicompare.js): AI_LEGACY[pid] = true schaltet für diesen Spieler die
+// Antwort-Zeitpunkte ab (Zugbeginn, Zug-Vorausschau bei Reaktionen, halber Haltewert) und in ai.js das Mana-Zurückhalten für
+// Zugbeginn-Karten und Everlasting Cold. Regel-Fixes gelten für beide.
+const AI_LEGACY = { 1: false, 2: false };
 function respondOptions(s, pid) {
     const moment = respondMoment(s, pid);
     if (!moment || typeof evaluateState !== 'function') return [];
@@ -1008,8 +1021,9 @@ function respondOptions(s, pid) {
     const onLink = a => !!top && (a.targets || []).flat().some(u => u === top.id || (top.card && u === top.card.uid));
     const out = [];
     for (const a of acts) {
-        const vNow = respondValue(s, pid, a, false);
+        let vNow = respondValue(s, pid, a, false);
         if (vNow === null) continue;
+        if (moment === 'end' && !AI_LEGACY[pid]) vNow += RESPOND_TEMPO * respondSpent(s, pid, a);
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
         // Mensch: Haltewert der Handkarte zählt nicht; sonst kleine Toleranz (Schätzung) – aber keine Kraft ohne Wirkung
         // (Staff of the Ruins im Gegnerzug: "next ability this turn costs less" war 1,4 schlechter als Passen und wurde angeboten)
@@ -1023,7 +1037,7 @@ function respondOptions(s, pid) {
     // Wirkungen "this turn" reichen über den laufenden Kampf hinaus (Divine Shield: "Prevent all damage that would be dealt to
     // your hero this turn" gegen alle folgenden Angriffe): für die übrigen Karten den Gegnerzug ausspielen – für Mensch und KI
     // (die KI vergleicht dabei mit dem halben Haltewert der Karte). In Simulationen genauso wie in der echten Partie.
-    if (moment === 'react' && s.activePlayer !== pid) {
+    if (moment === 'react' && s.activePlayer !== pid && !AI_LEGACY[pid]) {
         const have = new Set(out.map(o => respondKey(s, pid, o.a)));
         let rest = acts.filter(a => !have.has(respondKey(s, pid, a)));
         out.push(...respondTurnOptions(s, pid, rest, false, vPass));
@@ -1154,6 +1168,7 @@ function respondReplay(c, opp, r) {
     return validateAction(c, b, opp) ? null : b;
 }
 function respondPlayout(c, pid, onHalt, rec, plan) {
+    c.noHold = true;
     const opp = pid === 1 ? 2 : 1, rnd = Math.random, prev = _respondHalt;
     if (typeof seededRandom === "function") Math.random = seededRandom((c.turn || 0) * 7919 + pid);   // gleicher Zufall in allen Varianten
     let guard = 0, steps = 0;
@@ -1214,7 +1229,7 @@ function respondCandidates(s, pid, acts) {
 // Wert für pid, nachdem alles bis zur nächsten eigenen Entscheidung durchgelaufen ist (in einer Kopie):
 // act = null → passen; later → erst passen, dann dieselbe Aktion (gleiche Karte/Quelle/Ziele), falls noch möglich
 function respondValue(s, pid, act, later) {
-    const c = cloneState(s);
+    const c = cloneState(s); c.noHold = !AI_LEGACY[pid];   // Endpunkt = eigener Zugbeginn: kein Haltewert fürs eigene Zugende (aiHoldValue)
     const settle = () => { process(c); autoResolve(c); };
     try {
         if (!act || later) passPriority(c); else doAction(c, act, pid);

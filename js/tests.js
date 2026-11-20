@@ -2042,6 +2042,13 @@ function runRuleTests() {
         assert(o.exhausted, 'Lord Jorach Ravenholdt: Ziel nicht erschöpft');
         assert(j.exhausted, 'Lord Jorach Ravenholdt: Rogue (er selbst) als Kosten nicht erschöpft');
     });
+    test(170, 'KI: Everlasting Cold – noch nicht angegriffen kostet im eigenen Zug einen Schaden mehr (Bewertung); nach dem Angriff nicht mehr', () => {
+        const s = freshH(9, 9); const h = P(s, 1).hero;
+        const ec = makeCardInst(10034, false, 2); ec.joinedTurn = 1; ec.attachedTo = h.uid; P(s, 2).ongoing.push(ec);
+        const v0 = evaluateState(s, 1); h.lastAtk11 = s.turn; const v1 = evaluateState(s, 1);
+        assert(v1 - v0 >= 1.9, `Everlasting Cold: Angriff spart nur ${(v1 - v0).toFixed(2)}`);
+        s.activePlayer = 2; h.lastAtk11 = 0; const w0 = evaluateState(s, 1); h.lastAtk11 = s.turn; assert(evaluateState(s, 1) === w0, 'Everlasting Cold: im Gegnerzug bewertet');
+    });
     return results;
 }
 

@@ -4,7 +4,8 @@
 // gegen Winrate in Spielen, in denen sie im Deck war, aber nicht gespielt wurde.
 // Δ = WR(gespielt) − WR(nicht gespielt). Quests: "gespielt" = abgeschlossen.
 // ============================================================================
-const SIM_MAX_TURNS = 60, SIM_MAX_MS = 6000, SIM_EARLY_DRAWS = 3;
+// SIM_MAX_MS: nur gegen festgefahrene Partien (Dutzende Token) – großzügig, die CPU rechnet im Gegnerzug voraus (Antwort-Zeitpunkte)
+const SIM_MAX_TURNS = 60, SIM_MAX_MS = 30000, SIM_EARLY_DRAWS = 3;
 function simulateOneGame(deckA, deckB) {
     const s = newGameState(deckA.hero, deckA.cards, deckB.hero, deckB.cards);
     dealOpeningHands(s);
