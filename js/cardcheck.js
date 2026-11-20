@@ -542,6 +542,48 @@ function ccAiGame(seed, o = {}) {
     finally { Math.random = rnd0; AI_BUDGET.normal = b0; respondOptions = ro0; loops.restore(); performance.now = pn0; }
 }
 
+// ---------------------------------------------------------------- A5: Auslöser feuern (Kontroll-Lauf mit textloser Kopie)
+// Szenario einmal mit der Karte, einmal mit einer Kopie ohne Text/Wirkung (gleiche Werte, gleicher Zufall). Ist das Ergebnis
+// (ohne die Karte selbst) gleich, hat der Auslöser nichts bewirkt. Unabhängig vom Wortlaut der Wirkung.
+const CC_EVENTS = [
+    ['Angriff', /^When this ally attacks,/i, c => c.type === 'Ally', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); return applyAction(s, { type: 'ATTACK', attackerUid: x.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1); }],
+    ['Zerstört', /^When this (?:ally|weapon|armor|item) is destroyed,/i, c => ['Ally', 'Weapon', 'Armor', 'Item'].includes(c.type), (s, x) => { destroy(s, x); process(s); return true; }],
+    ['Zugbeginn', /^(?:Ongoing: )?At the start of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 8 && t.activePlayer === 1 && isIdle(t) && !t.pending, 400)],
+    ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 7 && t.activePlayer === 2 && isIdle(t) && !t.pending, 400)],
+];
+const CC_VAN = 99991;
+function ccCheckTriggerFires(c) {
+    const out = []; let n = 0;
+    for (const [name, re, ok, run] of CC_EVENTS) {
+        const sen = ccSentences(c).find(t => re.test(t)); if (!sen || !ok(c)) continue;
+        const base = ccSetup(c); base.humans = []; base.p1.hero.damage = 8;
+        ccPut(base, 1, ctVanilla(3).id, { damage: 1 }); ccPut(base, 2, ctVanilla(4).id, { damage: 1 });
+        ccPut(base, 2, ctPlain('Weapon').id); ccPut(base, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
+        if (c.type !== 'Weapon') ccPut(base, 1, ctPlain('Weapon').id, { exhausted: true }); if (c.type !== 'Armor' && c.type !== 'Item') ccPut(base, 1, ctPlain('Armor').id, { exhausted: true });   // eigene (erschöpfte) Ausrüstung
+        const card = ccPut(base, 1, c.id); card.exhausted = false;
+        CARDS[CC_VAN] = { ...CARDS[c.id], id: CC_VAN, name: 'Kontrolle', text: '' }; delete FX[CC_VAN];
+        const fp = [];
+        try {
+            for (const ctl of [false, true]) {
+                const s = cloneState(base); const x = findCharacter(s, card.uid); if (ctl) { x.id = CC_VAN; x.name = 'Kontrolle'; x.text = ''; }
+                const rnd0 = Math.random; Math.random = seededRandom(c.id * 13 + 1);
+                try { if (!run(s, x)) { fp.push(null); continue; } autoResolve(s); } finally { Math.random = rnd0; }
+                const inv = ctl ? null : ccInvariants(s); if (inv) out.push({ sev: 'fail', msg: `${name}: Invariante – ${inv}` });
+                fp.push(ccFingerprint(s, card.uid));
+            }
+        } catch (e) { out.push({ sev: 'fail', msg: `${name}: Absturz – ${e.message}` }); continue; }
+        finally { delete CARDS[CC_VAN]; }
+        if (fp[0] === null || fp[1] === null) continue;                                   // Szenario nicht möglich (z. B. kann nicht angreifen)
+        n++;
+        if (fp[0] === fp[1]) {
+            // bedingt bzw. vom Feld abhängig: braucht etwas, das das Standardfeld nicht hat (Anhänge, Zähler, Fraktionskarten, Erschöpftes)
+            const cond = /\b(if|may|unless|for each|instead|target|choose|reveal|look|search|random|any number|counter|Alliance|Horde|ready|with an attachment)\b|\bX\b/i.test(sen.replace(re, ''));
+            out.push({ sev: cond ? 'warn' : 'fail', msg: `${name}: Auslöser ohne Wirkung („${sen.slice(0, 70)}…“)${cond ? ' – bedingt, evtl. legitim' : ''}` });
+        }
+    }
+    return { n, out };
+}
+
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
 // "up to N …" im Text, aber pickMany ohne Höchstzahl (9. Argument) – fand Ruthlessness und Volley (beliebig viele statt 5 bzw. 3)
 function ccArgs(src, at) {   // Argumente des Aufrufs, der bei src[at] = '(' beginnt (Klammertiefe beachten)
@@ -574,7 +616,7 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); const hf = ccHumanFuzz(c); stats.humanChecked = (stats.humanChecked || 0) + hf.n; add('Menschenweg', c, hf.out); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); const hf = ccHumanFuzz(c); stats.humanChecked = (stats.humanChecked || 0) + hf.n; add('Menschenweg', c, hf.out); const tf = ccCheckTriggerFires(c); stats.trigChecked += tf.n; add('Auslöser (Kontroll-Lauf)', c, tf.out); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));
