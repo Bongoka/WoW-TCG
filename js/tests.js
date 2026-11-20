@@ -1889,6 +1889,16 @@ function runRuleTests() {
         for (let n = 0; n < 4; n++) { const r = searchBestAction(s, 1, 'normal'); if (!r) break; applyAction(s, r.action, true, 1); autoResolve(s); }
         assert(locate(s, big.uid).pid === 1 && s.p1.hero.flipped, `Remba: Ally gehört Spieler ${locate(s, big.uid).pid}, Remba ${s.p1.hero.flipped ? '' : 'nicht '}umgedreht`);
     });
+    test(162, 'canUse mit mehreren Bedingungen (firstErr): Stormtip nicht mit erschöpftem Helden oder ohne surge counters (vorher galt false als erlaubt – 12 Kräfte betroffen)', () => {
+        const s = fresh(); const st = makeCardInst(13200, false, 1); st.joinedTurn = 1; P(s, 1).hero.weapons.push(st);
+        const pw = getPowers(s, st).find(p => p.key === 'surge'); assert(pw, 'Stormtip-Kraft fehlt');
+        P(s, 1).hero.exhausted = true; st.counters = { surge: 2 };
+        assert(pw.canUse(s, 1, st) !== true, 'Stormtip: mit erschöpftem Helden nutzbar');
+        P(s, 1).hero.exhausted = false; st.counters = { surge: 0 };
+        assert(pw.canUse(s, 1, st) !== true, 'Stormtip: ohne surge counters nutzbar');
+        st.counters = { surge: 2 }; assert(pw.canUse(s, 1, st) === true, 'Stormtip: bereiter Held mit Zählern nicht nutzbar');
+        assert(firstErr(true, 'Fehler B') === 'Fehler B' && firstErr('Fehler A', true) === 'Fehler A' && firstErr(true, true) === true, 'firstErr falsch');
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

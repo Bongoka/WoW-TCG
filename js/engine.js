@@ -1759,6 +1759,9 @@ function powerCostOf(s, pid, pw, src) {
     return Math.max(0, c);
 }
 function tabiOwner(s) { const p = getPlayer(s, s.activePlayer); return p.hero.armors.some(a => a.id === 7213 && !metalmorphed(s, a)) ? p.id : null; }   // Nyn'jah's Tabi Boots
+// canUse aus mehreren Prüfungen (je true oder Fehlertext): erster Fehler, sonst true. Ersetzt "(A || msg) === true && (B || msg)" –
+// das ergab bei verfehltem A false, und false gilt in canUse als erlaubt (Stormtip mit erschöpftem Held und ohne surge counters)
+function firstErr(...xs) { for (const x of xs) if (x !== true) return x || tr('Nicht möglich'); return true; }
 function canUsePower(s, pid, src, pw, a = {}) {
     const l = locate(s, src.uid);
     const loc = l && l.zone === 'resource' && ((l.res.faceUp && (src.type === 'Location' || src.type === 'Quest')) || getPowers(s, src).length > 0);   // offene Location: [Activate] = diese Ressource erschöpfen

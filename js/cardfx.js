@@ -185,7 +185,7 @@ FX[8] = { powers: [{ key: 'flip', label: tr('Umdrehen: Protector'), flip: true, 
 FX[9] = { powers: [{ key: 'flip', label: tr('Umdrehen: Nächster Nahkampfschlag (3) billiger'), flip: true, cost: 1,
     resolve: (s, it) => addPE(s, it.pl, { k: 'gorebelly' }) }] };
 FX[10] = { distinct: true, powers: [{ key: 'flip', label: tr('Umdrehen: 3 Natur + Heile 3'), flip: true, myTurn: true, cost: 5, distinct: true,
-    slots: (s, pid) => [{ label: tr('3 Naturschaden an'), cands: targetCands(s, pid, CH), harm: true }, { label: tr('Heile 3 bei (zweites Ziel)'), cands: targetCands(s, pid, CH), harm: false }],
+    slots: (s, pid) => [{ label: tr('3 Naturschaden an'), cands: targetCands(s, pid, CH), harm: true }, { label: tr('Heile 3 bei (zweites Ziel)'), cands: targetCands(s, pid, CH), harm: false, ai: (u, st) => healValue(st, pid, u, 3) }],   // KI: beschädigte eigene zuerst
     resolve: (s, it) => { const a = T(it, 0)[0], b = T(it, 1)[0]; const h = heroOf(s, it.pl).uid; if (a) dealDamage(s, { src: h, tgt: a, amt: 3, dt: 'Nature' }); if (b) q(s, { op: 'call', k: '10:healB', a: { b, pid: it.pl } }); } }],
     k: { healB: (s, a) => heroHeal(s, a.pid, a.b, 3) } };
 FX[11] = { powers: [{ key: 'flip', label: tr('Umdrehen: Kampfschaden verhindern (Stealth)'), flip: true, cost: 2,

@@ -416,11 +416,21 @@ function ccJudge(s, pid, a, after) {
     const out = [], add = (kind, msg, card) => out.push({ kind, msg, card });
     const info = ccSlotsOf(s, pid, a);
     if (info) (a.targets || []).forEach((ts, i) => { const sl = info.slots[i]; if (!sl) return;
-        for (const u of ts || []) { const t = findCharacter(s, u); if (!t) continue; const mine = ctrlOf(s, t) === pid;
+        for (const u of ts || []) { const t = findCharacter(s, u), lz = locate(s, u); if (!t || !lz || !isInPlayZone(lz.zone)) continue; const mine = ctrlOf(s, t) === pid;   // nur Karten im Spiel (nicht Friedhof)
             if (sl.harm === true && mine) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
             if (sl.harm === false && !mine && t.type !== 'Ability' && !/each player/i.test(CARDS[info.card.id].text || '')) add('Hilfe für den Gegner', `${info.card.name} hilft gegnerischem ${t.name}`, info.card.id);
-            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
-                add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden`, info.card.id); } });
+            // nur ein Fehler, wenn ein beschädigtes eigenes Ziel wählbar gewesen wäre (sonst ist die Heilung erzwungen, z. B. Grennan)
+            const hurtOwn = (sl.cands || []).some(v => { const x = findCharacter(s, v); return x && ctrlOf(s, x) === pid && x.damage > 0; });
+            if (/\bheals?\b/i.test(CARDS[info.card.id].text || '') && sl.harm === false && !(t.damage > 0) && hurtOwn && !/\bdraw\b|\bReady\b|has \+|Protector|Elusive/i.test(CARDS[info.card.id].text || ''))
+                add('Heilung ohne Schaden', `${info.card.name} heilt ${t.name} ohne Schaden, obwohl ein beschädigtes eigenes Ziel wählbar war`, info.card.id); } });
+    // Wirkungslos: Karte gespielt / Kraft genutzt, aber außer Bezahlen ändert sich nichts (Quelle selbst ausgenommen)
+    // nur Fähigkeiten (nicht Ongoing) und Kräfte: bei Allies/Ausrüstung ist das Eintreten selbst die Wirkung
+    if (after && info && (a.type === 'ACTIVATE' || (a.type === 'PLAY_CARD' && info.card.type === 'Ability' && !CARDS[info.card.id].ongoing))) {
+        // Kraft: die Quelle zählt mit (Jezbella: +1 ATK auf sich selbst), nur ihr Erschöpfen (Kosten) wird angeglichen
+        let A = s, B = after, skip = info.card.uid;
+        if (a.type === 'ACTIVATE') { A = cloneState(s); B = cloneState(after); skip = '__none'; const x = findCharacter(A, a.srcUid), y = findCharacter(B, a.srcUid); if (x && y) y.exhausted = x.exhausted; }
+        if (ccFingerprint(A, skip) === ccFingerprint(B, skip)) add('Wirkungslos', `${info.card.name}${a.type === 'ACTIVATE' ? ' (Kraft)' : ''} ohne jede Wirkung`, info.card.id);
+    }
     if (a.type === 'ATTACK' && after) {
         const att = findCharacter(after, a.attackerUid), defBefore = findCharacter(s, a.defenderUid), la = locate(after, a.attackerUid), ld = locate(after, a.defenderUid);
         const attDead = !att || !la || !isInPlayZone(la.zone), defAlive = ld && isInPlayZone(ld.zone);
@@ -447,9 +457,11 @@ function ccAiGame(seed, o = {}) {
             const pid = s.activePlayer;
             for (let n = 0; n < 25 && !s.gameOver && Date.now() < tEnd; n++) {
                 if (s.pending) { autoResolve(s); continue; }
-                if (lethalTurn === null && attackPlans(s, pid).some(pl => pl.state.gameOver && pl.state.winner === pid)) lethalTurn = s.turn;
+                const lethalNow = lethalTurn === null && attackPlans(s, pid).some(pl => pl.state.gameOver && pl.state.winner === pid);
                 const best = searchBestAction(s, pid, 'normal'); if (!best || !best.action) break;
                 const a = best.action, after = simApply(s, a, pid);
+                // verpasst nur, wenn die KI dann gar nicht angreift (eine Antwort des Gegners kann den Plan legitim verhindern)
+                if (lethalNow && a.type !== 'ATTACK' && a.type !== 'PLACE_RESOURCE') lethalTurn = s.turn;
                 for (const f of ccJudge(s, pid, a, after)) found.push({ ...f, turn: s.turn, seed, pid });
                 if (!applyAction(s, a, true, pid)) break; autoResolve(s);
             }

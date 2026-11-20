@@ -785,7 +785,7 @@ FX[11220] = { on: { armorPrevented: (s, c, d, pid) => { if (d.uid === c.uid) tri
         if (h.class === 'Warrior') readyCard(s, h); } } };
 const oppAllyDiedThisTurn = (s, pid) => (s.died11 || {})[oppPid(s, pid)] === s.turn;
 onEvt('died', (s, d) => { if (isAllyCard(CARDS[d.snap.id])) (s.died11 = s.died11 || {})[d.snap.wasCtrl] = s.turn; });
-const vestPow = (klass, label, o) => actPow('v' + klass, label, { cost: 1, canUse: (s, pid) => (heroOf(s, pid).class === klass || tr`Nur mit ${klass}-Helden`) === true && (oppAllyDiedThisTurn(s, pid) || tr('Kein gegnerischer Ally wurde in diesem Zug zerstört')), ...o });
+const vestPow = (klass, label, o) => actPow('v' + klass, label, { cost: 1, canUse: (s, pid) => firstErr((heroOf(s, pid).class === klass || tr`Nur mit ${klass}-Helden`), (oppAllyDiedThisTurn(s, pid) || tr('Kein gegnerischer Ally wurde in diesem Zug zerstört'))), ...o });
 FX[11221] = { powers: [vestPow('Mage', tr('Ziehe eine Karte'), { resolve: (s, it) => drawCards(s, me(s, it.pl), 1) }),
     vestPow('Priest', tr('Held heilt 5'), { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heroHeal(s, it.pl, t, 5); } }),
     vestPow('Warlock', tr('Ziel-Gegner wirft ab'), { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }], resolve: (s, it) => q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Incursion Vestments' } }) })] };

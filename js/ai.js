@@ -275,6 +275,9 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
         if (!legal.length) return null;
     }
     legal = aiDistinct(state, legal);
+    // Lethal durch mehrere Angriffe zuerst prüfen – sonst kann die Zeit schon beim Bewerten der Einzelaktionen ablaufen
+    // und der Angriffsplan unten wird gar nicht mehr betrachtet (fand die Suche nach dummen Fehlern: "Lethal verpasst")
+    if (difficulty !== 'easy') for (const pl of attackPlans(state, playerId)) if (pl.state.gameOver && pl.state.winner === playerId) return { action: pl.first, score: 99999, reason: 'Lethal (Angriffsplan): ' + pl.first.desc };
     const scored = [];
     for (const act of legal) {
         const sim = simApply(state, act, playerId);
