@@ -365,6 +365,43 @@ function ccCheckStartOfTurn(c) {
     return { n: 1, out: [] };
 }
 
+// ---------------------------------------------------------------- A4: "Karte tut nichts" (alle Fähigkeiten, die nicht Ongoing sind)
+// Zustand vor/nach dem Ausspielen ohne die gespielte Karte, Ressourcen, Log und Buchhaltung: unverändert = verdächtig
+// (so fiel Shield Wall auf). Bedingte Texte ("If …", "for each …") können auf dem Standardfeld legitim nichts tun → Warnung.
+const CC_SKIP_KEYS = new Set(['log', 'fx', 'fxQ', '_batch', 'lastProtect', 'undo', 'resolvingCard', 'seq', 'nextUid', 'uidSeq', 'stats', 'chainLog', 'hist', 'history', 'events', 'look', '_hidden', '_oppDecided', 'pending', 'win', 'queue', 'chain', 'played', 'cardsPlayed', 'playedThisTurn', 'abilitiesPlayed', 'lastPlayed', 'dmn15', 'dr12', 'protector', 'elusive', 'stealth', 'tempAtkBonus']);   // abgeleitete Anzeige-Werte: echte Wirkungen stehen in tm/Auren
+const CC_PE_BOOK = new Set(['playedCard']);   // Buchhaltung in s.pe: zählt nicht als Wirkung
+const ccEmpty = v => v === undefined || v === null || v === false || v === 0 || v === '' || (Array.isArray(v) && !v.length) || (v && typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+function ccFingerprint(s, skipUid) {
+    const seen = new WeakSet();
+    const walk = v => {
+        if (Array.isArray(v)) return v.filter(x => !(x && x.uid === skipUid) && !(x && x.card && x.card.uid === skipUid)).map(walk);
+        if (v && typeof v === 'object') { if (seen.has(v)) return '@'; seen.add(v); const o = {}; for (const k of Object.keys(v).sort()) { if (CC_SKIP_KEYS.has(k) || k === 'exhausted' && 'faceUp' in v) continue; const w = walk(v[k]); if (!ccEmpty(w)) o[k] = w; } return o; }
+        return v;
+    };
+    const t = walk({ resCount: [s.p1.resources.length, s.p2.resources.length], p1: s.p1, p2: s.p2, pe: (s.pe || []).filter(m => !CC_PE_BOOK.has(m.k)), gameOver: s.gameOver });
+    for (const p of [t.p1, t.p2]) { if (p) { p.resLen = (p.resources || []).length; delete p.resources; p.deckLen = (p.deck || []).length; delete p.deck; } }   // Ressourcen = Bezahlen; Deck nur als Anzahl (Mischen)
+    return JSON.stringify(t);
+}
+function ccCheckNoop(c) {
+    if (c.type !== 'Ability' || c.ongoing || c.xCost || !(c.text || '').trim()) return { n: 0, out: [] };
+    const s = ccSetup(c); s.humans = []; s.p1.hero.damage = 10;
+    const own = ccPut(s, 1, ctVanilla(4).id, { damage: 1 }); ccPut(s, 2, ctVanilla(6).id); ccPut(s, 2, ctVanilla(3).id, { exhausted: true });
+    ccPut(s, 2, ctPlain('Weapon').id); ccPut(s, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
+    s.p1.graveyard.push(makeCardInst(ctVanilla(3).id, false, 1));
+    const card = makeCardInst(c.id, false, 1); s.p1.hand.unshift(card);
+    if (canPlayCard(s, 1, card)) return { n: 0, out: [] };
+    const vars = getLegalActions(s, 1).filter(v => v.type === 'PLAY_CARD' && v.handIdx === 0); if (!vars.length) return { n: 0, out: [] };
+    // jede Variante (höchstens 3): tut eine davon etwas, ist die Karte in Ordnung
+    for (const a of vars.slice(0, 3)) {
+        const t = cloneState(s), f0 = ccFingerprint(t, card.uid);
+        try { if (!applyAction(t, a, true, 1)) continue; autoResolve(t); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Absturz: ' + e.message }] }; }
+        if (ccFingerprint(t, card.uid) !== f0) return { n: 1, out: [] };
+    }
+    // Auf dem Standardfeld legitim wirkungslos: Bedingungen, Finisher mit X = 0, Friedhof/Deck/entfernte Karten, "any number", Wahl
+    const cond = /\b(if|for each|instead|unless|when|whenever|may|this turn|next|until|reveal|look at|any number|any amount|graveyard|removed from (?:the )?game|equal to|search|choose|name a card|this game|attached to)\b|\bX\b/i.test(c.text || '') || !!c.finishingMove;
+    return { n: 1, out: [{ sev: cond ? 'warn' : 'fail', msg: `Ausspielen ändert nichts am Spiel (${vars.length} Variante${vars.length > 1 ? 'n' : ''} geprüft)${cond ? ' – Text ist bedingt/zeitlich, evtl. legitim' : ''}` }] };
+}
+
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
 // "up to N …" im Text, aber pickMany ohne Höchstzahl (9. Argument) – fand Ruthlessness und Volley (beliebig viele statt 5 bzw. 3)
 function ccArgs(src, at) {   // Argumente des Aufrufs, der bei src[at] = '(' beginnt (Klammertiefe beachten)
@@ -397,7 +434,7 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));

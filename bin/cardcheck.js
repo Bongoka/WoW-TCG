@@ -38,7 +38,7 @@ fs.writeFileSync(path.join(dir, 'cardcheck.json'), JSON.stringify({ stats: res.s
 
 // Lesbarer Bericht: je Prüfung, Fehler vor Warnungen, neue zuerst
 const st = res.stats, L = [];
-L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
+L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · „tut nichts“ geprüft: ${st.noopChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
 const groups = {}; res.findings.forEach(f => (groups[f.check] = groups[f.check] || []).push(f));
 for (const [check, fs_] of Object.entries(groups)) {
     fs_.sort((a, b) => (a.sev === 'fail' ? 0 : 1) - (b.sev === 'fail' ? 0 : 1) || (b.isNew - a.isNew));
