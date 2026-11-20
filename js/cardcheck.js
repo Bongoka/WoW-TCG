@@ -696,6 +696,13 @@ function ccCheckStatic(c) {
 function ccCheckPowers(c) {
     if (!FX[c.id] || !(FX[c.id].powers || []).length) return { n: 0, out: [], proven: false };
     const base = ccSetup(c); base.humans = []; ccRich(base);
+    // Voraussetzungen typischer Helden-Kräfte: je Klasse ein Ally im Spiel und einer auf der Hand ("another Hunter", "a Mage in your hand"),
+    // Scourge-Ally, Pet und Totem im Friedhof
+    for (const k of ['Death Knight', 'Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior']) {
+        const a = Object.values(CARDS).find(x => x.type === 'Ally' && !x.isToken && !x.unique && x.allyClass === k && (x.cost || 0) <= 4 && !CARD_ISSUES[x.id]);
+        if (a) { ccPut(base, 1, a.id); base.p1.hand.push(makeCardInst(a.id, false, 1)); }
+    }
+    for (const pred of [x => x.scourge && x.type === 'Ally', x => x.isPet, x => x.totem]) { const g = Object.values(CARDS).find(x => !x.isToken && pred(x)); if (g) base.p1.graveyard.push(makeCardInst(g.id, false, 1)); }
     let src;
     if (c.type === 'Hero' || c.type === 'Master Hero') src = base.p1.hero;
     else if (c.type === 'Location' || c.type === 'Quest') { src = makeCardInst(c.id, false, 1); src.counters = { capture: 9, honor: 9 }; base.p1.resources.push({ card: src, faceUp: true, exhausted: false }); }
