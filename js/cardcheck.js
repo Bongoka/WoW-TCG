@@ -462,7 +462,8 @@ function ccJudge(s, pid, a, after) {
     if (info) (a.targets || []).forEach((ts, i) => { const sl = info.slots[i]; if (!sl) return;
         for (const u of ts || []) { const t = findCharacter(s, u), lz = locate(s, u); if (!t || !lz || !isInPlayZone(lz.zone)) continue; const mine = ctrlOf(s, t) === pid;   // nur Karten im Spiel (nicht Friedhof)
             // Schaden an Eigenem: nur bei Karten ohne weiteren Nutzen (Reforestation zerstört die eigene Waffe für drei Treants – legitim)
-            if (sl.harm === true && mine && ccSentences(CARDS[info.card.id]).length <= 1) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
+            // … und nicht bei Zielen mit Death Rattle (eigenes Zerstören löst deren Bonus aus: Incendiary Totem, Khorium Boar – gewollte Kombo)
+            if (sl.harm === true && mine && ccSentences(CARDS[info.card.id]).length <= 1 && !/Death Rattle/i.test(CARDS[t.id].text || '')) add('Schaden an Eigenem', `${info.card.name} trifft eigenes ${t.name}`, info.card.id);
             if (sl.harm === false && !mine && t.type !== 'Ability' && !/each player/i.test(CARDS[info.card.id].text || '')) add('Hilfe für den Gegner', `${info.card.name} hilft gegnerischem ${t.name}`, info.card.id);
             // nur ein Fehler, wenn ein beschädigtes eigenes Ziel wählbar gewesen wäre (sonst ist die Heilung erzwungen, z. B. Grennan)
             const hurtOwn = (sl.cands || []).some(v => { const x = findCharacter(s, v); return x && ctrlOf(s, x) === pid && x.damage > 0; });
