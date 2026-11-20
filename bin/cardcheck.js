@@ -4,6 +4,7 @@
 //   --baseline   aktuellen Stand als Baseline speichern (danach gelten nur neue Funde als neu)
 //   --repro S    nur die Partie mit Seed S spielen und den Fehler ausgeben (gezielte Partie: zusätzlich --card ID)
 //   --focus N    gezielte Partien je defensiver Reaktionskarte (Standard 3; 0 = aus)
+//   --dumm N     Partien mit der Spiel-KI auf beiden Seiten, jede Entscheidung auf dumme Fehler geprüft (Standard 10)
 //   --ki N       je gezielter Partie bis zu N Entscheidungsproben der Spiel-KI (große Suche; Standard 3; 0 = aus)
 // Ausgabe: reports/cardcheck.json und reports/cardcheck.md (nicht in Git)
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -22,7 +23,7 @@ if (arg('--repro')) {
     out(r.err ? `FEHLER: ${r.err}\n  Schritt ${r.step}, nach „${r.last}“\n  ${r.heroes.map(h => CARDS[h].name).join(' vs ')}\n  ${r.stack || ''}` : `ok: ${r.turns} Züge, Sieger ${r.winner}`);
     exit(0);
 }
-const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGames: +arg('--focus', 3), probe: +arg('--ki', 3), progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });   // Fortschritt: welche Partie gerade läuft (hängt eine, steht sie hier)
+const res = ccRun({ sims: +arg('--sims', 40), seed: +arg('--seed', 1), focusGames: +arg('--focus', 3), probe: +arg('--ki', 3), aiGames: +arg('--dumm', 10), progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });   // Fortschritt: welche Partie gerade läuft (hängt eine, steht sie hier)
 // Quelltext: Steuerzeichen (z. B. ein Backspace statt \b in einer Regex – so fanden isDemonS7 und Lolly nie einen Treffer)
 for (const f of fs.readdirSync(path.join(ROOT, 'js')).filter(x => x.endsWith('.js'))) {
     const lines = fs.readFileSync(path.join(ROOT, 'js', f), 'utf8').split('\n');
@@ -40,7 +41,7 @@ fs.writeFileSync(path.join(dir, 'cardcheck.json'), JSON.stringify({ stats: res.s
 
 // Lesbarer Bericht: je Prüfung, Fehler vor Warnungen, neue zuerst
 const st = res.stats, L = [];
-L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · „tut nichts“ geprüft: ${st.noopChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
+L.push(`# Kartenprüfung`, '', `${st.cards} Karten in ${st.classes} Klassen · Wirkung nach Verben geprüft: ${st.verbChecked} · Auslöser geprüft: ${st.trigChecked || 0} · „tut nichts“ geprüft: ${st.noopChecked || 0} · Menschenweg (zufällige Antworten) geprüft: ${st.humanChecked || 0} · ${st.sims} Partien (${st.simTurns} Züge, ${st.simErr} mit Fehler) · ${(st.ms / 1000).toFixed(0)} s`, '');
 const groups = {}; res.findings.forEach(f => (groups[f.check] = groups[f.check] || []).push(f));
 for (const [check, fs_] of Object.entries(groups)) {
     fs_.sort((a, b) => (a.sev === 'fail' ? 0 : 1) - (b.sev === 'fail' ? 0 : 1) || (b.isNew - a.isNew));

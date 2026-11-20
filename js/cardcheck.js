@@ -402,6 +402,39 @@ function ccCheckNoop(c) {
     return { n: 1, out: [{ sev: cond ? 'warn' : 'fail', msg: `Ausspielen ändert nichts am Spiel (${vars.length} Variante${vars.length > 1 ? 'n' : ''} geprüft)${cond ? ' – Text ist bedingt/zeitlich, evtl. legitim' : ''}` }] };
 }
 
+// ---------------------------------------------------------------- E: Menschenweg mit zufälligen Antworten (auch Abbrechen)
+// Jede auf dem Standardfeld spielbare Karte wird mehrmals wie ein Mensch gespielt; jede Abfrage bekommt eine zufällige Option.
+// Fehler: Absturz, hängende Abfrage, kaputter Zustand – oder die Karte bleibt nach "Abbrechen" verschwunden.
+function ccHumanFuzz(c, runs = 3) {
+    if (c.type === 'Hero' || c.type === 'Quest' || c.type === 'Location' || c.type === 'Master Hero') return { n: 0, out: [] };
+    const base = ccSetup(c); base.humans = [1]; base.p1.hero.damage = 8;
+    ccPut(base, 1, ctVanilla(4).id, { damage: 1 }); ccPut(base, 2, ctVanilla(5).id); ccPut(base, 2, ctVanilla(2).id, { exhausted: true });
+    const card = makeCardInst(c.id, false, 1); base.p1.hand.unshift(card);
+    if (canPlayCard(base, 1, card)) return { n: 0, out: [] };
+    const rnd = seededRandom(c.id * 31 + 7), out = [];
+    for (let r = 0; r < runs; r++) {
+        const s = cloneState(base); s.humans = [1]; let cancelled = false;
+        try {
+            if (!applyAction(s, { type: 'PLAY_CARD', handIdx: 0 }, true, 1)) { out.push({ sev: 'fail', msg: 'Menschenweg: Spielen abgelehnt – ' + (validateAction(s, { type: 'PLAY_CARD', handIdx: 0 }, 1) || '?') }); break; }
+            let n = 0;
+            for (; n < 80 && s.pending; n++) {
+                const d = s.pending; s.pending = null;
+                if (d.kind === 'priority') { passPriority(s); process(s); continue; }
+                let v;
+                if (d.pid === 1) { const opts = d.opts || []; if (!opts.length) { out.push({ sev: 'fail', msg: 'Abfrage ohne Optionen: ' + d.prompt }); break; } v = opts[Math.floor(rnd() * opts.length)].v; if (v === '__cancel') cancelled = true; }
+                else v = aiPick(s, d);
+                s.queue.unshift({ op: 'call', k: d.k, a: d.a, v }); process(s);
+            }
+            if (s.pending && n >= 80) out.push({ sev: 'fail', msg: 'hängt in Abfrage: ' + s.pending.prompt });
+            const inv = ccInvariants(s); if (inv) out.push({ sev: 'fail', msg: 'Invariante: ' + inv });
+            // Abbrechen: die Karte muss wieder auf der Hand sein (oder ganz normal gespielt), nie verloren
+            if (cancelled && !locate(s, card.uid)) out.push({ sev: 'fail', msg: 'nach Abbrechen verschwunden' });
+        } catch (e) { out.push({ sev: 'fail', msg: 'Absturz (Menschenweg): ' + e.message }); }
+        if (out.length) break;
+    }
+    return { n: 1, out };
+}
+
 // ---------------------------------------------------------------- KI: dumme Fehler, die ein Mensch nie machen würde
 // Partie, in der beide Seiten mit der echten Spiel-KI (große Suche) entscheiden; jede Entscheidung wird geprüft.
 // Ergebnis: Liste { kind, msg, turn, seed, card }
@@ -509,7 +542,7 @@ function ccRun(o = {}) {
     const stats = { cards: all.length, classes: classes.length, verbChecked: 0 };
     // je Karte billig: Wirkung nach Verben, Kosten, Dauer
     for (const c of all) {
-        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); }
+        try { const v = ccCheckVerbs(c); stats.verbChecked += v.n; add('Wirkung', c, v.out); add('Kosten', c, ccCheckCost(c)); add('Dauer', c, ccCheckDuration(c)); add('Text-Abgleich', c, ccCheckUpTo(c)); const tg = ccCheckTriggers(c); stats.trigChecked = (stats.trigChecked || 0) + tg.n; add('Auslöser', c, tg.out); const st2 = ccCheckStartOfTurn(c); stats.trigChecked += st2.n; add('Zugbeginn', c, st2.out); const no = ccCheckNoop(c); stats.noopChecked = (stats.noopChecked || 0) + no.n; add('Tut nichts', c, no.out); const hf = ccHumanFuzz(c); stats.humanChecked = (stats.humanChecked || 0) + hf.n; add('Menschenweg', c, hf.out); }
         catch (e) { findings.push({ check: 'Absturz', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'fail', msg: e.message }); }
     }
     findings.push(...ccCheckAiValues(classes));
@@ -542,6 +575,14 @@ function ccRun(o = {}) {
         if (t.n >= 2 && t.waste / t.n >= 0.5)
             findings.push({ check: 'KI-Timing', id: c.id, name: c.name, cls: clsOf[c.id], sev: 'warn', msg: `Reaktionskarte ${t.waste} von ${t.n}× ohne Anlass im eigenen Zug gespielt (${t.early}× in den ersten zwei Runden)${cl.ids.length > 1 ? ` – gilt für ${cl.ids.length} Karten der Klasse` : ''}` });
     }
-    Object.assign(stats, { sims, simErr, simTurns, ms: Date.now() - t0, timingCards: Object.keys(timing).length });
+    // Dumme KI-Fehler: Partien mit der echten Spiel-KI auf beiden Seiten, jede Entscheidung wird geprüft
+    let aiGames = 0;
+    for (let i = 0; i < (o.aiGames || 0); i++) {
+        if (o.progress) o.progress(`KI-Partie Seed ${seed0 + 9000 + i}`);
+        const r = ccAiGame(seed0 + 9000 + i); aiGames++;
+        if (r.err) findings.push({ check: 'KI-Fehler', id: 0, name: 'Partie', sev: 'fail', msg: r.err, repro: { seed: seed0 + 9000 + i } });
+        for (const f of r.found) findings.push({ check: 'KI-Fehler', id: f.card || 0, name: f.card ? CARDS[f.card].name : f.kind, sev: 'warn', msg: `${f.kind}: ${f.msg} (Zug ${f.turn}, Seed ${f.seed})` });
+    }
+    Object.assign(stats, { sims, simErr, simTurns, aiGames, ms: Date.now() - t0, timingCards: Object.keys(timing).length });
     return { classes, findings, stats };
 }
