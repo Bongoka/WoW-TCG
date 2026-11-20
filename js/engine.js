@@ -954,7 +954,11 @@ function priorityStep(s) {
     }
     const pid = w.prio;
     // Vorausschau der KI (Kopien, cloneState): dort antwortet niemand – sonst rechnete jede Kopie wieder Kopien durch
-    if (s.look && !isHuman(s, pid)) { passPriority(s); return true; }
+    if (s.look && !isHuman(s, pid)) {
+        // Ausspielen des Gegnerzugs (respondPlayout): an späteren Gelegenheiten anhalten, um die Antwort dort zu probieren
+        if (_respondHalt && _respondHalt.s === s && _respondHalt.pid === pid && respondHaltAt(s, pid)) { s.pending = { kind: 'priority', pid, halt: true }; return false; }
+        passPriority(s); return true;
+    }
     // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
     const opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
     if (!opts.length) { passPriority(s); return true; }
@@ -972,13 +976,17 @@ function priorityStep(s) {
 //    Kampfschaden (CR 602). Ein Angriffsvorschlag allein zählt nicht – reagieren kann man im Kampffenster.
 //  - 'end': End-Fenster des gegnerischen Zugs bei leerer Kette. Bereite Ressourcen sind jetzt übrig (sie werden
 //    im eigenen Ready-Schritt ohnehin bereit) – die letzte Gelegenheit, sie in diesem Zug zu nutzen.
-//  - sonst nichts: Ready-/Draw-Fenster, eigenes Zugende, Passen in der Aktionsphase (CR 502.2: das End-Fenster folgt).
+//  - 'start': Ready- und Draw-Fenster des gegnerischen Zugs (CR 501.1a/501.2a) – vor allem, was der Gegner in diesem Zug
+//    tut (Pin, Burgle); im Ready-Fenster nur, was vor dem Ziehen mehr bringt (Brain Freeze: "Players can't draw cards this turn").
+//  - sonst nichts: eigenes Zugende, Passen in der Aktionsphase (CR 502.2: das End-Fenster folgt).
 function respondMoment(s, pid) {
     const top = s.chain[s.chain.length - 1];
     // Auch auf einen gegnerischen Angriffsvorschlag: "can't attack" oder Ausschalten des Angreifers bricht ihn ab (CR 601.3)
     if (top) return top.pl !== pid && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
     if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
     if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
+    // Ready-Fenster nur in der echten Partie (Simulationen: Laufzeit, das Draw-Fenster genügt dort fast immer)
+    if (s.win && (s.win.reason === 'draw' || (s.win.reason === 'ready' && (isReal(s) || s.deepRespond))) && s.activePlayer !== pid) return 'start';
     return null;
 }
 // Sinnvolle Antworten für pid, beste zuerst: [{a, gain}]. Der Mensch wird nur gefragt, wenn es eine gibt; die KI
@@ -994,6 +1002,7 @@ function respondOptions(s, pid) {
     if (!acts.length) return [];
     const vPass = respondValue(s, pid, null, false);
     if (vPass === null) return [];
+    if (moment === 'start') return respondTurnOptions(s, pid, acts, true);
     // Der Mensch entscheidet selbst, ob sich ein teurer Konter lohnt: Antworten auf den Link selbst (Counterspell)
     // halten immer an, sonst reicht beim Reagieren "kaum schlechter als Passen" (die Bewertung ist nur eine Schätzung)
     const human = isHuman(s, pid), top = s.chain[s.chain.length - 1];
@@ -1003,14 +1012,159 @@ function respondOptions(s, pid) {
         const vNow = respondValue(s, pid, a, false);
         if (vNow === null) continue;
         if (human && moment === 'react' && onLink(a)) { out.push({ a, gain: vNow - vPass }); continue; }
-        if (vNow <= vPass + (human && moment === 'react' ? -2 : 0.5)) continue;
+        if (vNow <= vPass + (human && moment === 'react' ? 0.5 - Math.max(2.5, respondHoldBonus(s, pid, a)) : 0.5)) continue;
         // Gegnerischer Angriffsvorschlag (CR 601.1/601.3): der Mensch entscheidet selbst, ob er jetzt (Angriff verhindern)
         // oder erst im Kampf antwortet – das spätere Fenster kann wegfallen (der Gegner tötet den Verteidiger vorher)
         const proposal = human && moment === 'react' && top && top.kind === 'proposal' && stopsProposal(s, pid, a, top);
         if (moment === 'react' && !proposal) { const vLater = respondValue(s, pid, a, true); if (vLater !== null && vNow <= vLater + 0.5) continue; }
         out.push({ a, gain: vNow - vPass });
     }
+    // Wirkungen "this turn" reichen über den laufenden Kampf hinaus (Divine Shield: "Prevent all damage that would be dealt to
+    // your hero this turn" gegen alle folgenden Angriffe): in der echten Partie für die übrigen Karten den Gegnerzug ausspielen
+    // Nur für den Menschen: die KI entscheidet dort über den Haltewert (aiHoldValue/handCardValue) und soll nicht spürbar rechnen
+    if (moment === 'react' && human && (isReal(s) || s.deepRespond) && s.activePlayer !== pid) {   // deepRespond: Prüfungen ohne Oberfläche
+        const have = new Set(out.map(o => respondKey(s, pid, o.a)));
+        out.push(...respondTurnOptions(s, pid, acts.filter(a => !have.has(respondKey(s, pid, a))), false));
+    }
     return out.sort((x, y) => y.gain - x.gain);
+}
+// 'start': Eine Antwort zu Beginn des gegnerischen Zugs lohnt nur, wenn sie mehr bringt als jede spätere Gelegenheit in
+// diesem Zug. Dafür wird der Gegnerzug in Kopien zu Ende gespielt (Gegner: fastAiAction, wie in der Simulation): einmal mit
+// der Antwort jetzt, einmal mit Passen – dabei an jedem späteren Haltepunkt (Karte oder Angriff des Gegners auf der Kette,
+// Draw-Fenster, Kampfschaden, Zugende) dieselbe Karte/Kraft/Quest mit den dann besten Zielen. Verglichen wird zu Beginn
+// des eigenen nächsten Zugs. Mitten im Gegnerzug ('react', nur echte Partie) genauso, ab dem laufenden Fenster.
+// So gehören Pin ("Target player can't play allies this turn") an den Zugbeginn und Burgle vor die Angriffe; Snipe,
+// Counterspell oder Quests, die Karten ziehen, warten auf ihre Gelegenheit.
+const RESPOND_HALTS = 4;
+const RESPOND_BUDGET_MS = 900;    // Rechenzeit je Fenster für die Zug-Vorausschau (echte Partie, Mensch; KI 300 ms)          // höchstens so viele gegnerische Links als spätere Gelegenheit (das Zugende zählt immer)
+let _respondHalt = null;          // { s, pid }: nur genau diese Kopie hält an (Kopien darin – Vorausschau der KI – nicht)
+function respondHaltAt(s, pid) {
+    if (s.activePlayer === pid) return false;
+    const top = s.chain[s.chain.length - 1];
+    if (top) return top.pl !== pid && (top.kind === 'card' || top.kind === 'proposal');
+    if (s.battle) return s.battle.step === 'damage';
+    return !!s.win && (s.win.reason === 'end' || s.win.reason === 'draw');
+}
+// Der Sofort-Wert taugt hier nicht als Vorfilter ("can't play allies this turn" wirkt erst im Ausspielen). Vorfilter ist
+// stattdessen: Ändert die Antwort, was der Gegner in seiner Aktionsphase tun kann (legale Aktionen)? Sonst bringt sie jetzt
+// nichts, was sie am Zugende nicht auch brächte. Je Karte/Kraft/Quest die ersten zwei Varianten, die das tun (Simulation: eine).
+function respondOppSig(s, pid, act) {
+    const c = cloneState(s), opp = pid === 1 ? 2 : 1;
+    try { if (act) doAction(c, act, pid); else passPriority(c); process(c); autoResolve(c); } catch (e) { return null; }
+    if (c.gameOver || !isIdle(c) || c.activePlayer !== opp) return null;
+    // gleiche Karten auf der Hand ergeben dieselbe Aktion: Handgröße und Deck zählen mit (Brain Freeze: "Players can't draw cards")
+    const p = getPlayer(c, opp);
+    return p.hand.length + '/' + p.deck.length + '/' + getReadyRes(p) + '|' + getLegalActions(c, opp).map(a => JSON.stringify(a)).sort().join('|');
+}
+// Der Mensch entscheidet selbst, ob sich eine Karte lohnt: der Haltewert der Handkarte (evaluateState: "lieber behalten",
+// bei Reaktionskarten hoch) zählt für ihn nicht – gefragt wird, wo die Karte am meisten wirkt. Sonst würde z. B. Divine
+// Shield nie angeboten und wäre im Gegnerzug gar nicht spielbar. Am Zugende gilt das nicht (dort sonst jede Karte jedes Mal).
+function respondHoldBonus(s, pid, a) {
+    if (!isHuman(s, pid) || a.type !== 'PLAY_CARD' || a.gyUid || typeof handCardValue !== 'function') return 0;
+    const p = getPlayer(s, pid); return handCardValue(s, p, p.hand[a.handIdx]) || 0;
+}
+// Reihenfolgen: der Gegner kann seine Schritte auch anders ordnen, als die Vorausschau es gerade tut. Ob Warten sicher ist,
+// wird deshalb zusätzlich mit "erst alle Karten/Kräfte, dann die Angriffe" geprüft (nur echte Partie): angeboten wird, wenn
+// die Antwort jetzt in einer der Reihenfolgen mehr bringt als jede spätere Gelegenheit. So kommt Pin an den Zugbeginn (der
+// Gegner könnte als Erstes einen Ally legen), Divine Shield und Burgle aber erst zum Angriff (davor gibt es immer ein Fenster).
+function respondTurnOptions(s, pid, acts, sigFilter) {
+    if (!acts.length) return [];
+    const full = isReal(s) || s.deepRespond, maxLinks = full ? RESPOND_HALTS : 2;   // Simulationen: weniger Haltepunkte/Varianten (Laufzeit)
+    const per = {}, sig0 = sigFilter ? respondOppSig(s, pid, null) : null;
+    const pre = acts.filter(a => { const k = respondKey(s, pid, a); if ((per[k] || 0) >= (full ? 2 : 1)) return false; if (sigFilter) { const g = respondOppSig(s, pid, a); if (g !== null && sig0 !== null && g === sig0) return false; } per[k] = (per[k] || 0) + 1; return true; });
+    if (!pre.length) return [];
+    // Passen-Variante je Reihenfolge: Wert, Haltepunkte (spätere Gelegenheiten), Plan des Gegners
+    const order = (plan0) => {
+        const o = { halts: [], plan: plan0 || [] }; let links = 0;
+        const cp = cloneState(s); passPriority(cp); cp.rpIdx = 0;
+        o.vPass = respondPlayout(cp, pid, c => { const end = !c.chain.length && !c.battle; if (end || links++ < maxLinks) o.halts.push(cloneState(c)); }, plan0 ? null : o.plan, plan0);
+        return o;
+    };
+    const A = order(null); if (A.vPass === null) return [];
+    const orders = [A];
+    if (full) {
+        const re = [...A.plan.filter(r => r.a.type !== 'ATTACK'), ...A.plan.filter(r => r.a.type === 'ATTACK')];
+        if (re.some((r, i) => r !== A.plan[i])) { const B = order(re); if (B.vPass !== null) orders.push(B); }
+    }
+    // Zeitgrenze (große Felder): was nicht mehr geprüft wird, bekommt der Mensch trotzdem angeboten (er kann passen), die KI nicht
+    const out = [], t0 = performance.now(), budget = !full ? 120 : isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
+    for (const a of pre) {
+        if (performance.now() - t0 > budget) { if (isHuman(s, pid) && !out.some(o => respondKey(s, pid, o.a) === respondKey(s, pid, a))) out.push({ a, gain: 0 }); continue; }
+        const key = respondKey(s, pid, a), bonus = respondHoldBonus(s, pid, a);
+        const same = b => JSON.stringify([b.targets, b.mode, b.x]) === JSON.stringify([a.targets, a.mode, a.x]);
+        let best = -Infinity, gain = null;
+        for (const o of orders) {
+            const c = cloneState(s); c.rpIdx = 0;
+            try { doAction(c, a, pid); } catch (e) { break; }
+            const vNow = respondPlayout(c, pid, null, null, o.plan);
+            if (vNow === null) continue;
+            if (o === A) { gain = vNow - A.vPass; if (vNow <= A.vPass + 0.5 - bonus) break; }   // wirkt jetzt nicht (genug)
+            let later = o.vPass;
+            for (const h of o.halts) {
+                // dieselben Ziele/Modi wie jetzt (Pin: der Gegner) und die nach KI-Wert besten
+                const all = respondCandidates(h, pid, getPriorityActions(h, pid)).filter(b => respondKey(h, pid, b) === key);
+                for (const b of [...new Set([all.find(same), ...all.slice(0, full ? 2 : 1)].filter(Boolean))]) {
+                    const c2 = cloneState(h);
+                    try { doAction(c2, b, pid); } catch (e) { continue; }
+                    const v = respondPlayout(c2, pid, null, null, o.plan);
+                    if (v !== null && v > later) later = v;
+                }
+                if (vNow <= later + 0.5) break;
+            }
+            best = Math.max(best, vNow - later);
+            if (best > 0.5) break;
+        }
+        if (gain !== null && best > 0.5) out.push({ a, gain });
+    }
+    return out.sort((x, y) => y.gain - x.gain);
+}
+// Spielt den laufenden Gegnerzug in der Kopie c zu Ende (Gegner wie in simulateOneGame, pid passt), bis pid wieder in der
+// eigenen Aktionsphase ist; gibt evaluateState für pid zurück. onHalt(c) an jedem Haltepunkt (respondHaltAt), danach passt pid.
+// rec: die Aktionen des Gegners mitschreiben (Passen-Variante); plan: diese Aktionen ab c.rpIdx nachspielen, solange sie legal
+// sind – der Gegner weiß nichts von der Antwort und folgt seinem Plan (Snipe liegt bereit: er legt seinen Ally trotzdem). Erst
+// wenn ein Schritt nicht mehr geht (Pin: "can't play allies", Burgle: Angreifer gehört ihm nicht mehr), entscheidet er neu.
+function respondRecOf(c, opp, a) {
+    const p = getPlayer(c, opp);
+    return { a, uid: (a.type === 'PLAY_CARD' && !a.gyUid) || a.type === 'PLACE_RESOURCE' ? (p.hand[a.handIdx] || {}).uid : null, res: a.type === 'COMPLETE_QUEST' ? (p.resources[a.resIdx] || { card: {} }).card.uid : null };
+}
+function respondReplay(c, opp, r) {
+    const p = getPlayer(c, opp), b = { ...r.a };
+    if (r.uid) { b.handIdx = p.hand.findIndex(x => x.uid === r.uid); if (b.handIdx < 0) return null; }
+    if (r.res) { b.resIdx = p.resources.findIndex(x => x.card.uid === r.res); if (b.resIdx < 0) return null; }
+    return validateAction(c, b, opp) ? null : b;
+}
+function respondPlayout(c, pid, onHalt, rec, plan) {
+    const opp = pid === 1 ? 2 : 1, rnd = Math.random, prev = _respondHalt;
+    if (typeof seededRandom === "function") Math.random = seededRandom((c.turn || 0) * 7919 + pid);   // gleicher Zufall in allen Varianten
+    let guard = 0, steps = 0;
+    try {
+        _respondHalt = onHalt ? { s: c, pid } : null;
+        while (!c.gameOver && guard++ < 400) {
+            if (c.pending) {
+                const d = c.pending; c.pending = null;
+                if (d.halt) { const h = _respondHalt; _respondHalt = null; if (rec) c.rpIdx = rec.length; onHalt(c); _respondHalt = h; passPriority(c); }
+                else if (d.kind === 'priority') passPriority(c);
+                else c.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(c, d) });
+                process(c); continue;
+            }
+            if (!isIdle(c)) { process(c); if (!c.pending && !isIdle(c)) break; continue; }
+            if (c.activePlayer === pid) break;
+            if (steps < 30) {
+                let act = null;
+                if (plan && c.rpIdx >= 0 && c.rpIdx < plan.length) { act = respondReplay(c, opp, plan[c.rpIdx]); c.rpIdx = act ? c.rpIdx + 1 : -1; }
+                if (!act) { const h = _respondHalt; _respondHalt = null; const dec = fastAiAction(c, opp); _respondHalt = h; act = dec && dec.action; }
+                if (act && rec) rec.push(respondRecOf(c, opp, act));
+                if (act && applyAction(c, act, true, opp)) { steps++; continue; }
+            }
+            steps = 99;
+            if (applyAction(c, { type: 'END_TURN', actorId: opp }, true, opp)) continue;
+            const forced = getAttackActions(c, opp)[0];
+            if (forced && guard < 300 && applyAction(c, forced, true, opp)) continue;
+            _respondHalt = null; advanceTurn(c, true);
+        }
+        return evaluateState(c, pid);
+    } catch (e) { return null; }
+    finally { Math.random = rnd; _respondHalt = prev; }
 }
 // Verhindert die Antwort den vorgeschlagenen Angriff (Angreifer tot, "can't attack" – CR 601.3)? In einer Kopie geprüft
 function stopsProposal(s, pid, a, top) {
@@ -1066,6 +1220,7 @@ function priorityPrompt(s, pid) {
     if (s.chain.length) { const t = s.chain[s.chain.length - 1]; return tr`Auf der Kette: ${chainDesc(s, t)}. Reagieren?`; }
     if (s.battle) return tr`Kampf: ${nameOf(s, s.battle.att)} greift ${nameOf(s, s.battle.def)} an. Reagieren?`;
     if (s.phase === 'end') return tr('Ende des Zuges. Noch etwas spielen?');
+    if ((s.phase === 'draw' || s.phase === 'start') && s.activePlayer !== pid) return tr('Zugbeginn des Gegners. Etwas spielen?');
     return tr('Reagieren?');
 }
 function nameOf(s, uid) { const c = findCharacter(s, uid); return c ? c.name : '?'; }

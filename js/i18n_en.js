@@ -270,6 +270,7 @@ var I18N_EN = {
     'Elune, verlass mich nicht …': 'Elune, don\'t forsake me …',
     'Elusive – kann nicht angegriffen werden': 'Elusive – can\'t be attacked',
     'Ende des Zuges. Noch etwas spielen?': 'End of turn. Play something else?',
+    'Zugbeginn des Gegners. Etwas spielen?': "Start of your opponent's turn. Play something?",
     'Entfernen: Alle Allies aus den Friedhöfen ins Spiel': 'Remove: All allies from the graveyards into play',
     'Entfernen: Niemand zieht in diesem Zug': 'Remove: No one draws this turn',
     'Entfernen: Ziel-Spieler dreht eine Quest um': 'Remove: Target player flips a quest',

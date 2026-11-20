@@ -103,7 +103,8 @@ const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).s
 // Kampftricks, Angreifer entfernen), lohnen sich nur mit bereitem Mana. Bewertet wird das wertvollste bezahlbare –
 // im Gegnerzug spielt man meist eins. Andere Instants (Karten ziehen …) spielt die KI ohnehin mit übrigem Mana am
 // gegnerischen Zugende (respondOptions). Nur im eigenen Zug: dort entscheidet sich, ob Mana übrig bleibt.
-const AI_REACTIVE = /\bInterrupt\b|\bprevent\b|remove (all )?attackers|\battacking\b|\bdefending\b|in combat|would be dealt|can't attack|\bexhaust target\b/i;
+// Auch Karten für den Beginn des Gegnerzugs (Pin: "can't play allies this turn", Brain Freeze, Burgle: "You control them")
+const AI_REACTIVE = /\bInterrupt\b|\bprevent\b|remove (all )?attackers|\battacking\b|\bdefending\b|in combat|would be dealt|can't attack|\bexhaust target\b|can't (play|draw)\b|you control them\b/i;
 function aiHoldValue(s, p) {
     const ready = getReadyRes(p); if (!ready) return 0;
     let best = 0;

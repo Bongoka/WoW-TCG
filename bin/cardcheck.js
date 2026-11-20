@@ -6,6 +6,7 @@
 //   --focus N    gezielte Partien je defensiver Reaktionskarte (Standard 3; 0 = aus)
 //   --tief       zusätzlich Szenario-Varianten für Karten ohne Nachweis (bedingte Texte; langsam, ca. 30–60 min)
 //   --dumm N     Partien mit der Spiel-KI auf beiden Seiten, jede Entscheidung auf dumme Fehler geprüft (Standard 10)
+//   --zeitpunkt  nur: wann Instants/Quests/Kräfte im Gegnerzug spielbar sind und angeboten werden (reports/zeitpunkt.md)
 //   --ki N       je gezielter Partie bis zu N Entscheidungsproben der Spiel-KI (große Suche; Standard 3; 0 = aus)
 // Ausgabe: reports/cardcheck.json und reports/cardcheck.md (nicht in Git)
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -19,6 +20,27 @@ globalThis.CC_ENGINE_SRC = fs.readFileSync(path.join(ROOT, 'js/engine.js'), 'utf
 for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','ai','simcore','coach','tests','cardcheck'])
     vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), { filename: f + '.js' });
 
+// --zeitpunkt: wann Instants, Quests und Kräfte im Gegnerzug spielbar sind und wo sie angeboten werden → reports/zeitpunkt.md
+if (arg('--zeitpunkt')) {
+    const only = arg('--card') ? [+arg('--card')] : null, rows = ccTimingSweep({ only, progress: m => fs.writeFileSync(path.join(ROOT, 'reports', 'progress.txt'), new Date().toISOString().slice(11, 19) + ' ' + m + '\n') });
+    const L = ['# Zeitpunkte im Gegnerzug', '', 'Gespielt wird ein Standard-Gegnerzug (Gegner legt Allies, Waffe, Quick Strike und greift an). „angeboten“ = der Mensch wird dort gefragt (respondOptions).', ''];
+    const grp = { nie: [], err: [] };
+    for (const r of rows) {
+        if (r.err) { grp.err.push(r); continue; }
+        if (!r.playable.length) continue;
+        const k = r.offered.length ? r.offered.join(', ') : 'nie';
+        (grp[k] = grp[k] || []).push(r);
+    }
+    for (const [k, rs] of Object.entries(grp)) { if (!rs.length) continue;
+        L.push(`## ${k === 'err' ? 'Absturz' : 'angeboten: ' + k} (${rs.length})`, '');
+        for (const r of rs) L.push(`- ${r.name} (${r.id}, ${r.kind})${r.err ? ' – ' + r.err : ''}: ${r.text.replace(/\s+/g, ' ').slice(0, 160)}  · spielbar: ${r.playable.join(', ')}`);
+        L.push(''); }
+    fs.mkdirSync(path.join(ROOT, 'reports'), { recursive: true });
+    fs.writeFileSync(path.join(ROOT, 'reports', 'zeitpunkt.md'), L.join('\n'));
+    fs.writeFileSync(path.join(ROOT, 'reports', 'zeitpunkt.json'), JSON.stringify(rows, null, 1));
+    out(`${rows.length} Karten/Kräfte geprüft, ${rows.filter(r => r.playable && r.playable.length).length} im Gegnerzug spielbar, ${(grp.nie || []).length} nie angeboten → reports/zeitpunkt.md`);
+    exit(0);
+}
 if (arg('--repro')) {
     const r = ccSimGame(+arg('--repro'), { focus: arg('--card') ? +arg('--card') : undefined });
     out(r.err ? `FEHLER: ${r.err}\n  Schritt ${r.step}, nach „${r.last}“\n  ${r.heroes.map(h => CARDS[h].name).join(' vs ')}\n  ${r.stack || ''}` : `ok: ${r.turns} Züge, Sieger ${r.winner}`);

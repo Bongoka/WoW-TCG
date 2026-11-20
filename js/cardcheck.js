@@ -1014,3 +1014,80 @@ function ccRun(o = {}) {
     Object.assign(stats, { sims, simErr, simTurns, aiGames, ms: Date.now() - t0, timingCards: Object.keys(timing).length });
     return { classes, findings, stats };
 }
+
+// ---------------------------------------------------------------- Zeitpunkte im Gegnerzug (--zeitpunkt)
+// Jede Karte, die man im Gegnerzug einsetzen kann (Instant auf der Hand, Quest in der Ressourcenreihe, Kraft einer Karte
+// im Spiel), durchläuft denselben Gegnerzug: der Gegner (fastAiAction) legt Allies, Waffe und eine Fähigkeit und greift an.
+// Der Mensch hält in jedem Fenster an (stopAll); protokolliert wird, wo die Karte spielbar war und wo sie als sinnvolle
+// Antwort angeboten wurde (respondOptions – dieselbe Auswahl, nach der der Mensch ohne „Jedes Fenster“ gefragt wird).
+function ccTimingSetup(c, kind) {
+    const h = c.type === 'Hero' ? c : ctHeroFor(c); if (!h) return null;
+    const opp = ctHeroes().find(x => x.class === 'Warrior' && !x.set && x.faction !== h.faction) || ctHeroes().find(x => x.class === 'Warrior' && !x.set);
+    // Deck je Spieler aus spielbaren Allies seiner Fraktion (sonst sind gezogene Karten wertlos: Innervate "tut nichts")
+    const fill = hh => { const v = Object.values(CARDS).filter(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.cost >= 1 && c.cost <= 4 && cardMatchesPlayer(c, { hero: hh, faction: hh.faction, className: hh.class })).sort((a, b) => Math.abs(a.cost - 2) - Math.abs(b.cost - 2))[0] || ctVanilla(2); return Array(40).fill(v.id); };
+    const s = newGameState(h.id, fill(h), opp.id, fill(opp));
+    s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false; s.deepRespond = true; s.humans = [1]; s.stopAll = true;
+    for (const p of [s.p1, s.p2]) { for (let i = 0; i < 10; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); p.hero.damage = 6; p.hand = []; }
+    ccPut(s, 1, ctVanilla(3).id); ccPut(s, 2, ctVanilla(3).id); ccPut(s, 2, ctVanilla(4).id);
+    const w = ctPlain('Weapon');
+    s.p2.hand = [ctVanilla(2).id, ctVanilla(3).id, ctVanilla(5).id, w && w.id, 165].filter(Boolean).map(id => makeCardInst(id, false, 2));   // 165 Quick Strike: eine Fähigkeit des Gegners
+    let key;
+    if (kind === 'hand') { const x = makeCardInst(c.id, false, 1); s.p1.hand.push(x); key = k => k === x.uid; }
+    else if (kind === 'quest') { const x = makeCardInst(c.id, false, 1); s.p1.resources.push({ card: x, faceUp: true, exhausted: false }); key = k => k === x.uid; }
+    else { const x = c.type === 'Hero' ? s.p1.hero : ccPut(s, 1, c.id); if (!x || x.id !== c.id) return null; key = k => typeof k === 'string' && k.startsWith(x.uid + '|'); }
+    return { s, key };
+}
+function ccTimingMoment(s, pid) {
+    const top = s.chain[s.chain.length - 1];
+    if (top) return top.kind === 'proposal' ? 'Angriff' : top.kind === 'card' ? 'Link:' + top.card.type : 'Link:' + top.kind;
+    if (s.battle) return 'Kampf:' + s.battle.step;
+    return ({ ready: 'Ready', draw: 'Zugbeginn', end: 'Zugende', action: 'Aktion' })[(s.win || {}).reason] || ('Fenster:' + ((s.win || {}).reason || s.phase));
+}
+function ccTimingRun(c, kind) {
+    const st = ccTimingSetup(c, kind); if (!st) return null;
+    const { s, key } = st, playable = [], offered = [];
+    try {
+        if (!applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1)) return null;
+        for (let n = 0; n < 600; n++) {
+            if (s.gameOver || (s.activePlayer === 1 && s.turn > 6)) break;
+            if (s.pending) {
+                const d = s.pending; s.pending = null;
+                if (d.kind === 'priority' && d.pid === 1) {
+                    if (s.activePlayer === 2) {
+                        const m = ccTimingMoment(s, 1);
+                        if (getPriorityActions(s, 1).some(a => key(respondKey(s, 1, a)))) playable.push(m);
+                        if ((d.good || []).some(key)) offered.push(m);
+                    }
+                    passPriority(s);
+                } else if (d.kind === 'priority') passPriority(s);
+                else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) });
+                process(s); continue;
+            }
+            if (isIdle(s)) {
+                if (s.activePlayer !== 2) break;
+                const dec = fastAiAction(s, 2);
+                if (dec && dec.action && applyAction(s, dec.action, true, 2)) continue;
+                applyAction(s, { type: 'END_TURN', actorId: 2 }, true, 2); continue;
+            }
+            process(s);
+        }
+    } catch (e) { return { err: e.message, playable, offered }; }
+    return { playable: [...new Set(playable)], offered: [...new Set(offered)] };
+}
+function ccTimingSweep(o = {}) {
+    const out = [];
+    for (const c of ccAllCards()) {
+        if (o.only && !o.only.includes(c.id)) continue;
+        const kinds = [];
+        if (c.instant && c.type !== 'Hero') kinds.push('hand');
+        if (c.type === 'Quest') kinds.push('quest');
+        if (FX[c.id] && (FX[c.id].powers || []).length && c.type !== 'Quest' && c.type !== 'Location') kinds.push('power');
+        for (const kind of kinds) {
+            if (o.progress) o.progress(`Zeitpunkt ${c.id} ${c.name} (${kind})`);
+            const loops = ccWatchLoops(); let r;
+            try { r = ccTimingRun(c, kind); } finally { loops.restore(); }
+            if (r) out.push({ id: c.id, name: c.name, kind, text: c.text || '', ...r });
+        }
+    }
+    return out;
+}

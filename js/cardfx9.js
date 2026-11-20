@@ -185,8 +185,11 @@ FX[7028] = fxMix({ alt: TRAP }, onEnter(7028, 'hit'), { k: { hit: (s, a) => { if
 FX[7029] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { dmgIn: (s, src, sp, t, from, o) => t.uid === src.attachedTo && o.dt === 'Ranged' ? 1 : 0 } };
 FX[7031] = { resolve: (s, it) => addPE(s, it.pl, { k: 'snipe9' }) };
-onEvt('entersPlay', (s, d) => { const c = findCharacter(s, d.uid); if (!c || !(isAllyLike(c) || isEquip(c) || c.type === 'Ability')) return;
-    for (const m of pes(s, null, 'snipe9')) { if (m.used) continue; m.used = true; pushTrig(s, m.pid, 7031, [{ op: 'call', k: 'E:destroyUid', a: { uid: c.uid } }]); } });
+// Allies melden ihr Eintreten als 'allyEnters', Ausrüstung und Fähigkeiten als 'entersPlay' – Snipe hörte nur auf
+// 'entersPlay' und zerstörte so nie einen Ally (fand die Prüfung der Antwort-Zeitpunkte)
+const snipe9 = (s, d) => { const c = findCharacter(s, d.uid); if (!c || !(isAllyLike(c) || isEquip(c) || c.type === 'Ability')) return;
+    for (const m of pes(s, null, 'snipe9')) { if (m.used) continue; m.used = true; pushTrig(s, m.pid, 7031, [{ op: 'call', k: 'E:destroyUid', a: { uid: c.uid } }]); } };
+onEvt('entersPlay', snipe9); onEvt('allyEnters', snipe9);
 onEvt('cardPlayed', (s, d) => { if (d.card.type === 'Ability') { const a = (s.abil9 = s.abil9 || {}); a[d.pid] = a[d.pid] && a[d.pid].turn === s.turn ? { turn: s.turn, n: a[d.pid].n + 1 } : { turn: s.turn, n: 1 }; } });
 const abilitiesPlayed = (s, pid) => { const a = (s.abil9 || {})[pid]; return a && a.turn === s.turn ? a.n : 0; };
 FX[7032] = { selfCost: (s, pid) => -abilitiesPlayed(s, pid), slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 3, 'Ranged'); } };

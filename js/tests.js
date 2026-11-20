@@ -1971,6 +1971,40 @@ function runRuleTests() {
         const uq = rule([191, 191]); assert(uq && uq.keep === 1 && uq.rule === tr`${'King Magni Bronzebeard'} ist Unique: Man darf nur eine Karte mit diesem Namen im Spiel haben.`, 'Unique: ' + (uq && uq.rule));
     });
 
+    test(167, 'Antwort-Zeitpunkte im Gegnerzug: Pin zu Zugbeginn, Burgle erst beim Angriff (nach dem Ausspielen), Snipe auf den Ally (zerstört ihn), Counterspell nur auf eine Fähigkeit', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        // Wo wird der Mensch (Spieler 1) im folgenden Gegnerzug gefragt? Gegner: zwei Allies im Spiel, drei auf der Hand und Quick Strike
+        const moments = (cardId, cls, play) => {
+            const s = newGameState(heroOf(cls).id, fill, heroOf('Warrior').id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 };
+            s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [1];
+            for (const p of [s.p1, s.p2]) for (let i = 0; i < 8; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+            const mine = makeCardInst(cardId, false, 1); s.p1.hand = [mine];
+            s.p2.hand = [3, 4, 2].map(c => makeCardInst(ctVanilla(c).id, false, 2)).concat([makeCardInst(165, false, 2)]);
+            for (const c of [3, 4]) { const x = makeCardInst(ctVanilla(c).id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); }
+            applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1);
+            const out = [];
+            for (let n = 0; n < 400 && !s.gameOver && !(s.activePlayer === 1 && s.turn > 6); n++) {
+                if (s.pending) { const d = s.pending; s.pending = null;
+                    if (d.kind === 'priority') { if ((d.good || []).includes(mine.uid)) { const t = s.chain[s.chain.length - 1]; out.push(t ? (t.kind === 'card' ? t.card.type : t.kind) : s.battle ? 'combat' : s.win.reason);
+                            if (play && !out.hit) { out.hit = t && t.card ? t.card.uid : 1; out.s = s; s.pending = d; const o = respondOptions(s, 1).find(x => respondKey(s, 1, x.a) === mine.uid); s.pending = null; doAction(s, o.a, 1); process(s); continue; } }
+                        passPriority(s); }
+                    else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: aiPick(s, d) });
+                    process(s); continue; }
+                if (isIdle(s)) { if (s.activePlayer !== 2) break; const dec = fastAiAction(s, 2); if (dec && dec.action && applyAction(s, dec.action, true, 2)) continue; applyAction(s, { type: 'END_TURN', actorId: 2 }, true, 2); continue; }
+                process(s);
+            }
+            return out;
+        };
+        const pin = moments(10088, 'Hunter'); assert(pin[0] === 'draw', 'Pin: zuerst angeboten bei ' + pin.join(','));
+        const bur = moments(10054, 'Rogue'); assert(bur.length && bur[0] === 'proposal' && !bur.includes('draw'), 'Burgle: angeboten bei ' + bur.join(','));
+        const sni = moments(7031, 'Hunter'); assert(sni[0] === 'Ally' && !sni.includes('draw'), 'Snipe: angeboten bei ' + sni.join(','));
+        const cs = moments(51, 'Mage'); assert(cs.every(m => m === 'Ability'), 'Counterspell: angeboten bei ' + cs.join(','));
+        // Snipe: "When the next ability, ally, or equipment enters play this turn, destroy it" – auch Allies (vorher nur Ausrüstung/Fähigkeiten)
+        const sp = moments(7031, 'Hunter', true);
+        assert(sp.hit && sp.s.p2.graveyard.some(c => c.uid === sp.hit) && !sp.s.p2.allies.some(c => c.uid === sp.hit), 'Snipe: Ally nicht zerstört');
+    });
+
     return results;
 }
 
