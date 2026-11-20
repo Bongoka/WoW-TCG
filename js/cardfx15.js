@@ -373,7 +373,7 @@ EK.split15Add = (s, a, v) => { const m = { ...a.map }; m[v] = (m[v] || 0) + 1; q
 FX[3438] = { aura: { cost: (s, src, sp, pid, card) => pid === sp && isAllyCard(card) && alliesOf(me(s, sp)).length < alliesOf(foe(s, sp)).length ? -2 : 0 } };
 // The Undeath Carrier: "When a non-Undead ally you control is destroyed, put it into play, and it's also an Undead."
 const isUndead15 = c => !!c && (/\bUndead\b/.test(c.race || '') || (c.allyTypes || []).includes('Undead') || !!c.undead15);
-FX[3439] = { on: { destroyed: (s, c, d, pid) => { const sn = d.snap; if (!sn || sn.isToken || (sn.wasCtrl || sn.owner) !== pid || !isAllyCard(CARDS[sn.id]) || isUndead15({ race: sn.race, allyTypes: CARDS[sn.id].allyTypes, undead15: sn.undead15 })) return;
+FX[3439] = { on: { destroyed: (s, c, d, pid) => { const sn = d.snap; if (!sn || sn.isToken || (sn.wasCtrl || sn.owner) !== pid || !isAllyCard(CARDS[sn.id]) || isUndead15({ race: sn.race, allyTypes: sn.allyTypes || CARDS[sn.id].allyTypes, undead15: sn.undead15 })) return;   // aktueller Typ (zurückgeholt = "also an Undead"); vorher der gedruckte → Endlosschleife bei sofort sterbenden Allies
         trig(s, { id: 3439, k: 'go', a: { pid, uid: sn.uid } }); } },
     k: { go: (s, a) => { const l = gyCard(s, a.uid); if (!l) return; fromGyToPlay(s, a.uid, a.pid); const c = findCharacter(s, a.uid); if (c) { c.undead15 = true; c.allyTypes = [...(c.allyTypes || []), 'Undead']; } } } };
 // Widow's Fury: "This weapon has +3 ATK if an ally you controlled was destroyed this turn."

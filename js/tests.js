@@ -1933,6 +1933,20 @@ function runRuleTests() {
         const top = s.chain.find(x => x.card && x.card.uid === victim.uid);
         assert(top && top.interrupted, 'Nether Fissure: wurde unterbrochen und hat ihr Ziel nicht unterbrochen');
     });
+    test(166, 'The Undeath Carrier: zerstörter Nicht-Untoter kommt einmal als Untoter zurück, beim zweiten Mal nicht mehr (vorher Endlosschleife: gedruckter statt aktueller Typ geprüft)', () => {
+        const s = fresh(); s.humans = [];
+        const w = makeCardInst(3439, false, 1); w.joinedTurn = 1; P(s, 1).hero.weapons = [w];
+        const al = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && !/Undead/.test(c.race || '') && !(c.allyTypes || []).includes('Undead'));
+        const x = makeCardInst(al.id, false, 1); x.joinedTurn = 1; P(s, 1).allies.push(x);
+        const ce0 = console.error; let loop = 0; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) loop++; else ce0(...m); };
+        try {
+            destroy(s, x); process(s); autoResolve(s);
+            const back = P(s, 1).allies.find(a => a.uid === x.uid);
+            assert(back && back.undead15, 'Undeath Carrier: Ally nicht als Untoter zurück');
+            destroy(s, back); process(s); autoResolve(s);
+            assert(!loop && !P(s, 1).allies.some(a => a.uid === x.uid), `Undeath Carrier: Ally kam erneut zurück (Schleife ${loop})`);
+        } finally { console.error = ce0; }
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

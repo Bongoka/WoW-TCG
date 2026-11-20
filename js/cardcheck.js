@@ -103,9 +103,10 @@ function ccSetup(c, opts = {}) {
         for (let i = 0; i < (opts.res !== undefined && p.id === 1 ? opts.res : 10); i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
         p.hand = [1, 2, 3].map(k => makeCardInst(ctVanilla(k).id, false, p.id));
     }
+    if (CC_MUT && CC_MUT.board) CC_MUT.board(s);
     return s;
 }
-const ccPut = (s, pid, id, o = {}) => { const p = getPlayer(s, pid), x = makeCardInst(id, false, pid); x.joinedTurn = 1; Object.assign(x, o);
+const ccPut = (s, pid, id, o = {}) => { const p = getPlayer(s, pid), x = makeCardInst(id, false, pid); x.joinedTurn = 1; Object.assign(x, o); if (CC_MUT && CC_MUT.card && CC_MUT.cardId === id) CC_MUT.card(s, x);
     const d = CARDS[id]; (d.type === 'Weapon' ? p.hero.weapons : d.type === 'Armor' || d.type === 'Item' ? p.hero.armors : d.type === 'Ally' ? p.allies : p.ongoing).push(x); return x; };
 // Offene Entscheidungen wie die KI beantworten, Prioritäten passen
 function ccDrive(s, until, max = 400) {
@@ -427,6 +428,7 @@ function ccRich(s) {
         p.hero.damage = Math.max(p.hero.damage, 5); }
     if (R.totem) put(1, R.totem);
     s.p2.hand.push(makeCardInst(ctVanilla(2).id, false, 2));
+    if (CC_MUT && CC_MUT.board) CC_MUT.board(s);
     return s;
 }
 function ccCheckNoop(c) {
@@ -756,6 +758,39 @@ function ccCheckQuest(c) {
         const changed = ccFingerprint(A, q.card.uid, true) !== ccFingerprint(B, q.card.uid, true);
         return { n: 1, out: changed ? [] : [{ sev: 'warn', msg: 'Belohnung ohne erkennbare Wirkung auf dem Prüffeld' }], proven: changed };
     } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Quest: Absturz – ' + e.message }], proven: false }; }
+}
+
+// ---------------------------------------------------------------- A7: Bedingte Karten – Szenario-Varianten
+// Für Karten ohne Nachweis auf dem Standardfeld werden gezielt Spielstände hergestellt, in denen typische Bedingungen erfüllt sind
+// (alles beschädigt/erschöpft, leere/volle Hand, Zähler auf der Karte, viele gegnerische Allies, Kreaturentypen, Gegnerzug …).
+// Wird die Wirkung in einer Variante sichtbar, ist sie nachgewiesen; Abstürze/Invarianten zählen in jeder Variante als Fehler.
+let CC_MUT = null;
+const ccTypeAlly = t => (Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && (c.allyTypes || []).includes(t) && !CARD_ISSUES[c.id]) || {}).id;
+const CC_MUTATORS = [
+    ['alles beschädigt', { board: s => { for (const p of [s.p1, s.p2]) { p.hero.damage = Math.max(p.hero.damage, 12); for (const a of p.allies) if (!a.isTotem) a.damage = Math.max(a.damage || 0, Math.min(2, Math.max(0, hpOf(s, a) - 1))); } } }],
+    ['alles erschöpft', { board: s => { for (const p of [s.p1, s.p2]) { for (const a of p.allies) a.exhausted = true; for (const w of [...p.hero.weapons, ...p.hero.armors]) w.exhausted = true; } s.p2.hero.exhausted = true; } }],
+    ['gegnerische Hand leer', { board: s => { s.p2.hand = []; } }],
+    ['eigene Hand voll', { board: s => { while (s.p1.hand.length < 8) s.p1.hand.push(makeCardInst(ctVanilla(2).id, false, 1)); } }],
+    ['Zähler auf der Karte', { card: (s, x) => { const names = new Set(['atk1', 'def']); for (const m of (CARDS[x.id].text || '').matchAll(/(\w+)(?: \[\w+\])? counters?/gi)) names.add(m[1].toLowerCase()); x.counters = { ...(x.counters || {}) }; for (const n of names) x.counters[n] = 3; } }],
+    ['Gegner mit vielen Allies', { board: s => { for (let i = 0; i < 4; i++) { const a = makeCardInst(ctVanilla(2 + (i % 3)).id, false, 2); a.joinedTurn = 1; s.p2.allies.push(a); } } }],
+    ['Kreaturentypen', { board: s => { for (const ty of ['Demon', 'Undead', 'Elemental', 'Dragonkin', 'Beast', 'Mechanical', 'Giant', 'Murloc']) { const id = ccTypeAlly(ty); if (id) for (const pid of [1, 2]) { const a = makeCardInst(id, false, pid); a.joinedTurn = 1; getPlayer(s, pid).allies.push(a); } } } }],
+    ['keine eigenen Allies', { board: s => { s.p1.allies = []; } }],
+    ['wenig Ressourcen', { board: s => { s.p1.resources = s.p1.resources.slice(0, 3); } }],
+    ['Held mit Stealth und Kampfschaden', { board: s => { addTM(s.p1.hero, { k: 'stealth' }); for (const a of s.p2.allies) addTM(a, { k: 'hitByHero', turn: s.turn, by: 1 }); addTM(s.p2.hero, { k: 'hitByHero', turn: s.turn, by: 1 }); } }],
+    ['Gegnerzug', { board: s => { s.activePlayer = 2; s.lastTurnOf = { 1: 5, 2: 6 }; } }],
+];
+function ccProveConditional(c) {
+    const out = []; let via = null;
+    for (const [name, mut] of CC_MUTATORS) {
+        CC_MUT = { ...mut, cardId: c.id };
+        try {
+            const rs = [ccCheckNoop(c), ccCheckTriggerFires(c), ccCheckStatic(c), ccCheckPowers(c), ccCheckAttach(c), ccCheckQuest(c), ccCheckTriggers(c), ccCheckVerbs(c)];
+            for (const r of rs) for (const f of r.out || []) if (f.sev === 'fail' && /Absturz|Invariante/.test(f.msg)) out.push({ sev: 'fail', msg: `[${name}] ${f.msg}` });
+            if (rs.some(r => r.proven || (r.n && !(r.out || []).length && r !== rs[2] && r !== rs[3] && r !== rs[4] && r !== rs[5]))) { via = name; break; }
+        } catch (e) { out.push({ sev: 'fail', msg: `[${name}] Absturz: ${e.message}` }); }
+        finally { CC_MUT = null; }
+    }
+    return { proven: !!via, via, out };
 }
 
 // ---------------------------------------------------------------- Text-Abgleich im Quelltext
