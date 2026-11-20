@@ -2117,6 +2117,17 @@ function runRuleTests() {
         assert(mid === 1, 'Burgle: im End-Fenster nicht unter eigener Kontrolle (' + mid + ')');
         assert((locate(s, e.uid) || {}).pid === 2, 'Burgle: nach dem Zug nicht zurückgegeben');
     });
+    test(176, 'Champion Zosimuus auf beiden Seiten: Holy-Allies schießen sich über die Kette Schaden zu, bis einer zerstört ist (vorher Endlosschleife; "damaged" löst über die Kette aus, CR 708.1)', () => {
+        const s = freshH(9, 9); s.humans = [];
+        const holy = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.unique && c.atkType === 'Holy' && c.hp >= 3);
+        assert(holy, 'kein Holy-Ally ohne Text');
+        put(s, 1, 4143); put(s, 2, 4143); const a = put(s, 1, holy.id), b = put(s, 2, holy.id);
+        let loops = 0; const ce0 = console.error; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) loops++; else ce0(...m); };
+        try { dealDamage(s, { src: a.uid, tgt: b.uid, amt: 1, dt: 'Holy' }); process(s); autoResolve(s); } finally { console.error = ce0; }
+        assert(!loops, 'Endlosschleife');
+        const alive = [a, b].filter(x => [...P(s, 1).allies, ...P(s, 2).allies].some(y => y.uid === x.uid)).length;
+        assert(alive < 2, 'Hin und Her endete ohne Zerstörung (' + alive + ' leben noch)');
+    });
     return results;
 }
 

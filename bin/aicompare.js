@@ -29,18 +29,25 @@ function deckFor(heroId, rnd) {
     return { hero: heroId, cards, nTimed: cards.filter(id => timed.has(id)).length };
 }
 const res = [];
+// Endlosschleifen der Engine je Partie mitschreiben (process() meldet "Engine-Schleife abgebrochen")
+let loops = 0, loopWhy = []; const ce0 = console.error; console.error = (...m) => { if (/Engine-Schleife/.test(String(m[0]))) { loops++; if (loopWhy.length < 3) loopWhy.push(m.slice(1).join(' ')); } else ce0(...m); };
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
     const sd = seed0 + i, rnd = seededRandom(sd * 7919);
-    const h = heroes[Math.floor(rnd() * heroes.length)].id, deck = deckFor(h, rnd);
+    // --decks zufall: zufällige legale Decks statt der Instant-Decks (für Änderungen an der allgemeinen Bewertung)
+    const h = heroes[Math.floor(rnd() * heroes.length)].id, deck = arg('--decks') === 'zufall' ? (() => { const r0 = Math.random; Math.random = rnd; try { return { ...randomLegalDeck(h), nTimed: 0 }; } finally { Math.random = r0; } })() : deckFor(h, rnd);
     const legacySeat = sd % 2 ? 1 : 2;
     // --nur MERKMAL: die "neue" Seite hat nur dieses Merkmal (alle anderen alt) – zeigt, was es allein bringt
-    const FEATS = ['start', 'react', 'tempo', 'noHold', 'half', 'reactive', 'cold'], only = arg('--nur');
+    const FEATS = ['start', 'react', 'tempo', 'noHold', 'half', 'reactive', 'cold', 'oppres', 'handdelay', 'holddef', 'kwscale'], only = arg('--nur');
     const newSide = only ? Object.fromEntries(FEATS.filter(f => !only.split(',').includes(f)).map(f => [f, true])) : false;
     AI_LEGACY[1] = legacySeat === 1 ? true : newSide; AI_LEGACY[2] = legacySeat === 2 ? true : newSide;
+    // --basis neu: beide Seiten mit allen neuen Merkmalen (nur --w unterscheidet sie); --w '{"hpOpp":1.2}': Gewichte der neuen Seite
+    if (arg('--basis') === 'neu') AI_LEGACY[legacySeat] = false;
+    AI_W[1] = AI_W[2] = null; if (arg('--w')) AI_W[legacySeat === 1 ? 2 : 1] = JSON.parse(arg('--w'));
     Math.random = seededRandom(sd);
+    loops = 0; loopWhy = [];
     let r; try { r = simulateOneGame(deck, deck); } catch (e) { res.push({ sd, err: e.message }); continue; }
-    res.push({ sd, hero: h, nTimed: deck.nTimed, newWon: r.winner !== legacySeat, turns: r.turns, timeout: r.timeout });
+    res.push({ sd, hero: h, nTimed: deck.nTimed, newWon: r.winner !== legacySeat, turns: r.turns, timeout: r.timeout, loops, ...(loops ? { loopWhy } : {}) });
     if (!arg("--out")) errOut.write(`\r${i + 1}/${N}`);
 }
 if (arg('--out')) { fs.writeFileSync(arg('--out'), JSON.stringify(res)); exit(0); }

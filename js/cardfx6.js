@@ -418,8 +418,12 @@ FX[4139] = { on: { dmg: (s, c, d, pid) => { if (d.tgt === c.uid && d.spid && d.s
 FX[4140] = { aura: { kw: (s, src, sp, c, k) => k === 'elusive' && c.uid === src.uid && !src.exhausted } };
 FX[4141] = { aura: { kw: (s, src, sp, c, k) => k === 'untargetable' && c.uid === src.uid && !src.exhausted } };
 FX[4142] = { aura: { atk: (s, src, sp, c) => c.type === 'Ally' && ctrlOf(s, c) === sp && !c.exhausted ? 2 : 0 } };
-FX[4143] = { on: { damaged: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (t && t.type === 'Ally' && t.atkType === 'Holy' && d.tpid === pid && d.src && findCharacter(s, d.src)) trig(s, { id: 4143, k: 'hit', a: { from: d.tgt, to: d.src } }); } },
-    k: { hit: (s, a) => { if (findCharacter(s, a.from) && findCharacter(s, a.to)) dealDamage(s, { src: a.from, tgt: a.to, amt: 2, dt: 'Holy' }); } } };
+// Champion Zosimuus: ausgelöster Effekt über die Kette (CR 708.1) – vorher sofort: zwei Zosimuus mit Holy-Allies schossen sich
+// endlos Schaden zu, weil zwischen den Treffern keine Zustandsprüfung lief (tödlich getroffene Allies blieben im Spiel).
+// Ist der getroffene Ally inzwischen zerstört, wirkt der Effekt trotzdem (CR 707.3: letzte Informationen der Quelle), dann ohne
+// Quellkarte; das Ziel muss noch im Spiel sein (CR 408.2b)
+FX[4143] = { on: { damaged: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (t && t.type === 'Ally' && t.atkType === 'Holy' && d.tpid === pid && d.src && findCharacter(s, d.src)) pushTrig(s, pid, 4143, [{ op: 'trig', id: 4143, k: 'hit', a: { from: d.tgt, to: d.src, pid } }], c.uid); } },
+    k: { hit: (s, a) => { if (findCharacter(s, a.to)) dealDamage(s, { src: findCharacter(s, a.from) ? a.from : null, srcPl: a.pid, tgt: a.to, amt: 2, dt: 'Holy' }); } } };
 FX[4144] = { enter: (s, c, pid) => trig(s, { id: 4144, k: 'chicken', a: { pid } }),
     k: { chicken: (s, a) => makeToken(s, 9502, foe(s, a.pid).id) },
     powers: [{ key: 'cookie', label: tr('Alle Ally-Tokens zerstören'), act: true, resolve: (s, it) => [s.p1, s.p2].forEach(p => alliesOf(p).filter(x => x.isToken && x.type === 'Ally').forEach(x => destroy(s, x))) }] };

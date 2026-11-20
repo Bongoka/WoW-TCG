@@ -16,7 +16,7 @@ function evaluateStateNow(s, pid) {
     if (doomed.has(me.hero.uid) && !isIndestructible(s, me.hero)) return AI_LOSS + 1;
     if (doomed.has(opp.hero.uid) && !isIndestructible(s, opp.hero)) return AI_WIN - 1;
     let score = 0;
-    score += myHp * AI_HP_W.me - oppHp * AI_HP_W.opp;
+    score += myHp * aw(pid, 'hpMe') - oppHp * aw(pid, 'hpOpp');
     if (myHp <= 6) score -= (7 - myHp) * 14; else if (myHp <= 12) score -= (13 - myHp) * 3;
     if (oppHp <= 6) score += (7 - oppHp) * 16; else if (oppHp <= 12) score += (13 - oppHp) * 3;
     // Lage je Seite für die Schlüsselwörter: Angreifer, Protectors, mittlere ATK, Handkarten der Gegenseite
@@ -27,7 +27,7 @@ function evaluateStateNow(s, pid) {
     const infoMe = sideInfo(me), infoOpp = sideInfo(opp);
     const allyVal = (a, mine) => {
         const atk = a.isTotem ? 0 : atkOf(s, a, {}), rem = Math.max(0, hpOf(s, a) - (a.damage || 0));
-        let v = 3.5 + atk * (mine ? 2.2 : 2.6) + rem * (mine ? 1.5 : 1.6);
+        let v = 3.5 + atk * (mine ? aw(pid, 'atkMine') : aw(pid, 'atkOpp')) + rem * (mine ? aw(pid, 'hpAllyMine') : aw(pid, 'hpAllyOpp'));
         if (a.isTotem) v += 3 + (a.cost || 0);
         // Schlüsselwörter nach Lage (Gegenseite = die, gegen die das Schlüsselwort wirkt): Protector/Elusive je Angreifer,
         // Stealth je Protector, Long-Range nach der ATK der Verteidiger, Untargetable nach den Handkarten (mögliche Entfernung)
@@ -35,9 +35,12 @@ function evaluateStateNow(s, pid) {
         // Erschöpfte eigene Protectors schützen im Gegnerzug nicht (erst im eigenen Zug wieder bereit)
         if (hasProtector(s, a)) { const pv = 1.5 + 1.5 * o.attackers; v += mine ? (a.exhausted ? pv / 3 : pv) : (a.exhausted ? pv / 4 : pv + 0.5); }
         if (hasElusive(s, a)) v += (mine ? 1 : 1.3) + 0.8 * o.attackers;
-        if (atk > 0 && kwHas(s, a, 'stealth')) v += 0.5 + 1.5 * o.protectors;
+        // Nach Forge (Magic-KI, CreatureEvaluator): Evasion je Angriffspunkt (Flying +10 je Power bei 15 je Power selbst),
+        // Schutz vor Entfernung anteilig zum Kartenwert (Hexproof +35 bei rund 190 für einen 3/3 ≈ 18 %)
+        const kwNew = !aiOld(pid, 'kwscale');
+        if (atk > 0 && kwHas(s, a, 'stealth')) v += kwNew ? atk * (0.4 + 0.5 * o.protectors) : 0.5 + 1.5 * o.protectors;
         if (atk > 0 && kwHas(s, a, 'longRange')) v += 0.3 * o.avgAtk;
-        if (kwHas(s, a, 'untargetable')) v += 0.25 * o.hand;
+        if (kwHas(s, a, 'untargetable')) v += kwNew ? (3.5 + atk * 2.2 + rem * 1.5) * (o.hand ? 0.12 : 0.04) : 0.25 * o.hand;
         if (mine && !a.exhausted) v += 0.6;
         // Bleibt im nächsten Bereitmachen erschöpft (Leeroy Jenkins, Gouge, Hammer of Justice …): greift im nächsten
         // eigenen Zug nicht an und schützt bis dahin nicht
@@ -49,14 +52,17 @@ function evaluateStateNow(s, pid) {
     alliesOf(opp).forEach(a => { if (doomed.has(a.uid)) return; score -= allyVal(a, false); if (!a.isTotem && (!a.exhausted || hasFerocity(s, a))) threat += atkOf(s, a, { attacking: true }); });
     const ow = opp.hero.weapons.find(w => !w.exhausted);
     if (ow) threat += weaponAtk(s, ow, { attacking: true });
-    if (myHp <= threat) score -= 50;
+    if (myHp <= threat) score -= aw(pid, 'lethal');
     // Eigene Handkarten nach Nutzen (spielbare, gute Karten mehr wert als tote); gegnerische Hand ist verdeckt: pauschal
     me.hand.forEach(c => score += handCardValue(s, me, c));
-    score -= opp.hand.length * 2.5;
+    score -= opp.hand.length * aw(pid, 'oppCard');
     // Ressourcen sind bis 8 sehr wertvoll – jede verlorene kostet dauerhaft Tempo (z. B. Twig of the World Tree);
     // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
     const nRes = me.resources.length;
-    score += Math.min(nRes, 8) * 7 + Math.max(0, nRes - 8) * 1;
+    score += Math.min(nRes, 8) * aw(pid, 'res') + Math.max(0, nRes - 8) * 1;
+    // Gegnerische Ressourcen genauso – vorher kein Posten: gegnerische Ressourcen zu zerstören (Band of Vile Aggression,
+    // Caddrick Von Styler) war für die KI wirkungslos
+    if (!aiOld(pid, 'oppres')) { const oRes = opp.resources.length; score -= Math.min(oRes, 8) * aw(pid, 'res') + Math.max(0, oRes - 8) * 1; }
     // Ungenutztes Mana ist nichts wert – außer man hält es im eigenen Zug für ein Instant im gegnerischen Zug bereit
     // (nicht in den Vergleichen der Antworten im Gegnerzug: deren Endpunkt ist der eigene Zugbeginn, die Karte zählte sonst doppelt –
     // Cat Form "+1 ATK while attacking" war auf der Hand 5,4 mehr wert als im Spiel)
@@ -117,6 +123,11 @@ const AI_DOOM = [
 function aiDoomed(s) { const out = new Set(); for (const f of AI_DOOM) for (const u of f(s)) out.add(u); return out; }
 // Leben linear (je Punkt); bei wenig Leben kommen oben die starken Zuschläge dazu
 const AI_HP_W = { me: 1.0, opp: 1.6 };
+// Gewichte der Bewertung, je Spieler überschreibbar (AI_W[pid] = { hpOpp: 1.2, … }) – zum Nachjustieren per Selbstspiel
+// (bin/aicompare.js --w): eine Variante spielt gegen die Standard-CPU, ausgewertet Partie für Partie gegen den Nulllauf
+const AI_W_DEF = { hpMe: AI_HP_W.me, hpOpp: AI_HP_W.opp, atkMine: 2.2, atkOpp: 2.6, hpAllyMine: 1.5, hpAllyOpp: 1.6, lethal: 50, oppCard: 2.5, res: 7, card: 2.6 };
+const AI_W = { 1: null, 2: null };
+const aw = (pid, k) => (AI_W[pid] && AI_W[pid][k] !== undefined ? AI_W[pid][k] : AI_W_DEF[k]);
 const AI_FLIP_VALUE = 4;
 const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).some(pw => pw.flip));
 // Mana für den Zug des Gegners zurückhalten: Instants, die gerade dann wirken (unterbrechen, Schaden verhindern,
@@ -132,7 +143,7 @@ function aiHoldValue(s, p) {
     for (const c of p.hand) {
         if (c.type === 'Quest' || c.type === 'Location' || !c.instant || !(aiOld(p.id, 'reactive') ? AI_REACTIVE_OLD : AI_REACTIVE).test(c.text || '') || !cardMatchesPlayer(c, p)) continue;
         const cost = getPlayCost(s, p, c); if (cost > ready) continue;
-        best = Math.max(best, 3 + cost * 1.2);
+        best = Math.max(best, aiOld(p.id, 'holddef') ? 3 + cost * 1.2 : 1.5 + cost * 0.8);
     }
     return best;
 }
@@ -145,15 +156,20 @@ function handCardValue(s, p, c) {
     if (c.type === 'Location') return locsOf(p).length ? 1.2 : 2.6;              // Location (Set drums): eine offene lohnt, weitere kaum
     if (!cardMatchesPlayer(c, p) || !talentReqOk(c, p.hero)) return 0.5;
     const R = p.resources.length, cost = c.xCost ? 4 : (c.cost || 0);
-    let v = 2.6 + Math.min(cost, 8) * 0.18;
-    if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4);        // noch lange nicht spielbar
+    let v = aw(p.id, 'card') + Math.min(cost, 8) * 0.18;
+    // Noch nicht spielbar: je Zug Wartezeit 15 % weniger (ab dem nächsten Zug mit einer Ressource mehr). Vorher zog die KI erst
+    // ab "Ressourcen + 3" ab – ein 8er bei 5 Ressourcen war mehr wert als ein sofort spielbarer 3er (4,0 gegen 3,1)
+    if (aiOld(p.id, 'handdelay')) { if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4); }
+    else { const delay = Math.max(0, cost - R - 1); if (delay) v *= Math.pow(0.85, delay); }
     if (R >= 5 && cost <= 2) v -= 0.6;                                   // im Lategame wenig Wirkung
-    if (aiDefensive(c)) return Math.max(0.8, v) + AI_HOLD_DEF + cost * 0.8;   // Haltewert: lohnt sich erst als Antwort (Angriff, Schaden)
+    // Haltewert: lohnt sich erst als Antwort (Angriff, Schaden). Kleiner als früher: zusammen mit dem Mana-Zurückhalten
+    // (aiHoldValue) war ein Desperate Block (Kosten 2) auf der Hand 11,9 wert – fast so viel wie ein 3/3 im Spiel (15,2)
+    if (aiDefensive(c)) return Math.max(0.8, v) + (aiOld(p.id, 'holddef') ? AI_HOLD_DEF + cost * 0.8 : AI_HOLD_DEF_NEW + cost * 0.5);
     return Math.max(0.8, v);
 }
 // Defensive Reaktionskarten: wirken gegen Angriffe/Schaden (Power Word: Shield, Vanish, Divine Shield …) – ausspielen nur,
 // wenn es jetzt mehr bringt als der Haltewert (z. B. einen Ally vor tödlichem Schaden retten, Angreifer entfernen)
-const AI_HOLD_DEF = 2.5;
+const AI_HOLD_DEF = 2.5, AI_HOLD_DEF_NEW = 1.2;
 const AI_DEFENSIVE_RE = /\bprevent\b|remove (all )?attackers|would be dealt|\bElusive\b|\bStealth\b/i;
 function aiDefensive(c) { const d = c && CARDS[c.id]; return !!(d && d.instant && d.type === 'Ability' && AI_DEFENSIVE_RE.test(d.text || '')); }
 // Teuerste nützliche Karte in Hand und Deck (X-Kosten zählen wie 6): so viele Ressourcen braucht man höchstens

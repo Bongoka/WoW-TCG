@@ -693,7 +693,8 @@ const EV_CHAIN = { damaged: 'Schadens-Auslöser', destroyed: 'Zerstörungs-Ausl�
 // Ereignisse, deren Kartenreaktionen ausgelöste Effekte sind (sie kommen beim nächsten PPP auf die Kette)
 const CHAIN_EVENTS = { sabotages: 1, proposes: 1, targeted: 1, startOfTurn: 1, endOfTurn: 1, attacks: 1, defends: 1, protects: 1, allyEnters: 1, strike: 1, cardPlayed: 1,
     // Set 2/3: weitere ausgelöste Effekte
-    dmg: 1, died: 1, exhausted: 1, healed: 1, questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1,
+    dmg: 1, damaged: 1, died: 1, exhausted: 1, healed: 1,   // damaged: vorher sofort – zwei Champion Zosimuus schossen sich endlos Schaden zu (keine Zustandsprüfung dazwischen)
+    questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1,
     // Raid-Loot: Ressource kommt ins Spiel (Shard of the Flame), Rüstung verhindert Schaden (Drillborer Disk)
     resEnters: 1, armorPrevented: 1 };
 // Führt die Auslöse-Prüfung sofort aus; die erzeugten Schritte werden zu einem wartenden ausgelösten Effekt.
@@ -813,10 +814,12 @@ function execStep(s, st) {
 
 // ---------------------------------------------------------------- Hauptschleife
 function process(s) {
-    let guard = 0;
+    let guard = 0, trace = null;
     flushBatch(s);   // Schritte, die außerhalb eines Schritts erzeugt wurden (z. B. Tests, Setup)
     while (!s.gameOver && guard++ < 50000) {
         if (s.pending) return;
+        // Kurz vor dem Abbruch die letzten Schritte mitschreiben – die Meldung nennt dann die Ursache der Schleife
+        if (guard > 49960) (trace = trace || []).push(s.queue.length ? (s.queue[0].op + ':' + (s.queue[0].k || s.queue[0].step || '') + (s.queue[0].id ? '#' + s.queue[0].id : '')) : s.win ? 'win:' + (s.win.reason || '') + (s.chain.length ? '/' + chainDesc(s, s.chain[s.chain.length - 1]) : '') : s.waitTrig && s.waitTrig.length ? 'trig:' + (s.waitTrig[0].srcName || '') + '#' + (s.waitTrig[0].srcId || '') : s.battle ? 'battle:' + s.battle.step : 'state');
         if (s.queue.length) { execStep(s, s.queue.shift()); continue; }
         if (stateBased(s)) continue;
         if (s.waitTrig && s.waitTrig.length) { addWaitingTriggers(s); continue; }
@@ -825,7 +828,7 @@ function process(s) {
         if (s.battle) { const before = s.battle.step; battleStep(s, s.battle.step); if (s.battle && s.battle.step === before && !s.queue.length && !s.pending && !s.win) { endBattle(s, tr('Kampf hing')); } continue; }
         return;
     }
-    if (guard >= 50000) { console.error('Engine-Schleife abgebrochen'); s.queue = []; s.win = null; }
+    if (guard >= 50000) { console.error('Engine-Schleife abgebrochen', [...new Set(trace || [])].slice(0, 8).join(' | ')); s.queue = []; s.win = null; }
 }
 function isIdle(s) { return !s.gameOver && !s.pending && !s.queue.length && !s.win && !s.chain.length && !s.battle && s.phase === 'main'; }
 
@@ -1024,7 +1027,8 @@ function respondSpent(s, pid, a) {
 // Zugbeginn-Karten und Everlasting Cold. Regel-Fixes gelten für beide.
 // Einzeln abschaltbar (Messung, welche Änderung wie viel bringt): AI_LEGACY[pid] = { start: true, … } – Merkmale: start
 // (Zugbeginn-Fenster), react (Zug-Vorausschau bei Reaktionen), tempo (Zugende), noHold (kein aiHoldValue in Antwort-Vergleichen),
-// half (halber Haltewert), reactive (Mana für Zugbeginn-Karten halten), cold (Everlasting Cold)
+// half (halber Haltewert), reactive (Mana für Zugbeginn-Karten halten), cold (Everlasting Cold); Bewertung (ai.js): oppres
+// (gegnerische Ressourcen), handdelay (Handkarten nach Wartezeit), holddef (kleinere Haltewerte defensiver Instants), kwscale (Stealth je ATK, Untargetable anteilig wie bei Forge)
 const AI_LEGACY = { 1: false, 2: false };
 const aiOld = (pid, f) => AI_LEGACY[pid] === true || !!(AI_LEGACY[pid] && AI_LEGACY[pid][f]);
 function respondOptions(s, pid) {
