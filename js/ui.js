@@ -75,6 +75,8 @@ function renderDeckZone(player, prefix) {
     } else st.innerHTML = tr('<span class="grave-label">Friedhof</span>');
     const cnt = document.createElement("div"); cnt.className = "grave-count"; cnt.textContent = nr ? tr`${n} · ${nr} entfernt` : String(n); st.appendChild(cnt);
     st.onclick = () => openGraveyard(player);
+    // Nutzbare Kräfte aus Friedhof oder Entfernt-Bereich (Fan of Knives, Blinky): Ablage leuchtet wie eine spielbare Karte
+    if (player.id === 1 && [...player.graveyard, ...(player.removed || [])].some(c => usablePowers(c).length)) st.classList.add('can-act');
 }
 function openGraveyard(player) {
     const removed = player.removed || [];
@@ -89,6 +91,13 @@ function openGraveyard(player) {
             b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'PLAY_CARD', handIdx: -1, gyUid: c.uid }); };
             wrap.appendChild(b);
         }
+        // Kräfte aus dem Friedhof bzw. aus dem Entfernt-Bereich (vorher nur in Reaktionsfenstern erreichbar)
+        if (player.id === 1) usablePowers(c).forEach(pw => {
+            const b = document.createElement("button"); const cost = pw.cost === 'X' ? 'X' : (pw.cost || 0);
+            b.textContent = pw.label + (cost ? ` (${cost})` : ''); b.className = "gy-play-btn";
+            b.onclick = (e) => { e.stopPropagation(); document.getElementById("graveyard-modal").style.display = "none"; humanAct({ type: 'ACTIVATE', srcUid: c.uid, key: pw.key }); };
+            wrap.appendChild(b);
+        });
         box.appendChild(wrap); };
     player.graveyard.forEach(show);
     if (removed.length) {
@@ -126,10 +135,16 @@ function renderResourceTray(player, containerId, isHuman) {
                 decorateInPlay(cardNode, r.card);                                                 // offene Location (Set drums): Kräfte per Klick
                 if (usablePowers(r.card).length) { cardNode.classList.remove('can-act'); cardNode.classList.add('loc-ready'); }   // genug Zähler, aktivierbar: eigene Farbe
             }
-            if (isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1)) {
+            // Quest abschließen und Kräfte der Quest selbst (Gurok the Usurper) bzw. verliehene Kräfte (Invocation) – vorher bot der
+            // Klick nur das Abschließen an, Guroks Kraft war für den Menschen nicht erreichbar
+            const canDone = isHuman && (canMain() || canInstant()) && !validateAction(G, { type: 'COMPLETE_QUEST', resIdx: idx }, 1);
+            const pows = isHuman && r.card.type !== 'Location' ? cardActions(r.card) : [];
+            if (canDone || pows.length) {
                 wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
-                wrap.title = tr("Klicken: Quest abschließen");
-                wrap.onclick = () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx });
+                const opts = [...(canDone ? [{ label: tr('Quest abschließen'), cls: 'success', run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx }) }] : []), ...pows];
+                wrap.title = opts.length === 1 ? (canDone ? tr("Klicken: Quest abschließen") : opts[0].label) : tr("Klicken: Quest abschließen oder Kraft nutzen");
+                wrap.onclick = () => { if (opts.length === 1) { opts[0].run(); return; }
+                    openDecisionModal(r.card.name, tr('Was möchtest du tun?'), [...opts.map(o => ({ label: o.label, cls: o.cls || '', action: o.run })), { label: tr('Abbrechen'), action: () => {} }]); };
             }
             if (!isHuman) markSabotageTarget(wrap, r.card.uid);                                   // Sabotage: Quest/Ressource angreifen
             activeRow.appendChild(wrap);
@@ -137,6 +152,13 @@ function renderResourceTray(player, containerId, isHuman) {
             const slot = document.createElement("div"); slot.className = "res-card" + (r.exhausted ? " exhausted" : "");
             const back = document.createElement("img"); back.src = "cards/Card Back.png"; back.alt = ""; back.draggable = false;
             slot.appendChild(back); miniRow.appendChild(slot);
+            // Verdeckte Ressource mit verliehener Kraft (Invocation: "resources you control have [Activate] >>> Draw a card")
+            const pows = isHuman ? cardActions(r.card) : [];
+            if (pows.length) {
+                slot.classList.add("can-act"); slot.style.cursor = "pointer"; slot.title = pows.length === 1 ? pows[0].label : tr('Kraft nutzen');
+                slot.onclick = () => { if (pows.length === 1) { pows[0].run(); return; }
+                    openDecisionModal(tr('Ressource'), tr('Was möchtest du tun?'), [...pows.map(o => ({ label: o.label, action: o.run })), { label: tr('Abbrechen'), action: () => {} }]); };
+            }
             if (!isHuman) markSabotageTarget(slot, r.card.uid);
             shown.push([r, slot, back]);
         }
