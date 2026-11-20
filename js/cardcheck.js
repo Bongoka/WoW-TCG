@@ -584,7 +584,7 @@ function ccAiGame(seed, o = {}) {
 // Szenario einmal mit der Karte, einmal mit einer Kopie ohne Text/Wirkung (gleiche Werte, gleicher Zufall). Ist das Ergebnis
 // (ohne die Karte selbst) gleich, hat der Auslöser nichts bewirkt. Unabhängig vom Wortlaut der Wirkung.
 const CC_EVENTS = [
-    ['Angriff', /^When this ally attacks,/i, c => c.type === 'Ally', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); return applyAction(s, { type: 'ATTACK', attackerUid: x.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1); }],
+    ['Angriff', /^When this ally (?:attacks|deals combat damage)/i, c => c.type === 'Ally', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); return applyAction(s, { type: 'ATTACK', attackerUid: x.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1); }],
     ['Zerstört', /^When this (?:ally|weapon|armor|item) is destroyed,/i, c => ['Ally', 'Weapon', 'Armor', 'Item'].includes(c.type), (s, x) => { destroy(s, x); process(s); return true; }],
     ['Zugbeginn', /^(?:Ongoing: )?At the start of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => { advanceTurn(s, true); autoResolve(s); advanceTurn(s, true); autoResolve(s); return s.activePlayer === 1; }],   // Zugwechsel ohne Aktionen des Gegners (sonst stört sein Angriff)
     ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => { advanceTurn(s, true); autoResolve(s); return s.activePlayer === 2; }],
@@ -595,9 +595,14 @@ const CC_EVENTS = [
         const l = locate(s, x.uid); if (!l) return false; const p = s.p1; for (const z of [p.allies, p.hero.weapons, p.hero.armors, p.ongoing]) { const i = z.indexOf(x); if (i >= 0) z.splice(i, 1); }
         p.hand.unshift(x); const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); return !!a && applyAction(s, a, true, 1); }],
     // Schlag mit dieser Waffe: Held greift den gegnerischen Helden an und schlägt mit genau dieser Waffe zu
-    ['Schlag', /^When you strike with this weapon,/i, c => c.type === 'Weapon', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); s.humans = [1];
+    ['Schlag', /^When (?:you strike with this weapon|your hero deals combat damage with this weapon)/i, c => c.type === 'Weapon', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); s.humans = [1];
         if (!applyAction(s, { type: 'ATTACK', attackerUid: s.p1.hero.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1)) return false;
         for (let n = 0; n < 20 && s.pending; n++) { const d = s.pending; s.pending = null; const v = d.k === 'E:strikeDo' && d.opts.some(o => o.v === x.uid) ? x.uid : (d.kind === 'priority' ? null : aiPick(s, d)); if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v }); process(s); }
+        s.humans = []; return true; }],
+    ['Schlag (eigene Waffe)', /^(?:Ongoing: )?When (?:you strike with a weapon|your hero deals combat damage with a weapon|your hero attacks)/i, c => c.type !== 'Weapon' && c.type !== 'Hero', (s) => {
+        s.p2.allies.forEach(a => { a.exhausted = true; }); s.p1.hero.weapons.forEach(w => { w.exhausted = false; }); if (!s.p1.hero.weapons.length) return false; s.humans = [1];
+        if (!applyAction(s, { type: 'ATTACK', attackerUid: s.p1.hero.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1)) { s.humans = []; return false; }
+        for (let n = 0; n < 20 && s.pending; n++) { const d = s.pending; s.pending = null; const v = d.k === 'E:strikeDo' ? (d.opts.find(o => s.p1.hero.weapons.some(w => w.uid === o.v)) || d.opts[0]).v : (d.kind === 'priority' ? null : aiPick(s, d)); if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v }); process(s); }
         s.humans = []; return true; }],
     // Eine Fähigkeit spielen: billige Fähigkeit ohne Ziel, die zum Helden passt
     ['Fähigkeit gespielt', /^(?:Ongoing: )?When(?:ever)? you play an ability,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location', (s) => {
@@ -606,6 +611,10 @@ const CC_EVENTS = [
 ];
 const CC_VAN = 99991;
 const CC_BASE_KEYS = ['type', 'cost', 'atk', 'hp', 'def', 'strike', 'atkType', 'faction', 'race', 'allyClass', 'class', 'slot', 'slotMax', 'limitTags', 'twoHanded', 'allowedClasses', 'allowedFactions', 'subtypes', 'allyTypes', 'isPet', 'petType', 'totem', 'totemHp', 'instant', 'ongoing', 'attach', 'set', 'num', 'rarity', 'wsub', 'asub', 'dmgType', 'xCost'];
+// Instanz zur Kontroll-Kopie machen bzw. zurück: Instanzen tragen eine Kopie der Kartendaten (makeCardInst) – nur die ID zu tauschen
+// ließe Resistenzen, Protector, Assault … an der Instanz stehen
+function ccToVanilla(x, c) { for (const k of Object.keys(CARDS[c.id])) if (!(k in CARDS[CC_VAN])) delete x[k]; Object.assign(x, CARDS[CC_VAN]); }
+function ccFromVanilla(x, c) { for (const k of Object.keys(CARDS[CC_VAN])) delete x[k]; Object.assign(x, CARDS[c.id]); }
 function ccVanilla(c) { const v = { id: CC_VAN, name: 'Kontrolle', text: '' }; for (const k of CC_BASE_KEYS) if (CARDS[c.id][k] !== undefined) v[k] = CARDS[c.id][k]; CARDS[CC_VAN] = v; delete FX[CC_VAN]; }
 function ccCheckTriggerFires(c) {
     const out = []; let n = 0;
@@ -624,12 +633,12 @@ function ccCheckTriggerFires(c) {
         const fp = [];
         try {
             for (const ctl of [false, true]) {
-                const s = cloneState(base); const x = findCharacter(s, card.uid); if (ctl) { x.id = CC_VAN; x.name = 'Kontrolle'; x.text = ''; }
+                const s = cloneState(base); const x = findCharacter(s, card.uid); if (ctl) ccToVanilla(x, c);
                 const rnd0 = Math.random; Math.random = seededRandom(c.id * 13 + 1);
                 try { if (!run(s, x)) { fp.push(null); continue; } autoResolve(s); } finally { Math.random = rnd0; }
                 const inv = ctl ? null : ccInvariants(s); if (inv) out.push({ sev: 'fail', msg: `${name}: Invariante – ${inv}` });
                 // Karte selbst mitvergleichen (Wirkung auf sich: Jaedan Sunshot, Fist of the Deity) – die Kopie bekommt dafür ihre Identität zurück
-                if (ctl) { const y = findCharacter(s, card.uid) || (locate(s, card.uid) || {}).c; if (y) { y.id = c.id; y.name = c.name; y.text = CARDS[c.id].text; } }
+                if (ctl) { const y = findCharacter(s, card.uid) || (locate(s, card.uid) || {}).c; if (y) ccFromVanilla(y, c); }
                 fp.push(ccFingerprint(s, '__none'));
             }
         } catch (e) { out.push({ sev: 'fail', msg: `${name}: Absturz – ${e.message}` }); continue; }
@@ -638,7 +647,7 @@ function ccCheckTriggerFires(c) {
         n++;
         if (fp[0] === fp[1]) {
             // bedingt bzw. vom Feld abhängig: braucht etwas, das das Standardfeld nicht hat (Anhänge, Zähler, Fraktionskarten, Erschöpftes)
-            const cond = /\b(if|may|unless|for each|instead|target|choose|reveal|look|search|random|any number|counter|Alliance|Horde|ready|with an attachment|make up)\b|\bX\b/i.test(sen.replace(re, ''));   // "make up a name": Spaßtext ohne Spielwirkung
+            const cond = /\b(if|may|unless|for each|instead|target|choose|reveal|look|search|random|any number|counters?|Alliance|Horde|ready|with an attachment|make up|damaged|undamaged|opponent's turn|defending|to a hero|to an? (?:exhausted|damaged|undamaged))\b|\bX\b/i.test(sen.replace(re, '')) || (c.type === 'Ally' && !c.atk && /combat damage/i.test(sen));   // 0 ATK: kein Kampfschaden ohne Verstärkung (Hildagard)   // "make up a name": Spaßtext ohne Spielwirkung
             out.push({ sev: cond ? 'warn' : 'fail', msg: `${name}: Auslöser ohne Wirkung („${sen.slice(0, 70)}…“)${cond ? ' – bedingt, evtl. legitim' : ''}` });
         }
     }
@@ -651,7 +660,7 @@ function ccDerived(s) {
     const kws = c => [hasProtector(s, c), hasElusive(s, c), hasFerocity(s, c), kwHas(s, c, 'stealth'), kwHas(s, c, 'untargetable'), kwHas(s, c, 'longRange')].map(x => x ? 1 : 0).join('');
     const side = p => [
         ...[p.hero, ...p.allies].map(c => `${c.uid}:${atkOf(s, c, {})}:${atkOf(s, c, { attacking: true })}:${hpOf(s, c)}:${kws(c)}`),
-        ...p.hero.weapons.map(w => `${w.uid}:${weaponAtk(s, w, {})}`), ...p.hero.armors.map(a => `${a.uid}:${defOf(s, a)}`),
+        ...p.hero.weapons.map(w => `${w.uid}:${weaponAtk(s, w, {})}:${weaponAtk(s, w, { attacking: true })}`), ...p.hero.armors.map(a => `${a.uid}:${defOf(s, a)}`),
         ...p.hand.map(c => `${c.uid}:${getPlayCost(s, p, c, 0)}:${canPlayCard(s, p.id, c) ? 0 : 1}`),
         `res${getReadyRes(p)}`, `max${maxHandSize(s, p)}`];
     return [s.p1, s.p2].map(p => side(p).join(',')).join('#');
@@ -661,6 +670,7 @@ function ccCheckStatic(c) {
     if (!['Ally', 'Weapon', 'Armor', 'Item', 'Ability', 'Location'].includes(c.type) || c.attach || !(c.text || '').trim()) return { n: 0, out: [], proven: false };
     if (c.type === 'Ability' && !c.ongoing) return { n: 0, out: [], proven: false };
     const base = ccSetup(c); base.humans = []; ccRich(base);
+    if (c.type !== 'Weapon') ccPut(base, 1, ctPlain('Weapon').id); if (c.type !== 'Armor' && c.type !== 'Item') ccPut(base, 1, ctPlain('Armor').id);
     for (let i = 0; i < 2; i++) base.p1.hand.push(makeCardInst(Object.values(CARDS).find(x => x.type === 'Ability' && !x.isToken && cardMatchesPlayer(x, base.p1)).id || ctVanilla(2).id, false, 1));
     let card;
     if (c.type === 'Location') { card = makeCardInst(c.id, false, 1); base.p1.resources.push({ card, faceUp: true, exhausted: false }); }
@@ -669,13 +679,13 @@ function ccCheckStatic(c) {
     try {
         const d = [];
         const DT = ['Arcane', 'Fire', 'Frost', 'Holy', 'Melee', 'Nature', 'Ranged', 'Shadow'];
-        for (const ctl of [false, true]) { const s = cloneState(base); const l = locate(s, card.uid); const x = l && l.c; if (ctl && x) { x.id = CC_VAN; x.name = 'Kontrolle'; x.text = ''; }
+        for (const ctl of [false, true]) { const s = cloneState(base); const l = locate(s, card.uid); const x = l && l.c; if (ctl && x) ccToVanilla(x, c);
             let probe = '';
             if (x && (c.type === 'Ally' || c.type === 'Armor' || c.type === 'Item' || c.type === 'Ability' || c.type === 'Weapon')) for (const dt of DT) {   // je Schadensart eine frische Kopie
                 const p = cloneState(s), tgt = c.type === 'Ally' ? findCharacter(p, card.uid) : p.p1.hero, foeAlly = p.p2.allies[0];
                 if (!tgt) continue; const d0 = tgt.damage || 0; try { heroDmg(p, 2, tgt.uid, 2, dt); process(p); autoResolve(p); } catch (e) {}
-                const t2 = findCharacter(p, tgt.uid); probe += dt[0] + (t2 ? (t2.damage || 0) - d0 : 'x');
-                if (foeAlly) { const f0 = foeAlly.damage || 0; try { heroDmg(p, 1, foeAlly.uid, 1, dt); process(p); autoResolve(p); } catch (e) {} const f2 = findCharacter(p, foeAlly.uid); probe += '/' + (f2 ? (f2.damage || 0) - f0 : 'x'); }
+                const t2 = findCharacter(p, tgt.uid), z2 = locate(p, tgt.uid); probe += dt[0] + (t2 && z2 && (isInPlayZone(z2.zone) || t2.type === 'Hero') ? (t2.damage || 0) - d0 : 'x');
+                if (foeAlly) { const f0 = foeAlly.damage || 0; try { heroDmg(p, 1, foeAlly.uid, 1, dt); process(p); autoResolve(p); } catch (e) {} const f2 = findCharacter(p, foeAlly.uid), fz = locate(p, foeAlly.uid); probe += '/' + (f2 && fz && isInPlayZone(fz.zone) ? (f2.damage || 0) - f0 : 'x'); }
             }
             d.push(ccDerived(s) + '|' + probe); }
         return { n: 1, out: [], proven: d[0] !== d[1] };
