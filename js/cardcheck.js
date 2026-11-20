@@ -407,7 +407,7 @@ function ccRichIds() {
     const V = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id]);
     const find = p => (V.find(p) || {}).id;
     _ccRichIds = {
-        buff: find(c => c.type === 'Ability' && c.attach && /^Attach to target ally\. Ongoing: Attached ally has \+\d+ ATK\.?$/.test(c.text || '')),
+        buff: find(c => c.type === 'Ability' && c.attach && /^Attach to target (?:friendly )?(?:hero or )?ally\. Ongoing: Attached (?:ally|character) has \+\d+/.test(c.text || '')),
         poison: find(c => c.type === 'Ability' && c.attach && (c.subtypes || []).includes('Poison')),
         alli: find(c => c.type === 'Ally' && !c.text && c.faction === 'Alliance' && !c.unique), horde: find(c => c.type === 'Ally' && !c.text && c.faction === 'Horde' && !c.unique),
         prot: find(c => c.type === 'Ally' && c.text === 'Protector' && !c.unique), pet: find(c => c.isPet && !(c.text || '').trim()),
@@ -746,12 +746,27 @@ function ccCheckPowers(c) {
         if (a) { ccPut(base, 1, a.id); base.p1.hand.push(makeCardInst(a.id, false, 1)); }
     }
     for (const pred of [x => x.scourge && x.type === 'Ally', x => x.isPet, x => x.totem]) { const g = Object.values(CARDS).find(x => !x.isToken && pred(x)); if (g) base.p1.graveyard.push(makeCardInst(g.id, false, 1)); }
+    // weitere typische Ziele: erschöpfte Fern- und Nahkampfwaffe, offene Fähigkeit beim Gegner, Combos im entfernten Bereich,
+    // gegnerischer Ally mit Feuerschaden in diesem Zug
+    for (const slot of ['Ranged', 'Melee']) { const w = Object.values(CARDS).find(x => x.type === 'Weapon' && !x.isToken && !x.unique && !x.text && x.slot === slot && !x.twoHanded); if (w && !base.p1.hero.weapons.some(x => x.id === w.id)) ccPut(base, 1, w.id, { exhausted: true }); }
+    const oab = Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken && !(FX[x.id] || {}).aura); if (oab) ccPut(base, 2, oab.id);
+    const cmb = Object.values(CARDS).find(x => !x.isToken && (x.subtypes || []).includes('Combo')); if (cmb) for (let i = 0; i < 3; i++) base.p1.removed.push(makeCardInst(cmb.id, false, 1));
+    const burnt = base.p2.allies.find(a => !a.isTotem); if (burnt) { heroDmg(base, 1, burnt.uid, 1, 'Fire'); process(base); autoResolve(base); }
+    // je Klasse ein Ally im Friedhof ("remove a Druid in your graveyard"), bereite Totems jedes Elements, ein Ally-Token,
+    // Ausrüstung/Unique/Frost-Karte auf der Hand, erschöpfte Location (Mounts)
+    const V = Object.values(CARDS).filter(x => !x.isToken && !CARD_ISSUES[x.id]);
+    for (const k of ['Death Knight', 'Druid', 'Hunter', 'Mage', 'Paladin', 'Priest', 'Rogue', 'Shaman', 'Warlock', 'Warrior']) { const a = V.find(x => x.type === 'Ally' && x.allyClass === k && !x.unique); if (a) base.p1.graveyard.push(makeCardInst(a.id, false, 1)); }
+    for (const el of ['Air', 'Earth', 'Fire', 'Water']) { const tt = V.find(x => x.totem && !x.unique && (x.subtypes || []).includes(el)); if (tt && !base.p1.ongoing.some(o => o.id === tt.id)) { const x = makeCardInst(tt.id, false, 1); x.joinedTurn = 1; base.p1.ongoing.push(x); x.isTotem = true; x.b = x.b || {}; x.b.hp = tt.totemHp; x.hp = tt.totemHp; } }
+    const tok = Object.values(CARDS).find(x => x.isToken && x.type === 'Ally' && !x.text); if (tok) { const x = makeCardInst(tok.id, true, 1); x.joinedTurn = 1; base.p1.allies.push(x); }
+    for (const pred of [x => x.type === 'Weapon' && !x.text && !x.unique, x => x.type === 'Ally' && x.unique && !x.text, x => x.type === 'Ability' && x.school === 'Frost' && !x.ongoing]) { const h = V.find(pred); if (h) base.p1.hand.push(makeCardInst(h.id, false, 1)); }
+    const loc = V.find(x => x.type === 'Location' && !(FX[x.id] || {}).aura); if (loc && !base.p1.resources.some(r => r.card.type === 'Location')) base.p1.resources.push({ card: makeCardInst(loc.id, false, 1), faceUp: true, exhausted: true });
     let src;
     if (c.type === 'Hero' || c.type === 'Master Hero') src = base.p1.hero;
     else if (c.type === 'Location' || c.type === 'Quest') { src = makeCardInst(c.id, false, 1); src.counters = { capture: 9, honor: 9 }; base.p1.resources.push({ card: src, faceUp: true, exhausted: false }); }
     else src = ccPut(base, 1, c.id);
     if (!src || src.id !== c.id) return { n: 0, out: [], proven: false };
-    let acts; try { acts = getLegalActions(base, 1).filter(a => a.type === 'ACTIVATE' && a.srcUid === src.uid); } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Kraft: Absturz – ' + e.message }], proven: false }; }
+    // als Mensch auflisten: Mechanik prüfen, nicht die KI-Filter (aiSkip, schlechte Ziele)
+    let acts; try { base.humans = [1]; acts = getLegalActions(base, 1).filter(a => a.type === 'ACTIVATE' && a.srcUid === src.uid); base.humans = []; } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Kraft: Absturz – ' + e.message }], proven: false }; }
     if (!acts.length) return { n: 0, out: [], proven: false };
     for (const a of acts.slice(0, 4)) {
         try {

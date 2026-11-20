@@ -3010,7 +3010,7 @@ function powerVariants(s, pid, instantOnly) {
         for (const pw of getPowers(s, e.c)) {
             if (e.pid !== pid && !pw.anyPlayer && tabiOwner(s) !== pid) continue;
             if (canUsePower(s, pid, e.c, pw)) continue;
-            if (pw.aiSkip && pw.aiSkip(s, pid, e.c)) continue;
+            if (pw.aiSkip && !isHuman(s, pid) && pw.aiSkip(s, pid, e.c)) continue;   // nur KI-Hinweis – Menschen dürfen jede erlaubte Kraft nutzen
             // aiSkipT: einzelne Ziele, die die KI auslässt (Searing Light: Held erst, wenn er fast besiegt ist)
             const xs = (pw.cost === 'X' || pw.xRange) ? (() => { const xr = pw.xRange ? pw.xRange(s, pid, e.c) : { min: 0, max: 9 }; const lim = Math.min(xr.max, pw.cost === 'X' ? getReadyRes(getPlayer(s, pid)) : 99);
                 if (pw.xValues) return [...new Set(pw.xValues(s, pid, e.c))].filter(x => x !== undefined && x >= xr.min && x <= lim);   // X nach möglichen Zielen
