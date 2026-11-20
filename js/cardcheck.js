@@ -721,7 +721,16 @@ function ccCheckStatic(c) {
             // Ereignis-Batterie: Kampf, Fähigkeitsschaden, Heilung, Karte spielen, zwei Zugwechsel – Endzustand vergleichen (Karte selbst zählt mit)
             let bat = '';
             try { const b = cloneState(s); ccBattery(b); const y = (locate(b, card.uid) || {}).c; if (ctl && y) ccFromVanilla(y, c); bat = ccFingerprint(b, '__none') + ccDerived(b); if (ctl && y) ccToVanilla(y, c); } catch (e) { bat = 'Absturz:' + e.message; }
-            d.push(ccDerived(s) + '|' + probe + '|' + bat); }
+            // Einschränkungen ("Opponents can't …", "can't ready", Kosten fürs Zuschlagen): legale Aktionen beider Spieler
+            let legal = '';
+            try { const sig = (st, pid) => getLegalActions(st, pid).map(a => a.type + ':' + (a.handIdx ?? '') + ':' + (a.srcUid || '') + ':' + (a.attackerUid || '') + '>' + (a.defenderUid || '') + ':' + (a.resIdx ?? '')).sort().join(',');
+                legal = sig(cloneState(s), 1); const o = cloneState(s); o.activePlayer = 2; o.lastTurnOf = { 1: 5, 2: 6 }; o.placedResource = false; legal += '#' + sig(o, 2);
+                for (const pl of [s.p1, s.p2]) { const st = pl.hero.weapons[0]; if (st) legal += '#sc' + strikeCost(s, pl, st); }   // Kosten fürs Zuschlagen (Margaret Fowl, Band of the Ranger-General)
+            } catch (e) { legal = 'Absturz:' + e.message; }
+            // Zerstören-Probe ("can't be destroyed"): eigener Held mit tödlichem Schaden, jeder eigene Ally zerstört
+            let kill = '';
+            try { const k = cloneState(s); k.p1.hero.damage = hpOf(k, k.p1.hero) + 5; for (const a of [...k.p1.allies]) destroy(k, a); process(k); autoResolve(k); kill = (k.gameOver ? 'aus' : 'lebt') + ':' + k.p1.allies.length; } catch (e) { kill = 'Absturz:' + e.message; }
+            d.push(ccDerived(s) + '|' + probe + '|' + bat + '|' + legal + '|' + kill); }
         return { n: 1, out: [], proven: d[0] !== d[1] };
     } catch (e) { return { n: 1, out: [{ sev: 'fail', msg: 'Dauereffekt: Absturz – ' + e.message }], proven: false }; }
     finally { delete CARDS[CC_VAN]; }
