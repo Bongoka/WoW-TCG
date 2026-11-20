@@ -29,6 +29,7 @@ if (arg('--zeitpunkt')) {
         if (r.err) { grp.err.push(r); continue; }
         if (!r.playable.length) continue;
         // nie angeboten: ohne Wirkung in dieser Lage (richtig) oder mit Wirkung, aber nicht angeboten (Bewertung – prüfen)
+        if (r.rich) { const q = r.rich; (grp[q.err ? 'err' : q.offered.length ? 'Reiches Feld: angeboten ' + q.offered.join(', ') + ' · CPU: ' + (q.cpu && q.cpu.length ? q.cpu.join(', ') : 'nie') : 'Reiches Feld: nie, obwohl mit Wirkung (prüfen)'] = grp[q.err ? 'err' : q.offered.length ? 'Reiches Feld: angeboten ' + q.offered.join(', ') + ' · CPU: ' + (q.cpu && q.cpu.length ? q.cpu.join(', ') : 'nie') : 'Reiches Feld: nie, obwohl mit Wirkung (prüfen)'] || []).push({ ...r, ...q, kind: r.kind }); continue; }
         const k = r.offered.length ? r.offered.join(', ') + ' · CPU: ' + (r.cpu && r.cpu.length ? r.cpu.join(', ') : 'nie') : r.effect > 0.5 ? 'nie, obwohl mit Wirkung (prüfen)' : 'nie – im Prüffeld ohne Wirkung';
         (grp[k] = grp[k] || []).push(r);
     }

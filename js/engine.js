@@ -985,8 +985,7 @@ function respondMoment(s, pid) {
     if (top) return top.pl !== pid && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
     if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
     if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
-    // Ready-Fenster nur in der echten Partie (Simulationen: Laufzeit, das Draw-Fenster genügt dort fast immer)
-    if (s.win && (s.win.reason === 'draw' || (s.win.reason === 'ready' && (isReal(s) || s.deepRespond))) && s.activePlayer !== pid) return 'start';
+    if (s.win && (s.win.reason === 'draw' || s.win.reason === 'ready') && s.activePlayer !== pid) return 'start';
     return null;
 }
 // Sinnvolle Antworten für pid, beste zuerst: [{a, gain}]. Der Mensch wird nur gefragt, wenn es eine gibt; die KI
@@ -1023,16 +1022,11 @@ function respondOptions(s, pid) {
     }
     // Wirkungen "this turn" reichen über den laufenden Kampf hinaus (Divine Shield: "Prevent all damage that would be dealt to
     // your hero this turn" gegen alle folgenden Angriffe): für die übrigen Karten den Gegnerzug ausspielen – für Mensch und KI
-    // (die KI vergleicht dabei auch mit "nie spielen", also mit dem Haltewert der Karte). In Simulationen mit knapper Zeitgrenze.
+    // (die KI vergleicht dabei mit dem halben Haltewert der Karte). In Simulationen genauso wie in der echten Partie.
     if (moment === 'react' && s.activePlayer !== pid) {
         const have = new Set(out.map(o => respondKey(s, pid, o.a)));
         let rest = acts.filter(a => !have.has(respondKey(s, pid, a)));
-        // Simulationen (Laufzeit): nur Karten, deren Wirkung über den Moment hinausreicht, und höchstens RESPOND_SIM_MS je Zug
-        if (!isReal(s) && !s.deepRespond) {
-            const b = s.rpBudget && s.rpBudget.turn === s.turn ? s.rpBudget : (s.rpBudget = { turn: s.turn, ms: 0 });
-            rest = b.ms < RESPOND_SIM_MS ? rest.filter(a => RESPOND_LASTING.test(respondText(s, pid, a))) : [];
-            if (rest.length) { const t0 = performance.now(); out.push(...respondTurnOptions(s, pid, rest, false, vPass)); b.ms += performance.now() - t0; }
-        } else out.push(...respondTurnOptions(s, pid, rest, false, vPass));
+        out.push(...respondTurnOptions(s, pid, rest, false, vPass));
     }
     return out.sort((x, y) => y.gain - x.gain);
 }
@@ -1044,14 +1038,6 @@ function respondOptions(s, pid) {
 // So gehören Pin ("Target player can't play allies this turn") an den Zugbeginn und Burgle vor die Angriffe; Snipe,
 // Counterspell oder Quests, die Karten ziehen, warten auf ihre Gelegenheit.
 const RESPOND_HALTS = 4;
-const RESPOND_SIM_MS = 60;        // Simulation: Rechenzeit je Zug für die Zug-Vorausschau bei Reaktionen
-const RESPOND_LASTING = /this turn|this combat|next time|next|until|Ongoing|can't attack/i;
-// Kartentext der Antwort (Handkarte, Kraftquelle oder Quest)
-function respondText(s, pid, a) {
-    const p = getPlayer(s, pid);
-    const c = a.type === 'PLAY_CARD' ? (a.gyUid ? p.graveyard.find(x => x.uid === a.gyUid) : p.hand[a.handIdx]) : a.type === 'ACTIVATE' ? (findCharacter(s, a.srcUid) || (locate(s, a.srcUid) || {}).c) : a.type === 'COMPLETE_QUEST' ? (p.resources[a.resIdx] || {}).card : null;
-    return (c && CARDS[c.id] && CARDS[c.id].text) || '';
-}
 const RESPOND_EDGE = 0.25;        // "jetzt besser als später": die Varianten sind deterministisch (gleicher Plan, gleicher Zufall), Gleichstand ist exakt
 const RESPOND_BUDGET_MS = 900;    // Rechenzeit je Fenster für die Zug-Vorausschau (echte Partie, Mensch; KI 300 ms)          // höchstens so viele gegnerische Links als spätere Gelegenheit (das Zugende zählt immer)
 let _respondHalt = null;          // { s, pid }: nur genau diese Kopie hält an (Kopien darin – Vorausschau der KI – nicht)
@@ -1092,7 +1078,8 @@ function respondHoldBonus(s, pid, a) {
 // statt eines Allies – das sah schlechter aus als Passen). Der bessere der beiden Werte zählt.
 function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
     if (!acts.length) return [];
-    const full = isReal(s) || s.deepRespond, maxLinks = full ? RESPOND_HALTS : 2;   // Simulationen: weniger Haltepunkte/Varianten (Laufzeit)
+    // Echte Partie und Simulation gleich (Simulationen dürfen langsamer sein – die CPU soll dort genauso spielen wie im Spiel)
+    const full = true, maxLinks = RESPOND_HALTS;
     const per = {}, sig0 = sigFilter ? respondOppSig(s, pid, null) : null;
     const pre = acts.filter(a => { const k = respondKey(s, pid, a); if ((per[k] || 0) >= (full ? 2 : 1)) return false; if (sigFilter) { const g = respondOppSig(s, pid, a); if (g !== null && sig0 !== null && g === sig0) return false; } per[k] = (per[k] || 0) + 1; return true; });
     if (!pre.length) return [];
@@ -1110,7 +1097,7 @@ function respondTurnOptions(s, pid, acts, sigFilter, vShort0) {
         if (re.some((r, i) => r !== A.plan[i])) { const B = order(re); if (B.vPass !== null) orders.push(B); }
     }
     // Zeitgrenze (große Felder): was nicht mehr geprüft wird, bekommt der Mensch trotzdem angeboten (er kann passen), die KI nicht
-    const out = [], t0 = performance.now(), budget = !full ? 60 : isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
+    const out = [], t0 = performance.now(), budget = isHuman(s, pid) ? RESPOND_BUDGET_MS : 300;
     for (const a of pre) {
         if (performance.now() - t0 > budget) { if (isHuman(s, pid) && !out.some(o => respondKey(s, pid, o.a) === respondKey(s, pid, a))) out.push({ a, gain: 0 }); continue; }
         const key = respondKey(s, pid, a), bonus = respondHoldBonus(s, pid, a);

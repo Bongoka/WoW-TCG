@@ -1020,7 +1020,9 @@ function ccRun(o = {}) {
 // im Spiel), durchläuft denselben Gegnerzug: der Gegner (fastAiAction) legt Allies, Waffe und eine Fähigkeit und greift an.
 // Der Mensch hält in jedem Fenster an (stopAll); protokolliert wird, wo die Karte spielbar war und wo sie als sinnvolle
 // Antwort angeboten wurde (respondOptions – dieselbe Auswahl, nach der der Mensch ohne „Jedes Fenster“ gefragt wird).
-function ccTimingSetup(c, kind) {
+// rich: zweite Lage für Karten ohne Wirkung im Standardfeld – verletzte/erschöpfte Allies und Anhänge auf beiden Seiten,
+// Karten im Friedhof (ccRich), dazu eine eigene Waffe und ein eigener Protector (Verteidigen, "while defending")
+function ccTimingSetup(c, kind, rich) {
     const h = c.type === 'Hero' ? c : ctHeroFor(c); if (!h) return null;
     const opp = ctHeroes().find(x => x.class === 'Warrior' && !x.set && x.faction !== h.faction) || ctHeroes().find(x => x.class === 'Warrior' && !x.set);
     // Deck je Spieler aus spielbaren Allies seiner Fraktion (sonst sind gezogene Karten wertlos: Innervate "tut nichts")
@@ -1029,6 +1031,7 @@ function ccTimingSetup(c, kind) {
     s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false; s.deepRespond = true; s.humans = [1]; s.stopAll = true;
     for (const p of [s.p1, s.p2]) { for (let i = 0; i < 10; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false }); p.hero.damage = 6; p.hand = []; }
     ccPut(s, 1, ctVanilla(3).id); ccPut(s, 2, ctVanilla(3).id); ccPut(s, 2, ctVanilla(4).id);
+    if (rich) { ccRich(s); const R = ccRichIds(); if (R.prot) ccPut(s, 1, R.prot); const w0 = ctPlain('Weapon'); if (w0) ccPut(s, 1, w0.id); }
     const w = ctPlain('Weapon');
     s.p2.hand = [ctVanilla(2).id, ctVanilla(3).id, ctVanilla(5).id, w && w.id, 165].filter(Boolean).map(id => makeCardInst(id, false, 2));   // 165 Quick Strike: eine Fähigkeit des Gegners
     let key;
@@ -1043,8 +1046,8 @@ function ccTimingMoment(s, pid) {
     if (s.battle) return 'Kampf:' + s.battle.step;
     return ({ ready: 'Ready', draw: 'Zugbeginn', end: 'Zugende', action: 'Aktion' })[(s.win || {}).reason] || ('Fenster:' + ((s.win || {}).reason || s.phase));
 }
-function ccTimingRun(c, kind) {
-    const st = ccTimingSetup(c, kind); if (!st) return null;
+function ccTimingRun(c, kind, rich) {
+    const st = ccTimingSetup(c, kind, rich); if (!st) return null;
     const { s, key } = st, playable = [], offered = []; let effect = -Infinity, effAt = null;
     try {
         if (!applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1)) return null;
@@ -1077,11 +1080,11 @@ function ccTimingRun(c, kind) {
             process(s);
         }
     } catch (e) { return { err: e.message, playable, offered }; }
-    return { playable: [...new Set(playable)], offered: [...new Set(offered)], cpu: ccTimingCpu(c, kind), effect: offered.length ? null : +effect.toFixed(1), effAt };
+    return { playable: [...new Set(playable)], offered: [...new Set(offered)], cpu: ccTimingCpu(c, kind, rich), effect: offered.length ? null : +effect.toFixed(1), effAt };
 }
 // Dieselbe Lage mit der CPU als Spieler 1 (wie in der echten Partie, volle Vorausschau): wo spielt sie die Karte?
-function ccTimingCpu(c, kind) {
-    const st = ccTimingSetup(c, kind); if (!st) return null;
+function ccTimingCpu(c, kind, rich) {
+    const st = ccTimingSetup(c, kind, rich); if (!st) return null;
     const { s, key } = st, used = [], d0 = doAction;
     s.humans = []; s.stopAll = false;
     doAction = function (st2, a, pid) { if (st2 === s && pid === 1 && s.activePlayer === 2 && key(respondKey(s, 1, a))) used.push(ccTimingMoment(s, 1)); return d0.apply(this, arguments); };
@@ -1113,7 +1116,7 @@ function ccTimingSweep(o = {}) {
         for (const kind of kinds) {
             if (o.progress) o.progress(`Zeitpunkt ${c.id} ${c.name} (${kind})`);
             const loops = ccWatchLoops(); let r;
-            try { r = ccTimingRun(c, kind); } finally { loops.restore(); }
+            try { r = ccTimingRun(c, kind); if (r && !r.err && r.playable.length && !r.offered.length && !(r.effect > 0.5)) { const r2 = ccTimingRun(c, kind, true); if (r2 && (r2.err || r2.offered.length || r2.effect > 0.5)) r.rich = r2; } } finally { loops.restore(); }
             if (r) out.push({ id: c.id, name: c.name, kind, text: c.text || '', ...r });
         }
     }
