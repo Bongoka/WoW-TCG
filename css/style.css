@@ -1653,7 +1653,6 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 .mm-play-box { width: min(620px, calc(100vw - 32px)); gap: 14px; }
 .mm-play .mp-side > b { font: bold 17px Georgia, serif; color: var(--gold-light); }
 .mm-play .mp-side > span { font-size: 13px; color: #e8dcc0; }
-.mm-play .mp-vs { cursor: default; }
 .mm-ctl.mp-vis-tog { overflow: hidden; margin-top: 2px; }
 .mm-ctl.mp-vis-tog button { padding: 7px 16px; font-size: 14px; min-width: 76px; }
 .mm-play-mode { text-align: center; font-size: 13px; color: var(--text-dim); min-height: 1.3em; }

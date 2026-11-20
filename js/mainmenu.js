@@ -30,7 +30,7 @@ function mmBuild() {
             </div>
         </div>
         <div class="mm-options mm-play" hidden><div class="mm-opt-box mm-play-box"><h2>${tr('Neues Spiel')}</h2>
-            <div class="mp-versus"><div class="mp-side" data-seat="1"></div><div class="mp-vs"><span class="mp-vs-t">VS</span></div><div class="mp-side" data-seat="2"></div></div>
+            <div class="mp-versus"><div class="mp-side" data-seat="1"></div><button class="mp-vs mm-vs"></button><div class="mp-side" data-seat="2"></div></div>
             <div class="mm-play-mode"></div>
             <div class="mm-play-btns"><button class="mm-play-back">${tr('Zurück')}</button><button class="mm-play-go success">${tr('Spiel starten')}</button></div></div></div>
         <div class="mm-options mm-opt" hidden><div class="mm-opt-box"><h2>${tr('Optionen')}</h2><div class="mm-opt-body"></div><button class="mm-opt-close success">${tr('Fertig')}</button></div></div>`;
@@ -46,6 +46,9 @@ function mmBuild() {
     el.querySelector('.mm-opt').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseOptions(); });
     el.querySelector('.mm-play').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) closePlaySetup(); });
     el.querySelector('.mm-play-back').onclick = closePlaySetup;
+    el.querySelector('.mm-vs').onclick = () => PLAY_VS.toggle();
+    // Wie in der Online-Lobby: jeder andere Knopf (Deck, Spieler/CPU, Start, Zurück) beendet die VS-Simulation
+    el.querySelector('.mm-play').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.classList.contains('mm-vs')) PLAY_VS.stop(); }, true);
     el.querySelector('.mm-play-go').onclick = () => { const m = playSetup(); confirmLeaveGame(() => { document.getElementById('log-area').innerHTML = ''; initGame(m.p || null, m.o || null, { 1: m.c1, 2: m.c2 }); }); };
     return el;
 }
@@ -123,6 +126,9 @@ function setPlaySetup(patch) {
     if (MM.el) renderPlaySetup();
     return m;
 }
+// VS: beide gewählten Decks spielen im Hintergrund gegeneinander (gleicher Code wie die Online-Lobby: vsSim, online.js)
+const PLAY_VS = vsSim(() => MM.el && MM.el.querySelector('.mm-vs'), () => { const m = playSetup(); return [pickDeck(m.p), pickDeck(m.o)]; },
+    () => tr('Wähle zuerst beide Decks (nicht Zufall).'));
 function renderPlaySetup() {
     const m = playSetup();
     MM.el.querySelectorAll('.mm-play .mp-side').forEach(side => {
@@ -137,6 +143,7 @@ function renderPlaySetup() {
     const both = m.c1 === 'human' && m.c2 === 'human', none = m.c1 === 'cpu' && m.c2 === 'cpu';
     MM.el.querySelector('.mm-play-mode').textContent = both ? tr('Hotseat: Ihr spielt abwechselnd an diesem Gerät – zwischen den Zügen wird das Brett gedreht.')
         : none ? tr('CPU gegen CPU: zum Zuschauen.') : tr('Du gegen die CPU.');
+    PLAY_VS.render();
 }
 function openPlaySetup(patch) {
     mmBuild();
@@ -146,6 +153,7 @@ function openPlaySetup(patch) {
 }
 function closePlaySetup() {
     if (!MM.el) return;
+    PLAY_VS.stop();
     const o = MM.el.querySelector('.mm-play'); if (o.hidden) return;
     o.classList.remove('in'); o.hidden = true;
 }

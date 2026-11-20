@@ -449,7 +449,7 @@ function netShowRoom() {
         if (NET.role === 'host') netStart();
         else { NET.me.ready = !NET.me.ready; netPub(netRoom(NET.code, 'g'), { t: 'ready', on: NET.me.ready }); netRenderRoom(); }
     };
-    body.querySelector('#mp-vs').onclick = () => { if (NET.vs) netVsStop(); else netVsStart(); };
+    body.querySelector('#mp-vs').onclick = () => NET_VS.toggle();
     // Jeder andere Knopf im Online-Fenster beendet die Simulation
     const modal = netModal();
     if (!modal._vsStop) { modal._vsStop = true; modal.addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.id !== 'mp-vs') netVsStop(); }, true); }
@@ -486,34 +486,44 @@ function netRenderRoom() {
 }
 // VS: beide Decks spielen im Hintergrund gegeneinander (CPU gegen CPU, Startspieler abwechselnd), angezeigt wird nur
 // die eigene Winrate. Jeder andere Knopf, ein Deckwechsel oder der Spielstart beenden die Simulation.
-function netVsStart() {
-    const a = netPickDeck(NET.me.deck), b = netOppDeck();
-    if (!a || !b || !b.cards || !b.cards.length) { showToast(tr('Es fehlt noch ein Gegner-Deck.'), false, 2500); return; }
-    const key = a.id + '|' + b.hero + '|' + b.cards.length + '|' + (b.name || '');
-    if (!NET.vsRes || NET.vsRes.key !== key) NET.vsRes = { key, games: 0, wins: 0 };
-    const run = NET.vs = { stop: false };
-    const step = () => {
-        if (run.stop || NET.vs !== run) return;
-        const r = NET.vsRes, meFirst = r.games % 2 === 0;
-        try { const res = meFirst ? simulateOneGame(a, b) : simulateOneGame(b, a); r.games++; if (res.winner === (meFirst ? 1 : 2)) r.wins++; }
-        catch (e) { console.error(e); netVsStop(); return; }
-        netRenderVs();
-        setTimeout(step, 0);
+// Gemeinsam für Online-Lobby und Hauptmenü „Spielen“: vsSim(Knopf, () => [Deck links, Deck rechts], Hinweis ohne Decks)
+function vsSim(btn, decks, missing) {
+    const vs = { run: null, res: null };
+    const keyOf = (a, b) => a && b ? a.id + '|' + b.hero + '|' + (b.cards || []).length + '|' + (b.name || '') : null;
+    vs.render = () => {
+        const v = btn(); if (!v) return;
+        const [a, b] = decks(), r = vs.res;
+        const ok = r && r.key === keyOf(a, b) && r.games > 0;
+        // Nur "VS" im Kreis; der Kreis selbst ist ein Kuchendiagramm der Winrate des linken Decks (Details im Tooltip)
+        v.classList.toggle('running', !!vs.run); v.classList.toggle('pie', !!ok);
+        v.style.setProperty('--wr', ok ? (r.wins / r.games * 100).toFixed(1) + '%' : '0%');
+        v.title = ok ? tr`${Math.round(r.wins / r.games * 100)} % Winrate (${r.wins} von ${r.games} Spielen)` : tr('Simulation: beide Decks spielen im Hintergrund gegeneinander');
+        v.innerHTML = `<span class="mp-vs-t">VS</span>` + (ok ? `<span class="mp-vs-wr">${Math.round(r.wins / r.games * 100)}%</span>` : '');
     };
-    netRenderVs(); setTimeout(step, 0);
+    vs.stop = () => { if (vs.run) { vs.run.stop = true; vs.run = null; vs.render(); } };
+    vs.start = () => {
+        const [a, b] = decks();
+        if (!a || !b || !b.cards || !b.cards.length) { showToast(missing(), false, 2500); return; }
+        const key = keyOf(a, b);
+        if (!vs.res || vs.res.key !== key) vs.res = { key, games: 0, wins: 0 };
+        const run = vs.run = { stop: false };
+        const step = () => {
+            if (run.stop || vs.run !== run) return;
+            const r = vs.res, meFirst = r.games % 2 === 0;
+            try { const res = meFirst ? simulateOneGame(a, b) : simulateOneGame(b, a); r.games++; if (res.winner === (meFirst ? 1 : 2)) r.wins++; }
+            catch (e) { console.error(e); vs.stop(); return; }
+            vs.render();
+            setTimeout(step, 0);
+        };
+        vs.render(); setTimeout(step, 0);
+    };
+    vs.toggle = () => { if (vs.run) vs.stop(); else vs.start(); };
+    return vs;
 }
-function netVsStop() { if (NET.vs) { NET.vs.stop = true; NET.vs = null; netRenderVs(); } }
-function netRenderVs() {
-    const v = document.getElementById('mp-vs'); if (!v) return;
-    const r = NET.vsRes, a = netPickDeck(NET.me.deck), b = netOppDeck();
-    const key = a && b ? a.id + '|' + b.hero + '|' + (b.cards || []).length + '|' + (b.name || '') : null;
-    const ok = r && r.key === key && r.games > 0;
-    // Nur "VS" im Kreis; der Kreis selbst ist ein Kuchendiagramm der eigenen Winrate (Details im Tooltip)
-    v.classList.toggle('running', !!NET.vs); v.classList.toggle('pie', !!ok);
-    v.style.setProperty('--wr', ok ? (r.wins / r.games * 100).toFixed(1) + '%' : '0%');
-    v.title = ok ? tr`${Math.round(r.wins / r.games * 100)} % Winrate (${r.wins} von ${r.games} Spielen)` : tr('Simulation: beide Decks spielen im Hintergrund gegeneinander');
-    v.innerHTML = `<span class="mp-vs-t">VS</span>` + (ok ? `<span class="mp-vs-wr">${Math.round(r.wins / r.games * 100)}%</span>` : '');
-}
+const NET_VS = vsSim(() => document.getElementById('mp-vs'), () => [netPickDeck(NET.me.deck), netOppDeck()], () => tr('Es fehlt noch ein Gegner-Deck.'));
+function netVsStart() { NET_VS.start(); }
+function netVsStop() { NET_VS.stop(); }
+function netRenderVs() { NET_VS.render(); }
 function netRenderChat() {
     const box = document.getElementById('mp-chat'); if (!box) return;
     // Fester Sicherheitshinweis oben im Chat (Chat läuft unverschlüsselt über einen öffentlichen Server)
