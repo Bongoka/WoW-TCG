@@ -46,7 +46,8 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 | `ai.js` | CPU: `evaluateState`, `searchBestAction` (echtes Spiel), `fastAiAction` (Simulation) |
 | `simcore.js` | DOM-freie Simulation `simulateOneGame`, Karten-Statistik, Zufallsdecks, Late-Game-Testaufbau |
 | `simworker.js` | Web Worker für `runSimulation`: lädt die Engine und spielt je Nachricht eine Partie (wie `aiworker.js` für die CPU) |
-| `tests.js` | Regeltests `runRuleTests()` |
+| `tests.js` | Regeltests `runRuleTests()`; im Browser `runUiCheck(sekunden)` = Anzeige-Abgleich (Zufallspartien, Spielfeld gegen Zustand) |
+| `cardcheck.js` | Kartenprüfung (DOM-frei, nur Node über `bin/cardcheck.js`): Wirkung je Karte, Auslöser per Kontroll-Lauf (textlose Kopie), „Karte tut nichts“, Menschenweg mit Zufallsantworten, Kosten, Invarianten-Wächter in Simulationen, KI-Wert/Timing, Detektor für dumme KI-Fehler (`ccAiGame`, deterministische Uhr). Nicht in `index.html` |
 | `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
 | `spellfx.js` | Zauber-Effekte: beim Auflösen einer Ability meldet `resolveCard` `fxEvent {t:'spell'}`, `playFxEvents` ruft `playSpellFx` (Canvas-Vorlagen `SPX_T`: nova, bolt, beam, lightning, shield, heal, roots, slash …, Paletten `SPX_PAL`) und spielt den Original-Sound aus `sounds/spells/` (thewowdb.com, `SPELL_SND`). Zuordnung: `SPELL_ID` › `SPELL_NAME` › `SPELL_PATTERN` › Rückfall nach Element/Wirkung; ein Eintrag ist eine Zeile wie `'bolt.fire explode.fire x1.4 @cast_fire,pyroblast_hit'`. Einstellung „Zauber-Effekte An/Aus“ (`wow_tcg_spellfx`) |
 | `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
@@ -109,6 +110,8 @@ r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));
 ```
 
 Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit festem Seed ersetzen und prüfen, dass `simulateOneGame` vorher und nachher identische Ergebnisse liefert.
+
+Kartenprüfung (alle Karten + KI): `node bin/cardcheck.js` → `reports/cardcheck.md` (nicht in Git). Optionen: `--sims N` Wächter-Partien, `--focus N`/`--ki N` gezielte Partien und Spiel-KI-Proben je Reaktionskarte, `--dumm N` Partien Spiel-KI gegen Spiel-KI mit Prüfung jeder Entscheidung (Schaden an Eigenem, Hilfe für den Gegner, wirkungslos, verpasstes Lethal …), `--baseline` (danach nur neue Funde), `--repro SEED [--card ID]`. Funde der Art „tut nichts“ bei bedingten Texten sind Warnungen. Neue KI-Regeln: `aiBadTargets` (engine.js), `aiUseless`/Rausch-Toleranz/`enablerPlans` (ai.js).
 
 ## Simulation & Statistik
 
