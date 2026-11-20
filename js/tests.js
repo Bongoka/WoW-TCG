@@ -1914,6 +1914,15 @@ function runRuleTests() {
             assert((foe.damage || 0) === f0 + 1, `Gobloz: gegnerische Quelle nicht getroffen (${(foe.damage || 0) - f0} Schaden)`);
         } finally { console.error = ce0; }
     });
+    test(164, '"entered" auch für Allies und Ausrüstung: Fist of the Deity +2 ATK im Eintrittszug, Sword of Justice je Handkarte ein +1 ATK-Zähler, Reaper of Dark Souls X Zähler (vorher nie aufgerufen)', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set), fill = Array(40).fill(ctVanilla(2).id);
+        const mk = k => { const s = newGameState(heroOf(k).id, fill, heroOf('Rogue').id, fill); s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; s.real = false; s.humans = [];
+            for (let i = 0; i < 8; i++) s.p1.resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false }); return s; };
+        const play = (s, id, pick) => { s.p1.hand.unshift(makeCardInst(id, false, 1)); const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0 && (!pick || pick(v))); assert(a, CARDS[id].name + ': keine Spielvariante'); applyAction(s, a, true, 1); autoResolve(s); return s.p1.hero.weapons.find(w => w.id === id); };
+        const s1 = mk('Rogue'), f = play(s1, 12190); assert(f && weaponAtk(s1, f, {}) === CARDS[12190].atk + 2, `Fist of the Deity: ATK ${f && weaponAtk(s1, f, {})} statt ${CARDS[12190].atk + 2}`);
+        const s2 = mk('Paladin'); const n = s2.p1.hand.length; const sw = play(s2, 12198); assert(sw && ((sw.counters || {}).atk1 || 0) === n, `Sword of Justice: ${((sw || {}).counters || {}).atk1 || 0} Zähler statt ${n}`);
+        let rx = 0; const s3 = mk('Paladin'), r = play(s3, 11242, v => v.x > 0 && (rx = v.x)); assert(r && ((r.counters || {}).atk1 || 0) === rx, `Reaper of Dark Souls: ${((r || {}).counters || {}).atk1 || 0} Zähler statt ${rx}`);
+    });
     LANG = prevLang;
     test(155, 'Einzigartigkeit (CR 414.3): Auswahl nennt die Regel und wer bleiben darf (Pet, Legs, Ring (2), Unique); Rückgängig (undoVerdict) auch mitten in der eigenen Entscheidung, nicht nach Gegner-Entscheidung, neuer Info oder Zugende', () => {
         const s = fresh(); s.humans = [1]; const old = put(s, 1, 36); res(s, 1, 6); const hi = hand(s, 1, 38), nu = P(s, 1).hand[hi];

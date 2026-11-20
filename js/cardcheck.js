@@ -550,6 +550,19 @@ const CC_EVENTS = [
     ['Zerstört', /^When this (?:ally|weapon|armor|item) is destroyed,/i, c => ['Ally', 'Weapon', 'Armor', 'Item'].includes(c.type), (s, x) => { destroy(s, x); process(s); return true; }],
     ['Zugbeginn', /^(?:Ongoing: )?At the start of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 8 && t.activePlayer === 1 && isIdle(t) && !t.pending, 400)],
     ['Zugende', /^(?:Ongoing: )?At the end of your turn,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location' && !c.attach, (s) => ccDrive(s, t => t.turn >= 7 && t.activePlayer === 2 && isIdle(t) && !t.pending, 400)],
+    // Eintreten: die Karte (bzw. ihre textlose Kopie) kommt aus dem Spiel auf die Hand und wird ausgespielt
+    ['Eintreten', /^When this (?:ally|weapon|armor|item|ability) enters play,/i, c => ['Ally', 'Weapon', 'Armor', 'Item', 'Ability'].includes(c.type) && !c.attach, (s, x) => {
+        const l = locate(s, x.uid); if (!l) return false; const p = s.p1; for (const z of [p.allies, p.hero.weapons, p.hero.armors, p.ongoing]) { const i = z.indexOf(x); if (i >= 0) z.splice(i, 1); }
+        p.hand.unshift(x); const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); return !!a && applyAction(s, a, true, 1); }],
+    // Schlag mit dieser Waffe: Held greift den gegnerischen Helden an und schlägt mit genau dieser Waffe zu
+    ['Schlag', /^When you strike with this weapon,/i, c => c.type === 'Weapon', (s, x) => { s.p2.allies.forEach(a => { a.exhausted = true; }); s.humans = [1];
+        if (!applyAction(s, { type: 'ATTACK', attackerUid: s.p1.hero.uid, defenderUid: s.p2.hero.uid, actorId: 1 }, true, 1)) return false;
+        for (let n = 0; n < 20 && s.pending; n++) { const d = s.pending; s.pending = null; const v = d.k === 'E:strikeDo' && d.opts.some(o => o.v === x.uid) ? x.uid : (d.kind === 'priority' ? null : aiPick(s, d)); if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v }); process(s); }
+        s.humans = []; return true; }],
+    // Eine Fähigkeit spielen: billige Fähigkeit ohne Ziel, die zum Helden passt
+    ['Fähigkeit gespielt', /^(?:Ongoing: )?When(?:ever)? you play an ability,/i, c => c.type !== 'Hero' && c.type !== 'Quest' && c.type !== 'Location', (s) => {
+        const f = Object.values(CARDS).find(a => a.type === 'Ability' && !a.ongoing && !a.isToken && !a.instant && (a.cost || 0) <= 3 && !(FX[a.id] || {}).slots && !CARD_ISSUES[a.id] && cardMatchesPlayer(a, s.p1) && talentReqOk(a, s.p1.hero));
+        if (!f) return false; s.p1.hand.unshift(makeCardInst(f.id, false, 1)); const a = getLegalActions(s, 1).find(v => v.type === 'PLAY_CARD' && v.handIdx === 0); return !!a && applyAction(s, a, true, 1); }],
 ];
 const CC_VAN = 99991;
 function ccCheckTriggerFires(c) {
@@ -560,6 +573,9 @@ function ccCheckTriggerFires(c) {
         ccPut(base, 1, ctVanilla(3).id, { damage: 1 }); ccPut(base, 2, ctVanilla(4).id, { damage: 1 });
         ccPut(base, 2, ctPlain('Weapon').id); ccPut(base, 2, Object.values(CARDS).find(x => x.type === 'Ability' && x.ongoing && !x.attach && !x.totem && !x.isToken).id);
         if (c.type !== 'Weapon') ccPut(base, 1, ctPlain('Weapon').id, { exhausted: true }); if (c.type !== 'Armor' && c.type !== 'Item') ccPut(base, 1, ctPlain('Armor').id, { exhausted: true });   // eigene (erschöpfte) Ausrüstung
+        // Fähigkeit im eigenen Friedhof (Touch of Chaos), offene gegnerische Quest (Doomsayer Din'ju: Ressourcen umdrehen)
+        base.p1.graveyard.push(makeCardInst(Object.values(CARDS).find(x => x.type === 'Ability' && !x.ongoing && !x.isToken).id, false, 1));
+        base.p2.resources.push({ card: makeCardInst(Object.values(CARDS).find(x => x.type === 'Quest' && !x.isToken).id, false, 2), faceUp: true, exhausted: false });
         const card = ccPut(base, 1, c.id); card.exhausted = false;
         CARDS[CC_VAN] = { ...CARDS[c.id], id: CC_VAN, name: 'Kontrolle', text: '' }; delete FX[CC_VAN];
         const fp = [];
@@ -569,7 +585,9 @@ function ccCheckTriggerFires(c) {
                 const rnd0 = Math.random; Math.random = seededRandom(c.id * 13 + 1);
                 try { if (!run(s, x)) { fp.push(null); continue; } autoResolve(s); } finally { Math.random = rnd0; }
                 const inv = ctl ? null : ccInvariants(s); if (inv) out.push({ sev: 'fail', msg: `${name}: Invariante – ${inv}` });
-                fp.push(ccFingerprint(s, card.uid));
+                // Karte selbst mitvergleichen (Wirkung auf sich: Jaedan Sunshot, Fist of the Deity) – die Kopie bekommt dafür ihre Identität zurück
+                if (ctl) { const y = findCharacter(s, card.uid) || (locate(s, card.uid) || {}).c; if (y) { y.id = c.id; y.name = c.name; y.text = CARDS[c.id].text; } }
+                fp.push(ccFingerprint(s, '__none'));
             }
         } catch (e) { out.push({ sev: 'fail', msg: `${name}: Absturz – ${e.message}` }); continue; }
         finally { delete CARDS[CC_VAN]; }
@@ -577,7 +595,7 @@ function ccCheckTriggerFires(c) {
         n++;
         if (fp[0] === fp[1]) {
             // bedingt bzw. vom Feld abhängig: braucht etwas, das das Standardfeld nicht hat (Anhänge, Zähler, Fraktionskarten, Erschöpftes)
-            const cond = /\b(if|may|unless|for each|instead|target|choose|reveal|look|search|random|any number|counter|Alliance|Horde|ready|with an attachment)\b|\bX\b/i.test(sen.replace(re, ''));
+            const cond = /\b(if|may|unless|for each|instead|target|choose|reveal|look|search|random|any number|counter|Alliance|Horde|ready|with an attachment|make up)\b|\bX\b/i.test(sen.replace(re, ''));   // "make up a name": Spaßtext ohne Spielwirkung
             out.push({ sev: cond ? 'warn' : 'fail', msg: `${name}: Auslöser ohne Wirkung („${sen.slice(0, 70)}…“)${cond ? ' – bedingt, evtl. legitim' : ''}` });
         }
     }

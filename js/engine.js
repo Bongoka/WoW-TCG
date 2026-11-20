@@ -1658,15 +1658,17 @@ function resolveCard(s, it) {
         c.joinedTurn = s.turn; c.exhausted = false; c.damage = f.enterDamage || 0;     // "This ally enters play with N damage"
         if (f.enterCounters) c.counters = { ...(c.counters || {}), ...f.enterCounters };  // "enters play with a … counter"
         p.allies.push(c);
-        
+        // "entered" (Zustand beim Eintreten, kein Auslöser) wurde bisher nur bei Fähigkeiten aufgerufen – Allies und Ausrüstung
+        // bekamen es nie (Fist of the Deity +2 ATK, Reaper of Dark Souls X Zähler, Millhouse Manastorm …; fand die Kartenprüfung)
+        if (f.entered) f.entered(s, c, p.id, it);
         evt(s, 'allyEnters', { uid: c.uid, pid: p.id });
         if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it));
         return;
     }
     if (c.type === 'Master Hero') { becomeHero(s, p, c); return; }                         // Master Hero (CR 301.4a): ersetzt den Helden, ohne Kette
     if (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') equipEnterCounters(c);   // Edge of Oblivion, Breastplate of Undeath
-    if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
-    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.joinedTurn = s.turn; c.exhausted = !!f.entersExhausted; evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
+    if (c.type === 'Weapon') { p.hero.weapons.push(c); c.exhausted = !!f.entersExhausted; if (f.entered) f.entered(s, c, p.id, it); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
+    if (c.type === 'Armor' || c.type === 'Item') { p.hero.armors.push(c); c.joinedTurn = s.turn; c.exhausted = !!f.entersExhausted; if (f.entered) f.entered(s, c, p.id, it); evt(s, 'entersPlay', { uid: c.uid, pid: p.id }); if (f.enter) asTrigger(s, c, p.id, () => f.enter(s, c, p.id, it)); return; }
     // Fähigkeit
     it.dest = c.ongoing ? 'play' : 'graveyard';
     fxEvent(s, { t: 'spell', id: c.id, uid: c.uid, src: p.hero.uid, tg: it.targets ? it.targets.flat() : [] });   // Zauber-Effekt (spellfx.js), nur Anzeige
