@@ -3144,6 +3144,8 @@ const AI_NO_OWN_TARGET = new Set([7040, 58, 11057, 5064, 12050, 6052]);
 // KI: Ziele, die ein Mensch nie wählen würde – Schädliches (harm) auf Eigenes, Hilfreiches (harm: false) auf Gegnerisches.
 // Gilt für Anhänge und Kräfte (deren Wirkung sieht die Bewertung oft nicht); Ziele, die ausdrücklich eine Seite verlangen
 // (side: 'friendly' / 'enemy', z. B. Opfer), bleiben erlaubt. helpful: auch die Hilfe-Regel prüfen
+const AI_BUFF_TEXT = /\+\d+ (ATK|\[Health\]|\[DEF\])|\+\d+ \/ \+\d+|\bhas (Protector|Elusive|Stealth|Untargetable|Long-Range|Ferocity|Assault)|\bprevent (all|the next)/i;
+const AI_HARM_TEXT = /damage to|destroy|-\d+ (ATK|\[Health\])|can't|exhaust|discard|remove|interrupt|deals? \d/i;
 function aiBadTargets(s, pid, slots, tg, helpful) {
     const own = u => { const l = locate(s, u); return !!l && l.pid === pid; };
     // Kräfte, die einen Anhang am Ziel verlangen (Remba, Abbess of Ash: Kontrolle über Ally mit Anhang): Hilfe-Regel aus
@@ -3176,6 +3178,9 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
                 // ihre Wirkung sieht die Bewertung oft nicht, die eigene laufende Fähigkeit zählt aber als Plus
                 // … und hilfreiche Anhänge (harm: false, z. B. Blessing of the Martyr) nie auf gegnerische Karten
                 if (c.attach && !isHuman(s, pid) && aiBadTargets(s, pid, slots, tg, true)) continue;
+                // … ebenso reine Verstärkungen ohne Anhang (Sudden Reversal "+4 ATK while defending" spielte die KI auf einen
+                // gegnerischen Verteidiger – fand der Detektor für dumme KI-Fehler); Kräfte prüfen das schon (powerVariants)
+                if (!c.attach && !isHuman(s, pid) && AI_BUFF_TEXT.test(c.text || '') && !AI_HARM_TEXT.test(c.text || '') && aiBadTargets(s, pid, slots, tg, true)) continue;
                 const act = { type: 'PLAY_CARD', handIdx: idx, x, mode, targets: tg, actorId: pid, desc: `${c.name}${gyUid ? tr(tr(tr(tr(' (aus dem Friedhof)')))) : ''}${x !== undefined ? ' X=' + x : ''}${tg.flat().length ? ' → ' + tg.flat().map(u => nameOf(s, u)).join(', ') : ''}` };
                 if (gyUid) act.gyUid = gyUid;
                 out.push(act);

@@ -2073,6 +2073,14 @@ function runRuleTests() {
         const acts = [1, 2, 3, 4].map(i => ({ type: 'PLAY_CARD', handIdx: 0, targets: [['ally' + i]] })).concat([{ type: 'PLAY_CARD', handIdx: 0, targets: [[P(s, 2).hero.uid]] }]);
         assert(respondCandidates(s, 1, acts).some(x => x.targets[0][0] === P(s, 2).hero.uid), 'Kick: Ziel Held fehlt in den Kandidaten');
     });
+    test(173, 'KI: reine Verstärkungen ohne Anhang (Sudden Reversal "+4 ATK while defending") nie auf gegnerische Karten', () => {
+        const s = freshH(ctHeroFor(CARDS[170]).id, 9);
+        for (let i = 0; i < 3; i++) P(s, 1).resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+        put(s, 1, ctVanilla(3).id); const e = put(s, 2, ctVanilla(3).id); P(s, 1).hand = [makeCardInst(170, false, 1)];
+        const vs = getLegalActions(s, 1).filter(a => a.type === 'PLAY_CARD' && a.handIdx === 0);
+        assert(vs.length && !vs.some(a => a.targets.flat().includes(e.uid)), 'Sudden Reversal (KI): Variante auf gegnerischen Ally');
+        s.humans = [1]; assert(getLegalActions(s, 1).some(a => a.type === 'PLAY_CARD' && a.targets.flat().includes(e.uid)), 'Sudden Reversal (Mensch): gegnerischer Ally muss wählbar bleiben');
+    });
     return results;
 }
 
