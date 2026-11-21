@@ -49,6 +49,7 @@
 
     // ---------------------------------------------------------------- Run-Speicher
     function saveRun() {
+        R.upSeed = (run && run.upSeed) || 0;                                               // Aufwertungen je Run verschieden (R.effectForCard)
         try {
             if (run) localStorage.setItem(SAVE_KEY, JSON.stringify(run));
             else localStorage.removeItem(SAVE_KEY);
@@ -68,6 +69,7 @@
             if (!r.act) r.act = 1;
             if (!Array.isArray(r.potions)) r.potions = [];
             if (!r.clsEn) r.clsEn = (CARDS[r.hero] && CARDS[r.hero].class) || 'Warrior';
+            if (!r.upSeed) r.upSeed = 1 + Math.floor(Math.random() * 1e9);
             // Synthetische Aufwertungs-IDs gehen beim Neuladen verloren – neu erzeugen.
             if (r.deck && R.upgraded) {
                 for (const e of r.deck) {
@@ -193,8 +195,8 @@
         on('#rl-open-debug', 'click', () => { if (R.openDebug) R.openDebug(); });
         if (saved) {
             on('#rl-resume-btn', 'click', () => {
-                run = saved; if (run.pending) { delete run.pending; saveRun(); }
-                if ((run.row < 0) && run.act > 1) openActIntro(() => openMap());
+                run = saved; R.upSeed = run.upSeed || 0; if (run.pending) { delete run.pending; saveRun(); }
+                if ((run.row < 0) && run.act > 1) openActIntro(() => run.bossPick ? afterActReward() : openMap());
                 else openMap();
             });
             on('#rl-abandon-btn', 'click', () => {
@@ -224,7 +226,7 @@
             run = {
                 v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: draft.hero, faction: hero.faction,
                 deck: draft.deck.map(id => ({ uid: uid(), id })), maxHp, hp: maxHp, gold: 55, artifacts: [], potions: [R.randomPotion()],
-                priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [],
+                priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [], upSeed: 1 + Math.floor(Math.random() * 1e9),
                 battles: 0, elites: 0, boss: false, createdAt: Date.now(), goldEarnedTotal: 0
             };
             saveRun();
@@ -489,7 +491,7 @@
         G.rl = {
             arts: (run.artifacts || []).slice(), f: {}, kind: node.type, pid: 1,
             boss: !!enemy.isBoss, act: run.act || 1, goldEarned: 0, played: 0,
-            souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, elite: enemy.trait || null,
+            souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, ctr: { ...(run.ctr || {}) }, elite: enemy.trait || null,
             foeOwn: [...new Set(enemy.deck)]                  // Sammlung des Gegners = seine Deckliste ("from your collection", engine.js collectionOf)
         };
         UI.reset();
@@ -516,7 +518,8 @@
         try { render(); } catch (e) { }
         showBattleHud(enemy);
         watcher = setInterval(checkBattleEnd, 450);
-        // Mulligan (nutzt das vorhandene Fenster)
+        // Mulligan (nutzt das vorhandene Fenster); Boss-Artefakt "Hoard of the Black Dragonflight": kein Mulligan
+        if (R.noMulligan && R.noMulligan(run)) { if (typeof showTurnBanner === 'function') showTurnBanner(tr('Dein Zug!')); return; }
         try {
             openHsMulligan(() => {
                 if (!G || !G.rl) return;
@@ -591,7 +594,7 @@
         const hpLeft = Math.max(0, hpOf(G, G.p1.hero) - (G.p1.hero.damage || 0));
         const goldEarned = (G.rl.goldEarned || 0);
         // Werte, die den Kampf überdauern (Soulwell, Aufwertung "Blutdurst", Tome of Valor)
-        ctx.rl = { souls: G.rl.souls || 0, cardAtk: G.rl.cardAtk || {}, plays: G.rl.plays || 0, activePl: G.activePlayer };
+        ctx.rl = { souls: G.rl.souls || 0, cardAtk: G.rl.cardAtk || {}, ctr: G.rl.ctr || {}, master: G.rl.master || {}, plays: G.rl.plays || 0, activePl: G.activePlayer };
         setTimeout(() => finishBattle(won, hpLeft, goldEarned, ctx), 700);
     }
     function finishBattle(won, hpLeft, goldEarned, ctx) {
@@ -610,7 +613,11 @@
         run.battles++;
         if (ctx.node.type === 'elite') run.elites++;
         // Artefakt "Momentum"
-        if (ctx.rl) { run.cardAtk = ctx.rl.cardAtk; run.souls = ctx.rl.souls; }
+        if (ctx.rl) {
+            run.cardAtk = ctx.rl.cardAtk; run.souls = ctx.rl.souls; run.ctr = ctx.rl.ctr;
+            // Aufwertung "Meisterstück": jede Karte, die in diesem Kampf im Spiel war, wächst um +1 ATK (höchstens +6)
+            for (const k of Object.keys(ctx.rl.master || {})) run.cardAtk[k] = Math.min(6, (run.cardAtk[k] || 0) + 1);
+        }
         for (const id of (run.artifacts || [])) { const a = R.art(id); if (a && a.runWin) { try { a.runWin(run, ctx.rl || null); } catch (e) { } } }
         run.node = ctx.node.id; run.row = ctx.node.row; run.visited[ctx.node.id] = true;
         run.pending = null;
@@ -643,6 +650,7 @@
         run.map = genMap(run.act);
         run.maxHp += 6;
         run.hp = run.maxHp;
+        if (R.bossArtifacts) run.bossPick = R.bossArtifacts(run);
         saveRun();
         openActIntro(() => openActReward(), 6);
     }
@@ -698,10 +706,18 @@
             slot.className = 'rl-reward-card';
             slot.dataset.card = id;
             slot.appendChild(cardNode(id, 175));
-            slot.onclick = () => { addCardToRun(id); toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`); openMap(); };
+            slot.onclick = () => { addCardToRun(id); toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`); afterActReward(); };
             row.appendChild(slot);
         });
-        on('#rl-act-skip', 'click', () => { run.gold += 25; saveRun(); openMap(); });
+        on('#rl-act-skip', 'click', () => { run.gold += 25; saveRun(); afterActReward(); });
+    }
+
+    // Nach dem Boss: ein Boss-Artefakt (stark, mit Nachteil) aus drei
+    function afterActReward() {
+        const ids = run.bossPick || (R.bossArtifacts ? R.bossArtifacts(run) : []);
+        if (!ids.length) { openMap(); return; }
+        run.bossPick = ids; saveRun();                                                     // bleibt beim Neuladen erhalten
+        openArtifactChoice(ids, () => { delete run.bossPick; saveRun(); openMap(); }, 'boss');
     }
 
     // ---------------------------------------------------------------- Belohnung
@@ -751,8 +767,8 @@
             <div class="rl-modal-screen">
                 ${hudHtml()}
                 <div class="rl-panel wide">
-                    <div class="rl-panel-head"><div><div class="rl-kicker">${tr(first ? 'Dein erstes Artefakt' : 'Elite-Beute')}</div><h2>${tr('Wähle ein Artefakt')}</h2></div></div>
-                    <p class="rl-lead">Artefakte gelten für den gesamten Run und verändern die Regeln dauerhaft.</p>
+                    <div class="rl-panel-head"><div><div class="rl-kicker">${tr(first === 'boss' ? 'Boss-Beute' : first ? 'Dein erstes Artefakt' : 'Elite-Beute')}</div><h2>${tr('Wähle ein Artefakt')}</h2></div></div>
+                    <p class="rl-lead">${tr(first === 'boss' ? 'Boss-Artefakte sind stark, haben aber einen Preis. Sie gelten für den restlichen Run.' : 'Artefakte gelten für den gesamten Run und verändern die Regeln dauerhaft.')}</p>
                     <div class="rl-artifact-row" id="rl-art-row"></div>
                 </div>
             </div>`);

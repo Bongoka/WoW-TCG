@@ -129,7 +129,7 @@
                 .map(e => `<option value="${esc(e.id)}">${esc(e.text)}</option>`).join('');
             archSel.value = state.arch;
         } else {
-            const cats = [...new Set(R.ARTIFACTS.map(a => R.artCategory(a)))].sort((a, b) => a.localeCompare(b, 'de'));
+            const cats = [...new Set(R.ARTIFACTS.concat(R.BOSS_ARTIFACTS || []).map(a => R.artCategory(a)))].sort((a, b) => a.localeCompare(b, 'de'));
             catSel.innerHTML = '<option value="all">Alle Kategorien</option>' + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
             catSel.value = state.cat;
         }
@@ -199,14 +199,14 @@
     }
 
     function renderArtifacts(content, q) {
-        const rows = R.ARTIFACTS.filter(a => {
+        const rows = R.ARTIFACTS.concat(R.BOSS_ARTIFACTS || []).filter(a => {
             if (state.cat !== 'all' && R.artCategory(a) !== state.cat) return false;
             if (state.act && a.acts && !a.acts.includes(state.act)) return false;
             if (!q) return true;
             return (a.name + ' ' + a.text + ' ' + a.id + ' ' + R.artCategory(a)).toLowerCase().includes(q);
         }).slice().sort((a, b) => R.artCategory(a).localeCompare(R.artCategory(b), 'de') || String(a.name).localeCompare(String(b.name), 'de'));
         const shown = rows.slice(0, state.limit);
-        overlay.querySelector('#rl-dbg-count').textContent = R.ARTIFACTS.length + ' Artefakte';
+        overlay.querySelector('#rl-dbg-count').textContent = (R.ARTIFACTS.length + (R.BOSS_ARTIFACTS || []).length) + ' Artefakte';
         const cats = new Set(rows.map(a => R.artCategory(a)));
         overlay.querySelector('#rl-dbg-info').innerHTML = `Zeige <b>${shown.length}</b> von <b>${rows.length}</b> Artefakten in <b>${cats.size}</b> Kategorien. ` +
             `Artefakte ohne Akt-Angabe sind in allen Akten verfügbar.`;

@@ -1522,7 +1522,7 @@ function runRuleTests() {
         const run = { act: 1, artifacts: [], deck: plain.map((c, i) => ({ uid: 'u' + i, id: c.id })) };
         for (let i = 0; i < 30; i++) assert(!RL.availableArtifacts(run, 3).some(id => RL.ART_NEED[id]), 'unpassendes Artefakt angeboten');
         run.deck.push(...Object.values(CARDS).filter(c => c.isPet).slice(0, 2).map((c, i) => ({ uid: 'p' + i, id: c.id })));
-        let seen = false; for (let i = 0; i < 200 && !seen; i++) seen = RL.availableArtifacts(run, 3).indexOf('pet_bond') >= 0;
+        let seen = false; for (let i = 0; i < 800 && !seen; i++) seen = RL.availableArtifacts(run, 3).indexOf('pet_bond') >= 0;   // ~2 % pro Angebot: 800 Versuche, sonst zufällig rot
         assert(seen, 'Beast Mastery trotz Pets nie angeboten');
     });
     test(142, 'Roguelike: Aufwertungen nur, wenn sie auslösen können; Artefakt-Stufen bestimmen Seltenheit und Preis', () => {
@@ -2157,6 +2157,146 @@ function runRuleTests() {
         act(s, a, 1);
         assert(P(s, 1).hand.some(c => c.uid === q.uid), "Corki's Ransom nicht auf der Hand");
         assert(getReadyRes(P(s, 1)) === 1, 'bereite Ressourcen übrig: ' + getReadyRes(P(s, 1)) + ' (erwartet 1: Corki + eine verdeckte bezahlt)');
+    });
+    test(180, 'Roguelike-Draft: Pakete richten sich nach dem Deck (Kurve, Ally-Anteil, Synergie mit gewählten Themen, ein neues Thema je Angebot)', () => {
+        if (typeof RL === 'undefined' || !RL.draftNeeds) return;
+        const nonQ = ids => ids.map(id => CARDS[id]).filter(c => c.type !== 'Quest' && c.type !== 'Location');
+        let decks = 0, allies = 0, heavy = 0, dkAllies = 0, dk = 0;
+        for (const cls of RL.CLASSES) for (let i = 0; i < 3; i++) {
+            const d = RL.autoDraft(cls.key), nq = nonQ(d.deck);
+            decks++; allies += nq.filter(c => c.type === 'Ally').length / nq.length;
+            if (nq.filter(c => (c.cost || 0) >= 6).length > 4) heavy++;
+            if (cls.key === 'deathknight') { dk++; dkAllies += nq.filter(c => c.type === 'Ally').length; }
+        }
+        assert(allies / decks >= 0.4, `Ally-Anteil nur ${Math.round(100 * allies / decks)} %`);
+        assert(heavy <= decks * 0.15, `${heavy}/${decks} Decks mit mehr als vier 6+-Karten`);
+        assert(dkAllies / dk >= 4.5, `Todesritter: nur ${(dkAllies / dk).toFixed(1)} Allies`);
+        // Gewichte: fehlende 2er gesucht, die fünfte 6+-Karte kaum noch
+        const two = Object.values(CARDS).find(c => c.type === 'Ally' && c.cost === 2 && RL.isPoolCard(c));
+        const six = Object.values(CARDS).find(c => c.type === 'Ally' && c.cost === 7 && RL.isPoolCard(c));
+        const need = RL.draftNeeds(Array(10).fill(six.id));
+        assert(RL.draftCardWeight(two, need) > 3 * RL.draftCardWeight(six, need), 'Kurve: 2er nicht stärker gewichtet als die x-te 7er-Karte');
+        // Synergie: nach einem gewählten Paket bietet das nächste Paket-Angebot meist Karten, die zu diesem Thema passen;
+        // zugleich ist je Angebot mindestens ein Thema neu
+        let syn = 0, wild = 0, rounds = 0;
+        for (let i = 0; i < 24; i++) {
+            const d = RL.draftNew(RL.CLASSES[i % RL.CLASSES.length].key); RL.draftChoose(d, 0); RL.draftChoose(d, 0);
+            const t = RL.draftThemeById(Object.keys(d.picked)[0]);
+            while (RL.DRAFT_STEPS[d.step] !== 'pack') RL.draftChoose(d, 0);
+            if (d.offers.length < 3) continue;
+            rounds++;
+            if (d.offers.some(o => o.cards.some(id => t.core(CARDS[id]) || (t.support && t.support(CARDS[id]))))) syn++;
+            if (d.offers.some(o => !d.picked[o.theme])) wild++;
+        }
+        assert(syn >= rounds * 0.6, `Synergie: nur in ${syn}/${rounds} Angeboten Karten zum gewählten Thema`);
+        assert(wild >= rounds * 0.9, `Kein neues Thema in ${rounds - wild}/${rounds} Angeboten`);
+    });
+    test(181, 'Roguelike: Verstärker- und Zähler-Artefakte (Skull of Gul\'dan, Burning Adrenaline, Executioner …), Aufwertungen Schwarm und Meisterstück', () => {
+        if (typeof RL === 'undefined' || !RL.art('art_echoskull')) return;
+        const mk = (arts) => { const s = fresh(); s.rl = { arts: arts || [], f: {}, act: 1, pid: 1, cardAtk: {} }; s.chain = []; s.pending = null; s.battle = null; s.humans = []; const p = P(s, 1); p.allies = []; p.ongoing = []; P(s, 2).allies = []; return s; };
+        const plain = ctVanilla(2);                                                          // Ally ohne Text
+        // Schwarm: +1/+1 je anderer Karte mit gleichem Namen
+        let s = mk(); const sw = makeCardInst(RL.upgraded(plain.id, 'up_swarm'), false, 1); P(s, 1).allies.push(sw);
+        const a0 = atkOf(s, sw); P(s, 1).allies.push(makeCardInst(plain.id, false, 1), makeCardInst(plain.id, false, 1));
+        assert(atkOf(s, sw) === a0 + 2 && hpOf(s, sw) === plain.hp + 2, `Schwarm: ${atkOf(s, sw)}/${hpOf(s, sw)} statt ${a0 + 2}/${plain.hp + 2}`);
+        // Skull of Gul'dan: "Beim Ins-Spiel-Kommen: ziehe 1 Karte" zieht zweimal
+        for (const [arts, n] of [[[], 1], [['art_echoskull'], 2]]) {
+            s = mk(arts); const up = RL.upgraded(plain.id, 'up_enter_draw'), c = makeCardInst(up, false, 1); P(s, 1).allies.push(c);
+            const h = P(s, 1).hand.length; RL.afterEnter(s, c, 1, plain.id, c.rlUp, 'up_enter_draw'); process(s);
+            assert(P(s, 1).hand.length === h + n, `Skull of Gul'dan (${arts.length}): ${P(s, 1).hand.length - h} statt ${n} Karten`);
+        }
+        // Burning Adrenaline: Erschöpfen eigener Allies trifft Gegner, höchstens 4-mal pro Zug
+        s = mk(['art_adrenaline']); const ad = makeCardInst(plain.id, false, 1); P(s, 1).allies.push(ad);
+        for (let i = 0; i < 6; i++) { ad.exhausted = false; exhaust(s, ad); process(s); }
+        assert((P(s, 2).hero.damage || 0) === 4, `Burning Adrenaline: ${P(s, 2).hero.damage || 0} Schaden statt 4`);
+        // Executioner: tötender Ally erhält dauerhaft +1 ATK (im Run gespeichert, auch für spätere Kopien)
+        s = mk(['art_executioner']); const ex = makeCardInst(plain.id, false, 1); P(s, 1).allies.push(ex);
+        const foe = makeCardInst(plain.id, false, 2); P(s, 2).allies.push(foe); const ea = atkOf(s, ex);
+        dealDamage(s, { src: ex.uid, tgt: foe.uid, amt: 20, combat: true, sp: 1 }); process(s);
+        assert(s.rl.cardAtk['x:' + plain.id] === 1 && atkOf(s, ex) === ea + 1, `Executioner: ${JSON.stringify(s.rl.cardAtk)}, ATK ${atkOf(s, ex)}`);
+        // Meisterstück: gespeicherte ATK beim Ins-Spiel-Kommen, Karte wird für die Gutschrift nach dem Sieg vorgemerkt
+        s = mk(); const mid = RL.upgraded(plain.id, 'up_master'); s.rl.cardAtk[mid] = 2; const ms = makeCardInst(mid, false, 1); P(s, 1).allies.push(ms);
+        const ma = atkOf(s, ms); RL.afterEnter(s, ms, 1, plain.id, ms.rlUp, 'up_master');
+        assert(atkOf(s, ms) === ma + 2 && s.rl.master[mid] === 1, 'Meisterstück: ATK oder Vormerkung fehlt');
+        // Dark Pact: eigener Schaden am Helden wird einmal pro Zug zurückgeheilt
+        s = mk(['art_darkpact']); const me = P(s, 1).hero;
+        dealDamage(s, { src: me.uid, tgt: me.uid, amt: 3, sp: 1 }); process(s);
+        dealDamage(s, { src: me.uid, tgt: me.uid, amt: 3, sp: 1 }); process(s);
+        assert(me.damage === 3, `Dark Pact: ${me.damage} Schaden statt 3`);
+        // Insightful Earthstorm Diamond: leere Hand im eigenen Zug → ziehe 1
+        s = mk(['art_diamond']); P(s, 1).hand = []; evt(s, 'handLeft', { pid: 1, uid: 'x' }); process(s);
+        assert(P(s, 1).hand.length === 1, 'Diamond: keine Karte gezogen');
+        // Hand of Edward the Odd: nach einer Ongoing-Fähigkeit kostet eine andere Handkarte (2) weniger, nur in diesem Zug
+        s = mk(['art_edward']); P(s, 1).hand = []; const big = ctVanilla(5);
+        const hc = makeCardInst(big.id, false, 1); P(s, 1).hand.push(hc);
+        const ong = Object.values(CARDS).find(c => c.type === 'Ability' && /^Ongoing:/.test(c.text || '') && RL.isPoolCard(c));
+        const c0 = getPlayCost(s, P(s, 1), hc); RL.art('art_edward').cardPlayed(s, 1, makeCardInst(ong.id, false, 1));
+        assert(getPlayCost(s, P(s, 1), hc) === c0 - 2, 'Hand of Edward: Kosten nicht gesenkt'); s.turn++;
+        assert(getPlayCost(s, P(s, 1), hc) === c0, 'Hand of Edward: gilt länger als diesen Zug');
+        // Pendulum of Doom: die zehnte Karte zieht 2 (Zähler über Kämpfe in s.rl.ctr)
+        s = mk(['art_pendulum']); s.rl.ctr = { pend: 9 }; const ph = P(s, 1).hand.length; RL.art('art_pendulum').cardPlayed(s, 1, null); process(s);
+        assert(P(s, 1).hand.length === ph + 2 && s.rl.ctr.pend === 10, 'Pendulum of Doom: zehnte Karte ohne Wirkung');
+        // Hourglass Sand: höchstens eine Karte gespielt → 1 zusätzliche Karte im nächsten Zug
+        s = mk(['art_hourglass']); s.rl.plays = 1; RL.art('art_hourglass').endTurn(s, 1); const hh = P(s, 1).hand.length; RL.art('art_hourglass').startTurn(s, 1); process(s);
+        assert(P(s, 1).hand.length === hh + 1, 'Hourglass Sand: keine zusätzliche Karte');
+        // Call of the Wild: beliebig viele Pets, je +1/+1 pro anderem Pet; The Ashen Verdict: +1 ATK je Rasse
+        const pets = Object.values(CARDS).filter(c => c.type === 'Ally' && c.isPet && !c.unique && c.limitTags && c.limitTags.Pet === 1 && !(FX[c.id] || {}).aura).slice(0, 3);
+        s = mk(['art_callwild']); pets.forEach(c => P(s, 1).allies.push(makeCardInst(c.id, false, 1)));
+        assert(!findLimitViolation(s, P(s, 1)), 'Call of the Wild: drei Pets nicht erlaubt');
+        assert(hpOf(s, P(s, 1).allies[0]) === pets[0].hp + 2, 'Call of the Wild: Pet ohne +2/+2');
+        s = mk(); const h0 = atkOf(s, P(s, 1).hero); s.rl.arts = ['art_unity'];
+        const races = []; for (const c of Object.values(CARDS)) { if (races.length >= 3) break; if (c.type === 'Ally' && typeof c.id === 'number' && c.race && !c.isToken && !c.unique && !Object.keys(c.limitTags || {}).length && !(FX[c.id] || {}).aura && !races.some(r => r.race === c.race)) races.push(c); }
+        races.forEach(c => P(s, 1).allies.push(makeCardInst(c.id, false, 1)));
+        assert(atkOf(s, P(s, 1).hero) === h0 + 3, `The Ashen Verdict: ATK ${atkOf(s, P(s, 1).hero)} statt ${h0 + 3}`);
+    });
+    test(182, 'Roguelike: Boss-Artefakte mit sichtbarem Nachteil – nie im Shop, Handgrenze (CR 415.4b), zufällige Kosten, Blood Fury', () => {
+        if (typeof RL === 'undefined' || !RL.BOSS_ARTIFACTS) return;
+        const mk = (arts) => { const s = fresh(); s.rl = { arts: arts || [], f: {}, act: 1, pid: 1 }; s.humans = []; P(s, 1).allies = []; P(s, 2).allies = []; return s; };
+        for (const a of RL.BOSS_ARTIFACTS) assert(/Nachteil:/.test(a.text) && RL.art(a.id) === a, `${a.name}: Nachteil fehlt im Text oder nicht registriert`);
+        const run = { act: 1, clsKey: 'warrior', clsEn: 'Warrior', hero: 8, artifacts: ['boss_hoard'], deck: [] };
+        const pickB = RL.bossArtifacts(run);
+        assert(pickB.length === 3 && new Set(pickB).size === 3 && !pickB.includes('boss_hoard'), 'Boss-Beute: ' + pickB.join(', '));
+        for (let i = 0; i < 30; i++) assert(!RL.availableArtifacts(run, 3).some(id => /^boss_/.test(id)), 'Boss-Artefakt im Shop/Elite-Angebot');
+        assert(RL.noMulligan(run), 'Hoard: Mulligan nicht gesperrt');
+        let s = mk(); assert(maxHandSize(s, P(s, 1)) === 7, 'Handgrenze ohne Artefakt nicht 7');
+        s = mk(['boss_hoard']); assert(maxHandSize(s, P(s, 1)) > 20 && maxHandSize(s, P(s, 2)) === 7, 'Hoard: Handgrenze falsch');
+        // Serpent-Coil Braid: gezogene Karten mit zufälligen Kosten
+        s = mk(['boss_serpent']); const big = Object.values(CARDS).find(c => c.type === 'Ally' && c.cost === 6 && RL.isPoolCard(c) && !c.text);
+        const c = makeCardInst(big.id, false, 1); c.rlRand = 1; P(s, 1).hand.push(c);
+        assert(getPlayCost(s, P(s, 1), c) === 1, 'Serpent-Coil Braid: Kosten ' + getPlayCost(s, P(s, 1), c));
+        // Blood Fury: +2 für dich, +1 für die Allies des Gegners; Phylactery: Held 6 Gesundheit weniger
+        s = mk(['boss_bloodfury']); const mine = makeCardInst(big.id, false, 1), his = makeCardInst(big.id, false, 2); P(s, 1).allies.push(mine); P(s, 2).allies.push(his);
+        assert(atkOf(s, mine) === big.atk + 2 && atkOf(s, his) === big.atk + 1, `Blood Fury: ${atkOf(s, mine)}/${atkOf(s, his)}`);
+        s = mk(); const hp0 = hpOf(s, P(s, 1).hero); s.rl.arts = ['boss_phylactery'];
+        assert(hpOf(s, P(s, 1).hero) === hp0 - 6, 'Phylactery: Heldengesundheit unverändert');
+        // Fel Infusion: nur die erste Karte pro Zug ist billiger
+        s = mk(['boss_felinfusion']); const fc = makeCardInst(big.id, false, 1); P(s, 1).hand.push(fc);
+        assert(getPlayCost(s, P(s, 1), fc) === big.cost - 2, 'Fel Infusion: erste Karte nicht billiger');
+        RL.art('boss_felinfusion').cardPlayed(s, 1, null);
+        assert(getPlayCost(s, P(s, 1), fc) === big.cost, 'Fel Infusion: zweite Karte auch billiger');
+    });
+    test(183, 'Roguelike: Aufwertungen nach Kosten gestaffelt (günstig = klein, teuer = stark) und je Run verschieden', () => {
+        if (typeof RL === 'undefined' || !RL.upPower) return;
+        const cards = Object.keys(CARDS).filter(k => String(Number(k)) === k).map(k => CARDS[k])
+            .filter(cd => RL.isPoolCard(cd) && ['Ally', 'Ability', 'Weapon', 'Armor', 'Item'].includes(cd.type));
+        const seed0 = RL.upSeed; let cheapBig = 0, cheap = 0, dear = 0, dearStrong = 0, varied = 0;
+        try {
+            for (const cd of cards) {
+                const pw = RL.upPower(RL.effectForCard(cd).id), c = cd.cost || 0;
+                if (c <= 1) { cheap++; if (pw > 1) cheapBig++; }
+                if (c >= 6) { dear++; if (pw === 3) dearStrong++; }
+            }
+            assert(cheapBig === 0, `${cheapBig} Karten mit Kosten 0–1 haben eine mittlere/starke Aufwertung`);
+            assert(dearStrong >= dear * 0.9, `nur ${dearStrong}/${dear} Karten mit Kosten 6+ haben eine starke Aufwertung`);
+            // Kostensenkungen nie auf billigen Karten (sonst wären sie fast umsonst)
+            for (const cd of cards) { const e = RL.effectForCard(cd).id; if (['up_ephemeral', 'up_cost2', 'up_overload', 'up_blood'].includes(e)) assert((cd.cost || 0) >= 4, `${cd.name} (${cd.cost}): ${e}`); }
+            // Je Run (Startwert) eine andere passende Aufwertung; die gespeicherte Aufwertung bleibt erhalten
+            const sample = cards.filter((cd, i) => i % 25 === 0);
+            for (const cd of sample) { const seen = new Set(); for (let sd = 1; sd <= 8; sd++) { RL.upSeed = sd; seen.add(RL.effectForCard(cd).id); } if (seen.size > 1) varied++; }
+            assert(varied >= sample.length * 0.7, `nur ${varied}/${sample.length} Karten mit wechselnder Aufwertung`);
+            RL.upSeed = 3; const cd = sample.find(c => c.type === 'Ally'), key = RL.upgraded(cd.id), eff = CARDS[key].upgradeEffect;
+            RL.upSeed = 4; assert(CARDS[RL.upgraded(cd.id, eff)].upgradeEffect === eff, 'gespeicherte Aufwertung geht beim Laden verloren');
+        } finally { RL.upSeed = seed0; }
     });
     return results;
 }

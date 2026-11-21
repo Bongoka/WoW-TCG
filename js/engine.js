@@ -371,7 +371,8 @@ function defOf(s, a) {
     return Math.max(0, v);
 }
 function getEffectiveMaxHp(s, c) { return hpOf(s, c); }
-function maxHandSize(s, p) { return Math.max(0, MAX_HAND + 3 * attachedTo(s, p.hero.uid, 47).length + auraSum(s, 'handSize', p.id)); }   // Jin'do's Bag of Whammies (Set 2)
+const HAND_SIZE_MODS = [];   // (s, p) => zusätzliche maximale Handgröße (Roguelike-Artefakte)
+function maxHandSize(s, p) { let n = MAX_HAND + 3 * attachedTo(s, p.hero.uid, 47).length + auraSum(s, 'handSize', p.id); for (const f of HAND_SIZE_MODS) n += f(s, p) || 0; return Math.max(0, n); }   // Jin'do's Bag of Whammies (Set 2), CR 415.4b
 
 // ---------------------------------------------------------------- Schlüsselwörter
 function hasProtector(s, c) {
