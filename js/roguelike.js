@@ -49,7 +49,6 @@
 
     // ---------------------------------------------------------------- Run-Speicher
     function saveRun() {
-        R.upSeed = (run && run.upSeed) || 0;                                               // Aufwertungen je Run verschieden (R.effectForCard)
         try {
             if (run) localStorage.setItem(SAVE_KEY, JSON.stringify(run));
             else localStorage.removeItem(SAVE_KEY);
@@ -69,7 +68,6 @@
             if (!r.act) r.act = 1;
             if (!Array.isArray(r.potions)) r.potions = [];
             if (!r.clsEn) r.clsEn = (CARDS[r.hero] && CARDS[r.hero].class) || 'Warrior';
-            if (!r.upSeed) r.upSeed = 1 + Math.floor(Math.random() * 1e9);
             // Synthetische Aufwertungs-IDs gehen beim Neuladen verloren – neu erzeugen.
             if (r.deck && R.upgraded) {
                 for (const e of r.deck) {
@@ -195,7 +193,7 @@
         on('#rl-open-debug', 'click', () => { if (R.openDebug) R.openDebug(); });
         if (saved) {
             on('#rl-resume-btn', 'click', () => {
-                run = saved; R.upSeed = run.upSeed || 0; if (run.pending) { delete run.pending; saveRun(); }
+                run = saved; if (run.pending) { delete run.pending; saveRun(); }
                 if ((run.row < 0) && run.act > 1) openActIntro(() => run.bossPick ? afterActReward() : openMap());
                 else openMap();
             });
@@ -226,7 +224,7 @@
             run = {
                 v: 2, act: 1, clsKey: key, cls: cls.name, clsEn: cls.en, hero: draft.hero, faction: hero.faction,
                 deck: draft.deck.map(id => ({ uid: uid(), id })), maxHp, hp: maxHp, gold: 55, artifacts: [], potions: [R.randomPotion()],
-                priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [], upSeed: 1 + Math.floor(Math.random() * 1e9),
+                priceMod: 1, map: genMap(1), row: -1, node: null, visited: {}, seenEvents: [],
                 battles: 0, elites: 0, boss: false, createdAt: Date.now(), goldEarnedTotal: 0
             };
             saveRun();

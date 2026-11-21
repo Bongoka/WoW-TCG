@@ -2275,28 +2275,35 @@ function runRuleTests() {
         RL.art('boss_felinfusion').cardPlayed(s, 1, null);
         assert(getPlayCost(s, P(s, 1), fc) === big.cost, 'Fel Infusion: zweite Karte auch billiger');
     });
-    test(183, 'Roguelike: Aufwertungen nach Kosten gestaffelt (günstig = klein, teuer = stark) und je Run verschieden', () => {
+    test(183, 'Roguelike: jede Karte hat immer dieselbe, möglichst passende Aufwertung – nach Kosten gestaffelt (günstig = klein, teuer = stark), mit Wendungen zum Kartentext', () => {
         if (typeof RL === 'undefined' || !RL.upPower) return;
         const cards = Object.keys(CARDS).filter(k => String(Number(k)) === k).map(k => CARDS[k])
             .filter(cd => RL.isPoolCard(cd) && ['Ally', 'Ability', 'Weapon', 'Armor', 'Item'].includes(cd.type));
-        const seed0 = RL.upSeed; let cheapBig = 0, cheap = 0, dear = 0, dearStrong = 0, varied = 0;
-        try {
-            for (const cd of cards) {
-                const pw = RL.upPower(RL.effectForCard(cd).id), c = cd.cost || 0;
-                if (c <= 1) { cheap++; if (pw > 1) cheapBig++; }
-                if (c >= 6) { dear++; if (pw === 3) dearStrong++; }
-            }
-            assert(cheapBig === 0, `${cheapBig} Karten mit Kosten 0–1 haben eine mittlere/starke Aufwertung`);
-            assert(dearStrong >= dear * 0.9, `nur ${dearStrong}/${dear} Karten mit Kosten 6+ haben eine starke Aufwertung`);
+        let cheapBig = 0, dear = 0, dearStrong = 0, close = 0;
+        const count = {};
+        for (const cd of cards) {
+            const e = RL.effectForCard(cd).id, pw = RL.upPower(e), c = cd.cost || 0;
+            assert(RL.effectForCard(cd).id === e, `${cd.name}: Aufwertung nicht fest`);
+            count[e] = (count[e] || 0) + 1;
+            if (c <= 1 && pw > 1) cheapBig++;
+            if (c >= 6) { dear++; if (pw === 3) dearStrong++; }
+            if ((RL.FIT[e] ? RL.FIT[e](cd) : 1) >= 3) close++;
             // Kostensenkungen nie auf billigen Karten (sonst wären sie fast umsonst)
-            for (const cd of cards) { const e = RL.effectForCard(cd).id; if (['up_ephemeral', 'up_cost2', 'up_overload', 'up_blood'].includes(e)) assert((cd.cost || 0) >= 4, `${cd.name} (${cd.cost}): ${e}`); }
-            // Je Run (Startwert) eine andere passende Aufwertung; die gespeicherte Aufwertung bleibt erhalten
-            const sample = cards.filter((cd, i) => i % 25 === 0);
-            for (const cd of sample) { const seen = new Set(); for (let sd = 1; sd <= 8; sd++) { RL.upSeed = sd; seen.add(RL.effectForCard(cd).id); } if (seen.size > 1) varied++; }
-            assert(varied >= sample.length * 0.7, `nur ${varied}/${sample.length} Karten mit wechselnder Aufwertung`);
-            RL.upSeed = 3; const cd = sample.find(c => c.type === 'Ally'), key = RL.upgraded(cd.id), eff = CARDS[key].upgradeEffect;
-            RL.upSeed = 4; assert(CARDS[RL.upgraded(cd.id, eff)].upgradeEffect === eff, 'gespeicherte Aufwertung geht beim Laden verloren');
-        } finally { RL.upSeed = seed0; }
+            if (['up_ephemeral', 'up_cost2', 'up_overload', 'up_blood'].includes(e)) assert(c >= 4, `${cd.name} (${c}): ${e}`);
+        }
+        assert(cheapBig === 0, `${cheapBig} Karten mit Kosten 0–1 haben eine mittlere/starke Aufwertung`);
+        assert(dearStrong >= dear * 0.9, `nur ${dearStrong}/${dear} Karten mit Kosten 6+ haben eine starke Aufwertung`);
+        assert(close >= cards.length * 0.75, `nur ${close}/${cards.length} Aufwertungen mit starkem Bezug zur Karte`);
+        const most = Math.max(...Object.values(count));
+        assert(most <= cards.length * 0.07 && Object.keys(count).length >= 80, `zu wenig Abwechslung: ${Object.keys(count).length} Effekte, häufigster ${most}/${cards.length}`);
+        // Wendungen: [Activate] → Sentinel (zweimal nutzbar); eine Heilung bekommt keine Schadens-Aufwertung
+        const byName = n => Object.values(CARDS).find(c => c.name === n && typeof c.id === 'number');
+        assert(RL.effectForCard(byName('Sampron the Banisher')).id === 'up_sentinel', 'Sampron the Banisher ([Activate]) ohne Sentinel');
+        assert(['up_play_ping', 'up_play_ping1', 'up_dmg1', 'up_vamp'].indexOf(RL.effectForCard(byName('Regrowth')).id) < 0, 'Regrowth (Heilung) mit Schadens-Aufwertung');
+        assert(RL.effectForCard(byName('Ironforge Guards')).id === 'up_swarm', 'Ironforge Guards (Unlimited) ohne Schwarm');
+        // gespeicherte Aufwertung bleibt beim Laden erhalten
+        const al = cards.find(c => c.type === 'Ally'), eff = CARDS[RL.upgraded(al.id)].upgradeEffect;
+        assert(CARDS[RL.upgraded(al.id, eff)].upgradeEffect === eff, 'gespeicherte Aufwertung geht beim Laden verloren');
     });
     return results;
 }

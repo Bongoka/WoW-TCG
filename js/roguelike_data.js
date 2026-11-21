@@ -1101,7 +1101,7 @@
     const raceIs = (cd, r) => cd.race === r || cd.petType === r || (cd.allyTypes || []).indexOf(r) >= 0;
     const clsIs = (cd, k) => cd.allyClass === k || (cd.allowedClasses || []).indexOf(k) >= 0 || (cd.allyTypes || []).indexOf(k) >= 0;
     const anyCls = (cd, list) => list.some(k => clsIs(cd, k));
-    const dmgText = cd => has(cd, /deals? \d+|damage/i);
+    const dmgText = cd => has(cd, /\bdeals?\b[^.]*\bdamage\b/i);   // nicht "heals 4 damage"
     const healText = cd => has(cd, /\bheal/i);
     const drawText = cd => has(cd, /\bdraw/i);
     const isOngoing = cd => !!cd.ongoing || /(?:^|<p> )Ongoing:/i.test(txt(cd));
@@ -1124,7 +1124,7 @@
         up_attack_ping: cd => (cd.atkType === 'Ranged' || cd.slot === 'Ranged' || clsIs(cd, 'Hunter')) ? 3 : 1,
         up_hurt_gold: cd => raceIs(cd, 'Goblin') ? 3 : 1,
         up_hurt_thorns: cd => (has(cd, /Protector/) || (cd.hp || 0) >= 5 || clsIs(cd, 'Druid')) ? 3 : 1,
-        up_hurt_draw: cd => (has(cd, /Protector/) || clsIs(cd, 'Warrior')) ? 2 : 1,
+        up_hurt_draw: cd => has(cd, /Protector/) ? 3 : clsIs(cd, 'Warrior') ? 2 : 1,
         up_start_draw: cd => (anyCls(cd, ['Mage', 'Priest']) || cd.type === 'Item') ? 3 : 1,
         up_start_gold: cd => (raceIs(cd, 'Goblin') || cd.type === 'Item') ? 2 : 1,
         up_start_heal: cd => (healText(cd) || anyCls(cd, ['Priest', 'Druid']) || cd.type === 'Armor') ? 2 : 1,
@@ -1160,7 +1160,7 @@
         up_cond_draenei: cd => raceIs(cd, 'Draenei') ? 3 : cd.faction === 'Alliance' ? 1 : 0,
         up_quick: cd => cd.instant ? 0 : cd.type === 'Ability' ? ((dmgText(cd) || has(cd, /destroy|exhaust|prevent/i)) ? 3 : 1) : has(cd, /Protector/) ? 4 : cd.type === 'Ally' ? 1 : 0,
         up_thrown: cd => has(cd, /Thrown/) ? 0 : (cd.cost || 0) <= 3 ? 3 : 1,
-        up_sentinel: cd => cd.type === 'Ally' ? (has(cd, /Protector/) ? 4 : 0) : has(cd, /\[Activate\]|exhaust/i) ? 4 : cd.type === 'Armor' ? 2 : 0,
+        up_sentinel: cd => has(cd, /\[Activate\]/) ? 4 : cd.type === 'Ally' ? (has(cd, /Protector/) ? 3 : 0) : has(cd, /exhaust/i) ? 4 : cd.type === 'Armor' ? 2 : 0,
         up_discard: cd => (has(cd, /discard/i) || clsIs(cd, 'Warlock')) ? 4 : 1,
         up_dr_draw: cd => has(cd, /Death Rattle/) ? 0 : (cd.type === 'Ability' && !isOngoing(cd)) ? 2 : raceIs(cd, 'Undead') ? 3 : 1,
         up_dr_ping: cd => has(cd, /Death Rattle/) ? 0 : (clsIs(cd, 'Death Knight') || raceIs(cd, 'Undead')) ? 4 : 1,
@@ -1364,22 +1364,70 @@
     R.upPower = id => UP_PW[1].indexOf(id) >= 0 ? 1 : UP_PW[3].indexOf(id) >= 0 ? 3 : 2;
     // Erlaubte Stufen und Zielstufe je Kosten: (0–1) klein · (2–3) klein/mittel · (4–5) mittel/stark · (6+) stark (sonst Rückfall)
     R.upTiers = cost => cost <= 1 ? { ok: [1], want: 1 } : cost <= 3 ? { ok: [1, 2], want: cost === 2 ? 1 : 2 } : cost === 4 ? { ok: [2, 3], want: 2 } : cost === 5 ? { ok: [2, 3], want: 3 } : { ok: [3], want: 3 };
-    // Startwert des Runs (roguelike.js setzt ihn): Dieselbe Karte bekommt in jedem Run eine andere passende Aufwertung
-    R.upSeed = 0;
-    R.effectForCard = function (cd) {
+    // ---- Wendungen: Aufwertungen, die mit dem eigenen Kartentext eine neue Synergie bilden, bekommen Vorrang ----
+    // (z. B. ein Ally, der sich auf die Hand zurückholt, wiederholt seinen Ins-Spiel-Effekt; eine Karte mit [Activate]
+    // und Sentinel wirkt zweimal; Death Rattle + Eternal löst immer wieder aus)
+    const ENTER_UPS = ['up_enter_draw', 'up_enter_draw2', 'up_enter_ping', 'up_enter_aoe', 'up_enter_heal', 'up_enter_heal6', 'up_enter_refund', 'up_enter_exhaust', 'up_twin', 'up_enter_gold'];
+    const ATTACK_UPS = ['up_rage_atk', 'up_attack_gold', 'up_attack_heal', 'up_attack_ping', 'up_bloodthirst', 'up_master'];
+    const TWISTS = [
+        [cd => has(cd, /return[^.]*to (its owner's|your|their owner's) hand|put[^.]*into play/i), ENTER_UPS, 2],
+        [cd => has(cd, /\[Activate\]|Exhaust this/i), ['up_sentinel'], 3],
+        [cd => has(cd, /Protector/) || cardKw(cd, 'protector'), ['up_hurt_thorns', 'up_hurt_draw', 'up_sentinel', 'up_bloodthirst'], 2],
+        [cd => has(cd, /\bready\b/i), ATTACK_UPS.concat(['up_sentinel']), 2],
+        [cd => has(cd, /Ferocity|Elusive|Stealth|Long-Range/) || cardKw(cd, 'ferocity'), ATTACK_UPS, 1],
+        [cd => has(cd, /Death Rattle|is destroyed|dies|from your graveyard/i), ['up_eternal', 'up_death_draw', 'up_death_token', 'up_death_ping', 'up_dr_draw', 'up_dr_ping'], 2],
+        [cd => has(cd, /\bresources?\b/i), ['up_res_draw', 'up_res_ping', 'up_res_heal', 'up_res_gold', 'up_enter_refund', 'up_play_refund'], 2],
+        [cd => has(cd, /your hero (takes|is dealt)|damage to your hero|Life Tap/i), ['up_vamp', 'up_blood', 'up_attack_heal', 'up_start_heal'], 2],
+        [cd => has(cd, /\btokens?\b/i), ['up_aura_atk', 'up_aura_hp', 'up_twin'], 2],
+        [cd => has(cd, /discard/i), ['up_discard'], 2],
+        [cd => has(cd, /Finishing Move|destroy target/i), ['up_return', 'up_echo'], 1],
+        [cd => has(cd, /\bstrike|when your hero attacks/i) && cd.type === 'Weapon', ['up_master', 'up_bloodthirst', 'up_attack_ping', 'up_attack_heal'], 2],
+        [cd => cd.type === 'Ally' && (cd.hp || 0) >= (cd.atk || 0) + 3, ['up_hurt_thorns', 'up_hurt_draw', 'up_sentinel'], 1]
+    ];
+    const twistOf = (cd, id) => { let v = 0; for (const [cond, ids, b] of TWISTS) { if (ids.indexOf(id) < 0) continue; try { if (cond(cd)) v = Math.max(v, b); } catch (e) { } } return v; };
+    // Bewertung aller passenden Aufwertungen einer Karte: Passung (FIT) + Wendung + Zielstufe der Kosten
+    function upScores(cd) {
         const pool = R.CARD_EFFECTS.filter(e => (!e.types || e.types.indexOf(cd.type) >= 0) && R.effectFits(e, cd));
-        if (!pool.length) return R.CARD_EFFECTS[0];
         const cost = typeof cd.cost === 'number' ? cd.cost : 0, tiers = R.upTiers(cost);
-        // Passung bewerten (FIT) + Bonus für die Zielstufe; unter den bestpassenden Effekten entscheidet der Hash.
         const scored = pool.map(e => { let v = 1; try { v = FIT[e.id] ? FIT[e.id](cd) : 1; } catch (err) { v = 1; } return { e, v: v || 0, pw: R.upPower(e.id) }; })
             .filter(x => x.v > 0 && cost >= (UP_MINCOST[x.e.id] || 0));
-        if (!scored.length) return pool[hashStr(String(cd.id)) % pool.length];
         let cand = scored.filter(x => tiers.ok.indexOf(x.pw) >= 0);
         if (!cand.length) cand = scored;                                                     // nichts in dieser Stufe: jede passende Aufwertung
-        cand.forEach(x => { x.v += x.pw === tiers.want ? 1 : 0; });
-        const best = Math.max(...cand.map(x => x.v));
-        const top = cand.filter(x => x.v >= best - 1).map(x => x.e);
-        return top[hashStr(String(cd.id) + '|' + (cd.name || '') + '|' + cd.type + (R.upSeed ? '|' + R.upSeed : '')) % top.length];
+        cand.forEach(x => { x.v += (x.pw === tiers.want ? 1 : 0) + twistOf(cd, x.e.id); });
+        return { pool, cand };
+    }
+    // Feste Zuteilung: Jede Karte hat immer dieselbe Aufwertung (man soll die Karten kennenlernen). Einmal für alle Karten
+    // berechnet, in fester Reihenfolge (Karten-ID): die bestpassende Aufwertung; damit nicht alle Karten dasselbe bekommen,
+    // zählt jede schon oft vergebene Aufwertung etwas weniger (UP_SPREAD je Vergabe). Gleichstand entscheidet der Hash.
+    const UP_SPREAD = 0.02, UP_SPREAD_MAX = 1.5;                                          // höchstens 1,5: eine klar bessere Passung oder Wendung gewinnt immer
+    let UP_TABLE = null;
+    function pickUp(cd, cand, used) {
+        let best = -Infinity, top = [];
+        for (const x of cand) {
+            const v = x.v - (used ? Math.min(UP_SPREAD_MAX, UP_SPREAD * (used[x.e.id] || 0)) : 0);
+            if (v > best + 1e-9) { best = v; top = [x.e]; } else if (Math.abs(v - best) <= 1e-9) top.push(x.e);
+        }
+        return top[hashStr(String(cd.id) + '|' + (cd.name || '') + '|' + cd.type) % top.length];
+    }
+    function buildUpTable() {
+        UP_TABLE = {}; const used = {};
+        const ids = Object.keys(CARDS).filter(k => String(Number(k)) === k).map(Number).sort((a, b) => a - b);
+        for (const id of ids) {
+            const cd = CARDS[id];
+            if (!cd || cd.isToken || ALL_CARD_TYPES.indexOf(cd.type) < 0) continue;
+            const { pool, cand } = upScores(cd);
+            if (!pool.length) continue;
+            const e = cand.length ? pickUp(cd, cand, used) : pool[hashStr(String(cd.id)) % pool.length];
+            UP_TABLE[id] = e.id; used[e.id] = (used[e.id] || 0) + 1;
+        }
+    }
+    R.effectForCard = function (cd) {
+        if (!UP_TABLE) buildUpTable();
+        const t = UP_TABLE[cd.id];
+        if (t && R.EFFECTS[t]) return R.EFFECTS[t];
+        const { pool, cand } = upScores(cd);                                                 // Karten außerhalb der Tabelle (z. B. Tokens)
+        if (!pool.length) return R.CARD_EFFECTS[0];
+        return cand.length ? pickUp(cd, cand, null) : pool[hashStr(String(cd.id)) % pool.length];
     };
     R.archFor = function (cd) { return R.effectForCard(cd).id; };
     R.upgradeText = function (baseId) {
