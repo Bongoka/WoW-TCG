@@ -414,6 +414,14 @@ function optApply() {
     [...new Set(cur)].forEach(id => { const i = m.ids.indexOf(id); for (let k = 0; k < rec[i]; k++) out.push(id); });
     optStop();
     currentDeckBuilder.cards = out;
+    // Das optimierte Deck wird beim Speichern ein eigenes Deck („… (optimiert)“) – das Ausgangsdeck bleibt erhalten
+    if (diff) {
+        const hero = dbHero(), base = (currentDeckBuilder.name || '').trim() || (hero ? `${hero.class || hero.faction} – ${hero.name}` : 'Deck');
+        const suf = tr(' (optimiert)');
+        currentDeckBuilder.id = null;
+        currentDeckBuilder.name = base.endsWith(suf) ? base : base + suf;
+        document.getElementById('db-name').value = currentDeckBuilder.name;
+    }
     renderDBAll();
     dbFlash(tr`Anzahlen übernommen: ${out.length} Karten, ${diff} Kopien geändert.`);
 }
