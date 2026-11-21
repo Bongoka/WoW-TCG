@@ -841,6 +841,9 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 :is(#db-deck-cards, #dp-cards) .db-row::after { content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 80px; z-index: 0; pointer-events: none; background: linear-gradient(90deg, rgba(8,6,4,0), rgba(8,6,4,.55) 30%); }
 :is(#db-deck-cards, #dp-cards) .db-row:hover { border-color: var(--gold-dark); border-left-color: var(--tc, var(--gold)); background: linear-gradient(180deg, #241d15, #120e0a); }
 :is(#db-deck-cards, #dp-cards) .db-row:hover .db-row-art { filter: saturate(1.25) brightness(1.08); background-position: 55% 26%; }
+/* Ausrüstung hat rechts im Bild die senkrechte Leiste mit den Klassen-Symbolen: Ausschnitt nach links schieben (sichtbar ca. 9–80 % der Bildbreite) */
+.db-row-art.eq { background-position: 28% 30%; }
+:is(#db-deck-cards, #dp-cards) .db-row:hover .db-row-art.eq { background-position: 28% 26%; }
 :is(#db-deck-cards, #dp-cards) .db-row-name { font-weight: bold; color: #f4ecdc; letter-spacing: .2px; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 10px rgba(0,0,0,.95); }
 :is(#db-deck-cards, #dp-cards) .db-row-n { text-shadow: 0 0 4px #000, 0 1px 2px #000; }
 :is(#db-deck-cards, #dp-cards) .db-row-btn { background: rgba(12,9,6,.75); }

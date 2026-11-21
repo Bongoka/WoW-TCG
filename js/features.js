@@ -279,7 +279,7 @@ function dbRenderRows(box, cards, hero, o = {}) {
             row.innerHTML = `<span class="db-row-cost">${c.type === 'Quest' ? 'Q' : c.type === 'Location' ? 'L' : (c.cost || 0) + (c.xCost ? '+X' : '')}</span><span class="db-row-name">${CARD_ISSUES[id] ? `<span class="db-issue" title="${tr('Nicht vollständig umgesetzt: ')}${esc(tr(CARD_ISSUES[id]))}">⚠</span> ` : ''}${esc(c.name)}</span>`
                 + (o.edit ? `<button class="db-row-btn" data-a="-">−</button><span class="db-row-n">${counts[id]}</span><button class="db-row-btn" data-a="+">+</button>` : `<span></span><span class="db-row-n">${counts[id]}</span><span></span>`);
             // Kartenausschnitt rechts in der Zeile, nach links ins Dunkle ausgeblendet (Extended Art liegt obenauf, falls vorhanden)
-            const art = document.createElement('div'); art.className = 'db-row-art';
+            const art = document.createElement('div'); art.className = 'db-row-art' + (dbTypeOf(c).k === 'Equipment' ? ' eq' : '');   // Ausrüstung: Klassenleiste rechts im Bild aussparen
             dbRowArt(art, id);
             row.prepend(art);
             // Kosten auf der Original-Kugel der Karte (Ally je Fraktion, Fähigkeit lila, Ausrüstung grau, Quest-Schild); Streifen links in derselben Farbe
