@@ -34,7 +34,12 @@ const SKIPPERS = { 8094: 'chill', 8095: 'crackle', 8116: 'quick' };
 DRAW_REPLACE.push((s, p) => { if (p.skipAsk10) return false; const l = p.allies.filter(a => SKIPPERS[a.id] && active(s, a)); if (!l.length) return false;
     q(s, { op: 'call', k: 'E:skipAsk10', a: { pid: p.id, srcs: l.map(a => a.uid) } }); return true; });
 EK.skipAsk10 = (s, a) => { const srcs = a.srcs.filter(u => findCharacter(s, u)); if (!srcs.length) return EK.skipDraw10(s, a, 0);
-    ask(s, { pid: a.pid, prompt: tr('Eine Karte ziehen oder das Ziehen überspringen?'), src: findCharacter(s, srcs[0]).name, opts: [{ label: tr('Ziehen'), v: 0, ai: 1 }, ...srcs.map(u => ({ label: tr`Überspringen (${findCharacter(s, u).name})`, v: u, ai: me(s, a.pid).hand.length >= 5 ? 2 : 0.5 }))], k: 'E:skipDraw10', a }); };
+    ask(s, { pid: a.pid, prompt: tr('Eine Karte ziehen oder das Ziehen überspringen?'), src: findCharacter(s, srcs[0]).name, opts: [{ label: tr('Ziehen'), v: 0, ai: 1 }, ...srcs.map(u => ({ label: tr`Überspringen (${findCharacter(s, u).name})`, v: u, ai: skipAiVal10(s, a.pid, findCharacter(s, u)) }))], k: 'E:skipDraw10', a }); };
+// KI: Überspringen nur, wenn der Effekt den Gegner trifft – sonst traf Cracklehands mangels Gegner-Ally sich selbst
+function skipAiVal10(s, pid, c) { const opp = alliesOf(getPlayer(s, pid === 1 ? 2 : 1)).filter(x => ctrlOf(s, x) !== pid), k = SKIPPERS[c.id];
+    if (!opp.length || (k === 'chill' && s.activePlayer === pid)) return 0;                // Chillhands: im eigenen Zug greift der Gegner ohnehin nicht an
+    const kill = k === 'crackle' ? opp.some(x => hpOf(s, x) - (x.damage || 0) <= 2) : k === 'quick' ? opp.some(x => hpOf(s, x) - (x.damage || 0) <= 1) : false;
+    return kill ? 2 : me(s, pid).hand.length >= 5 ? 1.5 : 0.5; }
 EK.skipDraw10 = (s, a, v) => { const p = me(s, a.pid); if (!v) { p.skipAsk10 = true; drawCards(s, p, 1); p.skipAsk10 = false; return; }
     const c = findCharacter(s, v); if (!c) return; L(s, tr`${p.hero.name} überspringt das Ziehen (${c.name}).`, '', a.pid); evt(s, 'skippedDraw', { pid: a.pid, src: v }); pushTrig(s, a.pid, c.id, [{ op: 'trig', id: c.id, k: 'skip', a: { pid: a.pid, uid: v } }]); };
 // Kontrolle durch Anhang (Splinter Mind, Yoink!): solange die Fähigkeit angehängt ist; danach zurück

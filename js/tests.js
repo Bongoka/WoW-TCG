@@ -2282,6 +2282,13 @@ function runRuleTests() {
         RL.art('boss_felinfusion').cardPlayed(s, 1, null);
         assert(getPlayCost(s, P(s, 1), fc) === big.cost, 'Fel Infusion: zweite Karte auch billiger');
     });
+    test(184, 'KI: Spigotgulps überspringen das Ziehen nur, wenn der Effekt einen Gegner-Ally trifft (Cracklehands traf sich selbst)', () => {
+        const s = fresh(); const c = put(s, 1, 8095); P(s, 2).allies = [];
+        assert(skipAiVal10(s, 1, c) === 0, 'Cracklehands ohne Gegner-Ally: KI würde überspringen');
+        put(s, 2, 8095);
+        assert(skipAiVal10(s, 1, c) > 1, 'Cracklehands mit tötbarem Gegner-Ally: KI würde nicht überspringen');
+        const ch = put(s, 1, 8094); assert(skipAiVal10(s, 1, ch) === 0, 'Chillhands im eigenen Zug: wirkungslos, KI würde überspringen');
+    });
     test(183, 'Roguelike: jede Karte hat immer dieselbe, möglichst passende Aufwertung – nach Kosten gestaffelt (günstig = klein, teuer = stark), mit Wendungen zum Kartentext', () => {
         if (typeof RL === 'undefined' || !RL.upPower) return;
         const cards = Object.keys(CARDS).filter(k => String(Number(k)) === k).map(k => CARDS[k])
