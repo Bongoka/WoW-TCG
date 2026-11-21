@@ -1730,6 +1730,8 @@ EK.prepItem = (s) => {
     const alt0 = it.kind === 'card' ? altOf(s, p.id, card) : null;
     if (alt0 && !it.altAsked) {
         it.altAsked = true;
+        // "without paying its cost" (Preparation, Knolan …): keine Rückfrage – gratis ist nie schlechter als bezahlen
+        if (alt0.free) { it.altPaid = true; alt0.pay(s, it); return; }
         const cost = getPlayCost(s, p, card, it.x || 0, it.targets);
         const opts = [{ label: alt0.label, v: 'alt', ai: alt0.ai !== undefined ? (typeof alt0.ai === 'function' ? alt0.ai(s, p.id, card) : alt0.ai) : 2 }];
         if (getReadyRes(p) >= cost) opts.push({ label: tr`(${cost}) bezahlen`, v: 'pay', ai: 1 });

@@ -1217,6 +1217,13 @@ function runRuleTests() {
         const s = fresh(); const c = P(s, 1).hand[hand(s, 1, 3607)];
         s.firstTurnOf = { 1: s.turn }; assert(!!altOf(s, 1, c), 'Preparation: im ersten eigenen Zug nicht ohne Kosten spielbar');
         s.firstTurnOf = { 1: s.turn - 2 }; assert(!altOf(s, 1, c), 'Preparation: auch nach dem ersten Zug ohne Kosten');
+        { // ohne Kosten spielen: keine Rückfrage "Wie bezahlen?" für den Menschen
+            const sp = fresh('alliance_priest'); res(sp, 1, 9); sp.firstTurnOf = { 1: sp.turn }; sp.humans = [1];
+            const j = hand(sp, 1, 3607), n0 = P(sp, 1).hand.length;
+            applyAction(sp, { type: 'PLAY_CARD', handIdx: j, targets: [], actorId: 1 }, true, 1);
+            assert(!(sp.pending && sp.pending.k === 'E:altPay'), 'Preparation: Rückfrage "Wie bezahlen?" trotz Kosten 0');
+            assert(P(sp, 1).hand.length === n0 - 1 && getReadyRes(P(sp, 1)) === 9, 'Preparation: nicht ohne Kosten gespielt');
+        }
         assert([3201, 3301, 3411, 3501, 3001, 3101].every(id => TREASURE_SETS.has(CARDS[id].set)) && !TREASURE_SETS.has(CARDS[3603].set), 'Treasure-Sets falsch (immer Foil)');
         EK.test126 = (st, a) => { st.roll126 = a.roll; };
         const r0 = Math.random; Math.random = () => 0;
