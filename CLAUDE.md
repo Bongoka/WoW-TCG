@@ -50,7 +50,7 @@ const fs = require('fs'), vm = require('vm');
 const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','ai','simcore','coach','tests'])
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','cards16','cards17','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','cardfx16','cardfx17','ai','simcore','coach','tests'])
   vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));

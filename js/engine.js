@@ -180,16 +180,20 @@ function auraAny(s, hook, ...args) { for (const e of auraSrcs(s)) { const f = FX
 // Gedruckte Keywords stehen in den Kartendaten (bzw. c.kw bei Tokens "with Ferocity" o. Ä.) – nicht in den
 // Anzeige-Feldern c.protector/c.elusive/c.ferocity, die refreshDisplay jedes Mal neu berechnet.
 function printedKw(c, k) { return !!c && ((c.kw && c.kw[k]) || (CARDS[c.id] && !!CARDS[c.id][k])); }
+const KW_GAIN = [];   // (s, c, k) => true: c hat das Schlüsselwort ohne Karte im Spiel (Detect Prey, Set worldbreaker)
+const kwGain = (s, c, k) => KW_GAIN.length > 0 && KW_GAIN.some(f => f(s, c, k));
+const KW_LOSE = [];   // (s, c, k) => true: c verliert Elusive/Stealth/Long-Range/Untargetable ohne Karte im Spiel (Flare, Set worldbreaker)
+const kwLoseNow = (s, c, k) => !!auraAny(s, 'kwLose', c, k) || (KW_LOSE.length > 0 && KW_LOSE.some(f => f(s, c, k)));
 const KW_LOST = [];   // (s, c) => true: Karte verliert alle Schlüsselwörter (Retainer Alashon, Set illidan)
 function kwLostAll(s, c) { return KW_LOST.length > 0 && !!c && KW_LOST.some(f => f(s, c)); }
 function kwHas(s, c, k) {
     if (KW_LOST.length && kwLostAll(s, c) && !String(k).startsWith('cant')) return false;
     if (!c) return false;
-    if ((k === 'elusive' || k === 'stealth' || k === 'longRange' || k === 'untargetable') && auraAny(s, 'kwLose', c, k)) return false;   // Thulthun, Marksman Boriz (Set 6): "lose and can't have …"
+    if ((k === 'elusive' || k === 'stealth' || k === 'longRange' || k === 'untargetable') && kwLoseNow(s, c, k)) return false;   // Thulthun, Marksman Boriz (Set 6): "lose and can't have …"
     if (isAllyLike(c) && !active(s, c)) return hasTM(s, c, k) && k.startsWith('cant');
     if (c.type !== 'Hero' && printedKw(c, k)) return true;
     if (hasTM(s, c, k)) return true;
-    return !!auraAny(s, 'kw', c, k);
+    return !!auraAny(s, 'kw', c, k) || kwGain(s, c, k);
 }
 // Ausgelöster Effekt, der beim nächsten PPP auf die Kette kommt (auch wenn die Quelle das Spiel verlassen hat)
 function pushTrig(s, pid, srcId, steps, srcUid = null) {
@@ -386,39 +390,39 @@ function hasProtector(s, c) {
         if (countCtrl(s, pid, 285) > 0) return true;                                      // Draconian Deflector
         if (alliesOf(p).some(a => a.id === 220 && active(s, a))) return true;             // Treesong
         if (hasTM(s, c, 'protector')) return true;                                        // Warrax
-        return !!auraAny(s, 'kw', c, 'protector');
+        return (!!auraAny(s, 'kw', c, 'protector') || kwGain(s, c, 'protector'));
     }
     if (!active(s, c)) return false;
     if (printedKw(c, 'protector')) return true;
     if (attachedTo(s, c.uid, 161).length) return true;                                    // Guard Duty
     if (hasTM(s, c, 'protector')) return true;                                            // On Your Feet
     if (c.race === 'Dwarf' && alliesOf(p).some(a => a.id === 191 && active(s, a))) return true; // King Magni
-    return !!auraAny(s, 'kw', c, 'protector');
+    return (!!auraAny(s, 'kw', c, 'protector') || kwGain(s, c, 'protector'));
 }
 function hasElusive(s, c) {
     if (KW_LOST.length && kwLostAll(s, c)) return false;
     const pid = ctrlOf(s, c); if (!pid) return false;
-    if (auraAny(s, 'kwLose', c, 'elusive')) return false;                                   // Thulthun (Set 6)
+    if (kwLoseNow(s, c, 'elusive')) return false;                                          // Thulthun (Set 6), Flare (Set worldbreaker)
     const p = getPlayer(s, pid);
-    if (c.type === 'Hero') return alliesOf(p).some(a => a.id === 215 && active(s, a)) || hasTM(s, c, 'elusive') || !!auraAny(s, 'kw', c, 'elusive'); // Sentry Gwynn
-    if (!active(s, c)) return hasTM(s, c, 'elusive') || !!auraAny(s, 'kw', c, 'elusive');
+    if (c.type === 'Hero') return alliesOf(p).some(a => a.id === 215 && active(s, a)) || hasTM(s, c, 'elusive') || (!!auraAny(s, 'kw', c, 'elusive') || kwGain(s, c, 'elusive')); // Sentry Gwynn
+    if (!active(s, c)) return hasTM(s, c, 'elusive') || (!!auraAny(s, 'kw', c, 'elusive') || kwGain(s, c, 'elusive'));
     if (printedKw(c, 'elusive')) return true;
     if (hasTM(s, c, 'elusive')) return true;                                              // Sneak
     if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 151 && !o.attachedTo)) return true; // From the Shadows
     if (c.id === 280 && facIs(p, 'Alliance')) return true;                            // Hippogryph
-    return !!auraAny(s, 'kw', c, 'elusive');
+    return (!!auraAny(s, 'kw', c, 'elusive') || kwGain(s, c, 'elusive'));
 }
 function hasFerocity(s, c) {
     if (KW_LOST.length && kwLostAll(s, c)) return false;
     const pid = ctrlOf(s, c); if (!pid || !isAllyLike(c)) return false;
     const p = getPlayer(s, pid);
-    if (!active(s, c)) return hasTM(s, c, 'ferocity') || !!auraAny(s, 'kw', c, 'ferocity');
+    if (!active(s, c)) return hasTM(s, c, 'ferocity') || (!!auraAny(s, 'kw', c, 'ferocity') || kwGain(s, c, 'ferocity'));
     if (printedKw(c, 'ferocity')) return true;
     if (hasTM(s, c, 'ferocity')) return true;                                             // Into the Fray / Leeroy
     if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 154 && !o.attachedTo)) return true; // Lust for Battle
     if (c.race === 'Orc' && alliesOf(p).some(a => a.id === 268 && active(s, a))) return true; // Goretooth
     if (c.id === 280 && facIs(p, 'Horde')) return true;                               // Hippogryph
-    return !!auraAny(s, 'kw', c, 'ferocity');
+    return (!!auraAny(s, 'kw', c, 'ferocity') || kwGain(s, c, 'ferocity'));
 }
 // Stealth (602.2a): Held über Fähigkeiten / Dauereffekte, Allies gedruckt oder "this turn"
 function hasStealth(s, c) {
@@ -426,9 +430,10 @@ function hasStealth(s, c) {
     if (!c) return false;
     const pid = ctrlOf(s, c); if (!pid) return false;
     if (c.type === 'Hero') {
+        if (kwLoseNow(s, c, 'stealth')) return false;                                    // Faerie Fire, Flare (Set worldbreaker)
         const p = getPlayer(s, pid);
         if ((p.ongoing || []).some(o => (o.id === 103 || o.id === 104) && !o.attachedTo)) return true;
-        return hasTM(s, c, 'stealth') || !!auraAny(s, 'kw', c, 'stealth');
+        return hasTM(s, c, 'stealth') || (!!auraAny(s, 'kw', c, 'stealth') || kwGain(s, c, 'stealth'));
     }
     return kwHas(s, c, 'stealth');
 }
@@ -697,7 +702,9 @@ const CHAIN_EVENTS = { sabotages: 1, proposes: 1, targeted: 1, startOfTurn: 1, e
     dmg: 1, damaged: 1, died: 1, exhausted: 1, healed: 1,   // damaged: vorher sofort – zwei Champion Zosimuus schossen sich endlos Schaden zu (keine Zustandsprüfung dazwischen)
     questDone: 1, drew: 1, cardDiscarded: 1, resDestroyed: 1, handLeft: 1, entersPlay: 1, combatEnd: 1,
     // Raid-Loot: Ressource kommt ins Spiel (Shard of the Flame), Rüstung verhindert Schaden (Drillborer Disk)
-    resEnters: 1, armorPrevented: 1 };
+    resEnters: 1, armorPrevented: 1,
+    // "When a resource you control is turned face down" (Crimson Cranium Crusher, Set worldbreaker: Emerald-Allies)
+    resTurnedDown: 1 };
 // Führt die Auslöse-Prüfung sofort aus; die erzeugten Schritte werden zu einem wartenden ausgelösten Effekt.
 function asTrigger(s, c, pid, fn) {
     const saved = s._batch; s._batch = [];
@@ -884,8 +891,8 @@ function stateBased(s) {
 }
 function flushBatch(s) { if (s._batch && s._batch.length) { s.queue.unshift(...s._batch); s._batch = []; } }
 EK.placeFaceUp = (s) => { const r = s.resPrep; s.resPrep = null; if (!r) return; const p = getPlayer(s, r.pid), c = r.card;
-    s.chain.push({ kind: 'resource', id: newUid('r_'), pl: p.id, res: c, faceUp: true, srcId: c.id, srcName: c.name, label: tr('Ressource') });
-    L(s, tr`Ressource: ${c.name}`, '', p.id); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); s.win = linkWindow(s, p.id, s.win); flushBatch(s); };
+    s.chain.push({ kind: 'resource', id: newUid('r_'), pl: p.id, res: c, faceUp: true, exh: !!r.exh, srcId: c.id, srcName: c.name, label: tr('Ressource') });
+    L(s, tr`Ressource: ${c.name}`, '', p.id); if (!r.extra) evt(s, 'handLeft', { pid: p.id, uid: c.uid }); s.win = linkWindow(s, p.id, s.win); flushBatch(s); };
 EK.keepLocation = (s, a, uid) => { locsOf(getPlayer(s, a.pid)).forEach(r => { if (r.card.uid !== uid) { r.faceUp = false; L(s, tr`${r.card.name} wird verdeckt umgedreht (nur eine offene Location).`, '', a.pid); } }); };
 EK.limitDestroy = (s, a, uid) => { const c = findCharacter(s, uid); if (c && c.type === 'Hero') { pes(s, ctrlOf(s, c), 'heroForm').forEach(m => { m.ended = true; }); return; } if (c) leavePlay(s, c, 'graveyard', { destroyed: true, cause: 'limit' }); };
 // "Cards everywhere are Unique" (Eitrigg, Set wrathgate): (s) => true
@@ -1843,7 +1850,7 @@ function resolveTop(s) {
     s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
-        p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted) });
+        p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.exh || (it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted)) });   // exh: zusätzliche Ressource "exhausted" (CR 412.1c)
         if (it.faceUp && FX[it.res.id] && FX[it.res.id].enterRes) FX[it.res.id].enterRes(s, it.res, p.id);   // "As this location enters play, choose …" (Silvermoon City)
         evt(s, 'resEnters', { pid: p.id, faceUp: !!it.faceUp, uid: it.res.uid, id: it.res.id, placed: true });                                                   // Shard of the Flame
         return;
@@ -2260,7 +2267,8 @@ function dmgShields(s, c) {
     const t = findCharacter(s, c.tgt), tp = getPlayer(s, c.tp), src = c.src ? findCharacter(s, c.src) : null, o = c.o;
     if (t && !c.unprev) {
         const ok = m => m.v > 0 && !(m.srcUid && m.srcUid !== c.src)
-            && !(m.allyCombat && !(o.combat && src && isAllyLike(src)));                   // Mana Shield: nur Kampfschaden von Allies
+            && !(m.allyCombat && !(o.combat && src && isAllyLike(src)))
+            && !(m.magic && !['Arcane', 'Fire', 'Frost', 'Holy', 'Nature', 'Shadow'].includes(o.dt));   // nur magischer Schaden (Tattered Dreadmist Mantle, Set worldbreaker)                   // Mana Shield: nur Kampfschaden von Allies
         for (;;) {
             const usable = tms(s, t, 'shield').filter(ok);
             if (c.amt <= 0 || !usable.length) break;
@@ -2303,11 +2311,14 @@ function shieldLabel(s, m) {
     return tr`Verhindert noch ${m.v}` + (m.reflect ? tr(' · wirft den Schaden zurück') : '') + (m.srcUid ? tr` · nur Schaden von ${nameOf(s, m.srcUid)}` : '')
         + (m.allyCombat ? tr(' · nur Kampfschaden von Allies') : '') + (m.combat ? tr(' · nur in diesem Kampf') : '');
 }
+// Rüstung verhindert mehr als ihr [DEF] (Tattered Dreadmist Mantle, Set worldbreaker: "If this equipment would prevent magical damage, it prevents that much +3 instead")
+const ARMOR_PV_MODS = [];   // (s, Rüstung, Schadensschritt) => zusätzliche Verhinderung
+const armorPv = (s, x, st) => defOf(s, x) + ARMOR_PV_MODS.reduce((n, f) => n + (f(s, x, st) || 0), 0);
 EK.armorAsk = (s, a) => {
     const st = a.st; const tp = getPlayer(s, st.tp);
     const armors = armorFor(s, findCharacter(s, st.tgt), tp).filter(x => !x.exhausted && !cantExhaust(s, x) && defOf(s, x) > 0);
     if (!armors.length || st.amt <= 0) { q(s, { ...st, op: 'dmgApply' }); return; }
-    const opts = armors.map(x => ({ label: tr`${x.name} erschöpfen (verhindert ${Math.min(defOf(s, x), st.amt)})`, v: x.uid, ai: Math.min(defOf(s, x), st.amt) * 2 - defOf(s, x) * 0.1 }));
+    const opts = armors.map(x => ({ label: tr`${x.name} erschöpfen (verhindert ${Math.min(armorPv(s, x, st), st.amt)})`, v: x.uid, ai: Math.min(armorPv(s, x, st), st.amt) * 2 - defOf(s, x) * 0.1 }));
     opts.push({ label: tr`Keine Rüstung – ${st.amt} Schaden nehmen`, v: '__none', ai: 0 });
     ask(s, { pid: tp.id, prompt: tr`${tp.hero.name} erhält ${st.amt} Schaden. Rüstung benutzen?`, src: 'Rüstung', opts, k: 'E:armorUse', a: { st }, keep: true });
 };
@@ -2315,7 +2326,7 @@ EK.armorUse = (s, a, v) => {
     const st = a.st;
     if (v === '__none') { q(s, { ...st, op: 'dmgApply' }); return; }
     const ar = findCharacter(s, v);
-    if (ar && !ar.exhausted) { const d = defOf(s, ar); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, tr`🛡 ${ar.name}: ${pv} verhindert`, '', st.tp);
+    if (ar && !ar.exhausted) { const d = armorPv(s, ar, st); exhaust(s, ar); const pv = Math.min(d, st.amt); st.amt -= pv; L(s, tr`🛡 ${ar.name}: ${pv} verhindert`, '', st.tp);
         if (pv > 0) evt(s, 'armorPrevented', { uid: ar.uid, pid: st.tp, src: st.src || null, amt: pv }); }   // "When this armor prevents damage" (Drillborer Disk)
     q(s, { op: 'call', k: 'E:armorAsk', a: { st } });
 };
@@ -2604,11 +2615,13 @@ EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexO
 
 // ---------------------------------------------------------------- Quests
 // Abschlusskosten einer Quest (Travel Form: "You pay (1) less to complete your next quest this turn")
+const QUEST_COST_MODS = [];   // (s, Spieler, Quest) => Senkung der Abschlusskosten ohne Minimum
 function questCostOf(s, p, card) {
     let c = card.questCost || 0;
     { const f = FX[card.id]; if (f && f.questSelfLess) c -= f.questSelfLess(s, p.id) || 0; }   // Corruption of Earth and Seed (Set drums)
     pes(s, p.id, 'questLess').forEach(m => { if (!m.used && (!m.quest || m.quest === card.uid)) c -= m.v; });   // Marksman Glous (Set 7): nur für die inspirierte Quest
-    pes(s, p.id, 'questLessAll').forEach(m => { c -= m.v; });                             // The Rider of Frost (Set icecrown): "You pay (1) less to complete quests this turn"
+    pes(s, p.id, 'questLessAll').forEach(m => { c -= m.v; });
+    for (const f of QUEST_COST_MODS) c -= f(s, p, card) || 0;                             // Emerald Emissary (Set worldbreaker): ohne Minimum                             // The Rider of Frost (Set icecrown): "You pay (1) less to complete quests this turn"
     const less = auraSum(s, 'questLess', p.id, card);                                    // Aspect of the Cheetah (Set 6): "to a minimum of (1)"
     if (less > 0) c = Math.max(Math.min(c, 1), c - less); else if (less < 0) c -= less;   // Ja'zoona (Set 6): Gegner zahlen (1) mehr
     return Math.max(0, c);
@@ -2618,12 +2631,13 @@ function checkQuestCondition(s, p, r) {
     const f = FX[id] || {};
     if (blockedQuests(s, p.id)) return tr('Du kannst keine Quests abschließen');
     if (f.questCond) { const e = f.questCond(s, p.id, r); if (e) return e; }
+    if (r.faceUp && p.resources.includes(r) && QUEST_TAX.some(g => g(s, p.id)) && !p.resources.some(x => x !== r && x.faceUp && x.card.type === 'Quest')) return tr('Fel Geyser: Du musst eine weitere Quest verdeckt umdrehen');
     const cost = f.questNoPay ? 0 : questCostOf(s, p, r.card);
     if (getReadyRes(p) < cost) return tr`Braucht (${cost})`;
     return null;
 }
 // Kam'pah (Set illidan): "Opponents can't place quests face up."
-function questFaceUpBlocked(s, pid) { return alliesOf(getOpponent(s, pid)).some(a => a.id === 6159 && active(s, a)); }
+function questFaceUpBlocked(s, pid) { return alliesOf(getOpponent(s, pid)).some(a => (a.id === 6159 || a.id === 14133) && active(s, a)); }   // Arisa Sarum (Set worldbreaker)
 function blockedQuests(s, pid) { return !!auraAny(s, 'noQuest', pid); }   // Greefer: "Opponents can't complete quests."
 // Quests aus anderen Zonen (Set drums): QUEST_ZONES liefert je Spieler [{ c, zone, uid }] – zone 'hand' | 'graveyard' | 'deck' (oberste Karte).
 // "As you do, remove them from the game as an additional cost."
@@ -2648,11 +2662,19 @@ function startQuest(s, p, resIdx) {
     if (f.questExtra) { f.questExtra(s, p.id, r); return; }   // ruft danach E:questPay
     EK.questPay(s, {});
 }
+// Fel Geyser (Set Black Temple Raid): "Opposing quests have 'As an additional cost to complete, turn another quest you control face down.'" – (s, pid) => true
+const QUEST_TAX = [];
+EK.questTax = (s, a, v) => { const l = locate(s, v); if (!l || l.zone !== 'resource' || !l.res.faceUp) { s.questPrep = null; return; } l.res.faceUp = false; L(s, tr`${l.c.name} wird verdeckt umgedreht (Fel Geyser).`, '', l.pid); evt(s, 'resTurnedDown', { pid: l.pid, uid: v }); EK.questPay(s, {}); };
 EK.questPay = (s) => {
     const qp = s.questPrep; s.questPrep = null; if (!qp) return;
     const p = getPlayer(s, qp.pid);
     const r = p.resources.find(x => x.card.uid === qp.uid) || (qp.zone ? { card: (p.removed || []).find(x => x.uid === qp.uid), faceUp: true, zone: qp.zone } : null);
     if (!r || !r.card) return;
+    if (!qp.taxed && !qp.zone && QUEST_TAX.some(g => g(s, p.id))) {
+        const l = p.resources.filter(x => x !== r && x.faceUp && x.card.type === 'Quest'); if (!l.length) { L(s, tr('Fel Geyser: keine weitere offene Quest'), 'log-hit', p.id); return; }
+        s.questPrep = { ...qp, taxed: true };
+        ask(s, { pid: p.id, prompt: tr('Fel Geyser: Welche weitere Quest verdeckt umdrehen?'), src: 'Fel Geyser', opts: l.map(x => ({ label: x.card.name, v: x.card.uid, ai: 1 })), k: 'E:questTax', a: {} }); return;
+    }
     const f = FX[r.card.id] || {};
     const was = p.resources.map(x => x.exhausted);
     if (!f.questNoPay && !payRes(p, questCostOf(s, p, r.card))) { L(s, tr('Nicht genug Ressourcen'), 'log-hit'); return; }
@@ -2775,7 +2797,9 @@ function attackExhaustCands(s, p, att) { return [...cardsInPlayOf(s, p).filter(c
 function startAttack(s, p, a) {
     const att0 = findCharacter(s, a.attackerUid), ex = att0 ? ATTACK_EXHAUST.reduce((n, f) => n + (f(s, att0) || 0), 0) : 0;
     if (ex > 0 && !a.exPaid) { pickN(s, p.id, tr`${att0.name}: ${ex} andere eigene Karten erschöpfen, um anzugreifen`, 'Frostweaver Dakar\x27sith', attackExhaustCands(s, p, att0), ex, 'E:atkExhaust14', { pid: p.id, a: { ...a, exPaid: true }, n: ex }); flushBatch(s); return; }
-    const att = findCharacter(s, a.attackerUid), def = findCharacter(s, a.defenderUid);
+    const att = findCharacter(s, a.attackerUid); let def = findCharacter(s, a.defenderUid);
+    // Sava'gin the Reckless (Set worldbreaker): "This ally attacks opposing heroes and allies at random." – Verteidiger zufällig unter den möglichen
+    if (att && FX[att.id] && FX[att.id].randomAttack && !a.sabotage) { const l = attackTargets(s, att); if (l.length) { def = l[Math.floor(Math.random() * l.length)]; L(s, tr`🎲 ${att.name} greift zufällig ${def.name} an.`, '', p.id); } }
     const wc = winterCost(s, att, def); if (wc) payRes(p, wc);
     s.chain.push({ kind: 'proposal', id: newUid('pr_'), pl: p.id, att: att.uid, def: def.uid, label: tr('Angriff'), sabotage: !!a.sabotage });
     evt(s, 'proposes', { att: att.uid, def: def.uid, apid: p.id, item: s.chain[s.chain.length - 1].id });   // Battle Tactics (Set drums)

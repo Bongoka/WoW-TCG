@@ -105,8 +105,10 @@ function assaultOf0(s, c) {
     const f = FX[c.id]; if (f && f.assaultN) n += f.assaultN(s, c) || 0;
     n += auraSum(s, 'assault', c);
     tms(s, c, 'assault').forEach(m => n += m.v);
+    for (const h of ASSAULT_EXTRA) n += h(s, c) || 0;                                     // ohne Karte im Spiel (Gilneas, Set worldbreaker)
     return n;
 }
+const ASSAULT_EXTRA = [];   // (s, c) => zusätzliches Assault
 STAT_MODS.push((s, c, st) => st === 'atk' && isChar(c) && s.activePlayer === ctrlOf(s, c) ? assaultOf(s, c) : 0);
 
 // ---------------------------------------------------------------- Death Knights und Allgemeines

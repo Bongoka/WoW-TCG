@@ -22,7 +22,7 @@ UNIQUE_ALL.push(s => eitriggOn(s));
 const uniqueAllies = (s, pid) => alliesOf(me(s, pid)).filter(c => isUnique13(s, c));
 // "When this or another Unique ally enters play under your control"
 const onUniqueEnters = (id, k) => ({ on: { allyEnters: (s, c, d, pid) => { const a = findCharacter(s, d.uid); if (d.pid === pid && a && isUnique13(s, a)) trig(s, { id, k, a: { pid, uid: c.uid, who: d.uid } }); } } });
-const tgtResReady = (s, pid, n) => { for (let i = 0; i < n; i++) { const r = me(s, pid).resources.find(x => x.exhausted); if (r) r.exhausted = false; } };
+const tgtResReady = (s, pid, n) => { for (let i = 0; i < n; i++) { const r = me(s, pid).resources.find(x => x.exhausted && !READY_BLOCK.some(f => f(s, x.card))); if (r) r.exhausted = false; } };   // READY_BLOCK: Incapacitate (Set worldbreaker)
 
 // ---------------------------------------------------------------- Tokens
 Object.assign(CARDS, {

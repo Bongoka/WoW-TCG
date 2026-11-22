@@ -2352,6 +2352,86 @@ function runRuleTests() {
         respondOptions(s, 1);
         assert(!P(s, 1).aiPlan.persona && P(s, 2).aiPlan.persona, 'Mensch behält Spielstil bzw. CPU verliert ihn');
     });
+    // ---------------- Set worldbreaker
+    test(188, 'Stash (CR Glossar): verdeckt gelegte Karte wird gezeigt und umgedreht – Stash-Wirkung (Earthen Blast) und "turned face down" (Emerald Wanderer) lösen aus', () => {
+        const s = fresh(); s.placedResource = false; s.resPlaced = 0; const wan = put(s, 1, 14209); const h2 = P(s, 2).hero, d0 = h2.damage || 0;
+        const hi = hand(s, 1, 14095), a = getLegalActions(s, 1).find(x => x.type === 'PLACE_RESOURCE' && x.handIdx === hi && !x.faceUp);
+        assert(a, 'Earthen Blast nicht verdeckt legbar'); act(s, a, 1);
+        const r = P(s, 1).resources.find(x => x.card.id === 14095);
+        assert(r && !r.faceUp, 'Earthen Blast liegt nicht verdeckt in der Ressourcenreihe');
+        assert((h2.damage || 0) - d0 === 2, `Stash: gegnerischer Held hat ${(h2.damage || 0) - d0} statt 2 Naturschaden`);
+        assert(hasTM(s, wan, 'assault'), 'Emerald Wanderer: kein Assault 3 nach dem Umdrehen');
+        // Demonic Reclamation: Stash ist Pflicht ("it enters face up") – Ally aus dem Friedhof ins Deck
+        const s2 = fresh(); s2.placedResource = false; s2.resPlaced = 0; const g = makeCardInst(262, false, 1); P(s2, 1).graveyard.push(g); const n0 = P(s2, 1).deck.length;
+        const hj = hand(s2, 1, 14103); act(s2, getLegalActions(s2, 1).find(x => x.type === 'PLACE_RESOURCE' && x.handIdx === hj && !x.faceUp), 1);
+        assert(!P(s2, 1).graveyard.includes(g) && P(s2, 1).deck.length === n0 + 1, 'Demonic Reclamation: Ally nicht ins Deck gemischt');
+    });
+    test(189, 'Aberration: verhindert Schaden außerhalb des Kampfes, nicht Kampfschaden (Garet Vice)', () => {
+        const s = fresh(); const g = put(s, 2, 14138, { joined: 1 });
+        dealDamage(s, { src: P(s, 1).hero.uid, tgt: g.uid, amt: 3, dt: 'Fire', ability: true }); process(s); autoResolve(s);
+        assert(!(g.damage > 0) && P(s, 2).allies.includes(g), 'Fähigkeitsschaden an Aberration-Ally nicht verhindert');
+        const a = put(s, 1, 262); act(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: g.uid }, 1);
+        assert(!P(s, 2).allies.includes(g), 'Kampfschaden an Aberration-Ally wurde verhindert');
+    });
+    test(190, 'Zusätzliche Ressource (CR 412.1c): Eranikus legt zu Zugbeginn die oberste Karte bereit als Ressource, zählt nicht gegen die Ressource des Zuges', () => {
+        const s = fresh(); put(s, 1, 14210); const p = P(s, 1), top = p.deck[p.deck.length - 1], n0 = p.resources.length;
+        s.placedResource = false; s.resPlaced = 0;
+        evt(s, 'startOfTurn', { pid: 1 }); flushBatch(s); process(s); autoResolve(s);
+        assert(p.resources.length === n0 + 1 && p.resources.some(r => r.card.id === top && !r.exhausted), 'Eranikus: oberste Karte nicht bereit in der Ressourcenreihe');
+        assert(!s.placedResource && !(s.resPlaced > 0), 'Eranikus: zusätzliche Ressource zählt als gelegte Ressource');
+        // Flourish: "exhausted"
+        const s2 = fresh('alliance_druid'); res(s2, 1, 4); const q2 = P(s2, 1), t2 = q2.deck[q2.deck.length - 1], m0 = q2.resources.length;
+        const fi = hand(s2, 1, 14036); act(s2, getLegalActions(s2, 1).find(x => x.type === 'PLAY_CARD' && x.handIdx === fi), 1);
+        assert(q2.resources.length === m0 + 1 && q2.resources.some(r => r.card.id === t2 && r.exhausted), 'Flourish: oberste Karte nicht erschöpft als Ressource');
+    });
+    test(191, 'Worldbreaker-Helden: "(N) >>> Flip" dreht den Helden erst beim Auflösen um, die Rückseite wirkt danach (Jaenel: Assault 1)', () => {
+        const s = newGameState(14006, deck('alliance_hunter').cards, deck('horde_warrior').hero, deck('horde_warrior').cards);
+        s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 1: 6, 2: 5 }; s.placedResource = true; s.phase = 'main'; res(s, 1, 4);
+        const h = P(s, 1).hero, a0 = atkOf(s, h, {});
+        const fa = getLegalActions(s, 1).find(x => x.type === 'ACTIVATE' && x.srcUid === h.uid && x.key === 'flip16');
+        assert(fa, 'Jaenel: Flip-Kraft fehlt'); act(s, fa, 1);
+        assert(h.flipped && atkOf(s, h, {}) === a0 + 1, `Jaenel umgedreht: ATK ${atkOf(s, h, {})} statt ${a0 + 1}`);
+        assert(!getLegalActions(s, 1).some(x => x.type === 'ACTIVATE' && x.srcUid === h.uid && x.key === 'flip16'), 'Jaenel: zweimal umdrehbar');
+    });
+    test(192, 'Time is Money: [Activate] schon im Zug, in dem der Goblin ins Spiel kommt (Grazzle Grubhook) – ohne Time is Money nicht', () => {
+        const s = fresh(); const g = put(s, 1, 14175, { joined: 6 });
+        assert(getLegalActions(s, 1).some(x => x.type === 'ACTIVATE' && x.srcUid === g.uid), 'Grazzle Grubhook: [Activate] im ersten Zug nicht nutzbar');
+        const t = put(s, 1, 14169, { joined: 6 }); res(s, 1, 4);
+        assert(getLegalActions(s, 1).some(x => x.type === 'ACTIVATE' && x.srcUid === t.uid), 'Dorladris Spellfire: (4) >>> ohne [Activate] sollte nutzbar sein');
+        const k = put(s, 1, 14141, { joined: 6, exhausted: true });
+        assert(getLegalActions(s, 1).some(x => x.type === 'ACTIVATE' && x.srcUid === k.uid), 'Jarrod Gravon: (2) >>> Ready this ally nicht nutzbar');
+    });
+    test(193, 'Heirloom counter: Bloodied Arcanite Reaper hat +3 ATK je Zähler; Stash legt den Zähler auf eigene Ausrüstung', () => {
+        const s = fresh(); s.placedResource = false; s.resPlaced = 0; P(s, 1).hero.weapons = []; const w = put(s, 1, 14236); const a0 = weaponAtk(s, w, {});
+        const hi = hand(s, 1, 14236); act(s, getLegalActions(s, 1).find(x => x.type === 'PLACE_RESOURCE' && x.handIdx === hi && !x.faceUp), 1);
+        assert(heirlooms16(w) === 1 && weaponAtk(s, w, {}) === a0 + 3, `Reaper: ${heirlooms16(w)} Zähler, ATK ${weaponAtk(s, w, {})} statt ${a0 + 3}`);
+    });
+    test(194, 'Emerald Emissary: Quest-Kosten ohne Minimum (−1 je Druide und Jäger); Arisa Sarum: Gegner können Quests nicht offen legen', () => {
+        const s = fresh('alliance_hunter'); put(s, 1, 14205); const q = makeCardInst(14261, false, 1);
+        const n = partyOf(P(s, 1)).filter(c => isClassChar(c, 'Druid') || isClassChar(c, 'Hunter')).length;
+        assert(questCostOf(s, P(s, 1), q) === Math.max(0, 4 - n), `Questkosten ${questCostOf(s, P(s, 1), q)} statt ${Math.max(0, 4 - n)}`);
+        const s2 = fresh(); s2.placedResource = false; s2.resPlaced = 0; put(s2, 2, 14133); const qi = hand(s2, 1, 14261);
+        assert(!getLegalActions(s2, 1).some(x => x.type === 'PLACE_RESOURCE' && x.handIdx === qi && x.faceUp), 'Arisa Sarum: Quest offen legbar');
+    });
+    // ---------------- kleine Sets (cards17.js)
+    test(195, 'Black Temple Raid: "Traitor Hero Required" (CR 206.1) – nur Traitor-Helden; Fel Geyser verlangt beim Abschließen gegnerischer Quests eine weitere Quest verdeckt', () => {
+        const tr0 = Object.values(CARDS).find(c => c.type === 'Hero' && c.talent === 'Traitor'), loyal = CARDS[deck('alliance_hunter').hero];
+        assert(talentReqOk(CARDS[3343], tr0) && !talentReqOk(CARDS[3343], loyal), 'Bonechewer Behemoth: Traitor-Bedingung falsch');
+        const s = fresh(); res(s, 1, 6); put(s, 2, 3323); const q1 = makeCardInst(14261, false, 1), q2 = makeCardInst(14256, false, 1);
+        P(s, 1).resources.push({ card: q1, faceUp: true, exhausted: false });
+        assert(!getLegalActions(s, 1).some(x => x.type === 'COMPLETE_QUEST'), 'Fel Geyser: Quest ohne zweite offene Quest abschließbar');
+        P(s, 1).resources.push({ card: q2, faceUp: true, exhausted: false });
+        const qa = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && P(s, 1).resources[x.resIdx].card === q1); assert(qa, 'Fel Geyser: Quest nicht abschließbar'); act(s, qa, 1);
+        const r1 = P(s, 1).resources.find(r => r.card === q1), r2 = P(s, 1).resources.find(r => r.card === q2);
+        assert(!r1.faceUp && !r2.faceUp, 'Fel Geyser: zweite Quest nicht verdeckt umgedreht');
+    });
+    test(196, 'Kwee Q. Peddlefeet: übernimmt den getroffenen Ally, solange Kwee unter deiner Kontrolle bleibt', () => {
+        const s = fresh(); const k = put(s, 1, 16082); const t = put(s, 2, 262);
+        act(s, { type: 'ATTACK', attackerUid: k.uid, defenderUid: t.uid }, 1);
+        assert(P(s, 1).allies.includes(t), 'Kwee: Ally nicht übernommen');
+        destroy(s, k); process(s); autoResolve(s);
+        assert(P(s, 2).allies.includes(t), 'Kwee zerstört: Ally nicht zurück');
+    });
     return results;
 }
 
@@ -2461,6 +2541,9 @@ function runCardTests(ids) {
         ['Gegner-Ally greift Held an', s => { oppTurn(s); return atk(s, 2, fresh2(s).uid, s.p1.hero.uid); }],
         ['Gegner-Held greift Held an', s => { oppTurn(s); return atk(s, 2, s.p2.hero.uid, s.p1.hero.uid); }],
         ['Gegner-Ally greift eigenen Ally an', s => { oppTurn(s); return atk(s, 2, fresh2(s).uid, s.p1.allies[0].uid); }],
+        // Set worldbreaker: angreifender Ally mit Kosten 4 oder mehr (Blast Trap)
+        ['Gegner-Ally mit Kosten 4+ greift Held an', s => { oppTurn(s); const a = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && (c.cost || 0) >= 4 && !(FX[c.id] && (FX[c.id].aura || FX[c.id].on)));
+            const x = makeCardInst(a.id, false, 2); x.joinedTurn = 1; s.p2.allies.push(x); return atk(s, 2, x.uid, s.p1.hero.uid); }],
         ['Eigener Held greift Ally an', s => atk(s, 1, s.p1.hero.uid, weakest(s).uid)],
         ['Eigener Held greift Ally an, der überlebt', s => atk(s, 1, s.p1.hero.uid, s.p2.allies.slice().sort((a, b) => hpOf(s, b) - hpOf(s, a))[0].uid)],
         ['Eigener Held greift Held an', s => { s.p2.allies = []; return atk(s, 1, s.p1.hero.uid, s.p2.hero.uid); }],
