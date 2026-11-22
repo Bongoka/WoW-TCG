@@ -2472,6 +2472,28 @@ function runRuleTests() {
         assert(!s.gameOver && h.damage === hpOf(s, h) - 1, `Held nicht geschützt (Schaden ${h.damage}/${hpOf(s, h)})`);
         assert(toks.some(t => t.exhausted || !P(s, 2).allies.includes(t)), 'Kein Peasant hat geschützt');
     });
+    test(201, 'KI erkennt Sieg und Lebensgefahr: tödliche Angriffe (auch zu zweit gegen Protector), Schaden aus der Hand, Instant gegen tödlichen Angriff', () => {
+        const vanilla = (atk, ok = () => true) => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk === atk && ok(c)).id;
+        const prot = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && (c.text || '').trim() === 'Protector').id;
+        const setup = (a, b, active) => {
+            const s = fresh(a, b, active); s.real = false; s.humans = [];
+            for (const p of [s.p1, s.p2]) { p.hand = []; p.allies = []; p.hero.weapons = []; p.hero.armors = []; p.ongoing = []; p.resources = []; }
+            res(s, 1, 6); res(s, 2, 6); return s;
+        };
+        const low = (s, pid, n) => { const h = P(s, pid).hero; h.damage = hpOf(s, h) - n; };
+        const aiTurn = (s, pid) => { for (let i = 0, g = 0; i < 30 && g++ < 300 && !s.gameOver;) { if (s.pending) { autoResolve(s); continue; } const d = fastAiAction(s, pid); if (!d || !d.action || !applyAction(s, d.action, true, pid)) break; autoResolve(s); i++; } };
+        const attackHero = (s, a) => { applyAction(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: P(s, 2).hero.uid, actorId: 1 }, true, 1); autoResolve(s); };
+        let s = setup('alliance_warrior', 'horde_warrior', 2); low(s, 1, 3); put(s, 2, vanilla(3)); put(s, 2, vanilla(3)); put(s, 1, prot); aiTurn(s, 2);
+        assert(s.gameOver && s.winner === 2, 'Zwei Angreifer gegen einen Protector: Sieg verpasst');
+        s = setup('alliance_warrior', 'horde_warrior', 2); low(s, 1, 5); put(s, 2, vanilla(3)); put(s, 2, vanilla(2)); aiTurn(s, 2);
+        assert(s.gameOver && s.winner === 2, 'Zwei Angreifer zusammen tödlich: Sieg verpasst');
+        s = setup('alliance_warrior', 'horde_mage', 2); low(s, 1, 2); P(s, 2).hand.push(makeCardInst(52, false, 2)); aiTurn(s, 2);
+        assert(s.gameOver && s.winner === 2, 'Fire Blast für den Sieg nicht gespielt');
+        s = setup('alliance_warrior', 'horde_mage', 1); low(s, 2, 3); P(s, 2).hand.push(makeCardInst(52, false, 2)); attackHero(s, put(s, 1, vanilla(4, c => c.hp === 2)));
+        assert(!s.gameOver, 'Fire Blast gegen tödlichen Angreifer nicht genutzt');
+        s = setup('alliance_warrior', 'horde_priest', 1); low(s, 2, 3); P(s, 2).hand.push(makeCardInst(78, false, 2)); attackHero(s, put(s, 1, vanilla(4)));
+        assert(!s.gameOver, 'Flash Heal gegen tödlichen Angriff nicht genutzt');
+    });
     return results;
 }
 
