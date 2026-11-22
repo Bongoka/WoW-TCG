@@ -604,6 +604,14 @@ cards/* scans small/
 /cards/azeroth/AZEROTH-97 Eviscerate.webp
 /cards/azeroth/AZEROTH-98 Expose Armor.webp
 /cards/azeroth/AZEROTH-99 Gouge.webp
+/cards/badge small/BADGE-1 Bloodlust Brooch.webp
+/cards/badge small/BADGE-2 Essence of the Martyr.webp
+/cards/badge small/BADGE-3 Gnomeregan Auto-Blocker 600.webp
+/cards/badge small/BADGE-4 Icon of the Silver Crescent.webp
+/cards/badge/BADGE-1 Bloodlust Brooch.webp
+/cards/badge/BADGE-2 Essence of the Martyr.webp
+/cards/badge/BADGE-3 Gnomeregan Auto-Blocker 600.webp
+/cards/badge/BADGE-4 Icon of the Silver Crescent.webp
 /cards/bc crafted small/BC CRAFTED-1 Black Felsteel Bracers.webp
 /cards/bc crafted small/BC CRAFTED-10 Belt of Deep Shadow.webp
 /cards/bc crafted small/BC CRAFTED-11 Alchemist's Stone.webp
@@ -632,6 +640,8 @@ cards/* scans small/
 /cards/bc crafted/BC CRAFTED-7 Spellstrike Hood.webp
 /cards/bc crafted/BC CRAFTED-8 Eternium Runed Blade.webp
 /cards/bc crafted/BC CRAFTED-9 Belt of Blasting.webp
+/cards/bc promo small/BC PROMO-3 Through the Dark Portal.webp
+/cards/bc promo/BC PROMO-3 Through the Dark Portal.webp
 /cards/betrayer small/BETRAYER-100 Maelstrom Weapon.webp
 /cards/betrayer small/BETRAYER-101 Shamanistic Dual Wield.webp
 /cards/betrayer small/BETRAYER-102 Stoneskin Totem.webp
@@ -1108,6 +1118,8 @@ cards/* scans small/
 /cards/black temple treasure/BLACK TEMPLE-2 Cursed Vision of Sargeras.webp
 /cards/black temple treasure/BLACK TEMPLE-3 Blessed Medallion of Karabor.webp
 /cards/black temple treasure/BLACK TEMPLE-5 The Skull of Gul'dan.webp
+/cards/blizzcon small/BLIZZCON-1 Mrglrglmrglmrrrlggg.webp
+/cards/blizzcon/BLIZZCON-1 Mrglrglmrglmrrrlggg.webp
 /cards/citadel treasure small/CITADEL-1 Favor of Acherus.webp
 /cards/citadel treasure small/CITADEL-10 Reinforced Steel.webp
 /cards/citadel treasure small/CITADEL-11 Muradin Bronzebeard.webp
@@ -2662,6 +2674,14 @@ cards/* scans small/
 /cards/honor/HONOR-97 Dimzer the Prestidigitator.webp
 /cards/honor/HONOR-98 Durgle Wizzledab.webp
 /cards/honor/HONOR-99 Endina the Hunted.webp
+/cards/icecrown badge small/ICECROWN BADGE-1 Belt of the Singing Blade.webp
+/cards/icecrown badge small/ICECROWN BADGE-2 Gloves of Unerring Aim.webp
+/cards/icecrown badge small/ICECROWN BADGE-3 Legwraps of the Master Conjurer.webp
+/cards/icecrown badge small/ICECROWN BADGE-4 Wristwraps of the Cutthroat.webp
+/cards/icecrown badge/ICECROWN BADGE-1 Belt of the Singing Blade.webp
+/cards/icecrown badge/ICECROWN BADGE-2 Gloves of Unerring Aim.webp
+/cards/icecrown badge/ICECROWN BADGE-3 Legwraps of the Master Conjurer.webp
+/cards/icecrown badge/ICECROWN BADGE-4 Wristwraps of the Cutthroat.webp
 /cards/icecrown crafted small/ICECROWN CRAFTED-1 Trollwoven Spaulders.webp
 /cards/icecrown crafted small/ICECROWN CRAFTED-2 Gnomish Poultryizer.webp
 /cards/icecrown crafted small/ICECROWN CRAFTED-3 Titanium Frostguard Ring.webp
@@ -4250,6 +4270,14 @@ cards/* scans small/
 /cards/outland/OUTLAND-97 Spell Reflection.webp
 /cards/outland/OUTLAND-98 Strength of Arms.webp
 /cards/outland/OUTLAND-99 Victory Rush.webp
+/cards/scourgewar badge small/SCOURGEWAR BADGE-1 Band of Channeled Magic.webp
+/cards/scourgewar badge small/SCOURGEWAR BADGE-2 Renewal of Life.webp
+/cards/scourgewar badge small/SCOURGEWAR BADGE-3 Ring of Invincibility.webp
+/cards/scourgewar badge small/SCOURGEWAR BADGE-4 Signet of the Impregnable Fortress.webp
+/cards/scourgewar badge/SCOURGEWAR BADGE-1 Band of Channeled Magic.webp
+/cards/scourgewar badge/SCOURGEWAR BADGE-2 Renewal of Life.webp
+/cards/scourgewar badge/SCOURGEWAR BADGE-3 Ring of Invincibility.webp
+/cards/scourgewar badge/SCOURGEWAR BADGE-4 Signet of the Impregnable Fortress.webp
 /cards/scourgewar crafted small/SCOURGEWAR CRAFTED-1 Boots of Utter Darkness.webp
 /cards/scourgewar crafted small/SCOURGEWAR CRAFTED-2 Ebonweave Robe.webp
 /cards/scourgewar crafted small/SCOURGEWAR CRAFTED-3 Khorium Boar.webp
@@ -4556,6 +4584,18 @@ cards/* scans small/
 /cards/winter veil/WINTER VEIL-7 Gingerbread Cookie.webp
 /cards/winter veil/WINTER VEIL-8 Mistletoe.webp
 /cards/winter veil/WINTER VEIL-9 The Reason for the Season.webp
+/cards/wotlk promo small/WOTLK PROMO-1 Conqueror Kagon Blackskull.webp
+/cards/wotlk promo small/WOTLK PROMO-2 Lord Anton Lightbane.webp
+/cards/wotlk promo/WOTLK PROMO-1 Conqueror Kagon Blackskull.webp
+/cards/wotlk promo/WOTLK PROMO-2 Lord Anton Lightbane.webp
+/cards/wrathgate badge small/WRATHGATE BADGE-1 Belt of the Twilight Assassin.webp
+/cards/wrathgate badge small/WRATHGATE BADGE-2 Bladebreaker Gauntlets.webp
+/cards/wrathgate badge small/WRATHGATE BADGE-3 Leggings of the Tireless Sentry.webp
+/cards/wrathgate badge small/WRATHGATE BADGE-4 Wraps of the Astral Traveler.webp
+/cards/wrathgate badge/WRATHGATE BADGE-1 Belt of the Twilight Assassin.webp
+/cards/wrathgate badge/WRATHGATE BADGE-2 Bladebreaker Gauntlets.webp
+/cards/wrathgate badge/WRATHGATE BADGE-3 Leggings of the Tireless Sentry.webp
+/cards/wrathgate badge/WRATHGATE BADGE-4 Wraps of the Astral Traveler.webp
 /cards/wrathgate crafted small/WRATHGATE CRAFTED-1 Belt of the Black Eagle.webp
 /cards/wrathgate crafted small/WRATHGATE CRAFTED-2 Deathchill Cloak.webp
 /cards/wrathgate crafted small/WRATHGATE CRAFTED-3 Magnificent Flying Carpet.webp
