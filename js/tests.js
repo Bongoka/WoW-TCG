@@ -5,7 +5,10 @@ function runRuleTests() {
     const results = [], prevLang = LANG;
     LANG = 'de';   // Meldungen der Engine immer deutsch, unabhängig von der Spracheinstellung
     const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
-    const test = (num, name, fn) => { try { fn(); results.push({ num, name, ok: true, msg: 'OK' }); } catch (e) { results.push({ num, name, ok: false, msg: e.message }); } };
+    // RULE_TEST_OPTS (nur bin/ruletests.js, parallel): nums = Testnummern dieses Workers, cardIds = sein Anteil der Karten für #89/#90
+    const OPTS = typeof RULE_TEST_OPTS !== 'undefined' ? RULE_TEST_OPTS : null;
+    const test = (num, name, fn) => { if (OPTS && OPTS.nums && !OPTS.nums.includes(num)) return; const t0 = Date.now();
+        try { fn(); results.push({ num, name, ok: true, msg: 'OK', ms: Date.now() - t0 }); } catch (e) { results.push({ num, name, ok: false, msg: e.message, ms: Date.now() - t0 }); } };
     const deck = id => GAME_DECKS.find(d => d.id === id);
     // Frischer Zustand in der Aktionsphase von Spieler pid; beide Seiten entscheiden per KI
     const fresh = (a = 'alliance_hunter', b = 'horde_warrior', pid = 1) => {
@@ -667,6 +670,7 @@ function runRuleTests() {
     test(87, 'Simulation: gleicher Seed ergibt dasselbe Spiel', () => {
         const A = deck('alliance_mage'), B = deck('horde_warrior'), orig = Math.random;
         let r1, r2;
+        simulateOneGame(A, B);   // Aufwärmen: Caches der KI füllen, sonst sieht der erste Seed-Lauf einen anderen Zustand als der zweite (je nach vorher gelaufenen Tests, z. B. parallel in bin/ruletests.js)
         try { Math.random = seededRandom(42); r1 = simulateOneGame(A, B); Math.random = seededRandom(42); r2 = simulateOneGame(A, B); } finally { Math.random = orig; }
         assert(r1.winner === r2.winner && r1.turns === r2.turns && r1.p1Hp === r2.p1Hp && r1.p2Hp === r2.p2Hp, 'gleicher Seed, anderes Spiel');
     });
@@ -688,11 +692,11 @@ function runRuleTests() {
         assert(getReadyRes(P(s, 1)) === 1, `Kosten: noch ${getReadyRes(P(s, 1))} statt 1 Ressource übrig`);
     });
     test(89, 'Alle Karten: spielbar (auch in Kampf-/Ketten-Szenarien), für KI und Mensch auflösbar, Kräfte nutzbar', () => {
-        const f = runCardTests();
+        const f = runCardTests(OPTS && OPTS.cardIds);
         assert(!f.length, `${f.length} Probleme: ` + f.slice(0, 8).map(x => `${x.name}: ${x.problem}`).join(' · '));
     });
     test(90, 'Wirkung nach Text-Bausteinen (Werte, Schlüsselwörter, Schaden, Heilung, Zerstören, Anhänge)', () => {
-        const r = runCardTextTests();
+        const r = runCardTextTests(OPTS && OPTS.cardIds);
         assert(!r.fails.length, `${r.fails.length} Abweichungen: ` + r.fails.slice(0, 8).map(x => `${x.name}: ${x.problem}`).join(' · '));
     });
     test(91, 'Cruelty: Held hat +1 ATK, solange du eine Waffe kontrollierst', () => {
@@ -2432,6 +2436,42 @@ function runRuleTests() {
         destroy(s, k); process(s); autoResolve(s);
         assert(P(s, 2).allies.includes(t), 'Kwee zerstört: Ally nicht zurück');
     });
+    test(197, "Witch Doctor Koo'zar: Ziele vor den Kosten (CR 707.1d/e) – auch die bereite Ressource, mit der (1) bezahlt wird, darf Ziel sein", () => {
+        const s = freshH(8018, 13); const p = P(s, 1); p.resources = []; res(s, 1, 3); const [r1, r2, r3] = p.resources; r1.exhausted = r2.exhausted = true;
+        act(s, { type: 'ACTIVATE', srcUid: p.hero.uid, key: 'flip', targets: [[r1.card.uid, r2.card.uid, r3.card.uid]] }, 1);
+        assert(p.hero.flipped, "Koo'zar nicht umgedreht");
+        assert(p.resources.every(r => !r.exhausted), 'Nicht alle drei Ressourcen bereit: ' + p.resources.map(r => r.exhausted).join());
+    });
+    test(198, 'Questkosten: Mounts senken ohne Minimum (Swift Raptor macht eine (1)-Quest kostenlos), nur Aspect of the Cheetah hat "to a minimum of (1)" (CR 707.1e)', () => {
+        const q1 = Object.values(CARDS).find(c => c.type === 'Quest' && c.questCost === 1 && /^Pay \(1\) to complete this quest/.test(c.text || '') && !(FX[c.id] && FX[c.id].questSelfLess));
+        const q2 = Object.values(CARDS).find(c => c.type === 'Quest' && c.questCost === 2 && /^Pay \(2\) to complete this quest/.test(c.text || '') && !(FX[c.id] && FX[c.id].questSelfLess));
+        const s = fresh(), p = P(s, 1), cost = q => questCostOf(s, p, makeCardInst(q.id, false, 1));
+        put(s, 1, 11190);
+        assert(cost(q1) === 0, `Swift Raptor: (1)-Quest kostet ${cost(q1)} statt 0`);
+        assert(cost(q2) === 1, `Swift Raptor: (2)-Quest kostet ${cost(q2)} statt 1`);
+        const s2 = fresh(), p2 = P(s2, 1); put(s2, 1, 4031); const c2 = q => questCostOf(s2, p2, makeCardInst(q.id, false, 1));
+        assert(c2(q1) === 1 && c2(q2) === 1, `Aspect of the Cheetah: ${c2(q1)}/${c2(q2)} statt 1/1`);
+        put(s2, 1, 11025);   // Deathcharger dazu: Cheetah zuerst (2 → 1), dann Mount ohne Minimum (1 → 0)
+        assert(c2(q2) === 0 && c2(q1) === 0, `Cheetah + Mount: ${c2(q1)}/${c2(q2)} statt 0/0`);
+    });
+    test(199, '"Ready target …": Ziele müssen nicht erschöpft sein (CR 706.1, 707.1d) – Double Time, Elder Tomas, Path of Cenarius ("another")', () => {
+        const s = fresh(), p = P(s, 1); const w = put(s, 1, Object.values(CARDS).find(c => c.type === 'Weapon' && !c.text).id);
+        assert(!w.exhausted && FX[8085].slots(s, 1)[0].cands.includes(w.uid), 'Double Time: bereite Ausrüstung nicht wählbar');
+        const a = put(s, 1, 262), b = put(s, 1, 262);
+        assert(FX[8097].powers[0].slots(s, 1, a)[0].cands.includes(b.uid), 'Elder Tomas: bereiter Ally nicht wählbar');
+        const cs = FX_GRANT.cenarius11.slots(s, 1, a)[0].cands;
+        assert(cs.includes(b.uid) && !cs.includes(a.uid), 'Path of Cenarius: "another" falsch');
+    });
+    test(200, 'Weldon Barov: Peasant-Tokens haben Protector, die KI schützt ihren Helden vor einem tödlichen Angriff', () => {
+        const s = fresh(); put(s, 2, 7151); peasants(s, 2, 'protector');
+        const toks = P(s, 2).allies.filter(c => c.id === 9802);
+        assert(toks.length === 3 && toks.every(t => hasProtector(s, t)), 'Peasants ohne Protector');
+        const h = P(s, 2).hero; h.damage = hpOf(s, h) - 1;
+        const a = put(s, 1, 262);
+        act(s, { type: 'ATTACK', attackerUid: a.uid, defenderUid: h.uid }, 1);
+        assert(!s.gameOver && h.damage === hpOf(s, h) - 1, `Held nicht geschützt (Schaden ${h.damage}/${hpOf(s, h)})`);
+        assert(toks.some(t => t.exhausted || !P(s, 2).allies.includes(t)), 'Kein Peasant hat geschützt');
+    });
     return results;
 }
 
@@ -2666,7 +2706,7 @@ function runCardTests(ids) {
 // prüft die exakte Wirkung an allen passenden Karten (Schaden, Heilung, Zerstören, Werte, Schlüsselwörter …).
 // Ergebnis: { groups: { Baustein: Anzahl Karten }, fails: [{ group, id, name, problem }] }
 // ============================================================================
-function runCardTextTests() {
+function runCardTextTests(ids) {
     const groups = {}, fails = [];
     const T = c => (c.text || '').replace(/\s*<p>\s*/g, ' ').trim();
     const KW = ['Protector', 'Ferocity', 'Elusive', 'Untargetable', 'Long-Range', 'Stealth'];
@@ -2800,7 +2840,7 @@ function runCardTextTests() {
         return null;
     }]);
     for (const [name, match, check] of B) {
-        const cards = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id] && match(c));
+        const cards = Object.values(CARDS).filter(c => !c.isToken && !CARD_ISSUES[c.id] && (!ids || ids.includes(c.id)) && match(c));
         groups[name] = cards.length;
         for (const c of cards) { let r; try { r = check(c); } catch (e) { r = 'Absturz: ' + e.message; } if (r) fails.push({ group: name, id: c.id, name: c.name, problem: r }); }
     }

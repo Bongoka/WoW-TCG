@@ -34,8 +34,8 @@ FX[3106] = { on: legsPay(3106, 'Shaman'),
             mayPick(s, a.pid, tr('Legplates of Ten Storms: Zweites Ziel (dann je 1 Naturschaden)?'), 'Legplates of Ten Storms', rest, '3106:second', { ...a, first: v }); },
         second: (s, a, v) => { if (v) { ownHeroDmg(s, a.pid, a.first, 1, 'Nature'); ownHeroDmg(s, a.pid, v, 1, 'Nature'); } else ownHeroDmg(s, a.pid, a.first, 2, 'Nature'); } } };
 FX[3107] = { on: legsPay(3107, 'Warrior'),
-    k: { ask: legsAsk(3107, tr('Rüstung bereit machen'), (s, pid) => targetCands(s, pid, { armor: true, filter: x => x.exhausted })),
-        go: (s, a) => mustPick(s, a.pid, tr('Legplates of Wrath: Ziel-Rüstung bereit machen'), 'Legplates of Wrath', targetCands(s, a.pid, { armor: true, filter: x => x.exhausted }), 'E:optReady', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 5 : -5) } };
+    k: { ask: legsAsk(3107, tr('Rüstung bereit machen'), (s, pid) => targetCands(s, pid, { armor: true })),
+        go: (s, a) => mustPick(s, a.pid, tr('Legplates of Wrath: Ziel-Rüstung bereit machen'), 'Legplates of Wrath', targetCands(s, a.pid, { armor: true }), 'E:optReady', a, aiReadyVal(s, a.pid)) } };
 FX[3108] = { on: legsPay(3108, 'Warlock'),
     k: { ask: legsAsk(3108, tr('Schatten je angehängter Fähigkeit'), (s, pid) => targetCands(s, pid, { hero: true, side: 'enemy' }).filter(u => attachedTo(s, u).length)),
         go: (s, a) => mustPick(s, a.pid, tr('Nemesis Leggings: Gegnerischer Held'), 'Nemesis Leggings', targetCands(s, a.pid, { hero: true, side: 'enemy' }), '3108:do', a),

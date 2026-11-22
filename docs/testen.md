@@ -5,7 +5,12 @@
 
 Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü. Der Bereich „Tests“ im Menü rechts ist überall sichtbar, auch auf GitHub Pages (zum Testen auf dem Handy; `body.dev` in main.js).
 
-Ohne Browser mit Node: die Skripte in Ladereihenfolge (ohne UI-Dateien) in einen gemeinsamen Kontext laden und `runRuleTests()` aufrufen:
+Ohne Browser mit Node, parallel: `node bin/ruletests.js` (Quick-Test) bzw. `node bin/ruletests.js --full` (voller Test).
+- Jeder Worker lädt die Spieldateien einmal und holt sich Aufgaben aus einer Warteschlange: einzelne Testnummern bzw. Kartenanteile von #89/#90. `RULE_TEST_OPTS` in tests.js (`nums`, `cardIds`) wählt den Anteil; im Browser ist es nicht gesetzt, dort läuft alles.
+- Quick-Test: ohne `SLOW` (#92 Übersetzungen, #63/#72/#41 Simulationen, #107 Auto-Fill, #96 Deck Coach, #87 Seed). #89 läuft mit jeder 8. Karte; der Teil hängt vom Datum ab, nach 8 Tagen war jede Karte dran. #90 läuft vollständig.
+- Tests müssen unabhängig von der Reihenfolge sein: Parallel läuft jeder Test nach anderen Tests als im Ein-Thread-Lauf (#87 brauchte deshalb ein Aufwärmspiel für die KI-Caches).
+
+Ein Thread, ohne Skript: die Skripte in Ladereihenfolge (ohne UI-Dateien) in einen gemeinsamen Kontext laden und `runRuleTests()` aufrufen:
 
 ```js
 const fs = require('fs'), vm = require('vm');

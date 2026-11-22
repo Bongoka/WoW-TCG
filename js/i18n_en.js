@@ -2509,6 +2509,7 @@ var I18N_EN = {
     "\"Cracklehands\" Spigotgulp: 2 Arkanschaden an Ziel-Ally": "\"Cracklehands\" Spigotgulp: 2 arcane damage to target ally",
     "Anderen Ziel-Ally bereit machen": "Ready another target ally",
     "Anderer Ally": "Another ally",
+    "Andere Karte im Spiel": "Another card in play",
     "Gladiator Kinivus: abgeworfenen Arena-Ally zurück auf die Hand?": "Gladiator Kinivus: Return the discarded Arena ally to your hand?",
     "Ziel-Ally erschöpfen (Gladiator Lanthus)": "Exhaust target ally (Gladiator Lanthus)",
     "3 Feuer an Ziel-Helden (Gladiator Loraala)": "3 fire to target hero (Gladiator Loraala)",

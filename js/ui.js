@@ -127,7 +127,8 @@ function renderResourceTray(player, containerId, isHuman) {
         if (r.faceUp) {
             const wrap = document.createElement("div");
             wrap.className = "quest-card-large" + (r.exhausted ? " exhausted" : "");
-            const cardNode = createCardDOM(r.card, false, null, shownCost(player, r.card) || {});   // offene Quest: aktuelle Abschlusskosten (Mounts u. a.)
+            const qc = shownCost(player, r.card);
+            const cardNode = createCardDOM(r.card, false, null, qc || {});   // offene Quest: aktuelle Abschlusskosten (Mounts u. a.)
             wrap.appendChild(cardNode);
             shown.push([r, wrap, cardNode.querySelector('.cfx-rot')]);
             if (r.card.type === 'Location') locCapBadge(cardNode, r.card);
@@ -141,6 +142,7 @@ function renderResourceTray(player, containerId, isHuman) {
             const pows = isHuman && r.card.type !== 'Location' ? cardActions(r.card) : [];
             if (canDone || pows.length) {
                 wrap.classList.add("quest-ready"); cardNode.classList.add("can-act");   // Rand sitzt auf der Karte und dreht beim Erschöpfen mit
+                if (canDone && qc && qc.costNow < qc.costBase) cardNode.classList.add('cost-down');   // verbilligte Quest: grün wie günstigere Handkarten
                 const opts = [...(canDone ? [{ label: tr('Quest abschließen'), cls: 'success', run: () => humanAct({ type: 'COMPLETE_QUEST', resIdx: idx }) }] : []), ...pows];
                 wrap.title = opts.length === 1 ? (canDone ? tr("Klicken: Quest abschließen") : opts[0].label) : tr("Klicken: Quest abschließen oder Kraft nutzen");
                 wrap.onclick = () => { if (opts.length === 1) { opts[0].run(); return; }
@@ -744,7 +746,7 @@ function cardKeywords(uid, cardId) {
     const easy = rulesTextMode() === 'casual';
     const list = KEYWORDS.filter(k => {
         const src = k.on === 'type' ? type : k.on === 'both' ? type + ' <p> ' + text : text;
-        return k.re.test(src) || (k.flag && inst && inst[k.flag]);
+        return k.re.test(src) || (k.flag && inst && (inst[k.flag] || (inst.kw && inst.kw[k.flag])));   // kw: verliehen beim Erzeugen (Weldon Barovs Peasants: Protector)
     }).map(k => { const de = LANG === 'de' && KW_DE[k.name]; return { name: k.name, text: easy ? (de ? de[0] : k.easy) : (de ? de[1] : k.text) }; });
     for (const m of type.matchAll(/(?:—|, )([A-Z][^,—()]*?) \((\d+)\)/g))
         list.push({ name: m[1] + ' (' + m[2] + ')', text: LANG === 'de'
@@ -1092,9 +1094,25 @@ function markSabotageTarget(node, uid) {
     node.onclick = (e) => { e.stopPropagation(); UI.attacker = null; UI.preStrike = null; humanAct({ type: 'ATTACK', attackerUid: att.uid, defenderUid: uid, sabotage: true }); };
 }
 // Gemeinsame Interaktion für jede Karte im Spiel (Held, Ally, Ausrüstung, laufende Fähigkeit)
+// Protector (gedruckt, verliehen oder per Dauereffekt – hasProtector): Schild oben auf der Karte, dreht beim Erschöpfen mit
+const PROTECTOR_SVG = '<svg viewBox="0 0 40 46" aria-hidden="true"><defs>' +
+    '<linearGradient id="pshS" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dfe8f2"/><stop offset=".5" stop-color="#8fa3b8"/><stop offset="1" stop-color="#4d5f73"/></linearGradient>' +
+    '<linearGradient id="pshG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset="1" stop-color="#b8862e"/></linearGradient></defs>' +
+    '<path d="M20 2 L37 8 V21 C37 33 29 40 20 44 C11 40 3 33 3 21 V8 Z" fill="url(#pshG)" stroke="#3a2a10" stroke-width="1.5"/>' +
+    '<path d="M20 6.5 L33 11 V21 C33 30.5 27 36 20 39.3 C13 36 7 30.5 7 21 V11 Z" fill="url(#pshS)"/>' +
+    '<path d="M20 6.5 V39.3 M8.5 19 H31.5" stroke="#b8862e" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<circle cx="20" cy="19" r="4" fill="url(#pshG)" stroke="#3a2a10" stroke-width="1"/></svg>';
+function markProtector(node, c) {
+    if (!G || !(c.type === 'Hero' || isAllyLike(c)) || !hasProtector(G, c)) return;
+    node.classList.add('has-protector');
+    const host = node.querySelector('.cfx-tilt') || node;
+    const b = document.createElement('div'); b.className = 'protector-badge'; b.title = 'Protector'; b.innerHTML = PROTECTOR_SVG;
+    host.appendChild(b);
+}
 function decorateInPlay(node, c) {
     const uid = c.uid;
     node.dataset.uid = uid;
+    markProtector(node, c);
     const mine = isMine(uid);
     const choices = choiceUids();
     const pend = myPending('choose');

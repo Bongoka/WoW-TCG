@@ -12,7 +12,7 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
 2. **Offizielle Regeln:** Die Engine folgt den Comprehensive Rules v7.4 – `docs/wow_cr_v7.4_130723.pdf`. Bei Unklarheiten dort nachlesen und die Regelnummer im Code-Kommentar nennen (z. B. `CR 702.2`).
 3. **Kartentexte:** Jede Karte muss **genau** so funktionieren wie ihr Text in `docs/wow_ocr_110329.pdf` (OCR der offiziellen Kartenliste). **Keine Annäherungen** – wenn etwas nicht exakt umsetzbar ist, dem Nutzer sagen statt vereinfachen.
    - Durchsuchbare Textfassungen (vom Nutzer eingefügt, gleicher Inhalt): `docs/wow_cr_v7.4.txt` (Regeln inkl. Glossar) und `docs/wow_ocr_110329.txt` (Kartentexte aller Sets). Diese statt der PDFs lesen/greppen.
-4. Nach jeder Gameplay-Änderung die Regeltests laufen lassen (siehe unten); alle müssen bestehen. Neue Regeln/Karten-Fixes bekommen einen eigenen Test in `js/tests.js`.
+4. Nach jeder Gameplay-Änderung den **Quick-Test** laufen lassen (`node bin/ruletests.js`, siehe unten); alle müssen bestehen. Den **vollen Test** (`--full`) alle paar Tage und nach großen Änderungen (Engine-Umbau, neues Set, KI-Umbau). Neue Regeln/Karten-Fixes bekommen einen eigenen Test in `js/tests.js`.
    - `runCardTests()` spielt **jede** Karte (KI- und Menschenweg, Kräfte, Quests); situationsabhängige Karten über `SCENARIOS` (Kampf, Kette, Stealth …). `runCardTextTests()` prüft die exakte Wirkung je Text-Baustein. Beide laufen als Regeltest #89/#90.
    - Bewusst nicht (vollständig) umgesetzte Karten stehen in `CARD_ISSUES` (cards.js): werden im Spiel mit ⚠ markiert und von den Karten-Tests ausgelassen.
 
@@ -43,15 +43,11 @@ Icons aus `WoW Icon Pack/`: in Git nur die vom Code genannten – nach neuen Ico
 
 ## Testen (Details: `docs/testen.md` – KI-Vergleich `bin/aicompare.js`, Kartenprüfung `bin/cardcheck.js`, Simulation & Statistik)
 
-Regeltests ohne Browser (Skripte in Ladereihenfolge ohne UI-Dateien laden):
+Regeltests ohne Browser, parallel (Node-Worker, Kerne − 2):
 
-```js
-const fs = require('fs'), vm = require('vm');
-const ARGV = process.argv.slice();               // Achtung: die Engine definiert eine globale Funktion "process"
-globalThis.window = globalThis; globalThis.alert = () => {};
-globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','cards16','cards17','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','cardfx16','cardfx17','ai','simcore','coach','tests'])
-  vm.runInThisContext(fs.readFileSync('js/' + f + '.js', 'utf8'), { filename: f + '.js' });
-const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
-r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));
+```bash
+node bin/ruletests.js          # Quick-Test (~6 s): alle Tests außer den langen (SLOW), #89 nur mit jeder 8. Karte (Teil wechselt täglich)
+node bin/ruletests.js --full   # voller Test (~2,5 min): alle Tests, alle Karten
 ```
+
+Weitere Optionen: `--only 89,90` (nur diese, vollständig), `--times` (langsamste Tests), `--workers N`. Die langen Tests stehen in `SLOW` (bin/ruletests.js); ein neuer Test über ~10 s gehört dort hinein. Der Ein-Thread-Weg (`runRuleTests()` direkt) steht in `docs/testen.md`.

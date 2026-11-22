@@ -361,7 +361,7 @@ FX[2150] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) mayPick(s
 FX[2151] = { aura: { atk: (s, src, sp, c, ctx) => ctx.attacking && isDruidChar(c) && ctrlOf(s, c) === sp ? 1 : 0, kw: (s, src, sp, c, k) => k === 'protector' && isDruidChar(c) && ctrlOf(s, c) === sp } };
 FX[2152] = { aura: { atk: (s, src, sp, c) => c === src ? (c.damage || 0) : 0 } };
 FX[2153] = { aura: { noReady: (s, src, sp, c) => c === src } };
-FX[2154] = { enter: (s, c, pid) => mayPick(s, pid, tr('Broan Charges-the-Fight: Ziel-Ally (Kosten 2 oder weniger) bereit machen?'), 'Broan', targetCands(s, pid, { ally: true, filter: a => (a.cost || 0) <= 2 && a.exhausted }), 'E:optReady', {}, u => ctrlOf(s, findCharacter(s, u)) === pid ? 3 : -3) };
+FX[2154] = { enter: (s, c, pid) => mayPick(s, pid, tr('Broan Charges-the-Fight: Ziel-Ally (Kosten 2 oder weniger) bereit machen?'), 'Broan', targetCands(s, pid, { ally: true, filter: a => (a.cost || 0) <= 2 }), 'E:optReady', {}, aiReadyVal(s, pid)) };
 FX[2156] = { leave: (s, snap, dest, info) => { if (dest === 'graveyard' && info.destroyed) pushTrig(s, snap.wasCtrl, 2156, [{ op: 'trig', id: 2156, k: 'ask', a: { pid: snap.wasCtrl } }]); },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Erytheis: 1 Arkanschaden an Ziel'), 'Erytheis', targetCands(s, a.pid, CH), 'E:doDmg', { src: null, pid: a.pid, amt: 1, dt: 'Arcane' }) } };
 FX[2157] = { enter: (s, c, pid) => trig(s, { id: 2157, k: 'go', a: { opp: pid === 1 ? 2 : 1 } }),
@@ -444,7 +444,7 @@ FX[2193] = { aura: { hp: (s, src, sp, c) => facIs(heroOf(s, sp), 'Alliance') && 
 // ============================================================================
 FX[2194] = { powers: [{ key: 'aldori', label: tr('Ziel −2 ATK'), act: true, slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: -2, turn: s.turn }); } }] };
 FX[2195] = { aura: { watk: (s, src, sp, w) => ctrlOf(s, w) === sp && me(s, sp).hero.weapons.length + me(s, sp).hero.armors.length >= 5 ? 3 : 0 } };
-FX[2196] = { powers: [{ key: 'greaves', label: tr('Zerstören: eigenen Ally bereit machen'), cost: 2, selfCost: selfDestroyCost, slots: (s, pid) => [{ label: tr('Eigener Ally'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: a => a.exhausted }), harm: false }], resolve: (s, it) => { const t = T1(s, it); if (t) readyCard(s, t); } }] };
+FX[2196] = { powers: [{ key: 'greaves', label: tr('Zerstören: eigenen Ally bereit machen'), cost: 2, selfCost: selfDestroyCost, slots: (s, pid) => [{ label: tr('Eigener Ally'), cands: targetCands(s, pid, { ally: true, side: 'friendly' }), harm: false, ai: aiReadyVal(s, pid) }], resolve: (s, it) => { const t = T1(s, it); if (t) readyCard(s, t); } }] };
 FX[2197] = { powers: [{ key: 'faith', label: tr('Ally aus dem Friedhof auf die Hand'), act: true, canUse: (s, pid) => pes(s, pid, 'heroHealed').length ? (me(s, pid).graveyard.some(c => isAllyCard(c)) || tr('Kein Ally im Friedhof')) : tr('Dein Held hat in diesem Zug nicht geheilt'),
     resolve: (s, it) => mustPick(s, it.pl, tr("Faith Healer's Boots: Ally aus deinem Friedhof auf die Hand"), "Faith Healer's Boots", gyCands(s, it.pl, c => isAllyCard(c)), '1292:do', { pid: it.pl }, u => findCharacter(s, u).cost || 0) }] };
 FX[2198] = { aura: { watk: (s, src, sp, w) => w.slot === 'Melee' && ctrlOf(s, w) === sp ? 1 : 0, dmgOut: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && o.ability ? 1 : 0 } };

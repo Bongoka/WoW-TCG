@@ -31,6 +31,9 @@ function mustPick(s, pid, prompt, src, cands, k, a, aiFn) {
 EK.optDestroy = (s, a, v) => { if (v) { const c = findCharacter(s, v); if (c) destroy(s, c); } };
 EK.optExhaust = (s, a, v) => { if (v) { const c = findCharacter(s, v); if (c) exhaust(s, c); } };
 EK.optReady = (s, a, v) => { if (v) readyCard(s, findCharacter(s, v)); };
+// KI-Wert für "Ready target …": Ziele müssen nicht erschöpft sein (CR 706.1 – nur die Zielbeschreibung zählt, CR 411.1: Bereites bleibt bereit),
+// die KI nimmt aber lieber eigene erschöpfte Karten
+const aiReadyVal = (s, pid) => u => { const c = findCharacter(s, u); if (!c) return 0; return ctrlOf(s, c) === pid ? (c.exhausted ? 3 + (c.cost || 0) / 10 : 0.5) : -3; };
 EK.optRemoveGy = (s, a, v) => { if (v && gyCard(s, v)) { gyRemove(s, v); L(s, tr`${nameOf(s, v)} wird aus dem Spiel entfernt.`); } };
 EK.optBounce = (s, a, v) => { if (v) { const c = findCharacter(s, v); if (c) bounce(s, c); } };
 EK.doDmg = (s, a, v) => { if (v) dealDamage(s, { src: a.src, srcPl: a.pid, tgt: v, amt: a.amt, dt: a.dt, ability: !!a.ability, unprev: !!a.unprev }); };

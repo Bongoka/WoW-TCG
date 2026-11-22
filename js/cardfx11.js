@@ -280,7 +280,7 @@ FX[10089] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), 
 FX[10090] = { aura: { atk: (s, src, sp, c) => isChar(c) && ctrlOf(s, c) !== sp && s.battle && s.battle.att === c.uid ? -1 : 0 } };
 FX[10091] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { grant: (s, src, sp, c) => c.uid === src.attachedTo ? ['cenarius11'] : [] } };
-FX_GRANT.cenarius11 = { label: tr('Anderen Ziel-Ally bereit machen (Path of Cenarius)'), cost: 1, act: true, slots: (s, pid) => [{ label: tr('Anderer Ally'), cands: targetCands(s, pid, { ally: true, filter: c => c.exhausted }), harm: false }],
+FX_GRANT.cenarius11 = { label: tr('Anderen Ziel-Ally bereit machen (Path of Cenarius)'), cost: 1, act: true, slots: (s, pid, src) => [{ label: tr('Anderer Ally'), cands: targetCands(s, pid, { ally: true, filter: c => c.uid !== (src && src.uid) }), harm: false, ai: aiReadyVal(s, pid) }],   // "another": nicht der Ally mit der Kraft
     resolve: (s, it) => { const t = T1(s, it); if (t && t.uid !== it.src) readyCard(s, t); } };
 
 // ============================================================================

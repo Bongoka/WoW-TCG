@@ -1376,12 +1376,13 @@ function extraPayers(p) {
     return [...out].filter(c => !c.exhausted);
 }
 function getReadyRes(p) { return p.resources.filter(r => !r.exhausted).length + extraPayers(p).length; }
-// first: Ressource, die zuerst erschöpft wird, falls bereit (Corki's Ransom bezahlt mit sich selbst – sie geht ohnehin auf die Hand)
+// first: Ressource(n), die zuerst erschöpft werden, falls bereit (Corki's Ransom bezahlt mit sich selbst – sie geht ohnehin auf die Hand;
+// Koo'zar bezahlt mit Ziel-Ressourcen, die er danach wieder bereit macht – CR 707.1d/e: Ziele vor den Kosten)
 function payRes(p, n, first) {
     if (n <= 0) return true;
     if (getReadyRes(p) < n) return false;
     let paid = 0;
-    if (first && !first.exhausted && p.resources.includes(first)) { first.exhausted = true; paid++; }   // CR 412.2: auch offene Ressourcen
+    for (const f of [].concat(first || [])) if (f && !f.exhausted && p.resources.includes(f) && paid < n) { f.exhausted = true; paid++; }   // CR 412.2: auch offene Ressourcen
     // Erst verdeckte Ressourcen, dann offene Quests, offene Locations zuletzt (ihre [Activate]-Kräfte brauchen sie bereit)
     const isLoc = r => r.card && r.card.type === 'Location';
     for (const r of p.resources) if (!r.exhausted && !r.faceUp && paid < n) { r.exhausted = true; paid++; }
@@ -2101,7 +2102,8 @@ EK.prepItemPower = (s) => {
         const cost = pw.cost === 'X' ? (it.x || 0) : powerCostOf(s, p.id, pw, src);
         const rl = pw.act && locate(s, src.uid);
         if (rl && rl.zone === 'resource') rl.res.exhausted = true;                         // Location: erst sich selbst erschöpfen, dann bezahlen
-        if (!payRes(p, cost)) return abortPrep(s, tr('Nicht genug Ressourcen'));
+        const payFirst = pw.payFromTargets ? it.targets.flat().map(u => { const l = locate(s, u); return l && l.zone === 'resource' ? l.res : null; }) : undefined;
+        if (!payRes(p, cost, payFirst)) return abortPrep(s, tr('Nicht genug Ressourcen'));
         if (pw.act && !(rl && rl.zone === 'resource')) exhaust(s, src);
         if (pw.exhaustHero) exhaust(s, p.hero);
         if (pw.once === 'turn') { src.usedTurn = src.usedTurn || {}; src.usedTurn[pw.key] = s.turn; }
@@ -2617,14 +2619,19 @@ EK.fkPick = (s, a, id) => { const p = getPlayer(s, a.pid); const i = p.fk.indexO
 // Abschlusskosten einer Quest (Travel Form: "You pay (1) less to complete your next quest this turn")
 const QUEST_COST_MODS = [];   // (s, Spieler, Quest) => Senkung der Abschlusskosten ohne Minimum
 function questCostOf(s, p, card) {
-    let c = card.questCost || 0;
-    { const f = FX[card.id]; if (f && f.questSelfLess) c -= f.questSelfLess(s, p.id) || 0; }   // Corruption of Earth and Seed (Set drums)
-    pes(s, p.id, 'questLess').forEach(m => { if (!m.used && (!m.quest || m.quest === card.uid)) c -= m.v; });   // Marksman Glous (Set 7): nur für die inspirierte Quest
-    pes(s, p.id, 'questLessAll').forEach(m => { c -= m.v; });
-    for (const f of QUEST_COST_MODS) c -= f(s, p, card) || 0;                             // Emerald Emissary (Set worldbreaker): ohne Minimum                             // The Rider of Frost (Set icecrown): "You pay (1) less to complete quests this turn"
-    const less = auraSum(s, 'questLess', p.id, card);                                    // Aspect of the Cheetah (Set 6): "to a minimum of (1)"
-    if (less > 0) c = Math.max(Math.min(c, 1), c - less); else if (less < 0) c -= less;   // Ja'zoona (Set 6): Gegner zahlen (1) mehr
-    return Math.max(0, c);
+    // CR 707.1e: Aufschläge, dann Senkungen in beliebiger Reihenfolge; ein Minimum ("to a minimum of (1)") gilt nur für seine eigene Senkung –
+    // daher die Senkung mit Minimum zuerst (für den Spieler günstigste Reihenfolge), danach alle übrigen ohne Minimum.
+    // Vorher galt das Minimum von Aspect of the Cheetah für alle Dauer-Senkungen: Mounts (Swift Raptor …) machten eine (1)-Quest nicht kostenlos.
+    let c = card.questCost || 0, red = 0;
+    const mod = v => { v = v || 0; if (v > 0) red += v; else c -= v; };                     // positiv = Senkung, negativ = Aufschlag
+    { const f = FX[card.id]; if (f && f.questSelfLess) mod(f.questSelfLess(s, p.id)); }   // Corruption of Earth and Seed (Set drums)
+    pes(s, p.id, 'questLess').forEach(m => { if (!m.used && (!m.quest || m.quest === card.uid)) mod(m.v); });   // Marksman Glous (Set 7): nur für die inspirierte Quest
+    pes(s, p.id, 'questLessAll').forEach(m => mod(m.v));                                  // The Rider of Frost (Set icecrown): "You pay (1) less to complete quests this turn"
+    for (const f of QUEST_COST_MODS) mod(f(s, p, card));                                  // Emerald Emissary (Set worldbreaker)
+    mod(auraSum(s, 'questLess', p.id, card));                                             // Mounts u. a. (ohne Minimum); Ja'zoona (Set 6): Gegner zahlen (1) mehr
+    const min1 = auraSum(s, 'questLessMin1', p.id, card);                                 // Aspect of the Cheetah (Set 6): "to a minimum of (1)"
+    if (min1 > 0) c = Math.max(Math.min(c, 1), c - min1);
+    return Math.max(0, c - red);
 }
 function checkQuestCondition(s, p, r) {
     const id = r.card.id; const o = getOpponent(s, p.id);
@@ -3397,10 +3404,12 @@ function aiProtectValue(s, pr, att, def) {
     const aDefAtk = atkOf(s, pr, { defending: true });
     const attLeft = hpOf(s, att) - (att.damage || 0);
     let v = 0;
-    if (def.type === 'Hero') v += Math.min(aAtk, defLeft) * (defLeft <= aAtk + 4 ? 3 : 0.6);
+    if (def.type === 'Hero') v += Math.min(aAtk, defLeft) * (defLeft <= aAtk + 4 ? 3 : 0.6) + (aAtk >= defLeft ? 1000 : 0);   // tödlicher Angriff: immer schützen
     else if (aAtk >= defLeft) v += cardValue(s, def);
+    // Token, das am Ende dieses Zuges ohnehin zerstört wird (Weldon/Alexi Barov, Barov Peasant Caller), verliert nichts
+    const doomed = pr.id === 9004 || (s.pe || []).some(m => m.k === 'peasants9' && m.at === s.turn && m.uids.includes(pr.uid));
     if (pr.type === 'Hero') v -= aAtk * 0.8;
-    else if (aAtk >= prLeft) v -= cardValue(s, pr); else v += 1;
+    else if (aAtk >= prLeft) v -= doomed ? 0 : cardValue(s, pr); else v += 1;
     if (aDefAtk >= attLeft) v += cardValue(s, att) * 0.8;
     return v;
 }

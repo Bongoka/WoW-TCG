@@ -176,3 +176,7 @@
 .loc-cap small { font: 800 7.5cqw/1 Impact, 'Arial Black', sans-serif; color: #f3e3c0; -webkit-text-stroke: 0.3cqw #2a1d0e; margin-left: 0.5cqw; }
 .loc-cap.full span { color: #ffd34d; }
 .card-visual:has(.loc-cap) .cfx-counters { display: none; }
+/* Protector: Schild oben mittig auf der Karte (sitzt in .cfx-tilt, dreht beim Erschöpfen mit) */
+.protector-badge { position: absolute; left: 50%; top: -5cqw; width: 22cqw; transform: translateX(-50%); z-index: 6; pointer-events: none;
+    filter: drop-shadow(0 0.8cqw 1.6cqw rgba(0,0,0,.85)) drop-shadow(0 0 2.5cqw rgba(150,190,230,.55)); }
+.protector-badge svg { display: block; width: 100%; height: auto; }

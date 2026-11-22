@@ -102,7 +102,7 @@ FX[4030] = { on: bearOn, enterTrig: (s, c, pid) => q(s, { op: 'call', k: '4030:p
 // ============================================================================
 // FÄHIGKEITEN – Jäger
 // ============================================================================
-FX[4031] = { aura: { questLess: (s, src, sp, pid) => pid === sp ? 1 : 0 },
+FX[4031] = { aura: { questLessMin1: (s, src, sp, pid) => pid === sp ? 1 : 0 },   // "to a minimum of (1)" (questCostOf)
     on: { damaged: (s, c, d, pid) => { if (d.tgt === heroOf(s, pid).uid) trig(s, { id: 4031, k: 'hand', a: { uid: c.uid } }); } },
     k: { hand: (s, a) => { const l = locate(s, a.uid); if (l && isInPlayZone(l.zone)) leavePlay(s, l.c, 'hand', { destroyed: false }); } } };
 FX[4032] = { powers: [{ key: 'swift', label: tr('Pet erhält Ferocity'), act: true, slots: (s, pid) => [{ label: 'Pet', cands: targetCands(s, pid, { ally: true, pet: true }), harm: false }],

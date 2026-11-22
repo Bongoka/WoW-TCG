@@ -597,7 +597,7 @@ FX[11129] = { powers: [{ key: 'hp', label: tr('Ziel -1 [Health]'), cost: 1, canU
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'hp', v: -1, turn: s.turn }); } }] };
 FX[11130] = resist('Shadow');
 FX[11131] = { on: { defends: (s, c, d, pid) => { if (d.def === c.uid) trig(s, { id: 11131, k: 'go', a: { pid } }); } },
-    k: { go: (s, a) => mayPick(s, a.pid, tr('Ferandus Duskfall: Ziel-Waffe bereit machen?'), 'Ferandus Duskfall', targetCands(s, a.pid, { equipment: true, filter: c => c.type === 'Weapon' && c.exhausted }), '11131:do', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 3 : -3),
+    k: { go: (s, a) => mayPick(s, a.pid, tr('Ferandus Duskfall: Ziel-Waffe bereit machen?'), 'Ferandus Duskfall', targetCands(s, a.pid, { equipment: true, filter: c => c.type === 'Weapon' }), '11131:do', a, aiReadyVal(s, a.pid)),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) readyCard(s, c); } } };
 FX[11132] = { powers: [{ key: 'guard', label: tr('Eigene Charaktere dürfen diesen Ally schützen'), cost: 1, canUse: handN, payExtra: discardCost(11132), resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'foggo12', turn: s.turn }); } }] };
 PROTECT_FOR.push((s, c, def) => hasTM(s, def, 'foggo12') && ctrlOf(s, c) === ctrlOf(s, def));
