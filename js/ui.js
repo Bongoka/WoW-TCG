@@ -432,11 +432,38 @@ function layoutBar() {
 // Größe/Drehung des Fensters: neu anordnen (ohne Gleiten)
 let _layoutRaf = 0;
 addEventListener('resize', () => { cancelAnimationFrame(_layoutRaf); _layoutRaf = requestAnimationFrame(() => { if (G) layoutBoard(false); }); });
-// Hand fährt hoch, wenn die Maus im unteren Viertel des Bildschirms ist
+// Hand hoch/runter: Maus im unteren Viertel (oder über der Hand) ODER die Spielsituation verlangt es (handAutoUp)
+const HAND_UI = { hover: false, auto: false, key: '', dismissed: '' };
+function applyHandUp() { const h = document.getElementById('bot-hand'); if (h) h.classList.toggle('hand-up', HAND_UI.hover || HAND_UI.auto); }
+// Situation: true = hoch, false = runter
+function handAutoUp(box) {
+    if (!G || G.gameOver || G.spectate || !G.p1.hand.length) return false;
+    if (UI.attacker) return false;                                                        // Angriff: Blick aufs Feld
+    const ch = choiceUids();
+    if (ch.size) return G.p1.hand.some(c => ch.has(c.uid));                               // Entscheidung: über Handkarten hoch, sonst Feld frei
+    if (myPending() && !myPending('priority')) return false;                              // andere Entscheidung (Modus, Zahl …) im Fenster
+    const playable = !!box.querySelector('.hand-card-slot.playable');
+    if (canMain()) return playable || !G.placedResource;                                  // eigener Zug: solange etwas spielbar ist oder die Ressource fehlt
+    return canInstant() && playable;                                                      // Gegnerzug: nur wenn ich antworten kann
+}
+function updateHandAuto(box) {
+    if (UI.busy) return applyHandUp();                                                    // während Animationen bleibt die Hand, wo sie ist
+    const want = handAutoUp(box);
+    // Neuer Anlass (Zugbeginn, neue Entscheidung, Antwortfenster) hebt ein manuelles "runter" wieder auf
+    const key = G ? [G.turn, G.activePlayer, (G.pending && G.pending.pid === 1 && G.pending.kind) || '', want].join('|') : '';
+    if (key !== HAND_UI.key) { HAND_UI.key = key; HAND_UI.dismissed = ''; }
+    HAND_UI.auto = want && HAND_UI.dismissed !== key;
+    applyHandUp();
+}
 document.addEventListener('mousemove', e => {
     const h = document.getElementById('bot-hand'); if (!h) return;
-    h.classList.toggle('hand-up', e.clientY > window.innerHeight * 0.75 || h.contains(e.target));
+    HAND_UI.hover = e.clientY > window.innerHeight * 0.75 || h.contains(e.target); applyHandUp();
 });
+// Klick aufs Spielfeld außerhalb der Hand (z. B. Ally zum Angreifen): automatisch hochgefahrene Hand fährt runter
+document.addEventListener('pointerdown', e => {
+    const h = document.getElementById('bot-hand'); if (!h || !HAND_UI.auto || h.contains(e.target) || !e.target.closest('#arena')) return;
+    HAND_UI.dismissed = HAND_UI.key; HAND_UI.auto = false; applyHandUp();
+}, true);
 
 // ---------------------------------------------------------------- Hauptzeichnen
 function render() {
@@ -496,6 +523,7 @@ function render() {
     renderHeroCard(G.p1, "bot-hero-card-container");
     renderResourceTray(G.p1, "bot-resource-tray", true);
     renderPlayerHand(G.p1);
+    updateHandAuto(document.getElementById('bot-hand'));
     layoutBoard();
     renderPendingPanel();
     playFxEvents(prevRects);
