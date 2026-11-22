@@ -7,6 +7,8 @@
 //   --tief       zusätzlich Szenario-Varianten für Karten ohne Nachweis (bedingte Texte; langsam, ca. 30–60 min)
 //   --dumm N     Partien mit der Spiel-KI auf beiden Seiten, jede Entscheidung auf dumme Fehler geprüft (Standard 10)
 //   --zeitpunkt  nur: wann Instants/Quests/Kräfte im Gegnerzug spielbar sind und angeboten werden (reports/zeitpunkt.md)
+//   --files a,b  zusätzliche Dateien aus js/ laden (neues Set aus bin/setgen.js, z. B. cards16,cardfx16)
+//   --nur-set N  nur die Karten mit CARDS[id].set === N prüfen
 //   --ki N       je gezielter Partie bis zu N Entscheidungsproben der Spiel-KI (große Suche; Standard 3; 0 = aus)
 // Ausgabe: reports/cardcheck.json und reports/cardcheck.md (nicht in Git)
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -17,8 +19,12 @@ const exit = process.exit.bind(process), out = (...a) => console.log(...a), errO
 globalThis.window = globalThis; globalThis.alert = () => {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
 globalThis.CC_ENGINE_SRC = fs.readFileSync(path.join(ROOT, 'js/engine.js'), 'utf8');
-for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','ai','simcore','coach','tests','cardcheck'])
+// --files cards16,cardfx16: noch nicht eingebundene Dateien mitladen (neue Sets aus bin/setgen.js; Kartendaten nach cards15, Verhalten nach cardfx15)
+const EXTRA = String(arg('--files', '') || '').split(',').filter(Boolean);
+for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15', ...EXTRA.filter(x => /^cards\d/.test(x)),'decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15', ...EXTRA.filter(x => /^cardfx\d/.test(x)),'ai','simcore','coach','tests','cardcheck'])
     vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), { filename: f + '.js' });
+// --nur-set N: nur die Karten eines Sets prüfen (alle anderen gelten in diesem Lauf als CARD_ISSUES und werden ausgelassen)
+if (arg('--nur-set')) { const n = +arg('--nur-set'); for (const c of Object.values(CARDS)) if (!c.isToken && c.set !== n && !CARD_ISSUES[c.id]) CARD_ISSUES[c.id] = 'cardcheck --nur-set'; }
 
 // --zeitpunkt: wann Instants, Quests und Kräfte im Gegnerzug spielbar sind und wo sie angeboten werden → reports/zeitpunkt.md
 if (arg('--zeitpunkt')) {
