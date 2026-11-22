@@ -35,6 +35,12 @@ Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuer
 V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]*)?\"#\1?v=$V\"#g" index.html && ! grep -q '?v="' index.html
 ```
 
+Icons aus `WoW Icon Pack/`: in Git nur die vom Code genannten – nach neuen Icons `node bin/iconpack.js`.
+
+## Neue Sets
+
+`node bin/setgen.js <Kürzel>` erzeugt Kartendaten, FX-Gerüst und Bericht der Handarbeit aus der Card Reference (Anleitung `docs/setgen.md`).
+
 ## Testen (Details: `docs/testen.md` – KI-Vergleich `bin/aicompare.js`, Kartenprüfung `bin/cardcheck.js`, Simulation & Statistik)
 
 Regeltests ohne Browser (Skripte in Ladereihenfolge ohne UI-Dateien laden):

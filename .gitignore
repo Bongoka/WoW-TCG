@@ -4818,3 +4818,6 @@ Tokens small/*
 
 # WoW-Addon: TGA-Kartenbilder (≈720 MB) bleiben lokal
 addon/WoWTCG/Art/
+
+# WoW Icon Pack: in Git nur die Icons, die der Spielcode nennt (node bin/iconpack.js nimmt neue auf, alte heraus)
+/WoW Icon Pack/

@@ -25,6 +25,12 @@ sed -i '/^# >>> EA-Doppel/,/^# <<< EA-Doppel/{//!d}' .gitignore && sed -i '/^# >
 git ls-files -ci --exclude-standard -z | xargs -0 -r git rm -q --cached --   # schon eingecheckte Doppel aus Git nehmen
 ```
 
+### WoW Icon Pack (nur benutzte Icons auf GitHub)
+Der Ordner `WoW Icon Pack/` (≈4300 Icons, 34 MB) steht in `.gitignore`; eingecheckt sind nur die Icons, deren Pfad der Spielcode
+(`js/`, `css/`, `index.html`) als Text nennt – vor allem das Roguelike (Tränke, Artefakte, Karten-Knoten, Gold). Nach neuen
+Icons im Code: `node bin/iconpack.js` (nimmt neu benutzte mit `git add -f` auf, nicht mehr benutzte aus Git; `--dry` = nur
+anzeigen, meldet auch Verweise ohne Datei). Die Dateien selbst bleiben lokal liegen.
+
 ### Tablet (offline, Xiaomi Pad 7)
 Das Spiel liegt auf dem Tablet unter `/sdcard/Documents/WoWTCG`. Gespielt wird über die eigene App **WoW TCG** (`android/`, Paket `de.wowtcg.game`): eine WebView ohne Browser und Server, die die Dateien direkt aus diesem Ordner liest (`https://appassets.androidplatform.net/…`), Vollbild, Querformat, Bildschirm bleibt an, fordert die höchste Bildwiederholrate an. Bauen: `bash bin/build-apk.sh` (JDK 17 + Android-SDK in `G:\downloads\android-build`, nicht im Projekt); Installation: APK nach `/sdcard/Download` kopieren und am Tablet antippen (Xiaomi blockiert `adb install`). Die alte Variante (Server-App „Simple HTTP Server“ + Web-App `http://localhost:8080`) geht weiter, hat aber eigene Decks (eigener Speicher je Adresse). Änderungen **per WLAN**: am PC `bash bin/sync-server.sh` (bzw. `Tablet-Sync starten.bat`, Port 8766, `bin/SyncServer.java`) laufen lassen – die App sucht beim Start den PC im WLAN und lädt geänderte Dateien (Textdateien per MD5, Bilder per Größe/Zeit; `android/…/Sync.java`). Per USB: `bash bin/tablet-sync.sh` (nur seit dem letzten Abgleich geänderte Dateien; `--all` = alles; `-s <Seriennr>` = bestimmtes Gerät, z. B. das Handy, Merker dann `.tablet-sync.<Seriennr>`). Dieselbe App läuft auch auf dem Handy (gleicher Ordner, gleiche APK; `bash bin/build-apk.sh install <Seriennr>` bzw. APK nach `/sdcard/Download`). adb: aus dem PATH, sonst `scrcpy-win64-*/adb.exe` im Projektordner (nicht in Git, nicht auf die Geräte), sonst `C:\adb`.
 
