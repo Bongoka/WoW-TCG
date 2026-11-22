@@ -44,7 +44,9 @@ function createPlayerState(id, heroId, deckList) {
         deck: shuffleDeck(deckList), hand: [], allies: [], resources: [], graveyard: [], ongoing: [], removed: [],
         className: hero.class || 'Neutral', faction: hero.faction || 'Neutral', talent: hero.talent || null,
         maxHandSize: 7, mulliganed: false,
-        stats: { played: {}, completed: {} }
+        stats: { played: {}, completed: {} },
+        // Deck-Plan für die CPU-Bewertung (ai.js): wie das Deck gewinnen will (aggro/midrange/control), aus der Deckliste
+        aiPlan: typeof aiDeckPlan === 'function' ? aiDeckPlan(heroId, deckList, id) : null
     };
 }
 

@@ -1,0 +1,25 @@
+-- Automatisch erzeugt aus dem Browserspiel (Simulation) – nicht von Hand bearbeiten.
+-- Starterdecks des Addons: je Held 30 Karten (Limited, CR 100.1), jede Karte höchstens 2-mal, höchstens 3 Rare, keine Epics.
+-- Thematisch gebaut: Klassenkarten des eigenen Talentbaums, Allies der eigenen Rasse (Jäger: Begleiter, Hexenmeister: Dämonen),
+-- Fraktionskarten; Allianz- und Horde-Deck derselben Klasse meiden gleiche Karten. Danach untereinander ausbalanciert
+-- (Simulation, jedes Deck gegen die übrigen 15; wr = Siegquote). Ersetzt E.GAME_DECKS (Engine/Cards.lua).
+local ADDON, ns = ...
+local E = ns.E
+E.GAME_DECKS = {
+    { id = "alliance_druid", hero = 6, faction = "Alliance", class = "Druid", name = "Night Elf Restoration Druid", wr = 0.54, cards = { 17, 18, 19, 22, 23, 24, 24, 25, 27, 28, 171, 176, 176, 197, 197, 206, 206, 208, 208, 217, 217, 219, 219, 220, 220, 288, 291, 340, 357, 357 } },
+    { id = "alliance_hunter", hero = 3, faction = "Alliance", class = "Hunter", name = "Night Elf Marksmanship Hunter", wr = 0.56, cards = { 32, 33, 33, 36, 37, 39, 39, 41, 42, 43, 44, 45, 45, 46, 179, 197, 208, 209, 210, 217, 219, 219, 220, 222, 288, 311, 331, 340, 342, 357 } },
+    { id = "alliance_mage", hero = 5, faction = "Alliance", class = "Mage", name = "Human Frost Mage", wr = 0.52, cards = { 47, 48, 50, 52, 53, 55, 56, 56, 57, 58, 60, 173, 174, 175, 176, 181, 187, 194, 197, 200, 206, 206, 208, 218, 224, 282, 332, 340, 355, 357 } },
+    { id = "alliance_paladin", hero = 4, faction = "Alliance", class = "Paladin", name = "Human Protection Paladin", wr = 0.42, cards = { 62, 63, 65, 66, 68, 69, 70, 72, 73, 75, 173, 174, 175, 175, 181, 182, 187, 192, 194, 197, 206, 208, 218, 224, 290, 297, 312, 331, 340, 357 } },
+    { id = "alliance_priest", hero = 1, faction = "Alliance", class = "Priest", name = "Dwarf Holy Priest", wr = 0.50, cards = { 76, 76, 78, 78, 79, 79, 82, 84, 87, 89, 90, 182, 183, 183, 186, 192, 192, 193, 193, 197, 197, 205, 206, 208, 223, 323, 332, 340, 355, 357 } },
+    { id = "alliance_rogue", hero = 7, faction = "Alliance", class = "Rogue", name = "Gnome Assassination Rogue", wr = 0.42, cards = { 92, 93, 93, 94, 95, 96, 97, 98, 102, 103, 105, 176, 178, 185, 187, 190, 197, 200, 206, 207, 208, 209, 212, 213, 213, 291, 315, 331, 340, 357 } },
+    { id = "alliance_warlock", hero = 2, faction = "Alliance", class = "Warlock", name = "Gnome Affliction Warlock", wr = 0.49, cards = { 120, 120, 122, 123, 123, 125, 125, 128, 128, 130, 130, 132, 132, 134, 134, 176, 176, 197, 197, 206, 206, 207, 207, 212, 212, 281, 287, 340, 355, 357 } },
+    { id = "alliance_warrior", hero = 8, faction = "Alliance", class = "Warrior", name = "Dwarf Protection Warrior", wr = 0.59, cards = { 137, 138, 140, 142, 146, 147, 148, 148, 149, 149, 182, 183, 183, 192, 192, 193, 193, 197, 197, 206, 206, 208, 208, 223, 290, 312, 331, 340, 355, 357 } },
+    { id = "horde_druid", hero = 16, faction = "Horde", class = "Druid", name = "Tauren Feral Druid", wr = 0.48, cards = { 17, 18, 20, 21, 22, 24, 25, 29, 30, 225, 235, 235, 238, 240, 242, 242, 249, 252, 261, 262, 266, 266, 271, 284, 307, 323, 332, 343, 344, 345 } },
+    { id = "horde_hunter", hero = 14, faction = "Horde", class = "Hunter", name = "Troll Beast Mastery Hunter", wr = 0.46, cards = { 33, 35, 36, 37, 38, 39, 40, 42, 44, 45, 46, 171, 230, 236, 244, 248, 260, 260, 264, 269, 269, 270, 284, 286, 307, 311, 312, 343, 344, 345 } },
+    { id = "horde_mage", hero = 15, faction = "Horde", class = "Mage", name = "Troll Fire Mage", wr = 0.51, cards = { 47, 48, 52, 53, 54, 56, 57, 58, 59, 60, 61, 225, 228, 229, 230, 236, 244, 248, 253, 260, 264, 265, 269, 270, 275, 303, 329, 343, 344, 345 } },
+    { id = "horde_shaman", hero = 10, faction = "Horde", class = "Shaman", name = "Tauren Elemental Shaman", wr = 0.53, cards = { 106, 107, 107, 108, 109, 109, 114, 114, 116, 116, 117, 235, 240, 242, 248, 249, 252, 257, 262, 266, 270, 271, 274, 282, 294, 308, 329, 343, 344, 352 } },
+    { id = "horde_priest", hero = 12, faction = "Horde", class = "Priest", name = "Undead Shadow Priest", wr = 0.45, cards = { 76, 77, 78, 79, 80, 82, 83, 85, 87, 88, 171, 225, 225, 228, 232, 232, 233, 233, 234, 234, 251, 253, 258, 265, 272, 282, 294, 343, 344, 345 } },
+    { id = "horde_rogue", hero = 11, faction = "Horde", class = "Rogue", name = "Undead Subtlety Rogue", wr = 0.58, cards = { 93, 94, 95, 99, 101, 102, 103, 165, 171, 225, 225, 227, 228, 228, 232, 232, 234, 234, 239, 251, 258, 258, 265, 288, 307, 315, 326, 344, 345, 355 } },
+    { id = "horde_warlock", hero = 13, faction = "Horde", class = "Warlock", name = "Orc Demonology Warlock", wr = 0.47, cards = { 120, 123, 125, 125, 126, 127, 128, 130, 130, 131, 132, 134, 163, 165, 171, 226, 227, 238, 238, 247, 247, 256, 274, 282, 303, 329, 332, 343, 344, 345 } },
+    { id = "horde_warrior", hero = 9, faction = "Horde", class = "Warrior", name = "Orc Arms Warrior", wr = 0.47, cards = { 135, 137, 140, 141, 142, 144, 145, 146, 149, 226, 227, 231, 231, 238, 238, 243, 246, 247, 254, 256, 256, 274, 275, 285, 297, 301, 328, 343, 344, 345 } },
+}

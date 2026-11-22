@@ -1,0 +1,20 @@
+[
+ { "id": "rot3_warrior_fury_ctrl",          "name": "★ Warrior · Fury · Control (A · 69,0 %)" },
+ { "id": "rot1_paladin_holy_ctrl",          "name": "★ Paladin · Holy · Control (A · 68,5 %)" },
+ { "id": "rot1_warrior_protection_ctrl",    "name": "★ Warrior · Protection · Control (A · 68,1 %)" },
+ { "id": "rot2_paladin_protection_ctrl",    "name": "★ Paladin · Protection · Control (A · 66,7 %)" },
+ { "id": "eq2_warrior_fury_aggro",          "name": "★ Warrior · Fury · Aggro · Ausrüstung v2 (B · 65,4 %)" },
+ { "id": "rot1_warrior_fury_aggro",         "name": "★ Warrior · Fury · Aggro (A · 64,8 %)" },
+ { "id": "rot2_warrior_fury_mid",           "name": "★ Warrior · Fury · Mid (A · 63,0 %)" },
+ { "id": "rot2_warrior_arms_ctrl",          "name": "★ Warrior · Arms · Control (A · 62,0 %)" },
+ { "id": "rot2_shaman_elemental_ctrl",      "name": "★ Shaman · Elemental · Control (A · 61,6 %)" },
+ { "id": "rot3_hunter_marksmanship_ctrl",   "name": "★ Hunter · Marksmanship · Control (A · 61,1 %)" },
+ { "id": "rot3_mage_fire_ctrl",             "name": "★ Mage · Fire · Control (A · 60,6 %)" },
+ { "id": "rot3_warlock_destruction_ctrl",   "name": "★ Warlock · Destruction · Control (A · 60,6 %)" },
+ { "id": "rot2_hunter_marksmanship_mid",    "name": "◆ Hunter · Marksmanship · Mid (A · 60,2 %)" },
+ { "id": "rot3_shaman_elemental_aggro",     "name": "◆ Shaman · Elemental · Aggro (A · 58,8 %)" },
+ { "id": "rot1_warlock_destruction_aggro",  "name": "◆ Warlock · Destruction · Aggro (A · 57,9 %)" },
+ { "id": "rot2_druid_balance_ctrl",         "name": "◇ Druid · Balance · Control (A · 51,9 %)" },
+ { "id": "rot3_rogue_assassination_ctrl",   "name": "◇ Rogue · Assassination · Control (A · 51,4 %)" },
+ { "id": "rot1_priest_holy_ctrl",           "name": "◇ Priest · Holy · Control (A · 46,8 %)" }
+]

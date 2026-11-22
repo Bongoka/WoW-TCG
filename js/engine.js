@@ -1029,10 +1029,11 @@ function respondSpent(s, pid, a) {
 // Einzeln abschaltbar (Messung, welche Änderung wie viel bringt): AI_LEGACY[pid] = { start: true, … } – Merkmale: start
 // (Zugbeginn-Fenster), react (Zug-Vorausschau bei Reaktionen), tempo (Zugende), noHold (kein aiHoldValue in Antwort-Vergleichen),
 // half (halber Haltewert), reactive (Mana für Zugbeginn-Karten halten), cold (Everlasting Cold); Bewertung (ai.js): oppres
-// (gegnerische Ressourcen), handdelay (Handkarten nach Wartezeit), holddef (kleinere Haltewerte defensiver Instants), kwscale (Stealth je ATK, Untargetable anteilig wie bei Forge), lethalprot (Protectors in der Tödlich-Schwelle)
+// (gegnerische Ressourcen), handdelay (Handkarten nach Wartezeit), holddef (kleinere Haltewerte defensiver Instants), kwscale (Stealth je ATK, Untargetable anteilig wie bei Forge), lethalprot (Protectors in der Tödlich-Schwelle), plan (Deck-Plan aggro/control, aiDeckPlan), persona (Spielstile der CPU, AI_PERSONAS)
 const AI_LEGACY = { 1: false, 2: false };
 const aiOld = (pid, f) => AI_LEGACY[pid] === true || !!(AI_LEGACY[pid] && AI_LEGACY[pid][f]);
 function respondOptions(s, pid) {
+    if (s.real && typeof aiHumanNoPersona === 'function') aiHumanNoPersona(s);   // Spielstile nur für die CPU (ai.js)
     const moment = respondMoment(s, pid);
     if (!moment || typeof evaluateState !== 'function') return [];
     const acts = respondCandidates(s, pid, getPriorityActions(s, pid));

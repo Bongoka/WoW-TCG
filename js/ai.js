@@ -16,9 +16,11 @@ function evaluateStateNow(s, pid) {
     if (doomed.has(me.hero.uid) && !isIndestructible(s, me.hero)) return AI_LOSS + 1;
     if (doomed.has(opp.hero.uid) && !isIndestructible(s, opp.hero)) return AI_WIN - 1;
     let score = 0;
-    score += myHp * aw(pid, 'hpMe') - oppHp * aw(pid, 'hpOpp');
+    score += myHp * awp(s, pid, 'hpMe') - oppHp * awp(s, pid, 'hpOpp');
     if (myHp <= 6) score -= (7 - myHp) * 14; else if (myHp <= 12) score -= (13 - myHp) * 3;
-    if (oppHp <= 6) score += (7 - oppHp) * 16; else if (oppHp <= 12) score += (13 - oppHp) * 3;
+    // Zuschlag für einen fast besiegten Gegner – beim Aggro-Deck (Deck-Plan) stärker, beim Control-Deck schwächer
+    const low = awp(s, pid, 'low');
+    if (oppHp <= 6) score += (7 - oppHp) * 16 * low; else if (oppHp <= 12) score += (13 - oppHp) * 3 * low;
     // Lage je Seite für die Schlüsselwörter: Angreifer, Protectors, mittlere ATK, Handkarten der Gegenseite
     const sideInfo = p => { const al = alliesOf(p).filter(a => !a.isTotem && !doomed.has(a.uid)); let atk = 0, n = 0, prot = 0;
         for (const a of al) { const x = atkOf(s, a, {}); if (x > 0) { n++; atk += x; } if (hasProtector(s, a) && !a.exhausted) prot++; }
@@ -27,7 +29,7 @@ function evaluateStateNow(s, pid) {
     const infoMe = sideInfo(me), infoOpp = sideInfo(opp);
     const allyVal = (a, mine) => {
         const atk = a.isTotem ? 0 : atkOf(s, a, {}), rem = Math.max(0, hpOf(s, a) - (a.damage || 0));
-        let v = 3.5 + atk * (mine ? aw(pid, 'atkMine') : aw(pid, 'atkOpp')) + rem * (mine ? aw(pid, 'hpAllyMine') : aw(pid, 'hpAllyOpp'));
+        let v = 3.5 + atk * (mine ? awp(s, pid, 'atkMine') : awp(s, pid, 'atkOpp')) + rem * (mine ? awp(s, pid, 'hpAllyMine') : awp(s, pid, 'hpAllyOpp'));
         if (a.isTotem) v += 3 + (a.cost || 0);
         // Schlüsselwörter nach Lage (Gegenseite = die, gegen die das Schlüsselwort wirkt): Protector/Elusive je Angreifer,
         // Stealth je Protector, Long-Range nach der ATK der Verteidiger, Untargetable nach den Handkarten (mögliche Entfernung)
@@ -60,7 +62,7 @@ function evaluateStateNow(s, pid) {
     if (myHp <= threat) score -= aw(pid, 'lethal');
     // Eigene Handkarten nach Nutzen (spielbare, gute Karten mehr wert als tote); gegnerische Hand ist verdeckt: pauschal
     me.hand.forEach(c => score += handCardValue(s, me, c));
-    score -= opp.hand.length * aw(pid, 'oppCard');
+    score -= opp.hand.length * awp(s, pid, 'oppCard');
     // Ressourcen sind bis 8 sehr wertvoll – jede verlorene kostet dauerhaft Tempo (z. B. Twig of the World Tree);
     // darüber hinaus kaum noch. Eigene Ressourcen zu zerstören lohnt sich so nur für sehr viel Wirkung.
     const nRes = me.resources.length;
@@ -130,9 +132,87 @@ function aiDoomed(s) { const out = new Set(); for (const f of AI_DOOM) for (cons
 const AI_HP_W = { me: 1.0, opp: 1.6 };
 // Gewichte der Bewertung, je Spieler überschreibbar (AI_W[pid] = { hpOpp: 1.2, … }) – zum Nachjustieren per Selbstspiel
 // (bin/aicompare.js --w): eine Variante spielt gegen die Standard-CPU, ausgewertet Partie für Partie gegen den Nulllauf
-const AI_W_DEF = { hpMe: AI_HP_W.me, hpOpp: AI_HP_W.opp, atkMine: 2.2, atkOpp: 2.6, hpAllyMine: 1.5, hpAllyOpp: 1.6, lethal: 50, oppCard: 2.5, res: 7, card: 2.6 };
+const AI_W_DEF = { hpMe: AI_HP_W.me, hpOpp: AI_HP_W.opp, atkMine: 2.2, atkOpp: 2.6, hpAllyMine: 1.5, hpAllyOpp: 1.6, lethal: 50, oppCard: 2.5, res: 7, card: 2.6, low: 1 };
 const AI_W = { 1: null, 2: null };
 const aw = (pid, k) => (AI_W[pid] && AI_W[pid][k] !== undefined ? AI_W[pid][k] : AI_W_DEF[k]);
+// Gewicht mit dem Deck-Plan des Spielers (p.aiPlan, aiDeckPlan): ein Aggro-Deck wertet gegnerisches Leben höher, eigenes
+// Leben und Handkarten niedriger, ein Control-Deck umgekehrt
+// … und mit dem Spielstil der CPU (pl.persona, AI_PERSONAS) – nur für die CPU, der Mensch hat keinen (aiHumanNoPersona)
+const awp = (s, pid, k) => { let w = aw(pid, k); const pl = getPlayer(s, pid).aiPlan; if (!pl) return w;
+    if (pl.w && pl.w[k] && !aiOld(pid, 'plan')) w *= pl.w[k];
+    const ps = pl.persona && AI_PERSONAS[pl.persona]; if (ps && ps.w[k] && !aiOld(pid, 'persona')) w *= ps.w[k];
+    return w; };
+
+// ---------------------------------------------------------------- Deck-Plan (Win-Condition)
+// Liest beim Spielstart die Deckliste: Kostenkurve, teuerste Karten, schnelle Bedrohungen (billige Allies/Waffen, Stealth,
+// Ferocity …), Direktschaden auf Helden, Entfernung, Kartenziehen, Heilung. Daraus aggro (0–1) und control (0–1) und die
+// Faktoren für die Bewertung. Mehrfach-Deckbau ist egal: es zählt der Anteil im Deck.
+const AI_PLAN_BURN = /damage to (target|each|an?) (opposing |enemy )?hero\b|damage to target (opposing )?hero or ally|damage to (your opponent|each opponent|the opposing hero|opposing heroes)|damage to target opposing hero/i;
+const AI_PLAN_FAST = /\bFerocity\b|\bStealth\b|\bAmbush\b|\bHaste\b|\bAssault\b|can attack (the turn|this turn)|\+\d+ ATK\b/i;
+const AI_PLAN_REMOVAL = /destroy (target|all|each) (opposing |non-?[a-z]+ )?(ally|allies|character)|damage to (target|each) (opposing )?ally|damage to (each|all) (opposing )?(allies|characters)|return target (opposing )?ally/i;
+const AI_PLAN_DRAW = /\bdraw (a|two|three|four|\d+|X) cards?\b|\bdraws? a card\b/i;
+const AI_PLAN_HEAL = /\bheal\b|\bheals\b|\bprevent\b/i;
+const clamp01 = x => Math.max(0, Math.min(1, x));
+function aiDeckPlan(heroId, cards, pid) {
+    const list = (cards || []).map(id => CARDS[id]).filter(c => c && c.type !== 'Quest' && c.type !== 'Location');
+    const n = list.length; if (n < 10) return null;
+    let sum = 0, cheap = 0, burn = 0, fast = 0, rem = 0, draw = 0, heal = 0, big = 0, allies = 0;
+    const costs = [];
+    for (const c of list) {
+        const cost = c.xCost ? 4 : (c.cost || 0), t = c.text || ''; sum += cost; costs.push(cost);
+        const threat = (c.type === 'Ally' && (c.atk || 0) > 0) || c.type === 'Weapon';
+        if (c.type === 'Ally') allies++;
+        if (threat && cost <= 3) cheap++;
+        if (AI_PLAN_BURN.test(t)) burn++;
+        if (AI_PLAN_FAST.test(t)) fast++;
+        if (AI_PLAN_REMOVAL.test(t)) rem++;
+        if (AI_PLAN_DRAW.test(t)) draw++;
+        if (AI_PLAN_HEAL.test(t)) heal++;
+        if (cost >= 6) big++;
+    }
+    const avg = sum / n, f = x => x / n;   // Anteile im Deck
+    costs.sort((a, b) => b - a);
+    const top = costs[Math.min(costs.length - 1, Math.max(0, Math.round(n * 0.08) - 1))];   // teuerste Karten (oberste ~8 %)
+    const aggro = clamp01(0.4 * clamp01((3.3 - avg) / 1.1) + 0.25 * clamp01(f(cheap) / 0.45) + 0.15 * clamp01(f(burn) / 0.15)
+        + 0.2 * clamp01(f(fast) / 0.2) - 0.25 * clamp01(f(big) / 0.12));
+    const control = clamp01(0.35 * clamp01((avg - 2.9) / 1.0) + 0.25 * clamp01(f(rem) / 0.15) + 0.15 * clamp01(f(draw) / 0.1)
+        + 0.1 * clamp01(f(heal) / 0.1) + 0.15 * clamp01(f(big) / 0.12) - 0.2 * clamp01(f(cheap) / 0.45));
+    const t = aggro - control, style = t >= 0.25 ? 'aggro' : t <= -0.25 ? 'control' : 'midrange';
+    // Nur Aggro-Decks bekommen andere Gewichte: Selbstspiel mit Turnier-Decks (11/2026, je 800 Partienpaare gegen den Nulllauf)
+    // – Control-/Midrange-Anpassungen (eigenes Leben, Handkarten höher) kosteten 2–5 Prozentpunkte, Aggro mild ±0
+    const A = style === 'aggro' ? t : 0;
+    const w = { hpOpp: 1 + AI_PLAN_K.hpOpp * A, hpMe: 1 - AI_PLAN_K.hpMe * A, card: 1 - AI_PLAN_K.card * A,
+        oppCard: 1 - 0.2 * A, atkMine: 1 + 0.15 * A, low: 1 + AI_PLAN_K.low * A };
+    for (const k in w) w[k] = Math.round(w[k] * 100) / 100;
+    return { style, persona: aiPickPersona(pid, style), aggro: Math.round(aggro * 100) / 100, control: Math.round(control * 100) / 100, avg: Math.round(avg * 100) / 100, top, w };
+}
+// Stärke der Anpassung je Aggro-Anteil (per Selbstspiel justiert, bin/aicompare.js --plan)
+const AI_PLAN_K = { hpOpp: 0.3, hpMe: 0.15, card: 0.15, low: 0.4 };
+// ---------------------------------------------------------------- Spielstile der CPU (Abwechslung)
+// Je Partie wählt die CPU im Hintergrund einen Spielstil, der zu ihrem Deck-Plan passt (styles). Er verschiebt die Gewichte
+// der Bewertung leicht (Faktoren je Gewicht). Aufgenommen ist nur, was im Selbstspiel gegen die Standard-CPU nicht schlechter
+// abschnitt; "balanced" = Standard. Messung 11/2026 (Turnier-Decks, je 800 Partienpaare gegen den Nulllauf, Δ Prozentpunkte
+// aggro/control/midrange): reckless −3,2/+0,7/−1,2, guardian −1,2/0/−3,6, trader −1,1/+0,7/−2,4, hoarder −3,0/+2,0/−2,4, swarm −0,9/−0,7/+1,2.
+// Aggro-Decks spielen deshalb nur ausgewogen (sie spielen über den Deck-Plan ohnehin anders).
+const AI_PERSONAS = {
+    balanced: { styles: ['aggro', 'midrange', 'control'], w: {} },
+    reckless: { styles: ['control'], w: { hpOpp: 1.2, hpMe: 0.85, low: 1.3 } },                 // Draufgänger: auf den Helden
+    guardian: { styles: ['control'], w: { hpMe: 1.2, atkOpp: 1.1, low: 0.9 } },                  // Vorsichtig: eigenes Leben schützen
+    trader:   { styles: ['control'], w: { atkOpp: 1.15, hpAllyOpp: 1.15, atkMine: 1.05 } },     // Brett-Kontrolle: Allies tauschen
+    hoarder:  { styles: ['control'], w: { card: 1.2, oppCard: 1.2 } },                           // Kartenvorteil
+    swarm:    { styles: ['midrange'], w: { atkMine: 1.15, hpAllyMine: 1.15 } },                   // Brett aufbauen
+};
+// Erzwungener Spielstil je Spieler (Messung, bin/aicompare.js --persona NAME): null = zufällig
+const AI_PERSONA_FORCE = { 1: null, 2: null };
+function aiPickPersona(pid, style) {
+    const r = Math.random();                       // immer genau eine Zufallszahl – erzwungene Stile verschieben den Zufall nicht
+    if (AI_PERSONA_FORCE[pid]) return AI_PERSONA_FORCE[pid];
+    const l = Object.keys(AI_PERSONAS).filter(k => AI_PERSONAS[k].styles.includes(style || 'midrange'));
+    return l[Math.floor(r * l.length)] || 'balanced';
+}
+// Der Mensch hat keinen Spielstil: seine Antwort-Angebote (respondOptions) rechnet dieselbe Bewertung
+function aiHumanNoPersona(s) { for (const pid of s.humans || []) { const pl = getPlayer(s, pid).aiPlan; if (pl && pl.persona) pl.persona = null; } }
+
 const AI_FLIP_VALUE = 4;
 const heroFlipLeft = h => !h.flipped && !!(FX[h.id] && (FX[h.id].powers || []).some(pw => pw.flip));
 // Mana für den Zug des Gegners zurückhalten: Instants, die gerade dann wirken (unterbrechen, Schaden verhindern,
@@ -161,7 +241,7 @@ function handCardValue(s, p, c) {
     if (c.type === 'Location') return locsOf(p).length ? 1.2 : 2.6;              // Location (Set drums): eine offene lohnt, weitere kaum
     if (!cardMatchesPlayer(c, p) || !talentReqOk(c, p.hero)) return 0.5;
     const R = p.resources.length, cost = c.xCost ? 4 : (c.cost || 0);
-    let v = aw(p.id, 'card') + Math.min(cost, 8) * 0.18;
+    let v = awp(s, p.id, 'card') + Math.min(cost, 8) * 0.18;
     // Noch nicht spielbar: je Zug Wartezeit 15 % weniger (ab dem nächsten Zug mit einer Ressource mehr). Vorher zog die KI erst
     // ab "Ressourcen + 3" ab – ein 8er bei 5 Ressourcen war mehr wert als ein sofort spielbarer 3er (4,0 gegen 3,1)
     if (aiOld(p.id, 'handdelay')) { if (cost > R + 3) v -= Math.min(1.6, (cost - R - 3) * 0.4); }

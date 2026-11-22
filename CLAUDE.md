@@ -16,45 +16,9 @@ Das Spiel selbst ist zweisprachig (Englisch Standard, Deutsch über die Flaggen 
    - `runCardTests()` spielt **jede** Karte (KI- und Menschenweg, Kräfte, Quests); situationsabhängige Karten über `SCENARIOS` (Kampf, Kette, Stealth …). `runCardTextTests()` prüft die exakte Wirkung je Text-Baustein. Beide laufen als Regeltest #89/#90.
    - Bewusst nicht (vollständig) umgesetzte Karten stehen in `CARD_ISSUES` (cards.js): werden im Spiel mit ⚠ markiert und von den Karten-Tests ausgelassen.
 
-## Struktur (`js/`, Ladereihenfolge wie in `index.html`)
+## Struktur (Details: `docs/struktur.md`)
 
-| Datei | Inhalt |
-|---|---|
-| `i18n_en.js`, `i18n.js` | Englische Übersetzungen `I18N_EN`; `tr`, `LANG`, `setLang`, `translateDom` (feste HTML-Texte) |
-| `utils.js` | Hilfsfunktionen (z. B. `shuffleDeck`) |
-| `cards.js` | Kartendaten `CARDS[id]` – Werte, Typzeilen, Regeltexte (Set 1, IDs 1–361) |
-| `cards2.js`, `cards3.js` | Set 2 *Through the Dark Portal* (IDs 1001–1319) und Set 3 *Fires of Outland* (IDs 2001–2246), aus der Card Reference erzeugt; Tokens 9101+/9201+ |
-| `cards4.js`, `cards5.js` | Raid-Loot: Set 4 *Onyxia's Lair* (IDs 3001–3033) und Set 5 *Molten Core* (IDs 3101–3130); Token 9401 |
-| `cards6.js` | Set 6 *March of the Legion* (IDs 4001–4319 = 4000 + Kartennummer), aus der Card Reference erzeugt; Tokens 9501+ |
-| `decks.js` | Start-Decks `GAME_DECKS` (16 Decks) – nur noch für Regeltests und Test-Setups, in der Oberfläche nicht mehr sichtbar. Zufalls-Matches nehmen eigene + Turnier-Decks (`randomDeckPool` in main.js) |
-| `state.js` | Spielzustand: `newGameState`, `makeCardInst`, `cloneState` (schnelle Tiefenkopie), Statistik `statPlayed`/`statCompleted` |
-| `engine.js` | Regel-Engine: Warteschlange (`queue`, `q`, `process`), Kette (`chain`), Prioritätsfenster (`win`), Kampf (`battleStep`), Trigger, Quests, legale Aktionen (`getLegalActions`), Mulligan |
-| `cardfx.js` | Verhalten jeder Karte: `FX[id]` (Trigger, Kräfte, Ziele, Quest-Bedingungen/Belohnungen) |
-| `cardfx2.js`, `cardfx3.js` | Verhalten von Set 2 / Set 3; Dauereffekte über `FX[id].aura` (siehe `auraSrcs` in engine.js), alternative Kosten über `FX[id].alt` |
-| `cardfx4.js`, `cardfx5.js` | Verhalten des Raid-Loots (Onyxia / Molten Core); Kräfte von der Hand über `fromHand: true` |
-| `cards7.js`, `cardfx7.js` | Set 7 *Servants of the Betrayer* (IDs 5001–5264 = 5000 + Kartennummer): Daten und Verhalten |
-| `cards8.js`, `cardfx8.js` | Set *Hunt for Illidan* (IDs 6001–6252 = 6000 + Kartennummer, Tokens 9701+): Daten und Verhalten; Dämonen-Helden mit eigener Deckbau-Regel (`HERO_DECK_RULES`), nicht umsetzbare Karten in `CARD_ISSUES` |
-| `cards9.js`, `cardfx9.js` | Set *Drums of War* (drums, IDs 7001–7268, Tokens 9801+): u. a. **Locations** (Kartentyp, nur als Ressource; offen: Kräfte, Auslöser, Dauereffekte, höchstens eine offen – CR 306, 410.6g), Diplomacy, Shadowmeld, Berserking, War Stomp. Gemeinsame Hilfen für die folgenden Sets (`fxMix`, `KW9`, `warStomp`, `diplomacy`, `onEnter`, `actPow` …) |
-| `cards10.js`, `cardfx10.js` | Set *Blood of Gladiators* (gladiator, IDs 8001–8208, Tokens 9901+): Arena-Karten, Inspiring Presence, Arcane Torrent, Thrown, Kosten beim offenen Legen (`faceUpCost`), Allies beider Fraktionen (`facIs`) |
-| `cards11.js`, `cardfx11.js` | Set *Fields of Honor* (honor, IDs 10001–10208, Tokens 10501+): Will of the Forsaken, Escape Artist, Find Treasure, honor counters / Battlegrounds, Werte festsetzen (`STAT_SET`) |
-| `cards12.js`, `cardfx12.js` | Set *Scourgewar* (scourgewar, IDs 11001–11270, Tokens 11501+): **Death Knights** (zehnte Klasse), **Master Heroes** (Kartentyp `Master Hero`, CR 301.4: `becomeHero`, `restoreStartHero`), Death Rattle (Wächter über die Friedhöfe, `deathRattle`), Mend (`mendList`), Assault (`assaultOf`), Mounts (CR 302.3). Gemeinsame Hilfen für wrathgate/icecrown |
-| `cards13.js`, `cardfx13.js` | Set *Wrathgate* (wrathgate, IDs 12001–12219, Tokens 12501+): Argent Crusade, „Lesson of …“ (`lessonAlt`), Flip mit „discard a <Klasse>“, Eitrigg (`UNIQUE_ALL`) |
-| `cards14.js`, `cardfx14.js` | Set *Icecrown* (icecrown, IDs 13001–13218, Tokens 13501+): Scourge (`scourgeReq`), Helden mit Deckbau-Regel auf der Rückseite (`HERO_DECK_RULES`, „either [Alliance] or [Horde]“: `factionEither`), Kräfte aus dem Friedhof (`fromGy`). Am Ende: Spieler mit Untargetable (Modi „Gegner“/„Du selbst“ filtern) |
-| `cards15.js`, `cardfx15.js` | Kleine Sets: *Arena Grand Melee* (grand melee, IDs 3601–3611, Preparation = im ersten eigenen Zug ohne Kosten: `GLOBAL_ALT`, `s.firstTurnOf`) und Raid-Loot *Magtheridon's Lair* (magtheridon treasure, 3201–3220), *Black Temple* (black temple treasure, 3301–3312), *Naxxramas* (naxxramas treasure, 3405–3440, ohne die nachgedruckten Helden), *Icecrown Citadel* (citadel treasure, 3501–3530), *Death Knight Starter Set* (death knight starter, 3702–3726), *Drums of War Crafted* (drums crafted, 3801–3803, „<Beruf> Hero Required“: `profReq`), Crafted-Karten *Burning Crusade* (bc crafted, 3901–3914), *Gladiators* (gladiator crafted, 3921–3923), *Honor* (honor crafted, 3931–3933), *Scourgewar* (scourgewar crafted, 3941–3943), *Wrathgate* (wrathgate crafted, 3951–3953), *Icecrown* (icecrown crafted, 3961–3963), Promo *Feast of Winter Veil* (winter veil, 3981–3990), *Darkmoon Faire* (darkmoon faire, 3991–3995: Sayge/Madness entfernen die oberste Karte des Gegners, Location „The Darkmoon Faire“ gewinnt mit Kosten 1–8 im Spiel); Tokens 3651+. Treasure Cards sind immer Foil (`TREASURE_SETS`). Würfeln immer über `rollD6` (engine.js, Eye of Magtheridon) |
-| `cardfx6.js` | Verhalten von March of the Legion |
-| `tourneydecks.js` | Turnier-Decklisten (DMF 2006/2007, World Championships Top 8) als Text, werden einmalig über den Importer in „Deine Decks“ übernommen – Listen, deren Held es im Spiel noch nicht gibt, erst sobald er da ist. `WORLDS` = Ordner je World Championship (Jahr, Stadt, Land; Bilder `icons/worlds_logo.png`, `icons/worlds_text.png`), `TOURNEY_HEROES` = Fraktion/Klasse fehlender Helden |
-| `ai.js` | CPU: `evaluateState`, `searchBestAction` (echtes Spiel), `fastAiAction` (Simulation) |
-| `simcore.js` | DOM-freie Simulation `simulateOneGame`, Karten-Statistik, Zufallsdecks, Late-Game-Testaufbau |
-| `simworker.js` | Web Worker für `runSimulation`: lädt die Engine und spielt je Nachricht eine Partie (wie `aiworker.js` für die CPU) |
-| `tests.js` | Regeltests `runRuleTests()`; im Browser `runUiCheck(sekunden)` = Anzeige-Abgleich (Zufallspartien, Spielfeld gegen Zustand) |
-| `cardcheck.js` | Kartenprüfung (DOM-frei, nur Node über `bin/cardcheck.js`): Wirkung je Karte, Auslöser per Kontroll-Lauf (textlose Kopie), „Karte tut nichts“, Menschenweg mit Zufallsantworten, Kosten, Invarianten-Wächter in Simulationen, KI-Wert/Timing, Detektor für dumme KI-Fehler (`ccAiGame`, deterministische Uhr). Nicht in `index.html` |
-| `renderer.js`, `ui.js`, `main.js` | Darstellung, Drag & Drop, Spielablauf im Browser (**UI – nur auf Anfrage ändern**) |
-| `spellfx.js` | Zauber-Effekte: beim Auflösen einer Ability meldet `resolveCard` `fxEvent {t:'spell'}`, `playFxEvents` ruft `playSpellFx` (Canvas-Vorlagen `SPX_T`: nova, bolt, beam, lightning, shield, heal, roots, slash …, Paletten `SPX_PAL`) und spielt den Original-Sound aus `sounds/spells/` (thewowdb.com, `SPELL_SND`). Zuordnung: `SPELL_ID` › `SPELL_NAME` › `SPELL_PATTERN` › Rückfall nach Element/Wirkung; ein Eintrag ist eine Zeile wie `'bolt.fire explode.fire x1.4 @cast_fire,pyroblast_hit'`. Einstellung „Zauber-Effekte An/Aus“ (`wow_tcg_spellfx`) |
-| `backgrounds.js` | Spielfeld-Hintergrund je Partie aus `backgrounds/` (Liste `BG_FILES`, Parallax) |
-| `mainmenu.js` | Hauptmenü beim Start (und „Hauptmenü“ im Menü rechts): Logo `icons/logo.png`, Knöpfe (Weiterspielen, Schnelles Spiel, Online, Regeln lernen, Optionen = Einstellungen aus dem Menü rechts, solange offen dorthin verschoben), Deck-Box „Meine Decks“ → Deck-Übersicht, Booster-Stapel → Booster. Hintergrund: Matten klar mit Überblendung und Maus-Parallax, Glut-Partikel (Canvas). Jeder Spielstart ruft `mmHide()` |
-| `features.js` | Deck-Builder, Booster, Simulations-Oberfläche, Test-Setups; Deck-Übersicht als Deck-Boxen (`openDeckOverview`, mit `{ pick }` überall die Deck-Auswahl: Testmatch, Online-Lobby, Deck-Builder „Laden“) |
-| `coach.js` | Deck Coach im Deck-Builder: `coachAnalyze` (DOM-frei: Plan, Stärken, Schwächen, Empfehlungen aus `COACH_PLANS`/`COACH_STRENGTHS`/`COACH_ISSUES`/`COACH_RECS`) und Oberfläche: ab 60 Karten wird die Heldenkarte zum Avatar (`COACH_FACE` = Gesichtsausschnitt je Held), Chat links über den Karten. Texte nur Englisch (ohne `tr`) |
-| `online.js` | Online-Multiplayer 1 gegen 1 (Menü „Online-Spiel“): Lobbys mit Code (Host wählt „Öffentlich“ oder „Nur mit Code“ = nicht in der Liste), Lobbyliste, Raum mit großen Deck-Boxen und „VS“ (Hintergrund-Simulation beider Decks, nur Winrate; jeder andere Knopf stoppt sie), Chat, Bereit/Start, Hinweis-Popups auf neue Lobbys. Läuft ohne eigenen Server über einen öffentlichen MQTT-Broker (`NET_BROKERS`). Der Host rechnet die Partie (`G.online`, `G.humans = [1, 2]`), der Gast schickt nur Aktionen und sieht den Zustand gespiegelt (`netMirror`: Spieler 1 ⇄ 2) – **neue Zustandsfelder mit Spieler-ID** müssen in `NET_PID_KEYS`/`NET_PID_MAPS` stehen |
+Ladereihenfolge wie in `index.html`. Kern: `state.js` (Zustand), `engine.js` (Regeln, Kette, Kampf, `getLegalActions`, `respondOptions`), `cards*.js` (Kartendaten je Set), `cardfx*.js` (Verhalten `FX[id]`), `ai.js` (CPU: `evaluateState`, Deck-Plan `aiDeckPlan`, Spielstile `AI_PERSONAS`), `simcore.js` (DOM-freie Simulation), `tests.js` (Regeltests), `cardcheck.js` (Kartenprüfung, nur Node). UI (**nur auf Anfrage ändern**): `renderer.js`, `ui.js`, `main.js`, `features.js`, `mainmenu.js`, `spellfx.js`, `backgrounds.js`, `coach.js`-Oberfläche, `online.js` (neue Zustandsfelder mit Spieler-ID → `NET_PID_KEYS`/`NET_PID_MAPS`), Roguelike `roguelike*.js`.
 
 Wichtige Engine-Konzepte:
 - Der Zustand ist reines JSON (keine Funktionen). Fortsetzungen nach Entscheidungen laufen über Schlüssel (`k: 'id:name'` → `FX[id].k[name]`, `'E:name'` → `EK[name]`).
@@ -63,40 +27,17 @@ Wichtige Engine-Konzepte:
 - Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`). Auch das Legen einer Ressource ist ein Kettenglied (`kind: 'resource'`, Karte in `res`, nicht unterbrechbar, CR 412.1a).
 - `cloneState` (eigene Tiefenkopie `deepCopy`, schneller als `structuredClone`) teilt nur die statischen Kartenlisten (`CLONE_SHARED`: `limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`, `allyTypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
 
-## Veröffentlichen (GitHub Pages)
+## Veröffentlichen (Details: `docs/veroeffentlichen.md` – Kartenbilder, EA-Doppel, Tablet/App, Deck-Sync)
 
-Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuern – sonst laden Browser (vor allem Handys) alte Dateien aus dem Cache und es gibt Fehler wie „Funktion nicht definiert“:
+Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuern (Browser-Cache):
 
 ```bash
 V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]*)?\"#\1?v=$V\"#g" index.html && ! grep -q '?v="' index.html
 ```
 
-Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
+## Testen (Details: `docs/testen.md` – KI-Vergleich `bin/aicompare.js`, Kartenprüfung `bin/cardcheck.js`, Simulation & Statistik)
 
-### Kartenbilder
-Ordner je Set (`SET_IMG` in main.js): `cards/<set>` (716×1000), `<set> small` (358×500), `<set> big` (1432×2000), `<set> scans` (745×1040) und `<set> scans small` (372×519), alles WebP mit Qualität 92. Auf GitHub liegen nur `<set>` und `<set> small`. Dateinamen überall `<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp` (`cardImgBase`/`imgFileName` in main.js), z. B. `AZEROTH-100 Lobotomize (EA).webp`.
-
-Neue Bilder: PNG mit diesem Namen in den Ordner legen und mit `bin/conv.sh <png> card` (Set-Ordner → normal, small, big) bzw. `bin/conv.sh <png> scan` (Scan-Ordner → scans, scans small) umwandeln. Das PNG wird danach gelöscht. Danach `bash bin/imgindex.sh` ausführen: erzeugt `js/imgindex.js` (welche Karten eine EA haben, welche Bildordner es gibt) – das Spiel fragt so keine fehlenden Dateien an. Das Skript nutzt ImageMagick portable in `bin/imagemagick/` (nur lokal, von den GitHub-Releases von ImageMagick). Quelle der Bilder: `D:\warcraft tcg\NoRules\<Set>` (EA, sonst normal), sonst `D:\warcraft tcg\Scans\<Set>`.
-
-### Doppelte Kartenbilder (nicht auf GitHub)
-Hat eine Karte eine Extended-Art-Fassung (`… (EA).webp`), ist die EA die vollständige Karte – die normale Fassung bleibt lokal (Abschnitt `EA-Doppel` in `.gitignore`). Das Spiel nimmt überall zuerst die EA (`imageCandidatesAll`), nur Helden (ohne EA) und der Coach-Avatar nutzen die normale Karte. Nach neuen Kartenbildern den Abschnitt neu erzeugen und danach `git add -A cards`:
-
-```bash
-find cards -path '* big' -prune -o -path '* scans*' -prune -o -name '* (EA).webp' -print | sed 's/ (EA)\.webp$/.webp/' | while IFS= read -r f; do [ -e "$f" ] && echo "/$f"; done | sort > /tmp/d.txt
-sed -i '/^# >>> EA-Doppel/,/^# <<< EA-Doppel/{//!d}' .gitignore && sed -i '/^# >>> EA-Doppel/r /tmp/d.txt' .gitignore
-git ls-files -ci --exclude-standard -z | xargs -0 -r git rm -q --cached --   # schon eingecheckte Doppel aus Git nehmen
-```
-
-### Tablet (offline, Xiaomi Pad 7)
-Das Spiel liegt auf dem Tablet unter `/sdcard/Documents/WoWTCG`. Gespielt wird über die eigene App **WoW TCG** (`android/`, Paket `de.wowtcg.game`): eine WebView ohne Browser und Server, die die Dateien direkt aus diesem Ordner liest (`https://appassets.androidplatform.net/…`), Vollbild, Querformat, Bildschirm bleibt an, fordert die höchste Bildwiederholrate an. Bauen: `bash bin/build-apk.sh` (JDK 17 + Android-SDK in `G:\downloads\android-build`, nicht im Projekt); Installation: APK nach `/sdcard/Download` kopieren und am Tablet antippen (Xiaomi blockiert `adb install`). Die alte Variante (Server-App „Simple HTTP Server“ + Web-App `http://localhost:8080`) geht weiter, hat aber eigene Decks (eigener Speicher je Adresse). Änderungen **per WLAN**: am PC `bash bin/sync-server.sh` (bzw. `Tablet-Sync starten.bat`, Port 8766, `bin/SyncServer.java`) laufen lassen – die App sucht beim Start den PC im WLAN und lädt geänderte Dateien (Textdateien per MD5, Bilder per Größe/Zeit; `android/…/Sync.java`). Per USB: `bash bin/tablet-sync.sh` (nur seit dem letzten Abgleich geänderte Dateien; `--all` = alles; `-s <Seriennr>` = bestimmtes Gerät, z. B. das Handy, Merker dann `.tablet-sync.<Seriennr>`). Dieselbe App läuft auch auf dem Handy (gleicher Ordner, gleiche APK; `bash bin/build-apk.sh install <Seriennr>` bzw. APK nach `/sdcard/Download`). adb: aus dem PATH, sonst `scrcpy-win64-*/adb.exe` im Projektordner (nicht in Git, nicht auf die Geräte), sonst `C:\adb`.
-
-**Deck-Sync** (`js/decksync.js`): Die eigenen Decks (`wow_tcg_custom_decks`, ohne Turnier-Decks `custom_tourney_*`) gleichen PC, Tablet und Handy über den laufenden Sync-Server ab (`GET/POST /__decks`, Ablage `bin/decks-sync.json`, nicht in Git). Jedes Deck trägt seine Änderungszeit `mt`, Löschungen bleiben als Grabsteine (`wow_tcg_deck_tombs`); je Deck gewinnt die neueste Änderung. Der Server speichert nur (Schutz gegen gleichzeitiges Schreiben über `rev`, sonst 409), gemischt wird im Spiel. `saveCustomDecks` wird dafür umhüllt – jedes Speichern (Deck-Builder, Löschen, Wiederherstellen) setzt Zeiten/Grabsteine und stößt einen Abgleich an; außerdem beim Start, jede Minute und bei Rückkehr in die App. Weg zum Server: in der App über die Brücke `WTCG.deckReq` (findet den PC wie der Datei-Abgleich; App ab Version 1.3), im PC-Browser über `http://127.0.0.1:8766` – automatisch bei localhost/file://, auf GitHub Pages erst nach einmaligem Aufruf mit `?decksync=1` (`?decksync=0` = aus; sonst fragte Chrome jeden Besucher nach Zugriff aufs lokale Netz). Ohne Server bleibt alles lokal. Fernsteuern/Messen: `adb forward tcp:9222 localabstract:chrome_devtools_remote` → Chrome DevTools Protocol. Die Bildrate begrenzt HyperOS für Chrome auf 90 Hz (ohne Berührung 50 Hz); alle Animationen laufen nach Zeit (`f = dt / 16,667`), nicht je Frame.
-
-## Testen
-
-Im Browser: Button für automatische Tests (`runAutomatedTests()`), Late-Game-Test (`loadQuickTest()`), Simulation im Simulationsmenü. Der Bereich „Tests“ im Menü rechts ist überall sichtbar, auch auf GitHub Pages (zum Testen auf dem Handy; `body.dev` in main.js).
-
-Ohne Browser mit Node: die Skripte in Ladereihenfolge (ohne UI-Dateien) in einen gemeinsamen Kontext laden und `runRuleTests()` aufrufen:
+Regeltests ohne Browser (Skripte in Ladereihenfolge ohne UI-Dateien laden):
 
 ```js
 const fs = require('fs'), vm = require('vm');
@@ -108,18 +49,3 @@ for (const f of ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','ca
 const r = runRuleTests(); console.log(r.filter(t => t.ok).length + '/' + r.length);
 r.filter(t => !t.ok).forEach(t => console.log('FAIL', t.name, t.msg));
 ```
-
-Für Performance-Änderungen: `Math.random` durch einen Zufallsgenerator mit festem Seed ersetzen und prüfen, dass `simulateOneGame` vorher und nachher identische Ergebnisse liefert.
-
-Alte gegen neue CPU: `node bin/aicompare.js --n N [--seed S]` (Spiegelmatches mit Decks aus zeitkritischen Instants/Kräften laut `reports/zeitpunkt.json`, alte CPU über `AI_LEGACY[pid]` in engine.js, Plätze wechseln ab; `--nur MERKMAL` misst ein einzelnes Merkmal: start, react, tempo, noHold, half, reactive, cold). Stand 11/2026: neu gegen alt 48,5 % ± 2,8 bei 48,7 % im Nulllauf (alt gegen alt, gleiche Seeds) – die Änderungen drehen rund 15 % der Partien, etwa gleich oft in beide Richtungen. Auswerten immer Partie für Partie gegen den Nulllauf (`--nur keine`).
-
-Kartenprüfung (alle Karten + KI): `node bin/cardcheck.js` → `reports/cardcheck.md` (nicht in Git). Optionen: `--sims N` Wächter-Partien, `--focus N`/`--ki N` gezielte Partien und Spiel-KI-Proben je Reaktionskarte, `--dumm N` Partien Spiel-KI gegen Spiel-KI mit Prüfung jeder Entscheidung (Schaden an Eigenem, Hilfe für den Gegner, wirkungslos, verpasstes Lethal …), `--baseline` (danach nur neue Funde), `--repro SEED [--card ID]`, `--zeitpunkt [--card ID]` (wann jede Karte/Quest/Kraft im Gegnerzug spielbar ist, wo der Mensch gefragt wird und wo die CPU sie spielt → `reports/zeitpunkt.md`). Funde der Art „tut nichts“ bei bedingten Texten sind Warnungen. Neue KI-Regeln: `aiBadTargets` (engine.js), `aiUseless`/Rausch-Toleranz/`enablerPlans` (ai.js).
-
-## Simulation & Statistik
-
-- Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.
-- Nicht „gespielt“ vergleichen: das hängt vom Spielverlauf ab (wer vorne liegt, spielt mehr teure Karten). Ein wirkungsloser Platzhalter kam so auf +15 bis +28 Prozentpunkte.
-- Alle Simulations-Tests (eigene Decks, Turnier-Decks, All-Cards, Testmatch) laufen über dieselbe Funktion `runSimulation(spiele, decks, titel, pairs)` – nur die Paarungen wechseln (`pairs`: feste Paare oder Funktionen, die je Spiel neue Decks liefern). In Runden: jede Paarung einmal pro Runde. Neue Tests nur als neue Paarungen anlegen, keine eigene Schleife.
-- `runSimulation` spielt parallel in Web Workern (`js/simworker.js`, Pool `SIM_POOL`, Kerne − 2; ohne Worker, z. B. file://, wie früher im Haupt-Thread). „Im Hintergrund weiterlaufen lassen“ / Esc schließt nur das Fenster, die Anzeige `#sim-badge` oben zeigt Fortschritt und Restzeit (Klick öffnet das Fenster). Nur eine Simulation gleichzeitig (`SIM_STOP.running`).
-- „Abbrechen & auswerten“ / Schließen setzt `SIM_STOP.req`; bei Abbruch oder Fehler wertet `runSimulation` die bis dahin gespielten Spiele aus (mit Anteil in %).
-- Antworten in Prioritätsfenstern (Instants, Kräfte, Quests) wählen Mensch und KI über dieselbe Bewertung `respondOptions` (engine.js): bei einem gegnerischen Link oder im letzten Kampffenster nur, was jetzt mehr bringt als nach der Auflösung; am gegnerischen Zugende alles, was mehr bringt als Passen (übrige Ressourcen). Zu Beginn des Gegnerzugs (Ready-/Draw-Fenster, `'start'`) und bei Links/Angriffen für Wirkungen „this turn“ spielt `respondTurnOptions` den Gegnerzug in Kopien aus (`respondPlayout`, Gegner = `fastAiAction`, der seinen Plan nachspielt, solange er legal bleibt): angeboten wird, wo die Antwort mehr bringt als jede spätere Gelegenheit, auch bei umgekehrter Reihenfolge des Gegners (erst Karten, dann Angriffe). So Pin/Brain Freeze zu Zugbeginn, Burgle/Divine Shield beim Angriff, Snipe/Counterspell auf den Link. Für den Menschen zählt der Haltewert der Handkarte nicht, für die KI zur Hälfte (`respondHoldBonus`) – sonst wären Reaktionskarten nie spielbar bzw. hielte die KI Pin & Co. für immer. Am gegnerischen Zugende zählt für den Menschen Tempo (`RESPOND_TEMPO` je ausgegebene Ressource, `respondSpent` – sie werden ohnehin wieder bereit; für die KI nicht, im Vergleich schadete es ihr); in diesen Vergleichen gilt `s.noHold` (kein `aiHoldValue`, Endpunkt ist der eigene Zugbeginn). Mensch und KI nutzen dieselben Zeitpunkte (Regeltests #167/#168); in Simulationen genauso wie in der echten Partie (korrekt und glaubwürdig vor schnell; Zeitgrenze je Fenster `RESPOND_BUDGET_MS` Mensch / 300 ms KI). In Kopien (`cloneState` setzt `look`) antwortet niemand – sonst rechnete jede Vorausschau wieder Kopien durch. `stopAll` (Kartentests, Einstellung „Priorität: Jedes Fenster“) lässt den Menschen in jedem Fenster anhalten. Im eigenen Zug hält die KI Mana für reaktive Instants zurück (`aiHoldValue` in ai.js: Unterbrechen, Verhindern, Kampftricks).

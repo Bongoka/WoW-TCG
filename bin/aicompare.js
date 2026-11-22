@@ -38,7 +38,7 @@ for (let i = 0; i < N; i++) {
     const h = heroes[Math.floor(rnd() * heroes.length)].id, deck = arg('--decks') === 'zufall' ? (() => { const r0 = Math.random; Math.random = rnd; try { return { ...randomLegalDeck(h), nTimed: 0 }; } finally { Math.random = r0; } })() : deckFor(h, rnd);
     const legacySeat = sd % 2 ? 1 : 2;
     // --nur MERKMAL: die "neue" Seite hat nur dieses Merkmal (alle anderen alt) – zeigt, was es allein bringt
-    const FEATS = ['start', 'react', 'tempo', 'noHold', 'half', 'reactive', 'cold', 'oppres', 'handdelay', 'holddef', 'kwscale', 'lethalprot'], only = arg('--nur');
+    const FEATS = ['start', 'react', 'tempo', 'noHold', 'half', 'reactive', 'cold', 'oppres', 'handdelay', 'holddef', 'kwscale', 'lethalprot', 'plan', 'persona'], only = arg('--nur');
     const newSide = only ? Object.fromEntries(FEATS.filter(f => !only.split(',').includes(f)).map(f => [f, true])) : false;
     AI_LEGACY[1] = legacySeat === 1 ? true : newSide; AI_LEGACY[2] = legacySeat === 2 ? true : newSide;
     // --basis neu: beide Seiten mit allen neuen Merkmalen (nur --w unterscheidet sie); --w '{"hpOpp":1.2}': Gewichte der neuen Seite

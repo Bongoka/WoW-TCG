@@ -4815,3 +4815,6 @@ Tokens small/*
 
 # Kartenprüfung (bin/cardcheck.js): Berichte lokal
 /reports/
+
+# WoW-Addon: TGA-Kartenbilder (≈720 MB) bleiben lokal
+addon/WoWTCG/Art/

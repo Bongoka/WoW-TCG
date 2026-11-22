@@ -2319,6 +2319,39 @@ function runRuleTests() {
         const al = cards.find(c => c.type === 'Ally'), eff = CARDS[RL.upgraded(al.id)].upgradeEffect;
         assert(CARDS[RL.upgraded(al.id, eff)].upgradeEffect === eff, 'gespeicherte Aufwertung geht beim Laden verloren');
     });
+    test(185, 'Place ≠ Play (CR 409.2): Quest/Location als Ressource legen oder Quest abschließen löst "When you play a card" nicht aus (Eye of the Storm)', () => {
+        for (const [id, faceUp] of [[10193, true], [10193, false], [10203, true], [262, false]]) {
+            const s = fresh(); s.placedResource = false; s.resPlaced = 0; res(s, 1, 3);
+            const eye = makeCardInst(10204, false, 1); P(s, 1).resources.push({ card: eye, faceUp: true, exhausted: false });
+            const hi = hand(s, 1, id), a = getLegalActions(s, 1).find(x => x.type === 'PLACE_RESOURCE' && x.handIdx === hi && !!x.faceUp === faceUp);
+            assert(a, `${CARDS[id].name} nicht ${faceUp ? 'offen' : 'verdeckt'} legbar`); act(s, a, 1);
+            assert(!((eye.counters || {}).honor), `${CARDS[id].name} ${faceUp ? 'offen' : 'verdeckt'} gelegt: honor counter auf Eye of the Storm`);
+            assert(!getLegalActions(s, 1).some(x => x.type === 'PLAY_CARD' && ['Quest', 'Location'].includes((P(s, 1).hand[x.handIdx] || {}).type)), 'Quest/Location spielbar');
+        }
+        const s = fresh(); res(s, 1, 6); const eye = makeCardInst(10204, false, 1); P(s, 1).resources.push({ card: eye, faceUp: true, exhausted: false });
+        P(s, 1).resources.push({ card: makeCardInst(10193, false, 1), faceUp: true, exhausted: false });
+        const qa = getLegalActions(s, 1).find(x => x.type === 'COMPLETE_QUEST' && P(s, 1).resources[x.resIdx].card.id === 10193);
+        assert(qa, 'Quest nicht abschließbar'); act(s, qa, 1);
+        assert(!((eye.counters || {}).honor), 'Quest abgeschlossen: honor counter auf Eye of the Storm');
+    });
+    test(186, 'KI-Deck-Plan: billiges Rogue-Deck ist aggro (gegnerisches Leben zählt mehr), teures Druiden-Deck control (Gewichte unverändert)', () => {
+        const ag = aiDeckPlan(deck('alliance_rogue').hero, deck('alliance_rogue').cards), co = aiDeckPlan(deck('alliance_druid').hero, deck('alliance_druid').cards);
+        assert(ag && ag.style === 'aggro' && ag.w.hpOpp > 1 && ag.w.hpMe < 1, `Rogue: ${JSON.stringify(ag)}`);
+        assert(co && co.style === 'control' && Object.values(co.w).every(x => x === 1), `Druide: ${JSON.stringify(co)}`);
+        const s = fresh('alliance_rogue', 'alliance_druid');
+        assert(P(s, 1).aiPlan && P(s, 1).aiPlan.style === 'aggro', 'Spielzustand ohne Deck-Plan');
+        const e0 = evaluateState(s, 1); P(s, 2).hero.damage += 1; const d = evaluateState(s, 1) - e0;
+        assert(Math.abs(d - AI_W_DEF.hpOpp * P(s, 1).aiPlan.w.hpOpp) < 1e-9, `1 Schaden am Gegner: ${d}`);
+    });
+    test(187, 'KI-Spielstile: die CPU bekommt einen zum Deck-Plan passenden Stil, der Mensch keinen (Antwort-Angebote ohne Stil)', () => {
+        const seen = new Set();
+        for (let i = 0; i < 40; i++) { const s = fresh('alliance_rogue', 'alliance_druid'); for (const pid of [1, 2]) { const pl = P(s, pid).aiPlan;
+            assert(pl.persona && AI_PERSONAS[pl.persona] && AI_PERSONAS[pl.persona].styles.includes(pl.style), `Stil ${pl.persona} passt nicht zu ${pl.style}`); seen.add(pl.persona); } }
+        assert(seen.size >= Math.min(2, Object.keys(AI_PERSONAS).length), 'immer derselbe Stil');
+        const s = fresh(); s.real = true; s.humans = [1]; P(s, 1).aiPlan.persona = P(s, 2).aiPlan.persona = Object.keys(AI_PERSONAS).pop();
+        respondOptions(s, 1);
+        assert(!P(s, 1).aiPlan.persona && P(s, 2).aiPlan.persona, 'Mensch behält Spielstil bzw. CPU verliert ihn');
+    });
     return results;
 }
 
