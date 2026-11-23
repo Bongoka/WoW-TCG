@@ -1025,6 +1025,10 @@ function stashFlipAnim(node, r, e) {
     const l = locate(G, e.uid); const c = l && l.res && l.res.card; if (!c) return;
     const from = createCardDOM(c, false, null, { imageMode: 'full' });
     const to = document.createElement('img'); to.src = 'cards/Card Back.png'; to.alt = ''; to.draggable = false; to.style.borderRadius = '6%';
+    // Der Slot ist in der überlappenden Reihe oft nur 8px breit – Maße vom Kartenbild darin (ungedreht, auch wenn erschöpft)
+    const img = node.querySelector('img');
+    if (img && img.offsetWidth) { const b = img.getBoundingClientRect(), w = img.offsetWidth, h = img.offsetHeight, cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+        r = { left: cx - w / 2, top: cy - h / 2, width: w, height: h }; }
     flipShowAnim(node, r, e.uid, from, to, 74);
 }
 // Gemeinsamer Ablauf: Karte groß in die Mitte, Leuchten über dem Textfeld ab glowTop (% der Kartenhöhe), umdrehen, zurück.
@@ -1469,6 +1473,11 @@ function renderPlayerHand(p) {
         } else if (canMain() || canInstant()) {
             const playable = handPlayable(card);
             if (playable) { node.classList.add("can-act"); slot.classList.add("playable"); if (sc && sc.costNow < sc.costBase) node.classList.add('cost-down'); }
+            // Stash-Karte, die jetzt noch verdeckt als Ressource gelegt werden darf (in diesem Zug noch keine Ressource gelegt)
+            if (FX[card.id] && FX[card.id].stash && !validateAction(G, { type: 'PLACE_RESOURCE', handIdx: idx, faceUp: false }, 1)) {
+                const sb = document.createElement("div"); sb.className = "card-stash"; sb.textContent = '📦 Stash';
+                sb.title = tr('Als Ressource legen: Stash-Bonus'); node.appendChild(sb);
+            }
             node.draggable = true;
             node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });

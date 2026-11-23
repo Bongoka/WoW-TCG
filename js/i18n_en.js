@@ -1624,6 +1624,7 @@ var I18N_EN = {
     'Verwerfen': 'Discard',
     '„{0}“ ({1}) nutzen oder die Karte spielen?': 'Use “{0}” ({1}) or play the card?',
     'Kraft nutzen': 'Use power',
+    'Als Ressource legen: Stash-Bonus': 'Place as a resource: Stash bonus',
     'Karte spielen': 'Play card',
     'Tippen: hinzufügen · „−“ in der Deckliste: entfernen': 'Tap: add · “−” in the deck list: remove',
     'Karten ziehen zum Ausspielen · gedrückt halten: Karte groß ansehen': 'Drag cards to play them · press and hold: view a card large',

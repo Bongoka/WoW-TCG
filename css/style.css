@@ -565,6 +565,11 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .card-combo i.on { background: radial-gradient(circle at 35% 35%, #fff6a8, #f2c31b 55%, #9a6a05); box-shadow: 0 0 5px rgba(255, 210, 60, .9), inset 0 0 0 1px rgba(90,60,0,.6); }
 /* Overkill ("remove X finishing move cards"): Finisher im Friedhof statt Combos – rot statt gelb */
 .card-combo.fm { border-color: rgba(220, 70, 50, .7); }
+/* Stash-Karte auf der Hand, die jetzt noch als Ressource gelegt werden darf */
+.card-stash { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); z-index: 40; padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+    font: 700 11px/1.3 Georgia, serif; color: #ffe9a8; background: rgba(40, 26, 6, .92); border: 1px solid #d9a441;
+    box-shadow: 0 0 8px rgba(255, 200, 80, .8); animation: stashPulse 1.6s ease-in-out infinite; pointer-events: none; }
+@keyframes stashPulse { 50% { box-shadow: 0 0 14px 3px rgba(255, 210, 90, 1); } }
 .card-combo.fm i.on { background: radial-gradient(circle at 35% 35%, #ffc2a8, #e0452b 55%, #7a1406); box-shadow: 0 0 5px rgba(255, 80, 50, .9), inset 0 0 0 1px rgba(90,10,0,.6); }
 #bot-hand { z-index: 700; }
 #bot-hand.hand-up { z-index: 900; }
