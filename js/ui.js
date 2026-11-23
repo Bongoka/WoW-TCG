@@ -153,6 +153,7 @@ function renderResourceTray(player, containerId, isHuman) {
         } else {
             const slot = document.createElement("div"); slot.className = "res-card" + (r.exhausted ? " exhausted" : "");
             const back = document.createElement("img"); back.src = "cards/Card Back.png"; back.alt = ""; back.draggable = false;
+            slot.dataset.uid = r.card.uid; if (UI.flipHide === r.card.uid) slot.style.visibility = 'hidden';   // Stash-Animation (stashFlipAnim)
             slot.appendChild(back); miniRow.appendChild(slot);
             // Verdeckte Ressource mit verliehener Kraft (Invocation: "resources you control have [Activate] >>> Draw a card")
             const pows = isHuman ? cardActions(r.card) : [];
@@ -1015,19 +1016,32 @@ function deathAnim(e, r, delay) {
 const FLIP_MS = 3400, FLIP_AT = { mid: 0.16, glow: 0.48, turned: 0.62, back: 0.84 };     // Anteile der Gesamtdauer
 function heroFlipAnim(node, r, e) {
     const c = findCharacter(G, e.uid); if (!c) return;
+    const face = back => createCardDOM(c, true, null, { imageMode: back ? 'back' : 'ea' });
+    flipShowAnim(node, r, e.uid, face(!e.back), face(e.back), 61);
+}
+// Stash: die verdeckt gelegte Ressource fliegt offen in die Mitte, der Stash-Teil (unten im Textfeld) leuchtet auf,
+// dann dreht sie sich verdeckt um und fliegt zurück – wie beim Helden-Flip.
+function stashFlipAnim(node, r, e) {
+    const l = locate(G, e.uid); const c = l && l.res && l.res.card; if (!c) return;
+    const from = createCardDOM(c, false, null, { imageMode: 'full' });
+    const to = document.createElement('img'); to.src = 'cards/Card Back.png'; to.alt = ''; to.draggable = false; to.style.borderRadius = '6%';
+    flipShowAnim(node, r, e.uid, from, to, 74);
+}
+// Gemeinsamer Ablauf: Karte groß in die Mitte, Leuchten über dem Textfeld ab glowTop (% der Kartenhöhe), umdrehen, zurück.
+function flipShowAnim(node, r, uid, from, to, glowTop) {
     const T = FLIP_AT;
-    const face = back => { const d = createCardDOM(c, true, null, { imageMode: back ? 'back' : 'ea' }); d.style.cssText += ';position:absolute;inset:0;width:100%;height:100%;margin:0;backface-visibility:hidden;'; return d; };
+    [from, to].forEach(d => { d.style.cssText += ';position:absolute;inset:0;width:100%;height:100%;margin:0;backface-visibility:hidden;'; });
     const box = document.createElement('div');
     box.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;z-index:99000;pointer-events:none;perspective:1200px;`;
     const card = document.createElement('div'); card.style.cssText = 'position:absolute;inset:0;transform-style:preserve-3d;';
-    const from = face(!e.back), to = face(e.back); to.style.transform = 'rotateY(180deg)';
+    to.style.transform = 'rotateY(180deg)';
     // Leuchten über dem Textfeld der Seite, deren Kraft gerade benutzt wird
     const glow = document.createElement('div');
-    glow.style.cssText = 'position:absolute;left:5%;right:5%;top:61%;bottom:8%;border-radius:6%;pointer-events:none;opacity:0;mix-blend-mode:screen;'
+    glow.style.cssText = `position:absolute;left:5%;right:5%;top:${glowTop}%;bottom:8%;border-radius:6%;pointer-events:none;opacity:0;mix-blend-mode:screen;`
         + 'background:radial-gradient(ellipse at center, rgba(255,226,120,.55), rgba(255,190,60,.18) 60%, transparent 80%);box-shadow:0 0 22px 8px rgba(255,200,80,.75), inset 0 0 14px 4px rgba(255,236,170,.6);';
     from.appendChild(glow);
     card.append(from, to); box.appendChild(card); document.body.appendChild(box);
-    node.style.visibility = 'hidden'; UI.flipHide = e.uid;
+    node.style.visibility = 'hidden'; UI.flipHide = uid;
     const sc = Math.min(2.6, (innerHeight * 0.5) / r.height);
     const dx = innerWidth / 2 - (r.left + r.width / 2), dy = innerHeight / 2 - (r.top + r.height / 2);
     const mid = `translate(${dx}px, ${dy}px) scale(${sc})`;
@@ -1038,7 +1052,7 @@ function heroFlipAnim(node, r, e) {
     glow.animate([{ opacity: 0 }, { opacity: 0, offset: T.mid }, { opacity: 1, offset: T.mid + 0.08 }, { opacity: 0.55, offset: T.mid + 0.17 },
         { opacity: 1, offset: T.glow - 0.06 }, { opacity: 0, offset: T.glow + 0.04 }, { opacity: 0 }], opt);
     UI.flipWait = card.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(0deg)', offset: T.glow }, { transform: 'rotateY(180deg)', offset: T.turned }, { transform: 'rotateY(180deg)' }],
-        { ...opt, easing: 'ease-in-out' }).finished.catch(() => {}).then(() => { box.remove(); UI.flipHide = null; UI.flipWait = null; document.querySelectorAll(`#arena [data-uid="${e.uid}"]`).forEach(n => { n.style.visibility = ''; }); });
+        { ...opt, easing: 'ease-in-out' }).finished.catch(() => {}).then(() => { box.remove(); UI.flipHide = null; UI.flipWait = null; document.querySelectorAll(`#arena [data-uid="${uid}"]`).forEach(n => { n.style.visibility = ''; }); });
     if (typeof sfx !== 'undefined') setTimeout(() => sfx.play('flip'), FLIP_MS * T.glow);
 }
 function playFxEvents(prevRects) {
@@ -1081,6 +1095,8 @@ function playFxEvents(prevRects) {
             deathAnim(e, r, delay + 350);
         } else if (e.t === 'flip' && node) {
             heroFlipAnim(node, r, e);
+        } else if (e.t === 'stash' && node) {
+            stashFlipAnim(node, r, e);
         }
     }
 }

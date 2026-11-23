@@ -66,6 +66,7 @@ onEvt('resEnters', (s, d) => {
 EK.stash16 = (s, a, v) => {
     if (!v) return; const l = locate(s, a.uid); if (!l || l.zone !== 'resource' || l.res.faceUp) return;
     L(s, tr`📦 Stash: ${CARDS[a.id].name} wird gezeigt und verdeckt umgedreht.`, '', l.pid);
+    fxEvent(s, { t: 'stash', uid: a.uid });                                               // Anzeige: Karte zeigen und umdrehen (ui.js stashFlipAnim)
     evt(s, 'resTurnedDown', { pid: l.pid, uid: a.uid, stash: true });
     pushTrig(s, l.pid, a.id, [{ op: 'trig', id: a.id, k: 'stash', a: { pid: l.pid, uid: a.uid } }]);
 };
