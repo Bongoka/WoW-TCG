@@ -542,11 +542,12 @@ function renderOppThinking() {
     let el = document.getElementById('opp-thinking');
     const d = G.pending, w = G.win;
     const deciding = G.online && !G.gameOver && ((d && d.pid === 2) || (!d && w && w.prio === 2));
-    const show = deciding && (G.activePlayer === 1 || G.chain.some(it => it.pl === 1) || !!G.battle);
+    const mull = G.online && !G.gameOver && G.netReady && G.netReady[1] && !G.netReady[2];          // eigene Starthand gewählt, der Gegner wählt noch
+    const show = mull || (deciding && (G.activePlayer === 1 || G.chain.some(it => it.pl === 1) || !!G.battle));
     if (!show) { if (el) el.classList.remove('show'); return; }
     if (!el) { el = document.createElement('div'); el.id = 'opp-thinking'; el.innerHTML = '<b></b><span></span>'; document.body.appendChild(el); }
     el.firstChild.textContent = tr('Der Gegner überlegt …');
-    el.lastChild.textContent = d && d.kind === 'choose' ? tr('Er trifft gerade eine Entscheidung.') : tr('Er kann auf deine Aktion reagieren.');
+    el.lastChild.textContent = mull ? tr('Er wählt noch seine Starthand.') : d && d.kind === 'choose' ? tr('Er trifft gerade eine Entscheidung.') : tr('Er kann auf deine Aktion reagieren.');
     el.classList.add('show');
 }
 

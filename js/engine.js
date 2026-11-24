@@ -940,9 +940,11 @@ function limitRule(v) {
 // Ein Fenster "parkt" die restlichen Schritte – sie laufen erst weiter, wenn das Fenster schließt (CR 410.4)
 // Nach dem Hinzufügen eines Links bekommt der Spieler wieder Priorität (CR 410.2).
 // Für den menschlichen Spieler gilt das als sofortiges "Passen" (Bedienkomfort) – der Gegner darf antworten.
+// Einstellung „Priorität: Jedes Fenster“ je Spieler: online bringt der Gast seine eigene mit (s.stopAllP, online.js), sonst gilt s.stopAll
+function stopAllOf(s, pid) { return s.stopAllP && s.stopAllP[pid] !== undefined ? !!s.stopAllP[pid] : !!s.stopAll; }
 function linkWindow(s, pid, ow) {
     const w = { prio: pid, passes: 0, reason: ow ? ow.reason : undefined, after: ow ? ow.after : undefined };
-    if (isHuman(s, pid) && !s.stopAll) { w.prio = pid === 1 ? 2 : 1; w.passes = 1; }   // "Jedes Fenster": Priorität behalten (CR 410.1)
+    if (isHuman(s, pid) && !stopAllOf(s, pid)) { w.prio = pid === 1 ? 2 : 1; w.passes = 1; }   // "Jedes Fenster": Priorität behalten (CR 410.1)
     return w;
 }
 function openWindow(s, first, reason) {
@@ -973,15 +975,16 @@ function priorityStep(s) {
         passPriority(s); return true;
     }
     // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
-    let opts = s.stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    const stopAll = stopAllOf(s, pid);
+    let opts = stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
     // Einmal pro Situation fragen: was der Mensch für diesen Link, diesen Angriff bzw. diesen Zugbeginn schon gepasst hat, kommt
     // dort nicht noch einmal (im Browser: 25 Fragen in einem Gegnerzug, dieselbe viermal je Angriff)
     const ctx = isHuman(s, pid) ? respondCtx(s, pid) : null;
-    if (ctx && !s.stopAll && s.declinedTurn === s.turn) { const no = (s.declined || {})[ctx] || []; opts = opts.filter(o => !no.includes(respondKey(s, pid, o.a))); }
+    if (ctx && !stopAll && s.declinedTurn === s.turn) { const no = (s.declined || {})[ctx] || []; opts = opts.filter(o => !no.includes(respondKey(s, pid, o.a))); }
     if (!opts.length) { passPriority(s); return true; }
     if (isHuman(s, pid)) {
         // Sinnvolle Antworten (beste zuerst) merken: die Oberfläche zeigt sie vorn und hebt sie hervor
-        const good = (s.stopAll ? respondOptions(s, pid) : opts).map(o => respondKey(s, pid, o.a));
+        const good = (stopAll ? respondOptions(s, pid) : opts).map(o => respondKey(s, pid, o.a));
         s.pending = { kind: 'priority', pid, prompt: priorityPrompt(s, pid), reason: w.reason, good: [...new Set(good)], ctx }; return false;
     }
     if (isReal(s)) s._oppDecided = true;

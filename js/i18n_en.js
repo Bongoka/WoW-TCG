@@ -510,6 +510,7 @@ var I18N_EN = {
     'Der Gegner überlegt …': 'Your opponent is thinking …',
     'Er trifft gerade eine Entscheidung.': 'They are making a decision.',
     'Er kann auf deine Aktion reagieren.': 'They may respond to your action.',
+    'Er wählt noch seine Starthand.': 'They are still choosing their opening hand.',
     'Achtung: Die gewählte Karte wird zerstört und kommt auf den Friedhof.': 'Warning: the chosen card will be destroyed and put into the graveyard.',
     '{0} zerstören': 'Destroy {0}',
     '{0} spielen?': 'Play {0}?',

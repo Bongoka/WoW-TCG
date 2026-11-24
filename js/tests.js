@@ -911,6 +911,23 @@ function runRuleTests() {
         assert(JSON.stringify(netMirror(m)) === JSON.stringify(st), 'Zweimal gespiegelt ≠ Original');
         assert(!validateAction(m, { type: 'PASS', actorId: 1 }, 1) && getPriorityActions(m, 1).some(a => a.type === 'PLAY_CARD'), 'Gast kann im gespiegelten Zustand nicht antworten');
     });
+    if (typeof netMirror === 'function') test(203, 'Online: Spieler-Merker neuer Sets gespiegelt, Modus mit Spieler-ID aus Sicht des Hosts, „Jedes Fenster“ je Spieler', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter');
+        s.played14 = { '1:ally': 3 }; s.cd9 = { '2:hero_1': 4 }; s.heroAtk17 = { 1: 5 }; s.enslave = { c_x: 2 }; s.declined = { '1:B:c_y': ['k'] }; s.resolvingPl = 1;
+        s.w16 = { turn: 1, heroHit: { hero_2: [1] }, used: [], nature: { 2: true } }; s.stopAll = false; s.stopAllP = { 2: true };
+        const st = JSON.parse(JSON.stringify(s)), m = netMirror(st);
+        assert(m.played14['2:ally'] === 3 && m.cd9['1:hero_1'] === 4 && m.heroAtk17[2] === 5 && m.declined['2:B:c_y'] && m.resolvingPl === 2, 'Spieler-Merker (Schlüssel "pid", "pid:…") nicht getauscht');
+        assert(m.enslave.c_x === 1 && m.w16.heroHit.hero_2[0] === 2 && m.w16.nature[1] === true, 'Merker uid → Spieler-ID nicht getauscht');
+        assert(JSON.stringify(netMirror(m)) === JSON.stringify(st), 'Zweimal gespiegelt ≠ Original');
+        // Modus "Du ziehst 3 Karten" (v = eigene ID): der Gast wählt in seiner Sicht 1, beim Host muss daraus 2 werden
+        const hi = hand(s, 2, 23), g = netMirror(JSON.parse(JSON.stringify(s))), a = { type: 'PLAY_CARD', handIdx: hi, mode: 1, targets: [] };
+        const mi = netModeIdx(g, 1, a), ms = netModes(s, 2, a);
+        assert(mi === 0 && ms && ms[mi] === 2, 'Modus mit Spieler-ID nicht übersetzt');
+        // „Priorität: Jedes Fenster“ gilt je Spieler (online bringt der Gast seine eigene Einstellung mit)
+        assert(stopAllOf(s, 2) && !stopAllOf(s, 1) && stopAllOf(m, 1) && !stopAllOf(m, 2), 'Prioritäts-Einstellung nicht je Spieler');
+        s.humans = [1, 2]; s.stopAllP = null;
+        assert(!stopAllOf(s, 2) && (s.stopAll = true, stopAllOf(s, 1)), 'Ohne Online-Einstellung gilt stopAll');
+    });
     test(102, 'Ressource legen ist ein Link auf der Kette (CR 412.1a), nicht unterbrechbar (711.3)', () => {
         const s = fresh('alliance_hunter', 'alliance_mage'); s.placedResource = false; res(s, 2, 3); hand(s, 2, 51);
         const n = P(s, 1).resources.length; hand(s, 1, 192);

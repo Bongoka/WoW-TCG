@@ -130,6 +130,7 @@ function netHostMsg(m) {
     }
     if (!NET.peer || m.from !== NET.peer.cid) return;
     NET.peer.last = Date.now();
+    if (m.prio !== undefined) { NET.peer.prio = !!m.prio; if (G && G.online) G.stopAllP = { 2: NET.peer.prio }; }   // „Priorität: Jedes Fenster“ des Gasts
     if (m.t === 'leave') { netSys(tr`${NET.peer.name} hat die Lobby verlassen.`); netPeerGone(); return; }
     if (m.t === 'deck') { NET.peer.deck = m.deck; NET.peer.deckName = m.deck ? m.deck.name : ''; NET.peer.hero = m.deck ? m.deck.hero : null; NET.peer.ready = false; netSyncRoom(); return; }
     if (m.t === 'ready') { NET.peer.ready = !!m.on && !!NET.peer.deck; netSyncRoom(); return; }
@@ -163,7 +164,8 @@ function netStart() {
     G = newGameState(hd.hero, hd.cards, gd.hero, gd.cards);
     G.real = true; G.humans = [1, 2]; G.online = true;
     if (Math.random() < 0.5) { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; }
-    G.netReady = { 1: false, 2: false };                                                  // Mulligan beider Spieler (CR 101.2) vor dem ersten Zug
+    G.netReady = { 1: false, 2: false };
+    G.stopAllP = { 2: !!NET.peer.prio };                                                  // Prioritäts-Einstellung des Gasts (engine.js stopAllOf)                                                  // Mulligan beider Spieler (CR 101.2) vor dem ersten Zug
     dealOpeningHands(G); refreshDisplay(G);
     NET.inGame = true; NET.logBuf = []; NET.acks = 0; NET.peer.ready = false; netAnnounce(); netSyncRoom();   // nach der Partie wieder "nicht bereit"
     netHideModal(); UI.reset();
@@ -181,7 +183,9 @@ function netHostGuestAct(a) {
     if (!G || !G.online || G.gameOver || !a) return;
     if (!netBothReady()) { netPub(netRoom(NET.code, 'h'), { t: 'err', why: tr('Warte auf den Mulligan des Gegners …') }); return; }
     NET.acks++;                                                                           // jede Gast-Aktion wird bestätigt (auch abgelehnte)
-    const act = { ...a, actorId: 2 };
+    const act = { ...a, actorId: 2 }; delete act.modeIdx;
+    if (a.modeIdx !== undefined) { const ms = netModes(G, 2, act); if (ms && a.modeIdx < ms.length) act.mode = ms[a.modeIdx]; }   // Modus aus Sicht des Hosts
+    if (typeof act.uid === 'string' && /^deck:[12]$/.test(act.uid)) act.uid = 'deck:' + (act.uid === 'deck:1' ? 2 : 1);    // Quest oben auf dem Deck (QUEST_ZONES, cardfx9)
     const why = validateAction(G, act, 2);
     if (why || !applyAction(G, act, false, 2)) { netPub(netRoom(NET.code, 'h'), { t: 'err', why: why || tr('Aktion abgelehnt') }); netPush(); return; }
     netPush();
@@ -270,22 +274,43 @@ function netGuestAct(action) {
     // Sofort lokal ausführen (gleiche Engine, gespiegelter Zustand) – fühlt sich an wie offline; der Host rechnet
     // verbindlich nach und schickt seinen Stand, der den lokalen ersetzt (bei Zufall oder Ablehnung)
     NET.sent++;
-    netPub(netRoom(NET.code, 'g'), { t: 'act', a: action, n: NET.sent });
+    const mi = netModeIdx(G, 1, action);
+    netPub(netRoom(NET.code, 'g'), { t: 'act', a: mi >= 0 ? { ...action, modeIdx: mi } : action, n: NET.sent, prio: prioManual() });
     applyAction(G, { ...action, actorId: 1 }, false, 1);
     UI.reset(); render(); playEventAnimations();
     return true;
 }
+// Modus-Werte einer Karte/Kraft können Spieler-IDs sein ("Du selbst" = eigene ID, z. B. Helden-Flip, Card Draw-Modi):
+// der Gast schickt deshalb die Position in der Modus-Liste mit, der Host setzt den Wert aus seiner Sicht ein
+function netModes(s, pid, a) {
+    if (!a || a.mode === undefined || a.mode === null) return null;
+    let c = null, f = null;
+    if (a.type === 'PLAY_CARD') { const src = playSource(s, getPlayer(s, pid), a); c = src && src.card; f = c && FX[c.id]; }
+    else if (a.type === 'ACTIVATE') { c = findCharacter(s, a.srcUid); f = c && getPower(s, c, a.key); }
+    if (!f || !f.modes) return null;
+    return f.modes(s, pid, c, { x: a.x }).map((m, i) => (m.v !== undefined ? m.v : i));
+}
+function netModeIdx(s, pid, a) { const ms = netModes(s, pid, a); return ms ? ms.findIndex(v => sameV(v, a.mode)) : -1; }
 // Spieler-IDs tauschen: Spieler 1 ⇄ 2 in allen Feldern, die eine Spieler-ID tragen
-const NET_PID_KEYS = new Set(['pid', 'prio', 'actorId', 'srcPl', 'pl', 'owner', 'by', 'opp', 'first', 'wantedBy', 'onTurnOf', 'chooser', 'apid', 'dpid', 'activePlayer', 'winner', 'firstPid']);
-const NET_PID_MAPS = new Set(['lastTurnOf', 'firstTurnOf', 'halion15', 'widow15', 'urn15', 'skip', 'netReady', 'enslave']);
+// NET_PID_KEYS: Wert ist eine Spieler-ID (auch Listen davon, z. B. order: [1, 2]); nur die Werte 1 und 2 werden getauscht
+const NET_PID_KEYS = new Set(['pid', 'prio', 'actorId', 'srcPl', 'pl', 'owner', 'by', 'opp', 'first', 'wantedBy', 'onTurnOf', 'chooser', 'apid', 'dpid', 'activePlayer', 'winner', 'firstPid',
+    'resolvingPl', '_logPid', 'lastTurnPid9', 'sp', 'tp', 'tpid', 'hpid', 'spid', 'wasCtrl', 'from', 'to', 'ctrl', 'who', 'o', 'horrid', 'reveal', 'alashon8', 'mcFrom', 'helwenFrom', 'vunFrom13', 'order']);
+// NET_PID_MAPS: Schlüssel ist eine Spieler-ID ("1"/"2") oder beginnt damit ("1:ally", "2:hero_1" …)
+const NET_PID_MAPS = new Set(['lastTurnOf', 'firstTurnOf', 'halion15', 'widow15', 'urn15', 'skip', 'netReady', 'chosen', 'bids',
+    'abil9', 'allyDmg12', 'died11', 'disc9', 'gyIn17', 'healed13', 'heroAtk17', 'heroDmg13', 'heroHit10', 'heroHurtBy11', 'holy13', 'left13', 'q9', 'questRes12', 'sh12', 'shHero12', 'nature',
+    'cd9', 'demon9', 'played14', 'declined', 'stopAllP']);
+// NET_PID_VALS: Werte der Karte (uid → Spieler-ID bzw. Liste von Spieler-IDs); NET_PID_PREFIX: Text, der mit "Spieler-ID:" beginnt
+const NET_PID_VALS = new Set(['enslave', 'heroHit']);
+const NET_PID_PREFIX = new Set(['ctx']);
 function netMirror(st) {
     const sw = v => v === 1 ? 2 : v === 2 ? 1 : v;
+    const swKey = k => k === '1' ? '2' : k === '2' ? '1' : /^[12]:/.test(k) ? (k[0] === '1' ? '2' : '1') + k.slice(1) : k;
     const walk = (v, key) => {
-        if (v === null || typeof v !== 'object') return NET_PID_KEYS.has(key) ? sw(v) : v;
-        if (Array.isArray(v)) return v.map(x => walk(x, null));
+        if (v === null || typeof v !== 'object') return NET_PID_KEYS.has(key) ? sw(v) : NET_PID_PREFIX.has(key) && typeof v === 'string' ? swKey(v) : v;
+        if (Array.isArray(v)) return v.map(x => walk(x, NET_PID_KEYS.has(key) ? key : null));
         const o = {};
-        for (const k in v) o[k] = walk(v[k], k);
-        if (NET_PID_MAPS.has(key)) { const r = {}; for (const k in o) r[sw(+k)] = o[k]; return r; }
+        for (const k in v) o[k] = NET_PID_VALS.has(key) ? walk(v[k], 'pid') : walk(v[k], k);
+        if (NET_PID_MAPS.has(key)) { const r = {}; for (const k in o) r[swKey(k)] = o[k]; return r; }
         return o;
     };
     const m = walk(st, null);
@@ -313,7 +338,7 @@ function netMulligan(done) {
     NET.mullOpen = true; NET.mullReq = null;
     const fin = () => {
         NET.mullOpen = false;
-        if (NET.role === 'guest') netPub(netRoom(NET.code, 'g'), { t: 'mull', ...(NET.mullReq || {}) });
+        if (NET.role === 'guest') netPub(netRoom(NET.code, 'g'), { t: 'mull', ...(NET.mullReq || {}), prio: prioManual() });
         done();
     };
     if (mulliganMode() === 'hs') { UI.handSeen = new Set(G.p1.hand.map(c => c.uid)); render(); openHsMulligan(fin); return; }
@@ -346,7 +371,7 @@ function netBeat() {
     NET.timers.forEach(clearInterval);
     NET.timers = [setInterval(() => {
         if (!NET.role) return;
-        netPub(netRoom(NET.code, NET.role === 'host' ? 'h' : 'g'), { t: 'ping' });
+        netPub(netRoom(NET.code, NET.role === 'host' ? 'h' : 'g'), NET.role === 'guest' ? { t: 'ping', prio: prioManual() } : { t: 'ping' });
         if (NET.role === 'host' && !NET.inGame) netAnnounce();
         if (NET.peer && NET.peer.last && Date.now() - NET.peer.last > NET_LOST_MS) netPeerGone();
     }, NET_BEAT_MS)];
@@ -447,7 +472,7 @@ function netShowRoom() {
     body.querySelector('#mp-leave').onclick = () => netLeave(false);
     body.querySelector('#mp-go').onclick = () => {
         if (NET.role === 'host') netStart();
-        else { NET.me.ready = !NET.me.ready; netPub(netRoom(NET.code, 'g'), { t: 'ready', on: NET.me.ready }); netRenderRoom(); }
+        else { NET.me.ready = !NET.me.ready; netPub(netRoom(NET.code, 'g'), { t: 'ready', on: NET.me.ready, prio: prioManual() }); netRenderRoom(); }
     };
     body.querySelector('#mp-vs').onclick = () => NET_VS.toggle();
     // Jeder andere Knopf im Online-Fenster beendet die Simulation

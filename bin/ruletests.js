@@ -10,13 +10,13 @@
 const { Worker, isMainThread, parentPort, workerData } = require('worker_threads');
 const fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.join(__dirname, '..');
-const FILES = ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','cards16','cards17','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','cardfx16','cardfx17','ai','simcore','coach','tests'];
+const FILES = ['i18n_en','i18n','utils','cards','cards2','cards3','cards4','cards5','cards6','cards7','cards8','cards9','cards10','cards11','cards12','cards13','cards14','cards15','cards16','cards17','decks','state','engine','cardfx','cardfx2','cardfx3','cardfx4','cardfx5','cardfx6','cardfx7','cardfx8','cardfx9','cardfx10','cardfx11','cardfx12','cardfx13','cardfx14','cardfx15','cardfx16','cardfx17','ai','simcore','coach','online','tests'];   // online: Spiegelung für den Gast (Regeltest #101 u. a.)
 const CARD_TESTS = [89, 90];
 
 if (!isMainThread) {
     // Achtung: die Engine definiert eine globale Funktion "process" – Worker-API vorher sichern
     const port = parentPort, vm = require('vm');
-    globalThis.window = globalThis; globalThis.alert = () => {};
+    globalThis.window = globalThis; globalThis.alert = () => {}; globalThis.addEventListener = () => {}; globalThis.addLog = () => {};
     globalThis.localStorage = { getItem: () => null, setItem: () => {} };
     for (const f of FILES) vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'js', f + '.js'), 'utf8'), { filename: f + '.js' });
     const ids = Object.values(CARDS).filter(c => !c.isToken).map(c => c.id).sort((a, b) => a - b);
