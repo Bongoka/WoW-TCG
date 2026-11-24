@@ -703,6 +703,11 @@ function bootGame() {
         const n0 = tourneySimDecks().length;
         uiAskNumber(tr('Turnierdeck-Simulation'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runTourneySimulation(n)));
     };
+    const allBtn = document.getElementById("btn-simulate-alldecks");
+    if (allBtn) allBtn.onclick = () => {
+        const n0 = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards && d.cards.length && !isTourneyDeck(d)).length + tourneySimDecks().length;
+        uiAskNumber(tr('Alle Decks'), tr`Wie viele Spiele pro Deck-Paar? (${n0} Decks = ${n0 * n0} Paarungen; Standard: 1)`, 1, 1, n => simRun(() => runAllDecksSimulation(n)));
+    };
     document.getElementById("btn-simulate-all").onclick = () =>
         uiAskNumber(tr('All-Cards Test'), tr("Wie viele All-Cards-Spiele? (Standard: 100)"), 100, 10, n => simRun(() => runSimulationAllCards(n)));
 

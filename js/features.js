@@ -541,7 +541,7 @@ function dbParseList(text, heroId) {
         if (nm) { out.name = nm[2].trim(); continue; }
         const hm = line.match(/^(hero|held)\s*:?\s*(.*)$/i);
         if (hm) { if (hm[2].trim()) { const h = lookup(hm[2]).find(c => c.type === 'Hero'); if (h) { out.heroId = h.id; heroFound = true; } else out.report.push({ bad: true, msg: tr`Held „${hm[2].trim()}“ nicht gefunden` }); } else wantHero = true; continue; }
-        const m = line.match(/^(\d+)\s*[x×*]?\s*(.+)$/i);
+        const m = line.match(/^(\d+)\s*(?:[x×](?=\s)|\*)?\s*(.+)$/i);   // „4x Name“, aber „4 Xanata“ bleibt Xanata
         const n = m ? parseInt(m[1]) : 1, rawName = m ? m[2] : line;
         const cands = lookup(rawName);
         if (!cands.length) { if (m && !/^\d+$/.test(rawName.trim())) out.report.push({ bad: true, msg: tr`„${rawName.replace(/\([^)]*\)/g, '').trim()}“ nicht gefunden` }); continue; }
@@ -885,19 +885,25 @@ function tourneyMissing(text) {
     const out = [];
     text.split('\n').forEach(l => {
         l = l.trim(); if (!l || l.startsWith('#') || l.startsWith('//')) return;
-        const h = l.match(/^(?:hero|held)\s*:?\s*(.+)$/i), m = l.match(/^(\d+)\s*[x×*]?\s*(.+)$/i), name = (h ? h[1] : m ? m[2] : l).trim();
+        const h = l.match(/^(?:hero|held)\s*:?\s*(.+)$/i), m = l.match(/^(\d+)\s*(?:[x×](?=\s)|\*)?\s*(.+)$/i), name = (h ? h[1] : m ? m[2] : l).trim();
         if (!TOURNEY_NAMES.has(dbNorm(name))) out.push(name);
     });
     return out;
 }
 // Kopfzeile "#1 Spieler, Turnier": Platz, Spieler, Turnier, Held und der Ordner in der Deck-Übersicht
 // (World Championship → Eintrag aus WORLDS, Darkmoon Faire → 'dmf')
+// Platz-Text: genauer Platz ("1") oder "?" bei Bereichen ("#5-8" = geteilt/unbekannt, nur zum Sortieren); Deckname immer "Platz <Platz> · <Spieler> · <Turnier>"
+function tourneyHead(text) {
+    const m = String(text).split('\n')[0].match(/^#(\d+)(?:-(\d+))?\s+([^,]+),\s*(.+)$/);
+    return m ? { place: +m[1], to: m[2] ? +m[2] : 0, label: m[2] ? "?" : m[1], player: m[3].trim(), event: m[4].trim() } : null;
+}
+const tourneyName = h => tr`Platz ${h.label} · ${h.player} · ${h.event}`;
 function tourneyMeta(i) {
-    const text = TOURNEY_DECKS[i] || '', head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+    const text = TOURNEY_DECKS[i] || '', th = tourneyHead(text), head = th && [null, th.place, th.player, th.event];
     const hl = text.match(/^(?:hero|held)\s*:?\s*(.+)$/im);
     const w = head && head[3].match(/World Championship\s+(.+?),\s*(.+?)\s+(\d{4})/);
     const worlds = w && typeof WORLDS !== 'undefined' ? WORLDS.find(e => e.year === +w[3]) : null;
-    return { text, place: head ? +head[1] : 99, player: head ? head[2].trim() : '', event: head ? head[3].trim() : '', hero: hl ? hl[1].trim() : '',
+    return { text, place: head ? +head[1] : 99, to: th ? th.to : 0, label: th ? th.label : '', player: head ? head[2].trim() : '', event: head ? head[3].trim() : '', hero: hl ? hl[1].trim() : '',
         folder: worlds ? 'worlds' + worlds.year : head && /^DMF/.test(head[3]) ? 'dmf' : 'other', worlds };
 }
 function importTourneyDecks() {
@@ -913,18 +919,20 @@ function importTourneyDecks() {
     const list = loadCustomDecks();
     TOURNEY_DECKS.forEach((text, i) => {
         // Kopfzeile "#1 Spieler, Turnier" → "Platz 1 · Spieler · Turnier"
-        const head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+        const head = tourneyHead(text);
         const r = dbParseList(text, null), hero = CARDS[r.heroId];
         const id = `custom_tourney_${i + 1}`;
         if (done.includes(i + 1)) {
             const d = list.find(x => x.id === id);
+            // Platzierung korrigiert (Kopfzeile geändert): Name des übernommenen Decks nachziehen, solange er noch der alte Turnier-Name ist
+            if (d && head && /^(Platz|Place) [0-9?–-]+ · /.test(d.name)) d.name = tourneyName(head);
             if (d && rev < REV && hero && d.hero === hero.id && r.cards.length > d.cards.length && d.cards.every(c => r.cards.includes(c))) d.cards = r.cards;
             return;
         }
         // Listen mit Karten, die es im Spiel noch nicht gibt, werden erst übernommen, wenn alle Karten da sind
         if (!hero || !r.cards.length || tourneyMissing(text).length) return;
         done.push(i + 1);
-        const name = head ? tr`Platz ${head[1]} · ${head[2].trim()} · ${head[3].trim()}` : `Turnier-Deck ${i + 1}`;
+        const name = head ? tourneyName(head) : `Turnier-Deck ${i + 1}`;
         if (list.some(d => d.name === name)) return;
         list.push({ id, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards });
     });
@@ -960,6 +968,7 @@ function deckBoxHTML(deck, size = '') {                                      // 
 const isTourneyDeck = d => String(d.id).startsWith('custom_tourney_');
 // Kleine Landesflagge (SVG) für die Worlds-Ordner; unbekannte Länder ohne Flagge
 const WORLDS_FLAGS = {
+    France: '<rect width="19" height="10" fill="#fff"/><rect width="6.33" height="10" fill="#002395"/><rect x="12.67" width="6.33" height="10" fill="#ed2939"/>',
     USA: '<rect width="19" height="10" fill="#b22234"/><path d="M0 1.154h19M0 2.692h19M0 4.231h19M0 5.769h19M0 7.308h19M0 8.846h19" stroke="#fff" stroke-width=".77"/>'
         + '<rect width="7.6" height="5.385" fill="#3c3b6e"/><g fill="#fff">' + [0, 1, 2, 3].map(r => [0, 1, 2, 3, 4].map(c => `<circle cx="${.8 + c * 1.5 + (r % 2) * .75}" cy="${.75 + r * 1.3}" r=".32"/>`).join('')).join('') + '</g>',
 };
@@ -1044,7 +1053,7 @@ function openDeckOverview(opts = {}) {
         const m = tourneyMeta(i), miss = tourneyMissing(text);
         if (!miss.length || decks.some(d => d.id === `custom_tourney_${i + 1}`)) return;   // gesperrt: Karten fehlen noch (schon übernommene Decks bleiben)
         const hc = Object.values(CARDS).find(c => c.type === 'Hero' && c.name === m.hero), hi = hc ? [hc.faction, hc.class] : (typeof TOURNEY_HEROES !== 'undefined' && TOURNEY_HEROES[m.hero]) || [];
-        addTo(m, { id: `locked_tourney_${i + 1}`, locked: true, miss, text, hero: hc ? hc.id : null, heroName: m.hero, faction: hi[0], class: hi[1], name: tr`Platz ${m.place} · ${m.player} · ${m.event}` });
+        addTo(m, { id: `locked_tourney_${i + 1}`, locked: true, miss, text, hero: hc ? hc.id : null, heroName: m.hero, faction: hi[0], class: hi[1], name: tr`Platz ${m.label} · ${m.player} · ${m.event}` });
     });
     const rank = f => f.worlds ? -f.worlds.year : f.key === 'dmf' ? 0 : 1;                  // Worlds (neueste zuerst), dann Darkmoon Faire
     const order = Object.values(folders).sort((a, b) => rank(a) - rank(b));
@@ -1086,7 +1095,7 @@ function openDeckOverview(opts = {}) {
             hd.querySelector('button').onclick = () => { folder = null; render(); };
             grid.appendChild(hd);
             // World Championship: Platz 1–3 groß auf einer Siegertreppe (2 · 1 · 3) mit Pokal und Medaillen, darunter die übrigen Plätze
-            const top = w ? f.decks.filter(x => x.m.place <= 3) : [];
+            const top = w ? f.decks.filter(x => x.m.place <= 3 && !x.m.to) : [];
             if (top.length) {
                 const pod = document.createElement('div'); pod.className = 'wpodium';
                 [2, 1, 3].forEach(pl => {
@@ -1392,12 +1401,18 @@ async function runSimulationInner(gamesPerMatchup, decks, title, pairs, opts = {
 function tourneySimDecks() {
     const shortEvent = e => e.replace(/World Championship[^,]*, [^0-9]*(\d{4})/, 'Worlds $1').replace(/DMF: ([^,]+), [^0-9]*(\d{4})/, 'DMF $1 $2');
     return TOURNEY_DECKS.map((text, i) => {
-        const head = text.split('\n')[0].match(/^#(\d+)\s+([^,]+),\s*(.+)$/);
+        const th = tourneyHead(text), head = th && [null, th.label, th.player, th.event];
         const r = dbParseList(text, null), hero = CARDS[r.heroId];
         if (!hero || !r.cards.length || tourneyMissing(text).length) return null;
         const name = head ? `#${head[1]} ${head[2].trim().split(' ').slice(-1)[0]} · ${shortEvent(head[3].trim())}` : `Turnier-Deck ${i + 1}`;
         return { id: `tourney_sim_${i + 1}`, hero: hero.id, faction: hero.faction, class: hero.class, name, cards: r.cards };
     }).filter(Boolean);
+}
+// Alle eigenen Decks und alle spielbaren Turnier-Decks gegeneinander
+async function runAllDecksSimulation(gamesPerMatchup) {
+    const own = loadCustomDecks().filter(d => d && CARDS[d.hero] && d.cards && d.cards.length && !isTourneyDeck(d));
+    const decks = [...own, ...tourneySimDecks()];
+    await runSimulation(gamesPerMatchup, decks, tr`Alle Decks (${own.length} eigene + ${decks.length - own.length} Turnier-Decks)`);
 }
 async function runTourneySimulation(gamesPerMatchup) {
     const decks = tourneySimDecks();

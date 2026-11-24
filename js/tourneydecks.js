@@ -1,7 +1,7 @@
-// Turnier-Decklisten 2006–2009 (DMF Platz 1 und 2, World Championships Top 8), Quelle: wow.tcgbrowser.com und Nutzer
+// Turnier-Decklisten 2006–2010 (DMF Platz 1 und 2, World Championships Top 8; Worlds: "#5-8" = geteilter Platz 5–8, "#3-4" = Halbfinale, "#3-8" = Top 8, Platz nicht bekannt), Quelle: wow.tcgbrowser.com und Nutzer
 // Format wie der Import im Deck Builder (dbParseList); werden beim ersten Start in "Deine Decks" importiert.
 const TOURNEY_DECKS = [
-`#1 Michael Dalton, World Championship San Diego, USA 2007
+`#5-8 Michael Dalton, World Championship San Diego, USA 2007
 4 Bloodrage
 3 Broan Charges-the-Fight
 3 Finkle Einhorn, At Your Service!
@@ -20,7 +20,7 @@ const TOURNEY_DECKS = [
 3 Stronghold Gauntlets
 4 Twig of the World Tree
 3 Voss Treebender`,
-`#2 Matt Loomis, World Championship San Diego, USA 2007
+`#4 Matt Loomis, World Championship San Diego, USA 2007
 2 Blade Flurry
 4 Chipper Ironbane
 4 Corki's Ransom
@@ -347,7 +347,7 @@ const TOURNEY_DECKS = [
 4 Mezzik Darkspark
 4 Parvink
 4 The Defias Brotherhood`,
-`#3 Matt Markoff, World Championship San Diego, USA 2007
+`#5-8 Matt Markoff, World Championship San Diego, USA 2007
 2 Ancient Cornerstone Grimoire
 4 Chasing A-Me 01
 1 Chen Stormstout
@@ -371,7 +371,7 @@ const TOURNEY_DECKS = [
 3 Steal Essence
 2 The Abominable Greench
 4 The Missing Diplomat`,
-`#4 Guillaume Matignon, World Championship San Diego, USA 2007
+`#1 Guillaume Matignon, World Championship San Diego, USA 2007
 4 A Donation of Silk
 3 Avenger's Shield
 3 Blessing of Freedom
@@ -393,7 +393,7 @@ const TOURNEY_DECKS = [
 2 The Abominable Greench
 4 To Serve Kum'isha
 2 Vorden the Shadowbringer`,
-`#5 Eric Prieur, World Championship San Diego, USA 2007
+`#2 Eric Prieur, World Championship San Diego, USA 2007
 2 Blade Flurry
 3 Corki's Ransom
 2 Devilsaur Leggings
@@ -419,7 +419,7 @@ const TOURNEY_DECKS = [
 4 Timeslicer
 2 Vanish
 2 Warp Splinter's Thorn`,
-`#7 Stefan Urban, World Championship San Diego, USA 2007
+`#5-8 Stefan Urban, World Championship San Diego, USA 2007
 1 Chipper Ironbane
 3 Corki's Ransom
 4 Eskhandar's Right Claw
@@ -439,7 +439,7 @@ const TOURNEY_DECKS = [
 3 The Missing Diplomat
 4 Timeslicer
 3 Warp Splinter's Thorn`,
-`#1 Dusty Hostutler, World Championship Austin, USA 2009
+`#5-8 Dusty Hostutler, World Championship Austin, USA 2009
 Hero: Emek the Equalizer
 2 A Taste of Divinity
 2 Call to Arms: Arathi Basin
@@ -460,7 +460,7 @@ Hero: Emek the Equalizer
 4 The Last Barov
 3 Undercity
 3 United Front`,
-`#2 William Postlethwait, World Championship Austin, USA 2009
+`#1 William Postlethwait, World Championship Austin, USA 2009
 Hero: Spellweaver Jihan
 4 Blizzard
 3 Heartburn
@@ -481,7 +481,7 @@ Hero: Spellweaver Jihan
 2 Call to Arms: Arathi Basin
 3 Rise and Be Recognized
 4 Call to Arms: Eye of the Storm`,
-`#3 Phillip Martin, World Championship Austin, USA 2009
+`#5-8 Phillip Martin, World Championship Austin, USA 2009
 Hero: Pidge Filthfinder
 4 Victimize
 4 Mikael the Blunt
@@ -501,7 +501,7 @@ Hero: Pidge Filthfinder
 4 Gromble the Apt
 4 Rise and Be Recognized
 4 Call to Arms: Eye of the Storm`,
-`#4 Luke Chen, World Championship Austin, USA 2009
+`#3-8 Luke Chen, World Championship Austin, USA 2009
 Hero: Velindra Sepulchre
 4 Blizzard
 2 Heartburn
@@ -521,7 +521,7 @@ Hero: Velindra Sepulchre
 3 Wub's Cursed Hexblade
 3 Call to Arms: Arathi Basin
 4 Call to Arms: Eye of the Storm`,
-`#5 Matt Markoff, World Championship Austin, USA 2009
+`#2 Matt Markoff, World Championship Austin, USA 2009
 Hero: Loraala the Frigid
 4 Blizzard
 4 Heartburn
@@ -539,7 +539,7 @@ Hero: Loraala the Frigid
 4 Adam Eternum
 2 Call to Arms: Arathi Basin
 4 Call to Arms: Eye of the Storm`,
-`#6 Remi Lacorre, World Championship Austin, USA 2009
+`#3-4 Remi Lacorre, World Championship Austin, USA 2009
 Hero: Velindra Sepulchre
 3 Mana Ruby
 4 The Taste of Arcana
@@ -558,7 +558,7 @@ Hero: Velindra Sepulchre
 4 Roaring Blaze
 4 Dethvir the Malignant
 4 Sivandra Darklust`,
-`#7 Tim Batow, World Championship Austin, USA 2009
+`#3-8 Tim Batow, World Championship Austin, USA 2009
 Hero: Velindra Sepulchre
 4 Mana Ruby
 4 Meltdown
@@ -579,7 +579,7 @@ Hero: Velindra Sepulchre
 4 Call to Arms: Arathi Basin
 4 Rise and Be Recognized
 4 Undercity`,
-`#8 Anssi Alkio, World Championship Austin, USA 2009
+`#3-8 Anssi Alkio, World Championship Austin, USA 2009
 Hero: Loraala the Frigid
 4 Blizzard
 3 Heartburn
@@ -599,13 +599,402 @@ Hero: Loraala the Frigid
 3 Call to Arms: Arathi Basin
 2 Concerted Efforts
 4 Call to Arms: Eye of the Storm`,
+`#5-8 Matt Spreadbury, World Championship San Diego, USA 2007
+4 Surprise Attacks
+1 Predatory Gloves
+1 Sun-Gilded Shouldercaps
+4 Timeslicer
+2 Warp Splinter's Thorn
+4 Corki's Ransom
+4 One Draenei's Junk
+3 Sinister Strike
+2 Devilsaur Leggings
+4 Eye of Rend
+3 Scarlet Kris
+1 The Missing Diplomat
+4 Eskhandar's Right Claw
+4 Striker's Mark
+1 Eskhandar's Collar
+1 Onyxia Hide Backpack
+2 Blade Flurry
+4 Chipper Ironbane
+4 Steelsmith Joseph Carroll
+3 Major Healing Potion
+4 Finkle Einhorn, At Your Service!
+1 Rotun Daggerhand`,
+`#3 Brad Watson, World Championship San Diego, USA 2007
+4 Surprise Attacks
+1 Predatory Gloves
+1 Sun-Gilded Shouldercaps
+4 Timeslicer
+2 Warp Splinter's Thorn
+4 Corki's Ransom
+4 One Draenei's Junk
+3 Sinister Strike
+2 Devilsaur Leggings
+4 Eye of Rend
+3 Scarlet Kris
+1 The Missing Diplomat
+4 Eskhandar's Right Claw
+4 Striker's Mark
+1 Eskhandar's Collar
+1 Onyxia Hide Backpack
+2 Blade Flurry
+4 Chipper Ironbane
+4 Steelsmith Joseph Carroll
+3 Major Healing Potion
+4 Finkle Einhorn, At Your Service!
+1 Rotun Daggerhand`,
+`#3-8 Ben Isgur, World Championship Paris, France 2008
+4 Tidal Burst
+2 Illidan Stormrage
+2 Belt of Blasting
+3 Sayge
+2 The Darkmoon Faire
+1 The Abominable Greench
+4 Fizzle
+2 Chasing A-Me 01
+2 The More, the Scarier
+3 First Responder Avaressa
+4 Ol' Stonewall
+1 Scrapper Ironbane
+1 Talian Bladebender
+3 The Cipher of Damnation
+4 The Fel and the Furious
+4 Nether Fracture
+3 Portal
+3 Champion Zosimuus
+3 The Bringer of Death
+1 Obora the Mad
+2 Invocation
+4 Antikron the Unyielding
+1 Narthadus
+2 Deep Sea Salvage`,
+`#2 Laurent Pagorek, World Championship Paris, France 2008
+4 Tidal Burst
+2 Illidan Stormrage
+4 Fizzle
+2 Swift Discipline
+4 One Draenei's Junk
+4 Fire Blast
+3 Mana Agate
+3 Counterattack!
+2 The More, the Scarier
+4 Blood Knight Kyria
+2 Seer's Signet
+2 Battle of the Crimson Watch
+4 Nether Fracture
+1 The Bringer of Death
+1 Vor'na the Wretched
+4 Invisibility
+3 Invocation
+4 Metalmorph
+4 Blade of Wizardry
+4 Solanian's Belongings`,
+`#3-8 Jan Palys, World Championship Paris, France 2008
+4 Fizzle
+2 Corki's Ransom
+4 One Draenei's Junk
+1 The Missing Diplomat
+1 Black Ice Fizzlefreeze
+2 The More, the Scarier
+4 Water Elemental
+2 Scrapper Ironbane
+3 Anchorite Kilandra
+3 Instructor Giralo
+4 Tabards of the Illidari
+4 Nether Fracture
+4 Champion Zosimuus
+4 Antikron the Unyielding
+4 Myriam Starcaller
+4 Marksman Glous
+4 Xanata the Lightsworn
+4 Marks of Kil'jaeden
+3 Korthas Greybeard`,
+`#3-8 Oliver Schmid, World Championship Paris, France 2008
+4 Black Felsteel Bracers
+2 The Darkmoon Faire
+2 Pauldrons of the Crimson Flight
+2 Swift Discipline
+3 One Draenei's Junk
+4 Mortal Strike
+3 Rak Skyfury
+3 Stronghold Gauntlets
+4 Counterattack!
+1 Warmaster Bo'jo
+4 Pummel
+4 Vindicator's Brand
+2 Girdle of the Endless Pit
+3 Puncture
+2 Wreck
+4 Whispering Blade of Slaying
+4 A Final Blow
+4 Eskhandar's Right Claw
+3 Perdition's Blade
+2 Striker's Mark
+1 Slam`,
+`#3-8 Matt Markoff, World Championship Paris, France 2008
+4 Tidal Burst
+3 Illidan Stormrage
+4 Fizzle
+3 Counterattack!
+4 The More, the Scarier
+4 Blood Knight Kyria
+4 The Fel and the Furious
+2 Cold Front
+4 Nether Fracture
+2 Doshura Risestrider
+3 The Bringer of Death
+1 Vor'na the Wretched
+4 Invisibility
+2 Invocation
+3 Metalmorph
+3 Tomb of Ice
+2 Mana-Etched Crown
+3 Information Gathering
+3 Spellsteal
+4 Solanian's Belongings`,
+`#1 Jim Fleckenstein, World Championship Paris, France 2008
+2 Bonechewer Behemoth
+3 Sayge
+3 The Darkmoon Faire
+3 Earth Shock
+2 Crackling Purge
+4 Lightning Arc
+4 Offender Gora
+4 Retainer's Blade
+3 Chill
+4 Bloodsoul
+4 Whispering Blade of Slaying
+2 Falling to Corruption
+3 Perdition's Blade
+1 Kil'zin of the Bloodscalp
+4 Storm Shock
+4 Sha'kar
+4 Dr. Boom!
+4 Orders From Lady Vashj
+2 Nyn'jah
+1 Waz'luk`,
+`#3-8 Florent Jeudon, World Championship Paris, France 2008
+4 Sayge
+4 Fizzle
+3 Corki's Ransom
+4 One Draenei's Junk
+2 Fire Blast
+2 The Missing Diplomat
+1 Black Ice Fizzlefreeze
+4 Water Elemental
+1 Scrapper Ironbane
+4 Instructor Giralo
+4 Nether Fracture
+4 Xavar the Resourceful
+4 Antikron the Unyielding
+4 Myriam Starcaller
+4 Marksman Glous
+4 Xanata the Lightsworn
+4 Marks of Kil'jaeden
+2 Korthas Greybeard
+2 Finkle Einhorn, At Your Service!`,
+`#3-8 Manuel Alvisi, World Championship Paris, France 2008
+4 One Draenei's Junk
+3 Frost Shock
+2 Lightning Bolt
+3 Lightning Arc
+3 Brok Bloodcaller
+4 Offender Gora
+3 Lucky Strike Axe
+3 Minions of the Shadow Council
+3 Elements' Fury
+3 Bloodsoul
+4 Perdition's Blade
+1 Kil'zin of the Bloodscalp
+3 Death Shock
+4 Storm Shock
+3 Tatulla the Reclaimer
+4 Vexmaster Nar'jo
+4 Marksman Glous
+2 Dr. Boom!
+3 Orders From Lady Vashj
+2 Finkle Einhorn, At Your Service!`,
+`#2-8 Ian Johnson, World Championship Indianapolis, USA 2010
+1 Pidge Filthfinder
+4 Mikael the Blunt
+2 Pappy Ironbane
+4 A Question of Gluttony
+4 Drain Will
+4 Hesriana
+3 Adam Eternum
+3 Dimzer the Prestidigitator
+3 Marundal the Kindred
+4 Eye of the Storm
+3 Corki's Ransom
+2 Scrapper Ironbane
+4 Dreadsteed
+3 Tuskarr Kite
+3 Justicar Broxlo Frostnuggle
+4 Banish to the Nether
+3 Voidfire Wand
+4 Eye of Kilrogg
+3 Finkle Einhorn, At Your Service!
+4 Burly Berta
+4 Lady Bancroft
+2 Haunting Call`,
+`#2-8 Stefan Urban, World Championship Indianapolis, USA 2010
+1 Pagatha Soulbinder
+4 Hesriana
+4 Dethvir the Malignant
+3 Undercity
+4 Bloodsoul
+3 Forces of Jaedenar
+4 Signet of Manifested Pain
+3 Dreadsteed
+4 Tuskarr Kite
+4 Broderick Langforth
+4 Nathanos Blightcaller
+4 Death to the Traitor King
+4 Dark Horizon
+4 Banish to the Nether
+3 Eye of Kilrogg
+4 Lesson of the Nether
+4 Vuz'din`,
+`#1 Jonas Skali, World Championship Indianapolis, USA 2010
+1 Nicholas Merrick
+4 Blizzard
+4 The Taste of Arcana
+4 Elder Achillia
+4 Mikael the Blunt
+3 Spell Suppression
+4 Brittilize
+4 Everlasting Cold
+3 Adam Eternum
+4 Eye of the Storm
+3 Corki's Ransom
+2 Blast Wave
+1 The More, the Scarier
+2 The Restless Dead
+4 Myriam Starcaller
+4 Wanted: Hogger
+4 Burly Berta
+4 Lady Bancroft
+2 Wanton Warlord`,
+`#2-8 Brad Watson, World Championship Indianapolis, USA 2010
+1 Spellweaver Jihan
+3 Blizzard
+4 The Taste of Arcana
+4 Mikael the Blunt
+4 A Question of Gluttony
+3 Darkness Calling
+2 Conjured Cinnamon Roll
+3 Mystic Denial
+4 Spell Suppression
+2 Hardpacked Snowball
+2 Roaring Blaze
+3 Eye of the Storm
+4 Fizzle
+2 Slow
+2 Flickers from the Past
+1 Seer's Signet
+4 Nether Fracture
+4 Forces of Jaedenar
+4 Mana Sapphire
+2 Smoldering Blast
+2 Netherbreath Spellblade
+1 Invocation`,
+`#2-8 Niles Rowland, World Championship Indianapolis, USA 2010
+1 Lord Benjamin Tremendouson
+4 Guardian's Plate Bracers
+1 Shuriken of Negation
+4 A Question of Gluttony
+1 Goblin Rocket Launcher
+4 Darkness Calling
+3 Bloody Ritual
+1 Amani Mask of Death
+4 A Rare Bean
+3 Keys to the Armory
+2 Bonefist Gauntlets
+2 Jin'rohk, The Great Apocalypse
+1 Lionheart Helm
+1 Wraith Scythe
+4 Pummel
+4 Vindicator's Brand
+3 Puncture
+1 Girdle of Razuvious
+2 Kel'Thuzad
+4 Death Wish
+4 Reconstruct
+3 Greaves of Ancient Evil
+3 Tanks for Everything, Dalaran
+1 Cloak of the Shadowed Sun`,
+`#2-8 Stuart Wright, World Championship Indianapolis, USA 2010
+1 Spellweaver Jihan
+3 Blizzard
+4 The Taste of Arcana
+4 Mikael the Blunt
+4 A Question of Gluttony
+3 Darkness Calling
+2 Conjured Cinnamon Roll
+3 Mystic Denial
+4 Spell Suppression
+2 Hardpacked Snowball
+2 Roaring Blaze
+3 Eye of the Storm
+4 Fizzle
+2 Slow
+2 Flickers from the Past
+1 Seer's Signet
+4 Nether Fracture
+4 Forces of Jaedenar
+3 Mana Sapphire
+2 Smoldering Blast
+2 Netherbreath Spellblade
+2 Invocation`,
+`#2-8 Hans Joachim Höh, World Championship Indianapolis, USA 2010
+1 Pagatha Soulbinder
+4 Hesriana
+4 Dethvir the Malignant
+4 Eye of the Storm
+4 Bloodsoul
+3 Forces of Jaedenar
+4 Signet of Manifested Pain
+3 Dreadsteed
+4 Tuskarr Kite
+4 Broderick Langforth
+4 Nathanos Blightcaller
+4 Death to the Traitor King
+4 Dark Horizon
+4 Banish to the Nether
+3 Eye of Kilrogg
+4 Lesson of the Nether
+4 Vuz'din`,
+`#2-8 Jeffrey Verwoerd, World Championship Indianapolis, USA 2010
+1 Nicholas Merrick
+4 Blizzard
+4 The Taste of Arcana
+4 Elder Achillia
+4 Mikael the Blunt
+3 Spell Suppression
+4 Brittilize
+4 Everlasting Cold
+3 Eye of the Storm
+2 Fizzle
+2 One Draenei's Junk
+4 Blast Wave
+2 Flickers from the Past
+3 Nether Fracture
+3 Mana Sapphire
+4 Wanted: Hogger
+2 Finkle Einhorn, At Your Service!
+4 Burly Berta
+4 Wanton Warlord`,
 ];
 
 // World Championships als Ordner in der Deck-Übersicht (features.js): Decks gehören über ihre Kopfzeile
 // ("…, World Championship <Stadt>, <Land> <Jahr>") zum Ordner. country: Kürzel für die Flagge (WORLDS_FLAGS).
 const WORLDS = [
     { year: 2007, city: 'San Diego', country: 'USA' },
+    { year: 2008, city: 'Paris', country: 'France' },
     { year: 2009, city: 'Austin', country: 'USA' },
+    { year: 2010, city: 'Indianapolis', country: 'USA' },
 ];
 // Helden der Listen, deren Set im Spiel noch fehlt: Fraktion und Klasse für die (gesperrte) Deck-Box
 const TOURNEY_HEROES = {
