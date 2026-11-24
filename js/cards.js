@@ -815,6 +815,12 @@ function applyOCR(map) {
         if (c.type === 'Location') { c.limitTags = {}; continue; }                     // "Objective (5)" ist die Kapazität, kein Limit
         c.instant = /^Instant/.test(tl);
         c.talentCard = /\bTalent\b/.test(tl);
+        // Ally-Typen aus der Typzeile wie bei den späteren Sets ("Ally—Imp Demon, Pet (1)" → Imp, Demon; "Ally—Night Elf Druid" → Night, Elf, Druid).
+        // Set 1 hatte keine: Grimdron, Helwen, Infernal, Sarmoth zählten nicht als Demon (Obliveron, Dämonen-Karten)
+        if (c.type === 'Ally' && !c.allyTypes) {
+            const t = ((tl.split('—')[1] || '').split(',')[0] || '').replace(/\s*\d+ \[.*$/, '').trim();
+            if (t) { c.allyTypes = t.split(/\s+/); if (c.isPet) c.race = t; }
+        }
         // Tags mit Limit: "Form (1)", "Pet (1)", "Earth Totem (1)", "Ring (2)" …
         c.limitTags = {};
         for (const m of tl.matchAll(/([A-Z][A-Za-z\- ]*?) \((\d)\)/g)) c.limitTags[m[1].trim()] = +m[2];
