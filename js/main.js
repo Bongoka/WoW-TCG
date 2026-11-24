@@ -676,6 +676,7 @@ function bootGame() {
     document.getElementById("btn-spawn-card").onclick = debugSpawnCard;
     document.getElementById("btn-zoom-tune").onclick = openZoomTune;
     document.getElementById("btn-fx-test").onclick = () => { if (typeof mmHide === 'function') mmHide(); loadFxTest(); };
+    document.getElementById("btn-death-test").onclick = () => { if (typeof mmHide === 'function') mmHide(); loadDeathTest(); };
     const spawnInput = document.getElementById("dbg-spawn-name");
     spawnInput.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); debugSpawnCard(); } };
     debugFillSpawnList();

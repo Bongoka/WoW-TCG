@@ -1438,6 +1438,24 @@ function loadQuickTest() {
     render();
 }
 
+// Tod-Test (Debug): Tod-Animation je nach Wucht (deathAnim, ui.js) ausprobieren. Gegner hat textlose Allies mit 1–6 Leben,
+// auf der Hand Direktschaden 1–6 (je Schadensart andere Farbe) und Vanquish (zerstören ohne Schaden), eigene kampfbereite
+// Allies (3 und 8 ATK) für Kampf-Kills. Der gegnerische Held steht 3 Schaden vor dem Tod. Erneut klicken = Szene neu.
+function loadDeathTest() {
+    loadQuickTest();
+    const p = G.p1, o = G.p2;
+    const free = c => { c.allowedClasses = null; c.allowedFactions = null; c.heroReq = null; c.talentReq = null; c.raceReq = null; return c; };
+    const ally = (id, pid) => Object.assign(makeCardInst(id, false, pid), { joinedTurn: 0 });
+    p.resources = Array.from({ length: 150 }, () => ({ card: makeCardInst(192, false, 1), faceUp: false, exhausted: false }));
+    p.hand = [33, 52, 56, 113, 31, 7101, 7101, 171].filter(id => CARDS[id]).map(id => free(makeCardInst(id, false, 1)));   // 1 … 6 Schaden, Vanquish
+    p.allies = [192, 13122].filter(id => CARDS[id]).map(id => ally(id, 1));                                            // 3/3 und 8/6 zum Angreifen
+    for (const pl of [p, o]) { pl.hero.armors = []; pl.hero.weapons = []; pl.ongoing = []; }                       // übersichtlich, nichts verhindert Schaden
+    o.allies = [14140, 228, 192, 2167, 1193, 175].filter(id => CARDS[id]).map(id => ally(id, 2));                        // 1 … 6 Leben
+    o.hand = Array.from({ length: 10 }, () => makeCardInst(192, false, 2));
+    p.hero.damage = 0; o.hero.damage = Math.max(0, hpOf(G, o.hero) - 3); G.placedResource = true;
+    addLog(tr('💀 Tod-Test: Gegner-Allies mit 1–6 Leben, Schaden 1–6 auf der Hand, Vanquish und zwei Angreifer. Je mehr Schaden und Overkill, desto heftiger die Zerstörung – ab Wucht 6 explodiert die Karte. Der gegnerische Held hat noch 3 Leben.'), "log-turn");
+    render();
+}
 // Effekt-Test (Debug): Zauber-Effekte und Sounds ausprobieren. Auf der Hand je Effekt-Art (spellfx.js SPX_T) eine Karte,
 // dazu Mehrfach-Treffer: Orlund im Spiel + Abwurf-Karten (je Abwurf ein Geschoss) und verteilter Schaden. Kartenbeschränkungen
 // (Klasse, Fraktion, Held) sind hier aufgehoben, Ressourcen reichlich, gegnerische Allies als Ziele.
