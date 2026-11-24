@@ -25,9 +25,9 @@
         "-File",
         ".claude/serve.ps1",
         "-Port",
-        "8766"
+        "8767"
       ],
-      "port": 8766
+      "port": 8767
     }
   ]
 }
