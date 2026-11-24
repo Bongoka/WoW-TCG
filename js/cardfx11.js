@@ -474,7 +474,7 @@ FX[10176] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid && !c.exhau
 FX[10177] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.amt > 0 && (d.weapon === c.uid || (d.weapons || []).includes(c.uid)) && t && t.type === 'Hero') trig(s, { id: 10177, k: 'ask', a: { pid, opp: d.tpid, n: d.amt } }); } },
     k: { ask: (s, a) => { const o = me(s, a.opp); const l = [...nonHeroCards(s, o).map(c => c.uid), ...o.resources.map(r => r.card.uid)]; if (!l.length) return; pickMany(s, a.pid, tr`Jin'rohk: bis zu ${a.n} Karten des Gegners zerstören`, "Jin'rohk, The Great Apocalypse", l, '10177:do', a, true, a.n); },
         do: (s, a, list) => (list || []).slice(0, a.n).forEach(u => { const l = locate(s, u); if (!l) return; if (l.zone === 'resource') destroyResource(s, u); else destroy(s, l.c); }) } };
-FX[10178] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && !o.combat ? (o.amt || 0) : 0 } };
+FX[10178] = { aura: { dmgDbl: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && !o.combat ? 1 : 0 } };   // "double that much" (CR 716.1e)
 FX[10179] = { strikeLR: true, on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 10179, k: 'ask', a: { pid, uid: c.uid } }); } },
     k: { ask: (s, a) => { const w = findCharacter(s, a.uid); if (!w) return; if (getReadyRes(me(s, a.pid)) < 1) { exhaust(s, w); return; } yesNo(s, a.pid, tr('Steelhawk Crossbow: (1) bezahlen, sonst wird sie erschöpft?'), 'Steelhawk Crossbow', '10179:do', a, true); },
         do: (s, a, v) => { const w = findCharacter(s, a.uid); if (!w) return; if (v && payRes(me(s, a.pid), 1)) return; exhaust(s, w); } } };

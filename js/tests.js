@@ -2511,6 +2511,15 @@ function runRuleTests() {
         s = setup('alliance_warrior', 'horde_priest', 1); low(s, 2, 3); P(s, 2).hand.push(makeCardInst(78, false, 2)); attackHero(s, put(s, 1, vanilla(4)));
         assert(!s.gameOver, 'Flash Heal gegen tödlichen Angriff nicht genutzt');
     });
+    test(202, 'Mehrere "double that much"-Ersatzeffekte verdoppeln nacheinander (CR 716.1e): Gavel + Elemental Precision = ×4', () => {
+        const mk = () => { const s = fresh(); for (const p of [P(s, 1), P(s, 2)]) { p.allies = []; p.hero.weapons = []; p.hero.armors = []; p.ongoing = []; } return s; };
+        const hit = (s, n, dt) => { const h = P(s, 2).hero, d0 = h.damage || 0; heroDmg(s, 1, h.uid, n, dt); process(s); autoResolve(s); return (h.damage || 0) - d0; };
+        let s = mk(); put(s, 1, 10178); put(s, 1, 5098);                                  // Merciless Gladiator's Gavel + Elemental Precision
+        let d = hit(s, 2, 'Nature'); assert(d === 8, `Gavel + Elemental Precision: ${d} statt 8 Naturschaden (2 × 2 × 2)`);
+        d = hit(s, 2, 'Fire'); assert(d === 4, `nur Gavel (Feuer): ${d} statt 4`);
+        s = mk(); put(s, 1, 5098); d = hit(s, 3, 'Nature'); assert(d === 6, `nur Elemental Precision: ${d} statt 6`);
+        s = mk(); put(s, 1, 10178); put(s, 1, 61); d = hit(s, 1, 'Fire'); assert(d === 4, `Gavel + World in Flames: ${d} statt 4`);
+    });
     return results;
 }
 

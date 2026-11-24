@@ -142,7 +142,7 @@ function hasForm(s, pid) { return (getPlayer(s, pid).ongoing || []).some(o => o.
 function hasType(c, t) { return !!c && ((c.allyTypes && c.allyTypes.includes(t)) || c.race === t || c.petType === t || c.wsub === t || c.asub === t || (c.subtypes && c.subtypes.includes(t)) || (t === 'Totem' && !!c.totem) || (t === 'Pet' && !!c.isPet)); }
 
 // ---------------------------------------------------------------- Dauereffekte (Set 2/3)
-// FX[id].aura = { atk, hp, def, watk, kw, cost, strike, dmgOut, dmgIn, prevent, heal, noPlay, atkBlock, atkTax }
+// FX[id].aura = { atk, hp, def, watk, kw, cost, strike, dmgOut, dmgIn, dmgDbl, prevent, heal, noPlay, atkBlock, atkTax }
 // Jede Funktion bekommt (s, src, srcPid, …) – src ist die Karte im Spiel, die den Effekt erzeugt.
 let AURA_IDS = null;
 // Nur-Lese-Abschnitt (readScope): solange der Zustand nicht verändert wird – Tote suchen in stateBased, KI-Bewertung –,
@@ -2235,6 +2235,9 @@ function dmgStep(s, o) {
     if (t.type === 'Hero' && amt > 0) amt += unattachedOngoing(tp, 136).length;           // Berserker Stance (erhalten)
     // Verdoppeln zuletzt: die Erhöhungen wählt der Verursacher (CR 717.4a) – erst alle +N, dann ×2
     if (heroSrc && amt > 0 && o.dt === 'Fire') for (let i = 0; i < unattachedOngoing(getPlayer(s, sp), 61).length; i++) amt *= 2; // World in Flames
+    // "it deals double that much instead" (Gavel, Elemental Precision, Battlegear, Illidari-Bane Mageblade): jede Verdopplung ist ein eigener
+    // Ersatzeffekt und wirkt auf den schon verdoppelten Betrag – zwei Verdopplungen = ×4 (CR 716.1b, 716.1e). aura.dmgDbl liefert die Anzahl.
+    if (amt > 0) { const n = auraSum(s, 'dmgDbl', src, t, o, sp); for (let i = 0; i < n; i++) amt *= 2; }
     // 2) Verhinderung
     const amtPre = amt;                                                                   // für "When damage … is prevented" (Divine Riposte, Set 7)
     let unprev = !!o.unprev;

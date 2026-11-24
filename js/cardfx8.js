@@ -585,7 +585,7 @@ FX[6225] = { on: { strike: (s, c, d, pid) => { if (d.weapon !== c.uid) return; c
         if (!(s.delayed || []).some(x => x.k === '6225:back' && x.a.uid === c.uid)) (s.delayed = s.delayed || []).push({ at: 'nextEnd', pid, srcId: 6225, srcName: 'Felsteel Whisper Knives', k: '6225:back', a: { uid: c.uid } }); } },
     k: { back: (s, a) => { const c = findCharacter(s, a.uid); if (c && isInPlayZone((locate(s, a.uid) || {}).zone)) leavePlay(s, c, 'hand', { destroyed: false }); } } };
 FX[6226] = { on: { attacks: (s, c, d, pid) => { if (d.att === heroOf(s, pid).uid) trig(s, { id: 6226, k: 'go', a: { pid } }); } }, k: { go: (s, a) => opposingChars(s, a.pid).forEach(c => exhaust(s, c)) } };
-FX[6227] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.type === 'Hero' && ctrlOf(s, from) === sp && t && isDemon8(s, t) ? (o.amt || 0) : 0 } };
+FX[6227] = { aura: { dmgDbl: (s, src, sp, from, t, o) => from && from.type === 'Hero' && ctrlOf(s, from) === sp && t && isDemon8(s, t) ? 1 : 0 } };   // "double that much" (CR 716.1e)
 FX[6228] = { entered: (s, c) => { if (oppWentFirst(s, ctrlOf(s, c))) c.counters = { ...(c.counters || {}), atk1: ((c.counters || {}).atk1 || 0) + 3 }; } };
 FX[6230] = { powers: [{ key: 'tirisfal', label: tr('Fähigkeit im Friedhof entfernen: nächster Schlag (1) billiger'),
     canUse: (s, pid) => me(s, pid).graveyard.some(c => c.type === 'Ability') || tr('Keine Fähigkeit im Friedhof'),

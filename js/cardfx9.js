@@ -615,10 +615,8 @@ FX[7208] = fxMix(onEnter(7208, 'look'), { k: { look: (s, a) => { const p = me(s,
         ask(s, { pid: a.pid, prompt: tr`Girdle of the Blasted Reaches: ${CARDS[top].name} unter das Deck legen?`, src: 'Girdle of the Blasted Reaches', opts: [{ label: tr('Oben lassen'), v: 0, card: top, ai: CARDS[top].cost || 1 }, { label: tr('Unter das Deck'), v: 1, card: top, ai: 2 }], k: '7208:do', a, hidden: true }); },
     do: (s, a, v) => { const p = me(s, a.pid); if (v && p.deck.length) { p.deck.unshift(p.deck.pop()); L(s, tr`${p.hero.name} legt die oberste Karte unter das Deck.`, '', a.pid); } } } });
 FX[7209] = { engine: true, powers: [actPow('regalia', tr('2 Feuerschaden'), { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 2, 'Fire', { ability: false }); } })] };
-FX[7211] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && o.weapon && (o.amt || 0) > 0 ? weaponDmgBase(s, o) : 0 },
+FX[7211] = { aura: { dmgDbl: (s, src, sp, from, t, o) => from && from.uid === heroOf(s, sp).uid && o.weapon ? 1 : 0 },
     powers: [actPow('battlegear', tr('Ziel erschöpfen und 1 Nahkampfschaden'), { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T1(s, it); if (!t) return; exhaust(s, t); heroDmg(s, it.pl, t.uid, 1, 'Melee', { ability: false }); } })] };
-// "deals double that much": verdoppelt den Betrag vor den übrigen Erhöhungen (dmgOut addiert den einfachen Betrag)
-const weaponDmgBase = (s, o) => o.amt || 0;
 FX[7212] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl !== pid && isAllyCard(CARDS[d.snap.id])) trig(s, { id: 7212, k: 'add', a: { uid: c.uid } }); } }, k: { add: (s, a) => addCounter(s, findCharacter(s, a.uid), 'def', 1) } };
 FX[7214] = { on: { dmg: (s, c, d, pid) => { const a = findCharacter(s, d.src), t = findCharacter(s, d.tgt); if (d.amt > 0 && a && t && a.uid !== t.uid && isAllyLike(a) && isAllyLike(t)) trig(s, { id: 7214, k: 'go', a: { x: a.uid, y: t.uid } }); } },
     k: { go: (s, a) => [a.x, a.y].forEach(u => { const c = findCharacter(s, u); if (c) destroy(s, c); }) } };
