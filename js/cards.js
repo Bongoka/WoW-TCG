@@ -15,9 +15,11 @@ function A(id, name, cost, atk, atkType, hp, faction, race, allyClass, text, ext
     CARDS[id] = { id, name, type:'Ally', cost, atk, hp, atkType, faction, race, allyClass, text,
         allowedFactions: faction === 'Neutral' ? null : [faction], ...extra };
 }
+// Mehrklassen-Pets stehen in der Kartenliste als zusammengesetzter Code ("HuLo" = [Hunter] und [Warlock], Phase Hound)
+const petCls = k => /^(?:[A-Z][a-z])+$/.test(k || '') && k.match(/[A-Z][a-z]/g).every(x => CL[x]) ? k.match(/[A-Z][a-z]/g).map(x => CL[x]) : [k];
 function Pet(id, name, cost, atk, atkType, hp, klass, petType, text, extra = {}) {
     CARDS[id] = { id, name, type:'Ally', cost, atk, hp, atkType, faction:'Neutral', race:petType, allyClass:null,
-        isPet:true, petType, allowedClasses:[klass], text, ...extra };
+        isPet:true, petType, allowedClasses:petCls(klass), text, ...extra };
 }
 function Ab(id, name, cost, klass, school, text, extra = {}) {
     const isFac = klass === 'Alliance' || klass === 'Horde';

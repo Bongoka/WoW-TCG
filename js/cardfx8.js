@@ -29,13 +29,14 @@ const resist = dt => ({ aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid 
 
 // ---------------------------------------------------------------- Deckbau der Dämonen-Helden
 // "You can include only neutral quests, … You can't include cards with reputation or text restrictions (like Fire Hero Required)."
-const noTextReq = c => !c.talentReq && !c.raceReq && !c.factionReq && !c.loyalReq && !c.reputation;
+// Textauflagen: "<Talent>/<Volk>/<Fraktion>/Loyal/[Klasse]/Scourge/<Beruf> Hero Required"
+const noTextReq = (c, talentOk) => (!c.talentReq || c.talentReq === talentOk) && !c.raceReq && !c.factionReq && !c.loyalReq && !c.classReq && !c.scourgeReq && !c.profReq && !c.reputation;
 const neutralQuest = c => c.type === 'Quest' && (!c.allowedFactions || !c.allowedFactions.length) && (!c.faction || c.faction === 'Neutral');
 const HERO_DECK_RULES = {
     6021: c => noTextReq(c) && (neutralQuest(c) || (c.type === 'Ability' && /\bfire damage\b/i.test(c.text || '')) || (c.type === 'Ally' && c.atkType === 'Fire')),       // Imp Lord Pinprik
     6022: c => noTextReq(c) && (neutralQuest(c) || (c.type === 'Weapon' && c.slot === 'Melee')),                                                                          // Mother Misery
     6023: c => (c.type === 'Ability' || c.type === 'Ally' || c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item' || c.type === 'Quest') &&                       // Obliveron
-        !c.raceReq && !c.factionReq && !c.loyalReq && !c.reputation && (!c.talentReq || c.talentReq === 'Traitor') &&
+        noTextReq(c, 'Traitor') &&
         (neutralQuest(c) || c.talentReq === 'Traitor' || (c.type === 'Ally' && ((c.allyTypes || []).includes('Demon') || /\bDemon\b/.test(c.race || '')))),
     6024: c => noTextReq(c) && (neutralQuest(c) || (c.type === 'Ability' && (c.allowedClasses || []).includes('Warlock')) || (c.type === 'Ally' && ((c.allyTypes || []).includes('Warlock') || c.allyClass === 'Warlock'))),   // Xia
 };

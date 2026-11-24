@@ -13,7 +13,7 @@ const isScourge14 = (s, c) => !!c && (!!(CARDS[c.id] && CARDS[c.id].scourge) || 
 // [Back]: "Deckbuilding: You can only include either [Alliance] or [Horde] cards, [<Klasse>] cards, [<Klasse>] <Talent> Talents, neutral cards, and <Argent Crusade|Scourge> cards.
 //          You can't include cards with (other) reputations or other text restrictions."
 const isNeutral14 = c => !(c.allowedClasses && c.allowedClasses.length) && !(c.allowedFactions && c.allowedFactions.length) && (!c.faction || c.faction === 'Neutral');
-const textOk14 = (c, hero, o) => !c.raceReq && !c.factionReq && !c.loyalReq && (!c.classReq || (c.masterHero && heroReqOk(hero, c))) && (!c.talentReq || (o.talent && c.talentReq === hero.talent)) && (!c.reputation || c.reputation === o.rep) && (!c.scourgeReq || o.scourge);
+const textOk14 = (c, hero, o) => !c.raceReq && !c.factionReq && !c.loyalReq && !c.profReq && (!c.classReq || (c.masterHero && heroReqOk(hero, c))) && (!c.talentReq || (o.talent && c.talentReq === hero.talent)) && (!c.reputation || c.reputation === o.rep) && (!c.scourgeReq || o.scourge);
 const classDeckRule = (klass, o) => (c, hero) => c.type !== 'Hero' && textOk14(c, hero, o) && (o.scourge || !c.scourge) && (!c.masterHero || heroReqOk(hero, c)) &&
     (isNeutral14(c) || (c.allowedFactions && c.allowedFactions.length === 1) || (c.allowedClasses || []).includes(klass) || (o.rep && c.reputation === o.rep) || (o.scourge && !!c.scourge));
 // Scourge-Helden ohne Klasse: "[A] abilities (and Pets), [E] equipment, allies with ally type Death Knight, neutral quests and locations, and Scourge cards."

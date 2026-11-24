@@ -2520,6 +2520,18 @@ function runRuleTests() {
         s = mk(); put(s, 1, 5098); d = hit(s, 3, 'Nature'); assert(d === 6, `nur Elemental Precision: ${d} statt 6`);
         s = mk(); put(s, 1, 10178); put(s, 1, 61); d = hit(s, 1, 'Fire'); assert(d === 4, `Gavel + World in Flames: ${d} statt 4`);
     });
+    test(204, 'Deckbau klassenloser Helden: Obliveron nimmt Dämonen-Pets, keine Karten mit Textauflage (Scourge/Beruf Hero Required); Phase Hound ist [Hunter]- und [Warlock]-Pet', () => {
+        const ok = (h, id) => cardMatchesPlayer(CARDS[id], { hero: CARDS[h] }) && talentReqOk(CARDS[id], CARDS[h]);
+        assert(JSON.stringify(CARDS[8087].allowedClasses) === '["Hunter","Warlock"]', 'Phase Hound: Klassen ' + JSON.stringify(CARDS[8087].allowedClasses));
+        for (const id of [1104, 1111, 5107, 8087]) assert(ok(6023, id), `Obliveron: Dämonen-Pet ${CARDS[id].name} nicht erlaubt`);
+        const beast = Object.values(CARDS).find(c => c.isPet && !c.isToken && !(c.allyTypes || []).includes('Demon') && !/\bDemon\b/.test(c.race || ''));
+        assert(!ok(6023, beast.id), `Obliveron: Nicht-Dämonen-Pet ${beast.name} erlaubt`);
+        assert(ok(13012, 8087) && ok(13015, 8087), 'Askalti/Kjaran: Phase Hound nicht erlaubt');
+        const scReq = Object.values(CARDS).find(c => c.scourgeReq && !c.scourge && !c.isToken);
+        for (const h of [6021, 6022, 6023, 6024]) assert(!ok(h, scReq.id), `${CARDS[h].name}: ${scReq.name} (Scourge Hero Required) erlaubt`);
+        const prof = Object.values(CARDS).filter(c => c.profReq);
+        for (const h of [13011, 13012, 13013, 13014, 13015]) { const bad = prof.find(c => ok(h, c.id)); assert(!bad, `${CARDS[h].name}: ${bad && bad.name} (Beruf Hero Required) erlaubt`); }
+    });
     return results;
 }
 
