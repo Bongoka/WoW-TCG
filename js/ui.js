@@ -1714,7 +1714,7 @@ const HSORT = { slot: null, box: null, orig: null, pos: [], zone: null, done: fa
 function handSortStart(slot) {
     const box = slot.parentNode, kids = [...box.children];
     const rs = kids.map(k => k.getBoundingClientRect());
-    HSORT.slot = slot; HSORT.box = box; HSORT.orig = kids; HSORT.done = false;
+    HSORT.slot = slot; HSORT.box = box; HSORT.orig = kids; HSORT.cur = null; HSORT.done = false;
     HSORT.pos = rs.map(r => r.left + r.width / 2);                                      // Mitte jedes Platzes (bleibt beim Umsortieren gleich)
     const top = Math.min(...rs.map(r => r.top));
     HSORT.zone = { left: Math.min(...rs.map(r => r.left)) - 40, right: Math.max(...rs.map(r => r.right)) + 40, top: top - 20, bottom: window.innerHeight + 10 };
@@ -1722,9 +1722,13 @@ function handSortStart(slot) {
 const inHandZone = e => { const z = HSORT.zone; return !!z && e.clientX >= z.left && e.clientX <= z.right && e.clientY >= z.top && e.clientY <= z.bottom; };
 function handSortApply(list) {
     const box = HSORT.box; if (!box || !HSORT.slot || !HSORT.slot.isConnected) return;
-    if (list.every((k, i) => box.children[i] === k)) return;
+    const cur = HSORT.cur || HSORT.orig;
+    if (list.every((k, i) => cur[i] === k)) return;
     const before = new Map(list.map(k => [k, k.getBoundingClientRect().left]));
-    list.forEach(k => box.appendChild(k));
+    // Nur per CSS-order umstellen, nie im DOM verschieben: auf Touch verliert die gezogene Karte sonst den Finger (Ziehen bricht ab)
+    const back = list === HSORT.orig;
+    list.forEach((k, i) => { k.style.order = back ? '' : i; k.style.zIndex = back ? '' : 10 + i; });
+    HSORT.cur = list;
     const mid = (list.length - 1) / 2;
     list.forEach((k, i) => {
         k.style.transform = handSlotTransform(i - mid); k.dataset.ang = (i - mid) * (UI.fanAng || 6);
@@ -1744,14 +1748,14 @@ function handSortOver(e) {
 function handSortDrop(e) {
     if (!HSORT.slot || !HSORT.slot.isConnected || !inHandZone(e)) return;
     e.preventDefault(); e.stopPropagation();
-    UI.handOrder = [...HSORT.box.children].map(k => k.dataset.uid);
+    UI.handOrder = (HSORT.cur || HSORT.orig).map(k => k.dataset.uid);
     HSORT.done = true;
     if (typeof sfx !== 'undefined') sfx.play('deal');
 }
 function handSortEnd() {
     const was = HSORT.slot, done = HSORT.done;
     if (was && was.isConnected && !done) handSortApply(HSORT.orig);
-    Object.assign(HSORT, { slot: null, box: null, orig: null, pos: [], zone: null, done: false });
+    Object.assign(HSORT, { slot: null, box: null, orig: null, cur: null, pos: [], zone: null, done: false });
     if (was && was.isConnected && done) render();                                      // Fächer, Breiten und Flug-Winkel neu
 }
 document.addEventListener('dragover', handSortOver);
@@ -2175,6 +2179,7 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
     };
     const moveGhost = (x, y) => { const g = TOUCH_DRAG.ghost; if (g) g.style.transform = `translate(${x - g._w / 2}px, ${y - g._h * 0.6}px) rotate(-3deg) scale(1.05)`; };
     const begin = (x, y) => {
+        if (typeof touchZoomCancel === 'function') touchZoomCancel();                    // Ziehen und Zoom nie gleichzeitig (auch kein später Zoom-Timer)
         const src = TOUCH_DRAG.src; TOUCH_DRAG.active = true; TOUCH_DRAG.dt = mkDT(); TOUCH_DRAG.over = null; TOUCH_DRAG.accept = false;
         let hidden = false; const sdi = TOUCH_DRAG.dt.setDragImage; TOUCH_DRAG.dt.setDragImage = (img, ...r) => { if (img === _noDragImg) hidden = true; try { sdi && sdi.call(TOUCH_DRAG.dt, img, ...r); } catch (e) {} };
         const ev = fire(src, 'dragstart', TOUCH_DRAG.x0, TOUCH_DRAG.y0);
@@ -2200,7 +2205,7 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
         }
         if (TOUCH_DRAG.ghost) TOUCH_DRAG.ghost.remove();
         if (TOUCH_DRAG.active) { TOUCH_DRAG.eatClick = true; setTimeout(() => { TOUCH_DRAG.eatClick = false; }, 400); }   // kein Klick hinterher
-        Object.assign(TOUCH_DRAG, { src: null, active: false, dt: null, ghost: null, over: null, accept: false });
+        Object.assign(TOUCH_DRAG, { src: null, active: false, dt: null, ghost: null, over: null, accept: false, viaTouch: false });
     };
     document.addEventListener('click', (e) => { if (TOUCH_DRAG.eatClick) { TOUCH_DRAG.eatClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
     document.addEventListener('pointerdown', (e) => {
@@ -2210,17 +2215,24 @@ const TOUCH_DRAG = { src: null, x0: 0, y0: 0, active: false, dt: null, ghost: nu
         if (!src || TOUCH_DRAG.active) return;
         Object.assign(TOUCH_DRAG, { src, x0: e.clientX, y0: e.clientY });
     }, true);
-    document.addEventListener('pointermove', (e) => {
-        if (e.pointerType !== 'touch' || !TOUCH_DRAG.src) return;
-        // Zoom per Gedrückthalten offen: nur ein deutliches Losziehen startet das Ziehen (Fingerzittern nicht)
-        // Finger noch über der Karte: kippt die Zoom-Karte (renderer.js), gezogen wird erst beim Verlassen der Karte
-        if (!TOUCH_DRAG.active && typeof touchZoomInside === 'function' && touchZoomInside(e.clientX, e.clientY)) return;
-        const th = typeof touchZoomShown === 'function' && touchZoomShown() ? 30 : START_PX;
-        if (!TOUCH_DRAG.active) { if (Math.hypot(e.clientX - TOUCH_DRAG.x0, e.clientY - TOUCH_DRAG.y0) > th) begin(e.clientX, e.clientY); }
-        else move(e.clientX, e.clientY);
-    }, true);
+    const onMove = (x, y) => {
+        // Gedrückthalten = nur Zoom: leichtes Bewegen kippt die Zoom-Karte (renderer.js). Erst ein weites Wegziehen
+        // (gut eine halbe Kartenhöhe, mind. 90 px) schließt den Zoom und startet das Ziehen (Spielen, Ressource, Umsortieren).
+        const zoom = typeof touchZoomShown === 'function' && touchZoomShown();
+        const th = zoom ? Math.max(90, TOUCH_DRAG.src.getBoundingClientRect().height * 0.6) : START_PX;
+        if (!TOUCH_DRAG.active) { if (Math.hypot(x - TOUCH_DRAG.x0, y - TOUCH_DRAG.y0) > th) begin(x, y); }
+        else move(x, y);
+    };
+    document.addEventListener('pointermove', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src && !TOUCH_DRAG.viaTouch) onMove(e.clientX, e.clientY); }, true);
+    // Manche Browser brechen die Pointer-Events beim langen Drücken (Zoom) ab: dann über Touch-Events weiter
+    document.addEventListener('touchmove', (e) => { const t = e.touches[0]; if (TOUCH_DRAG.src && TOUCH_DRAG.viaTouch && t) onMove(t.clientX, t.clientY); }, { capture: true, passive: true });
+    document.addEventListener('touchend', (e) => { const t = e.changedTouches[0]; if (TOUCH_DRAG.src && TOUCH_DRAG.viaTouch && t && !e.touches.length) finish(t.clientX, t.clientY, true); }, true);
     document.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src) finish(e.clientX, e.clientY, true); }, true);
-    document.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch' && TOUCH_DRAG.src) finish(e.clientX, e.clientY, false); }, true);
+    document.addEventListener('pointercancel', (e) => {
+        if (e.pointerType !== 'touch' || !TOUCH_DRAG.src) return;
+        if (!TOUCH_DRAG.active && typeof touchZoomShown === 'function' && touchZoomShown()) { TOUCH_DRAG.viaTouch = true; return; }
+        finish(e.clientX, e.clientY, false);
+    }, true);
     // Eingebautes Ziehen des Handy-Browsers aus (sonst doppelt); echte Maus-Drags bleiben unberührt
     document.addEventListener('dragstart', (e) => { if (e.isTrusted && TOUCH_DRAG.lastType === 'touch') { e.preventDefault(); e.stopImmediatePropagation(); } }, true);
 })();

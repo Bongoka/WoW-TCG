@@ -413,6 +413,8 @@
     const T = { timer: 0, wrap: null, x: 0, y: 0, shown: false, eatClick: false };
     const HOLD_MS = 380, MOVE_PX = 16;
     window.touchZoomShown = () => T.shown;
+    // Ziehen beginnt (ui.js): Zoom-Timer stoppen, offenen Zoom schließen – Zoom und Ziehen nie gleichzeitig
+    window.touchZoomCancel = () => { clearTimeout(T.timer); T.wrap = null; if (T.shown) { T.shown = false; release(); } };
     // Zoom offen: Finger über der gehaltenen Karte kippt die Zoom-Karte in 3D wie die Maus (Finger darüber = innerhalb)
     window.touchZoomInside = (x, y) => {
         if (!T.shown || !S.live) return false;
