@@ -1569,6 +1569,7 @@ var I18N_EN = {
     'Starthand': 'Opening hand',
     '☠ {0} {1} verliert!': '☠ {0} {1} loses!',
     'Ziel': 'Target',
+    '{0} tauschen': 'Swap {0}',
     'Nein': 'No',
     'Gegner': 'Opponent',
     'Fertig': 'Done',

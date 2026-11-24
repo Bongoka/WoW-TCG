@@ -265,7 +265,7 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null, ctl = null) {
     G.real = true; G.humans = hot ? [1, 2] : watch ? [] : [1];
     if (hot) G.hotseat = { seat: 1 };
     if (watch) G.spectate = true;
-    UI.reset();
+    UI.reset(); UI.handOrder = null;                                                     // neue Partie: Hand in Ziehreihenfolge
     dealOpeningHands(G);
     if (!hot && aiWantsMulligan(G, 2)) doMulligan(G, 2);
     if (watch && aiWantsMulligan(G, 1)) doMulligan(G, 1);

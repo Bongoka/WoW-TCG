@@ -841,7 +841,7 @@ const SHOWCASED = new Set();   // schon groß gezeigte Karten (driveCpu zeigt vo
 async function showcaseCpuCard(card, handIdx, pid = 2) {
     SHOWCASED.add(card.uid);
     const th = document.getElementById(pid === 1 ? 'bot-hand' : 'top-hand');            // CPU gegen CPU: Spieler 1 spielt von unten
-    const slot = th && th.children[handIdx];
+    const slot = th && (pid === 1 ? th.querySelector(`.hand-card-slot[data-idx="${handIdx}"]`) : th.children[handIdx]);   // eigene Hand: Anzeige-Reihenfolge
     const from = slot ? slot.getBoundingClientRect() : { left: window.innerWidth / 2 - 50, top: -160, width: 100, height: 140 };
     if (slot) slot.style.visibility = 'hidden';
     const w = Math.round(Math.min(300, window.innerHeight * 0.46 / 1.4));
@@ -1449,8 +1449,11 @@ function renderPlayerHand(p) {
     if (p.hand.length === 0) { UI.handSeen = new Set(); UI.handFly.clear(); return; }
     const total = p.hand.length, mid = (total - 1) / 2;
     const choices = choiceUids();
-    p.hand.forEach((card, idx) => {
+    const order = handDisplayOrder(p), nodes = [], angs = [];                          // order[Platz] = Index in p.hand
+    order.forEach((idx, pos) => {
+        const card = p.hand[idx];
         const slot = document.createElement("div"); slot.className = "hand-card-slot";
+        slot.dataset.idx = idx; slot.dataset.uid = card.uid;
         // Aktuelle Kosten (Rabatte wie Nature's Swiftness, Aufschläge): Plakette auf der Karte
         const sc = shownCost(p, card);
         const node = createCardDOM(card, false, null, sc || {});
@@ -1464,8 +1467,10 @@ function renderPlayerHand(p) {
             cb.innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < cp ? 'on' : ''}"></i>`).join('');
             node.appendChild(cb);
         }
-        const offset = idx - mid;
-        slot.style.transform = `translateY(${Math.abs(offset) * 8}px) rotate(calc(${offset} * var(--fan-ang, 6deg)))`;
+        const offset = pos - mid;
+        slot.style.transform = handSlotTransform(offset); slot.dataset.ang = offset * (UI.fanAng || 6);
+        nodes[idx] = node; angs[idx] = offset * (UI.fanAng || 6);
+        const sortable = !G.spectate && !G.gameOver;                                     // Reihenfolge per Ziehen ändern: immer (nur Anzeige)
         if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
             node.classList.add('choice-target'); node.style.cursor = 'pointer';
@@ -1480,14 +1485,78 @@ function renderPlayerHand(p) {
                 sb.title = tr('Als Ressource legen: Stash-Bonus'); node.appendChild(sb);
             }
             node.draggable = true;
-            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
-            node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); });
+            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'hand', idx, card }; e.dataTransfer.setData('text/plain', card.uid); node.classList.add("is-dragging"); if (sortable) handSortStart(slot); if (firstSlotCands(card).length) startDragAim(card.uid, e); markDropTargets(); });
             node.addEventListener('click', (e) => { if (e.target.closest('button')) return; openHandCardMenu(idx); });
         }
+        if (sortable && !node.draggable) {                                               // nicht spielbar (z. B. Gegnerzug): nur umsortieren
+            node.draggable = true;
+            node.addEventListener('dragstart', (e) => { UI.drag = { kind: 'handsort', idx, card }; e.dataTransfer.setData('text/plain', card.uid); e.dataTransfer.effectAllowed = 'move'; node.classList.add("is-dragging"); handSortStart(slot); });
+        }
+        if (node.draggable) node.addEventListener('dragend', () => { node.classList.remove("is-dragging"); UI.drag = null; clearDragHighlights(); handSortEnd(); });
         slot.appendChild(node); box.appendChild(slot);
     });
-    flyNewHandCards(p, box);
+    flyNewCards(p.hand, nodes, 'handSeen', 'handFly', deckRect(), i => angs[i] || 0);
 }
+const handSlotTransform = offset => `translateY(${Math.abs(offset) * 8}px) rotate(calc(${offset} * var(--fan-ang, 6deg)))`;
+// Anzeige-Reihenfolge der eigenen Hand (UI.handOrder: uids, per Drag & Drop oder aus dem Mulligan). Reine Anzeige –
+// p.hand und alle Aktionen (handIdx) bleiben unberührt, auch online. Neue Karten kommen hinten dazu.
+function handDisplayOrder(p) {
+    const all = p.hand.map((c, i) => i);
+    if (!UI.handOrder || G.spectate) return all;
+    const pos = new Map(UI.handOrder.map((u, i) => [u, i]));
+    const order = all.filter(i => pos.has(p.hand[i].uid)).sort((a, b) => pos.get(p.hand[a].uid) - pos.get(p.hand[b].uid)).concat(all.filter(i => !pos.has(p.hand[i].uid)));
+    UI.handOrder = order.map(i => p.hand[i].uid);
+    return order;
+}
+// ---------------------------------------------------------------- Handkarten umsortieren (Drag & Drop)
+// Solange die gezogene Karte über der Hand ist, rückt sie live an die nächste Stelle (Nachbarn gleiten zur Seite);
+// außerhalb der Hand gilt wieder die alte Reihenfolge (z. B. beim Ausspielen aufs Feld). Loslassen über der Hand merkt die Reihenfolge.
+const HSORT = { slot: null, box: null, orig: null, pos: [], zone: null, done: false };
+function handSortStart(slot) {
+    const box = slot.parentNode, kids = [...box.children];
+    const rs = kids.map(k => k.getBoundingClientRect());
+    HSORT.slot = slot; HSORT.box = box; HSORT.orig = kids; HSORT.done = false;
+    HSORT.pos = rs.map(r => r.left + r.width / 2);                                      // Mitte jedes Platzes (bleibt beim Umsortieren gleich)
+    const top = Math.min(...rs.map(r => r.top));
+    HSORT.zone = { left: Math.min(...rs.map(r => r.left)) - 40, right: Math.max(...rs.map(r => r.right)) + 40, top: top - 20, bottom: window.innerHeight + 10 };
+}
+const inHandZone = e => { const z = HSORT.zone; return !!z && e.clientX >= z.left && e.clientX <= z.right && e.clientY >= z.top && e.clientY <= z.bottom; };
+function handSortApply(list) {
+    const box = HSORT.box; if (!box || !HSORT.slot || !HSORT.slot.isConnected) return;
+    if (list.every((k, i) => box.children[i] === k)) return;
+    const before = new Map(list.map(k => [k, k.getBoundingClientRect().left]));
+    list.forEach(k => box.appendChild(k));
+    const mid = (list.length - 1) / 2;
+    list.forEach((k, i) => {
+        k.style.transform = handSlotTransform(i - mid); k.dataset.ang = (i - mid) * (UI.fanAng || 6);
+        const dx = before.get(k) - k.getBoundingClientRect().left;                     // FLIP: Karte gleitet vom alten Platz herüber
+        if (Math.abs(dx) > 1 && k.firstChild) k.firstChild.animate([{ translate: `${dx}px 0` }, { translate: '0 0' }], { duration: 200, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    });
+}
+function handSortOver(e) {
+    if (!HSORT.slot) return;
+    if (!HSORT.slot.isConnected) { HSORT.slot = null; return; }                         // Hand wurde neu gezeichnet: abbrechen
+    if (!inHandZone(e)) { handSortApply(HSORT.orig); return; }
+    e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    let t = 0; HSORT.pos.forEach((x, i) => { if (Math.abs(e.clientX - x) < Math.abs(e.clientX - HSORT.pos[t])) t = i; });
+    const rest = HSORT.orig.filter(k => k !== HSORT.slot); rest.splice(t, 0, HSORT.slot);
+    handSortApply(rest);
+}
+function handSortDrop(e) {
+    if (!HSORT.slot || !HSORT.slot.isConnected || !inHandZone(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    UI.handOrder = [...HSORT.box.children].map(k => k.dataset.uid);
+    HSORT.done = true;
+    if (typeof sfx !== 'undefined') sfx.play('deal');
+}
+function handSortEnd() {
+    const was = HSORT.slot, done = HSORT.done;
+    if (was && was.isConnected && !done) handSortApply(HSORT.orig);
+    Object.assign(HSORT, { slot: null, box: null, orig: null, pos: [], zone: null, done: false });
+    if (was && was.isConnected && done) render();                                      // Fächer, Breiten und Flug-Winkel neu
+}
+document.addEventListener('dragover', handSortOver);
+document.addEventListener('drop', handSortDrop, true);
 function openHandCardMenu(idx) {
     const card = G.p1.hand[idx]; if (!card) return;
     const zq = card.type === 'Quest' && questZoneList(G, 1).find(e => e.zone === 'hand' && e.c.uid === card.uid && !validateAction(G, { type: 'COMPLETE_QUEST_ZONE', uid: e.uid }, 1));
@@ -1545,9 +1614,10 @@ function flyFrom(node, from, { delay = 0, elapsed = 0, angle = 0 } = {}) {
     if (elapsed > 0) anim.currentTime = elapsed;
     return anim;
 }
-function flyTo(node, to, delay = 0) {
+function flyTo(node, to, delay = 0, angle = 0) {
     const r = node.getBoundingClientRect(); if (!r.width) return Promise.resolve();
-    const dx = to.left + to.width / 2 - (r.left + r.width / 2), dy = to.top + to.height / 2 - (r.top + r.height / 2);
+    const sx = to.left + to.width / 2 - (r.left + r.width / 2), sy = to.top + to.height / 2 - (r.top + r.height / 2);
+    const a = -angle * Math.PI / 180, dx = sx * Math.cos(a) - sy * Math.sin(a), dy = sx * Math.sin(a) + sy * Math.cos(a);   // gedrehter Slot (wie flyFrom)
     const sc = Math.max(0.2, to.width / r.width);
     return node.animate([
         { transform: 'translate(0, 0) scale(1) rotate(0deg)', opacity: 1 },
@@ -1567,10 +1637,6 @@ function flyNewCards(hand, nodes, seenKey, flyKey, from, angleOf) {
         if (el >= FLY_MS) { fly.delete(c.uid); return; }
         if (nodes[idx]) flyFrom(nodes[idx], from, { delay: Math.max(0, -el), elapsed: el, angle: angleOf(idx) });
     });
-}
-function flyNewHandCards(p, box) {
-    const mid = (p.hand.length - 1) / 2;
-    flyNewCards(p.hand, [...box.children].map(s => s.firstChild), 'handSeen', 'handFly', deckRect(), i => (i - mid) * (UI.fanAng || 6));
 }
 // Gegner-Hand: Kartenrücken fliegen vom gegnerischen Deck heran (Container ist um 180° gedreht)
 function flyNewOppCards(p, box) {
@@ -1709,50 +1775,160 @@ function cpuReact(dmgBefore) {
 function resetBanter() { _banter.last = 0; _banter.saidLow = false; _banter.end = false; }
 
 // ---------------------------------------------------------------- Mulligan im Hearthstone-Stil
-// Starthand groß in der Mitte; angeklickte Karten werden markiert und bei "Keep" ersetzt
-// (doPartialMulligan). Ersatzkarten fliegen vom Deck an den Platz der getauschten Karte.
+// Starthand groß im Fächer vor dem abgedunkelten, verschwommenen Spielfeld; angeklickte Karten werden markiert und bei
+// "Keep" ersetzt (doPartialMulligan). Getauschte Karten fliegen ins Deck, Ersatzkarten an ihren Platz. Danach fliegen
+// alle Karten an ihren Platz auf der Hand, während das Spielfeld scharf wird (Reihenfolge = Reihenfolge im Fächer).
+function hsMullLayout(row, slots) {
+    const n = slots.length; if (!n) return;
+    const avail = window.innerWidth * 0.9, w0 = Math.min(340, window.innerHeight * 0.44 / 1.4);
+    const fitOv = n > 1 ? (1 - (avail / w0 - 1) / (n - 1)) / 2 : 0;                        // Überlappung je Seite, mit der w0 passt
+    const ov = Math.max(0.06, Math.min(window.innerWidth < 700 ? 0.3 : 0.12, fitOv));     // nur die Ränder überlappen (schmal: mehr)
+    const w = Math.max(60, Math.min(w0, avail / (1 + (n - 1) * (1 - 2 * ov))));
+    row.style.setProperty('--mw', w + 'px'); row.style.setProperty('--mov', (w * ov) + 'px');
+    const ang = n > 1 ? Math.min(4, 24 / (n - 1)) : 0, mid = (n - 1) / 2;
+    slots.forEach((s, i) => {
+        const o = i - mid; s._ang = o * ang;
+        s.style.transform = `translateY(${(o * o * w * 0.018).toFixed(1)}px) rotate(${s._ang}deg)`;
+        s.style.zIndex = 10 + i;
+        s.firstChild.style.setProperty('--bd', (-i * 0.55) + 's');                          // Schweben versetzt
+    });
+}
+function hsMullEmbers(box) {
+    if (box.childElementCount) return;
+    let h = '';
+    for (let i = 0; i < 26; i++) {
+        const r = (a, b) => (a + Math.random() * (b - a)).toFixed(2);
+        h += `<i style="left:${r(0, 100)}%;--s:${r(3, 8)}px;--d:${r(7, 15)}s;--dl:${r(-15, 0)}s;--dx:${r(-80, 80)}px;--o:${r(.35, .9)}"></i>`;
+    }
+    box.innerHTML = h;
+}
 function openHsMulligan(onDone) {
     const ov = document.getElementById("hs-mulligan"), row = document.getElementById("hs-mull-cards"), keep = document.getElementById("hs-mull-keep");
+    const bg = document.getElementById("hs-mull-bg"), embers = document.getElementById("hs-mull-embers"), head = document.getElementById("hs-mull-head");
     const marked = new Set();
+    const snd = n => { if (typeof sfx !== 'undefined') sfx.play(n); };
+    const keepLabel = () => {
+        keep.textContent = marked.size ? tr`${marked.size} tauschen` : tr('Behalten');
+        keep.classList.toggle('swap', marked.size > 0);
+        keep.classList.remove('bump'); void keep.offsetWidth; keep.classList.add('bump');
+    };
+    const shine = s => { s.classList.remove('shine'); void s.offsetWidth; s.classList.add('shine'); };
     const makeSlot = (card) => {
-        const slot = document.createElement("div"); slot.className = "hs-mull-card";
-        slot.appendChild(createCardDOM(card, false));
-        const x = document.createElement("div"); x.className = "hs-mull-x"; x.textContent = "×"; slot.appendChild(x);
+        const slot = document.createElement("div"); slot.className = "hs-mull-card"; slot._uid = card.uid;
+        const bob = document.createElement("div"); bob.className = "hs-mull-bob";
+        const lift = document.createElement("div"); lift.className = "hs-mull-lift";
+        slot._card = createCardDOM(card, false);
+        const sh = document.createElement("div"); sh.className = "hs-mull-shine";
+        const x = document.createElement("div"); x.className = "hs-mull-x"; x.innerHTML = "<b>✕</b>";
+        lift.append(slot._card, sh, x); bob.appendChild(lift); slot.appendChild(bob);
         slot.onclick = () => {
-            if (keep.disabled) return;
+            if (ov.classList.contains('busy')) return;
             if (marked.has(card.uid)) marked.delete(card.uid); else marked.add(card.uid);
             slot.classList.toggle("marked", marked.has(card.uid));
+            snd(marked.has(card.uid) ? 'flip' : 'click');
+            keepLabel();
         };
         return slot;
     };
-    row.innerHTML = ""; keep.disabled = false;
+    // Ankommen: Karte fliegt vom Deck in ihren Fächerplatz, landet mit Glanz
+    const dealIn = (s, delay) => {
+        const a = flyFrom(s._card, deckRect(), { delay, angle: s._ang });
+        setTimeout(() => snd('deal'), delay);
+        const done = () => shine(s);
+        if (a) a.finished.then(done, done); else done();
+    };
+    row.innerHTML = ""; keep.disabled = false; marked.clear(); keepLabel(); keep.classList.remove('bump');
+    ov.classList.remove('busy', 'landing');
+    hsMullEmbers(embers);
+    document.body.classList.add('mull-open');
     ov.style.display = "flex";
     const slots = G.p1.hand.map(c => { const s = makeSlot(c); row.appendChild(s); return s; });
-    const from = deckRect();
-    slots.forEach((s, i) => flyFrom(s.firstChild, from, { delay: 150 + i * FLY_GAP }));
-    if (typeof sfx !== 'undefined') { sfx.play('shuffle'); slots.forEach((s, i) => setTimeout(() => sfx.play('deal'), 150 + i * FLY_GAP)); }
+    hsMullLayout(row, slots);
+    const onResize = () => { if (!ov.classList.contains('landing')) hsMullLayout(row, slots); };
+    addEventListener('resize', onResize);
+    const onKey = e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !ov.classList.contains('busy')) { e.preventDefault(); keep.click(); } };
+    document.addEventListener('keydown', onKey);
+    // Einblenden: Spielfeld wird dunkel und unscharf, Titel senkt sich, Karten werden ausgeteilt, dann der Knopf
+    bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 650, easing: 'ease-out' });
+    embers.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1400, easing: 'ease-out' });
+    head.animate([{ opacity: 0, transform: 'translateY(-24px) scale(.96)', letterSpacing: '.6em' }, { opacity: 1, transform: 'none' }], { duration: 700, delay: 120, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    snd('shuffle');
+    slots.forEach((s, i) => dealIn(s, 250 + i * FLY_GAP));
+    keep.animate([{ opacity: 0, transform: 'translateY(20px) scale(.9)' }, { opacity: 1, transform: 'none' }], { duration: 420, delay: 250 + slots.length * FLY_GAP + 200, easing: 'cubic-bezier(.2,.9,.3,1.3)', fill: 'backwards' });
     keep.onclick = async () => {
-        keep.disabled = true;
+        if (ov.classList.contains('busy')) return;
+        ov.classList.add('busy'); keep.disabled = true;
         const uids = [...marked];
         if (uids.length) {
-            await Promise.all(slots.filter(s => s.classList.contains("marked")).map((s, i) => flyTo(s.firstChild, deckRect(), i * 80)));
+            snd('shuffle');
+            await Promise.all(slots.filter(s => s.classList.contains("marked")).map((s, i) => flyTo(s._card, deckRect(), i * 80, s._ang)));
             const swapped = G.p1.hand.map(c => uids.includes(c.uid));
             doPartialMulligan(G, 1, uids);
             refreshDisplay(G);
             let k = 0;
             G.p1.hand.forEach((c, i) => {
                 if (!swapped[i] || !slots[i]) return;
-                const s = makeSlot(c); row.replaceChild(s, slots[i]); slots[i] = s;
-                flyFrom(s.firstChild, deckRect(), { delay: k++ * FLY_GAP });
+                const s = makeSlot(c); s.classList.add('fresh'); row.replaceChild(s, slots[i]); slots[i] = s;
             });
-            await sleep(FLY_MS + k * FLY_GAP + 600);
+            hsMullLayout(row, slots);
+            slots.forEach(s => { if (s.classList.contains('fresh')) dealIn(s, 120 + k++ * FLY_GAP); });
+            marked.clear(); keepLabel();
+            await sleep(120 + FLY_MS + k * FLY_GAP + 550);
         }
-        await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 250 }).finished;
-        ov.style.display = "none";
-        UI.handSeen = new Set(G.p1.hand.map(c => c.uid));
-        render();
+        removeEventListener('resize', onResize); document.removeEventListener('keydown', onKey);
+        await hsMullToHand(ov, slots);
         if (onDone) onDone();
     };
+}
+// Abflug: jede Mulligan-Karte fliegt (mit kurzem Ausholen) an ihren Platz auf der Hand, das Spielfeld wird dabei scharf
+async function hsMullToHand(ov, slots) {
+    const bg = document.getElementById("hs-mull-bg"), embers = document.getElementById("hs-mull-embers"), head = document.getElementById("hs-mull-head"), keep = document.getElementById("hs-mull-keep");
+    UI.handOrder = slots.map(s => s._uid);                                                // Hand in der Reihenfolge des Fächers
+    UI.handSeen = new Set(G.p1.hand.map(c => c.uid)); UI.handFly.clear();
+    document.body.classList.add('mull-land');
+    render();
+    const rad = a => a * Math.PI / 180;
+    const geo = (node, ang) => {                                                          // Mitte und ungedrehte Breite (5:7) einer gedrehten Karte
+        const r = node.getBoundingClientRect(), a = Math.abs(rad(ang));
+        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width / (Math.cos(a) + 1.4 * Math.sin(a)), a: ang };
+    };
+    const targets = new Map();
+    document.querySelectorAll('#bot-hand .hand-card-slot').forEach(sl => { if (sl.firstChild) targets.set(sl.dataset.uid, geo(sl.firstChild, parseFloat(sl.dataset.ang) || 0)); });
+    const items = slots.map(s => ({ s, ...geo(s._card, s._ang) }));
+    ov.classList.add('busy', 'landing');
+    items.forEach(it => {                                                                 // aus dem Fächer lösen, Lage bleibt gleich
+        const s = it.s; s.classList.remove('marked', 'shine', 'fresh');
+        Object.assign(s.style, { position: 'fixed', margin: '0', left: (it.cx - it.w / 2) + 'px', top: (it.cy - it.w * 0.7) + 'px', transformOrigin: '50% 50%', transform: `rotate(${it.a}deg)` });
+    });
+    const fade = (el, o) => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, ...o }], { duration: 260, easing: 'ease-in', fill: 'forwards' });
+    fade(head, { transform: 'translateY(-16px)' }); fade(keep, { transform: 'translateY(14px) scale(.92)' });
+    bg.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 760, delay: 140, easing: 'cubic-bezier(.4,0,.6,1)', fill: 'forwards' });
+    embers.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 500, fill: 'forwards' });
+    const DUR = 620, GAP = 55;
+    const flights = items.map((it, i) => {
+        const t = targets.get(it.s._uid);
+        if (!t) return it.s.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: i * GAP, fill: 'forwards' }).finished;
+        const dx = t.cx - it.cx, dy = t.cy - it.cy, sc = t.w / it.w;
+        setTimeout(() => { if (typeof sfx !== 'undefined') sfx.play('deal'); }, i * GAP + DUR * 0.8);
+        return it.s.animate([
+            { transform: `translate(0, 0) rotate(${it.a}deg) scale(1)`, easing: 'cubic-bezier(.3,0,.5,1)' },
+            { transform: `translate(${dx * -0.03}px, ${-it.w * 0.07}px) rotate(${it.a * 1.3}deg) scale(1.05)`, offset: 0.2, easing: 'cubic-bezier(.55,0,.25,1)' },
+            { transform: `translate(${dx}px, ${dy}px) rotate(${t.a}deg) scale(${sc})` }
+        ], { duration: DUR, delay: i * GAP, fill: 'forwards' }).finished;
+    });
+    await Promise.all(flights);
+    // Übergabe an die echte Hand im selben Bild: Fenster weg, Hand sichtbar – dann kurzes Aufleuchten beim Einsortieren
+    document.body.classList.remove('mull-open');
+    ov.style.display = "none";
+    [bg, embers, head, keep].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+    ov.classList.remove('busy', 'landing');
+    document.getElementById('hs-mull-cards').innerHTML = "";
+    document.querySelectorAll('#bot-hand .hand-card-slot > .card-wrapper').forEach((n, i) => n.animate([
+        { transform: 'translateY(-10px) scale(1.05)', filter: 'brightness(1.45) drop-shadow(0 0 10px rgba(253,230,138,.9))' },
+        { transform: 'none', filter: 'none' }
+    ], { duration: 380, delay: i * 25, easing: 'ease-out' }));
+    await sleep(420);
+    document.body.classList.remove('mull-land');                                          // Hand fährt ab jetzt wie gewohnt hoch/runter
 }
 
 // ---------------------------------------------------------------- Drag & Drop

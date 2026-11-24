@@ -508,21 +508,70 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .cpu-bubble.out { opacity: 0; transform: translateY(-6px); }
 @keyframes bubbleIn { from { opacity: 0; transform: scale(.6) translateX(20px); } to { opacity: 1; transform: none; } }
 
-/* ===== Mulligan im Hearthstone-Stil ===== */
-#hs-mulligan { position: fixed; inset: 0; z-index: 100000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 4vh;
-    background: radial-gradient(ellipse at center, #1f1a16 0%, #050302 75%); }
-#hs-mull-hint { color: var(--text-dim); font-size: 14px; letter-spacing: 1px; }
-#hs-mull-cards { display: flex; gap: 1.2vw; justify-content: center; align-items: center; }
-.hs-mull-card { position: relative; cursor: pointer; transition: transform .18s; }
-.hs-mull-card .card-wrapper.hand-card { --cw: min(12vw, 27vh); }
-.hs-mull-card:hover { transform: translateY(-10px); }
-.hs-mull-card.marked { transform: translateY(16px); }
-.hs-mull-card .card-visual { transition: filter .18s; }
-.hs-mull-card.marked .card-visual { filter: grayscale(.85) brightness(.45); }
-.hs-mull-x { position: absolute; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; pointer-events: none;
-    color: #ef4444; font-size: min(7vw, 15vh); font-weight: 900; text-shadow: 0 0 18px #000, 0 0 8px #7f1d1d; }
-.hs-mull-card.marked .hs-mull-x { display: flex; }
-#hs-mull-keep { padding: 12px 64px; font-size: 20px; }
+/* ===== Mulligan im Hearthstone-Stil =====
+   Spielfeld dunkel und verschwommen im Hintergrund (#hs-mull-bg), Glut steigt auf, Starthand groß im Fächer.
+   Ebenen je Karte: Slot (Fächer-Lage) > bob (leichtes Schweben) > lift (Hover/Markiert) > Karte (Anflug). */
+#hs-mulligan { position: fixed; inset: 0; z-index: 100000; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 2.6vh; overflow: hidden; }
+#hs-mull-bg { position: absolute; inset: 0; z-index: -2; pointer-events: none;
+    background: radial-gradient(ellipse 80% 70% at 50% 55%, rgba(40,28,14,.12) 0%, rgba(8,5,3,.5) 60%, rgba(2,1,0,.86) 100%);
+    -webkit-backdrop-filter: blur(8px) saturate(.75) brightness(.72); backdrop-filter: blur(8px) saturate(.75) brightness(.72); }
+#hs-mull-embers { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+#hs-mull-embers i { position: absolute; bottom: -14px; width: var(--s); height: var(--s); border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle, #fff3c4 0%, #f59e0b 42%, rgba(245,158,11,0) 72%); animation: mullEmber var(--d) linear var(--dl) infinite; }
+@keyframes mullEmber { 0% { transform: translate(0, 0); opacity: 0; } 12% { opacity: var(--o, .8); } 75% { opacity: calc(var(--o, .8) * .5); } 100% { transform: translate(var(--dx), -108vh); opacity: 0; } }
+#hs-mull-head { display: flex; flex-direction: column; align-items: center; gap: .9vh; pointer-events: none; }
+#hs-mull-title { display: flex; align-items: center; gap: .7em; font: 900 clamp(22px, 4.4vh, 48px)/1.1 Georgia, serif; letter-spacing: .2em; text-transform: uppercase;
+    color: #f6d983; filter: drop-shadow(0 0 14px rgba(232,180,70,.45)) drop-shadow(0 4px 10px #000); }
+#hs-mull-title::before, #hs-mull-title::after { content: ''; width: clamp(40px, 9vw, 160px); height: 2px; background: linear-gradient(90deg, rgba(201,168,76,0), #e9c46a); }
+#hs-mull-title::after { background: linear-gradient(270deg, rgba(201,168,76,0), #e9c46a); }
+#hs-mull-hint { color: #e6d7b5; opacity: .78; font-size: clamp(12px, 1.8vh, 17px); letter-spacing: 1.5px; text-shadow: 0 2px 8px #000; }
+#hs-mull-cards { display: flex; justify-content: center; align-items: flex-end; padding: 1vh 0 2vh; }
+.hs-mull-card { position: relative; flex: none; margin: 0 calc(-1 * var(--mov, 12px)); transform-origin: 50% 100%; cursor: pointer; }
+.hs-mull-card .card-wrapper.hand-card { --cw: var(--mw, 220px); }
+.hs-mull-bob { animation: mullBob 3.8s ease-in-out var(--bd, 0s) infinite; }
+@keyframes mullBob { 50% { transform: translateY(calc(var(--mw, 220px) * -.018)); } }
+.hs-mull-lift { position: relative; transition: transform .3s cubic-bezier(.2,.9,.3,1.35); }
+.hs-mull-card:hover { z-index: 60 !important; }
+#hs-mulligan:not(.busy) .hs-mull-card:hover .hs-mull-lift { transform: translateY(-7%) scale(1.08); }
+.hs-mull-card .card-visual { transition: filter .25s, box-shadow .25s; box-shadow: 0 2cqw 6cqw rgba(0,0,0,.7); }
+#hs-mulligan:not(.busy) .hs-mull-card:hover .card-visual { box-shadow: 0 0 0 .8cqw #f6d983, 0 0 7cqw 1.4cqw rgba(250,204,21,.5), 0 4cqw 8cqw rgba(0,0,0,.75); }
+.hs-mull-card.marked .hs-mull-lift { transform: translateY(8%) scale(.93) rotate(-2deg); }
+#hs-mulligan:not(.busy) .hs-mull-card.marked:hover .hs-mull-lift { transform: translateY(4%) scale(.96) rotate(-2deg); }
+.hs-mull-card.marked .card-visual { filter: grayscale(.85) brightness(.42); }
+#hs-mulligan:not(.busy) .hs-mull-card.marked:hover .card-visual { box-shadow: 0 0 0 .8cqw #ef4444, 0 0 7cqw 1.4cqw rgba(239,68,68,.45); }
+/* Austausch-Stempel: springt groß herein und setzt sich schräg */
+.hs-mull-x { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; pointer-events: none; opacity: 0;
+    transform: scale(2.3) rotate(-24deg); transition: opacity .12s, transform .3s cubic-bezier(.3,1.7,.5,1); }
+.hs-mull-x b { width: 46%; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font: 900 calc(var(--mw, 220px) * .3)/1 Arial, sans-serif; color: #fff;
+    background: radial-gradient(circle at 40% 35%, #f87171, #b91c1c 60%, #7f1d1d); border: calc(var(--mw, 220px) * .018) solid #fecaca;
+    box-shadow: 0 0 0 calc(var(--mw, 220px) * .012) #7f1d1d, 0 0 26px rgba(239,68,68,.8), 0 8px 18px rgba(0,0,0,.7); text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+.hs-mull-card.marked .hs-mull-x { opacity: 1; transform: scale(1) rotate(-10deg); }
+/* Glanz, der nach dem Landen einmal über die Karte läuft */
+.hs-mull-shine { position: absolute; inset: 0; z-index: 25; pointer-events: none; border-radius: calc(var(--mw, 220px) * .046); overflow: hidden; }
+.hs-mull-shine::before { content: ''; position: absolute; inset: -20% -60%; opacity: 0; transform: translateX(-60%) rotate(8deg);
+    background: linear-gradient(100deg, rgba(255,255,255,0) 38%, rgba(255,240,200,.55) 50%, rgba(255,255,255,0) 62%); mix-blend-mode: screen; }
+.hs-mull-card.shine .hs-mull-shine::before { animation: mullShine .75s ease-out; }
+@keyframes mullShine { 0% { opacity: 0; transform: translateX(-60%) rotate(8deg); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateX(60%) rotate(8deg); } }
+/* Neue Karte nach dem Tausch: kurzer goldener Schein */
+.hs-mull-card.fresh .card-visual { animation: mullFresh 1.2s ease-out; }
+@keyframes mullFresh { 0%, 35% { box-shadow: 0 0 0 .9cqw #fde68a, 0 0 9cqw 3cqw rgba(253,230,138,.85); } 100% { box-shadow: 0 2cqw 6cqw rgba(0,0,0,.7); } }
+#hs-mull-keep { position: relative; padding: 13px 64px; min-width: 240px; font: 900 clamp(16px, 2.3vh, 21px)/1 Georgia, serif; letter-spacing: 1.5px; border-radius: 40px;
+    color: #dcfce7; border: 2px solid #4ade80; background: linear-gradient(180deg, #1f6b3d, #0f3b22); text-shadow: 0 2px 4px rgba(0,0,0,.6);
+    box-shadow: 0 0 22px rgba(74,222,128,.35), inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.7); animation: mullBtn 2.4s ease-in-out infinite;
+    transition: transform .15s, filter .15s, background .25s, border-color .25s, color .25s; }
+#hs-mull-keep:hover:not(:disabled) { transform: translateY(-2px) scale(1.05); filter: brightness(1.15); }
+#hs-mull-keep:active:not(:disabled) { transform: scale(.96); }
+#hs-mull-keep:disabled { color: #dcfce7; cursor: default; animation: none; }
+#hs-mull-keep.swap { color: #fff7ed; border-color: #fb923c; background: linear-gradient(180deg, #b4531a, #6b260b); box-shadow: 0 0 22px rgba(251,146,60,.4), inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.7); animation-name: mullBtnSwap; }
+@keyframes mullBtn { 50% { box-shadow: 0 0 36px rgba(74,222,128,.65), inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.7); } }
+@keyframes mullBtnSwap { 50% { box-shadow: 0 0 36px rgba(251,146,60,.7), inset 0 1px 0 rgba(255,255,255,.18), 0 8px 20px rgba(0,0,0,.7); } }
+/* Abflug zur Hand: kein Schweben/Hover mehr */
+#hs-mulligan.landing .hs-mull-bob { animation: none; }
+#hs-mulligan.busy .hs-mull-card { cursor: default; }
+/* Solange das Fenster offen ist, liegt die echte Hand unsichtbar bereit – beim Abflug ganz ausgefahren (Zielplätze) */
+body.mull-open #bot-hand { visibility: hidden; }
+body.mull-land #bot-hand { transform: translate(calc(-50% + var(--hand-shift, 0px)), 0) !important; transition: none !important; }
 
 /* ===== Symmetrisches Brett =====
    Spielfeld über die volle Höhe, zwei gleich große Hälften, Zuglinie genau in der Mitte.

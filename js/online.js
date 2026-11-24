@@ -168,7 +168,7 @@ function netStart() {
     G.stopAllP = { 2: !!NET.peer.prio };                                                  // Prioritäts-Einstellung des Gasts (engine.js stopAllOf)                                                  // Mulligan beider Spieler (CR 101.2) vor dem ersten Zug
     dealOpeningHands(G); refreshDisplay(G);
     NET.inGame = true; NET.logBuf = []; NET.acks = 0; NET.peer.ready = false; netAnnounce(); netSyncRoom();   // nach der Partie wieder "nicht bereit"
-    netHideModal(); UI.reset();
+    netHideModal(); UI.reset(); UI.handOrder = null;
     netPub(netRoom(NET.code, 'h'), { t: 'start' });
     netPush();
     netMulligan(() => { G.netReady[1] = true; netPush(); render(); netTurnBanner(); });
@@ -247,7 +247,7 @@ function netGuestStart() {
     document.getElementById("log-area").innerHTML = "";
     NET.inGame = true; NET.mullOpen = false; NET.me.ready = false; G = null;
     NET.sent = 0; NET.lastAck = 0; NET.sync = { ok: 0, diff: 0 };
-    netHideModal(); UI.reset();
+    netHideModal(); UI.reset(); UI.handOrder = null;
 }
 // Zustand vom Host: gespiegelt übernehmen. Das Objekt G bleibt dasselbe (Oberfläche merkt sich z. B. das Spielende daran)
 function netGuestState(m) {

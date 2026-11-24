@@ -492,7 +492,7 @@
             souls: run.souls || 0, cardAtk: { ...(run.cardAtk || {}) }, ctr: { ...(run.ctr || {}) }, elite: enemy.trait || null,
             foeOwn: [...new Set(enemy.deck)]                  // Sammlung des Gegners = seine Deckliste ("from your collection", engine.js collectionOf)
         };
-        UI.reset();
+        UI.reset(); UI.handOrder = null;
         UI.overFor = G;                                         // Standard-Siegbildschirm unterdrücken
         // Lebensstand aus dem Run übernehmen
         run.hp = run.maxHp;                                     // Jeder Kampf ist fair: volles Leben (kein Lebensverlust zwischen den Kämpfen)
