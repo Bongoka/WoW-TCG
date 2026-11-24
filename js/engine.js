@@ -575,6 +575,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     if (info.cause !== 'limit' && hasTM(s, c, 'invincible')) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Invincible).`, '', l.pid); return false; }   // Invincible (CR Glossar)
     if (info.destroyed) for (const f of DESTROY_PRE) f(s, c);
     const p = getPlayer(s, l.pid);
+    const hpEff = isReal(s) && l.zone === 'party' ? hpOf(s, c) : null;                   // nur Anzeige: Stärke der Tod-Animation (deathAnim, ui.js)
     if (l.zone === 'party' && c.allyRes6) noaliRestore(s, p, c, true);   // Imp Mistress Noali (Set 6): Ressource verlässt zugleich die Ressourcenreihe
     if (l.zone === 'party') { p.allies.splice(p.allies.indexOf(c), 1); if (c.allyItem9) { const i = p.hero.armors.indexOf(c); if (i >= 0) p.hero.armors.splice(i, 1); delete c.allyItem9; } }
     else if (l.zone === 'equip') { const arr = p.hero.weapons.includes(c) ? p.hero.weapons : p.hero.armors; arr.splice(arr.indexOf(c), 1); }
@@ -590,7 +591,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     // An diese Karte angehängte Fähigkeiten gehen auf den Friedhof ihres Besitzers
     for (const pp of [s.p1, s.p2]) for (const o of [...pp.ongoing]) if (o.attachedTo === c.uid) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' });
     fxEvent(s, { t: 'leave', uid: c.uid, dest: c.isToken ? 'token' : dest, owner: owner.id,
-        card: { id: c.id, uid: c.uid, name: c.name, type: c.type, cost: c.cost, text: c.text, atk: c.atk, hp: c.hp, damage: c.damage || 0, isTotem: c.isTotem } });
+        card: { id: c.id, uid: c.uid, name: c.name, type: c.type, cost: c.cost, text: c.text, atk: c.atk, hp: c.hp, damage: c.damage || 0, hpEff, isTotem: c.isTotem } });
     resetInst(c); c.isTotem = false;
     if (c.isToken) { /* Tokens hören auf zu existieren */ }
     else if (dest === 'hand') owner.hand.push(c);

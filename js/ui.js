@@ -974,11 +974,12 @@ function burstParticles(r, colors, n, delay, rise) {
             { duration: 550 + Math.random() * 350, delay, easing: 'cubic-bezier(.15,.7,.3,1)', fill: 'backwards' }).finished.then(() => p.remove());
     }
 }
-function floatNumber(r, text, color, icon, delay) {
+function floatNumber(r, text, color, icon, delay, size = 1) {
     const { x, y } = fxCenter(r);
     const el = document.createElement('div'); el.className = 'dmg-number';
     el.innerHTML = `<span class="dmg-icon">${icon}</span>${text}`;
     el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.color = color;
+    if (size !== 1) el.style.fontSize = Math.round(46 * size) + 'px';
     document.body.appendChild(el);
     el.animate([
         { transform: 'translate(-50%, -50%) scale(.3)', opacity: 0 },
@@ -992,25 +993,218 @@ function hitFlash(node, color, delay) {
     v.animate([{ filter: 'none' }, { filter: `brightness(1.9) drop-shadow(0 0 14px ${color})` }, { filter: 'none' }], { duration: 380, delay });
     setTimeout(() => triggerShake(node), delay);
 }
-// Karte stirbt: färbt sich rot, zerfällt und fliegt verblassend auf den Friedhof ihres Besitzers
-function deathAnim(e, r, delay) {
+// Tod einer Karte: je wuchtiger der tödliche Treffer (Schaden + Overkill), desto heftiger die Zerstörung
+//   Stufe 0  ohne Schaden zerstört (Effekt, Opfer …): färbt sich grau und fliegt auf den Friedhof
+//   Stufe 1  knapp tödlich: rotes Aufglühen, Beben, zerfällt zu Asche und fliegt auf den Friedhof
+//   Stufe 2  kräftig: Risse laufen über die Karte, Blitz, sie bricht in wenige große Stücke, die herabstürzen
+//   Stufe 3  gewaltig: kurze Trefferpause mit Rissen, dann explodiert die Karte in Splitter – Druckwelle, Funken, Beben
+// Ein fallender Held zerbricht immer (mindestens Stufe 2).
+function deathPower(hit, dmg, hp, hero) {
+    const amt = hit ? hit.amt || 0 : 0;
+    if (!amt) return { tier: hero ? 2 : 0, I: hero ? 0.6 : 0, dt: null };
+    const P = amt + Math.max(0, dmg - (hp || 0));                                        // tödlicher Treffer + Overkill
+    const tier = Math.max(hero ? 2 : 0, P >= 6 ? 3 : P >= 3 ? 2 : 1);
+    return { tier, P, I: Math.min(1.8, Math.max(0.4, P / 7)), dt: hit.dt || null, hit };
+}
+// Vorab: welche Karte stirbt in diesem Schub woran (letzter Treffer vor dem Verlassen; beim Helden vor Spielende)
+function deathPlan(evs) {
+    const last = {}, plan = new Map();
+    for (const e of evs) {
+        if (e.t === 'dmg') last[e.uid] = e;
+        else if (e.t === 'leave' && e.card && (e.dest === 'graveyard' || e.dest === 'removed' || e.dest === 'token')) {
+            const c = e.card;
+            plan.set(e.uid, deathPower(c.hpEff != null ? last[e.uid] : null, c.damage || 0, c.hpEff, false));
+        }
+    }
+    if (G.gameOver) for (const p of [G.p1, G.p2]) {
+        const h = p && p.hero; if (!h || G.winner === p.id || !last[h.uid]) continue;
+        let hp = 0; try { hp = hpOf(G, h); } catch (err) { continue; }
+        if ((h.damage || 0) >= hp) plan.set(h.uid, { ...deathPower(last[h.uid], h.damage || 0, hp, true), hero: true });
+    }
+    return plan;
+}
+// Karte als fixierte Kopie an ihrer alten Stelle
+function deathGhost(r, card, opt) {
     const ghost = document.createElement('div'); ghost.className = 'fx-ghost';
     ghost.style.left = r.left + 'px'; ghost.style.top = r.top + 'px'; ghost.style.width = r.width + 'px'; ghost.style.height = r.height + 'px';
-    const node = createCardDOM({ ...e.card, exhausted: false }, true, null, { noDamage: true });
+    const node = createCardDOM({ ...card, exhausted: false }, true, null, { noDamage: true, ...(opt || {}) });
     node.classList.add('no-fx'); node.style.setProperty('--cw', r.width + 'px');
     ghost.appendChild(node); document.body.appendChild(ghost);
+    return { ghost, node };
+}
+function deathAnim(e, r, delay, d) {
+    d = d || { tier: 0, I: 0 };
+    const { ghost, node } = deathGhost(r, e.card);
+    if (d.tier >= 2) { shatterCard(ghost, node, r, delay, d); return; }
     const gy = document.getElementById(`p${e.owner}-deck-stack`);
     const t = gy && gy.style.visibility !== 'hidden' ? gy.getBoundingClientRect() : null;
     const dx = t ? t.left + t.width / 2 - (r.left + r.width / 2) : 0, dy = t ? t.top + t.height / 2 - (r.top + r.height / 2) : r.height * 0.3;
     const sc = t ? Math.max(0.15, t.width / r.width) : 0.6;
+    const hot = d.tier === 1;                                                            // getötet: glüht rot auf und bebt stärker
+    const red = 'sepia(1) saturate(5) hue-rotate(-30deg) brightness(1.15)', k = hot ? 7 : 4;
     ghost.animate([
-        { transform: 'none', filter: 'none', opacity: 1 },
-        { transform: 'translateX(-4px) rotate(-2deg)', filter: 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.9)', opacity: 1, offset: .12 },
-        { transform: 'translateX(4px) rotate(2deg)', filter: 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.8)', opacity: 1, offset: .22 },
-        { transform: 'scale(.92) rotate(0deg)', filter: 'grayscale(1) brightness(.55) blur(.5px)', opacity: .85, offset: .5 },
+        { transform: 'none', filter: hot ? 'brightness(2.2)' : 'none', opacity: 1 },
+        { transform: `translateX(${-k}px) rotate(-2.5deg) scale(${hot ? 1.05 : 1})`, filter: hot ? red : 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.9)', opacity: 1, offset: .1 },
+        { transform: `translateX(${k}px) rotate(2.5deg)`, filter: hot ? red : 'sepia(1) saturate(4) hue-rotate(-30deg) brightness(.8)', opacity: 1, offset: .2 },
+        { transform: `translateX(${-k / 2}px) rotate(-1deg)`, filter: 'sepia(1) saturate(3) hue-rotate(-30deg) brightness(.7)', opacity: 1, offset: .28 },
+        { transform: 'scale(.92) rotate(0deg)', filter: 'grayscale(1) brightness(.5) blur(.5px)', opacity: .85, offset: .5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${sc}) rotate(-12deg)`, filter: 'grayscale(1) brightness(.4) blur(1px)', opacity: 0 }
     ], { duration: 1300, delay, easing: 'ease-in-out', fill: 'both' }).finished.then(() => ghost.remove());
-    burstParticles(r, ['#57534e', '#a8a29e', '#292524'], 16, delay + 450, true);
+    if (hot) {
+        burstParticles(r, (DMG_STYLE[d.dt] || DMG_STYLE.Melee).c, 10, delay + 60);
+        burstParticles(r, ['#f97316', '#fbbf24', '#7c2d12'], 8, delay + 380, true);      // Glut
+    }
+    burstParticles(r, ['#57534e', '#a8a29e', '#292524'], hot ? 22 : 16, delay + 450, true);
+}
+// Bruchlinien radial vom Einschlag aus, je Ring leicht gezackt – die Splitter passen lückenlos aneinander
+function shardMesh(W, H, cx, cy, nA, nR) {
+    const R = Math.hypot(Math.max(cx, W - cx), Math.max(cy, H - cy)) * 1.4, a0 = Math.random() * Math.PI * 2;
+    const angs = Array.from({ length: nA }, (_, j) => a0 + (j + (Math.random() - 0.5) * 0.55) * Math.PI * 2 / nA);
+    const reach = Math.max(W, H) * 0.62, radii = [0];
+    for (let i = 1; i < nR; i++) radii.push(reach * (i / nR) * (0.8 + Math.random() * 0.4));
+    radii.push(R);
+    const V = radii.map((rad, i) => angs.map(a => { const q = i === 0 || i === nR ? 1 : 0.8 + Math.random() * 0.4; return [cx + Math.cos(a) * rad * q, cy + Math.sin(a) * rad * q]; }));
+    const shards = [], lines = [];
+    for (let i = 0; i < nR; i++) for (let j = 0; j < nA; j++) {
+        const j2 = (j + 1) % nA;
+        shards.push(i === 0 ? [V[0][j], V[1][j], V[1][j2]] : [V[i][j], V[i + 1][j], V[i + 1][j2], V[i][j2]]);
+    }
+    angs.forEach((_, j) => lines.push(V.map(row => row[j])));                            // Risse: Strahlen + Ringstücke
+    for (let i = 1; i < nR; i++) angs.forEach((_, j) => lines.push([V[i][j], V[i][(j + 1) % nA]]));
+    return { shards, lines };
+}
+function shatterCard(ghost, node, r, delay, d) {
+    const W = r.width, H = r.height, I = d.I, big = d.tier >= 3;
+    const col = (DMG_STYLE[d.dt] || DMG_STYLE.Melee).c;
+    const cx = W * (0.38 + Math.random() * 0.24), cy = H * (0.35 + Math.random() * 0.25);   // Einschlagpunkt
+    const nA = big ? Math.round(7 + I * 3) : 3 + (Math.random() < 0.5 ? 1 : 0), nR = big ? (I > 1.1 ? 3 : 2) : 1;
+    const mesh = shardMesh(W, H, cx, cy, nA, nR);
+    const crackMs = big ? 160 : 280;                                                     // Trefferpause: Risse laufen, Karte bebt
+    const boom = delay + crackMs;
+    // 1) Risse laufen vom Einschlag aus über die Karte
+    const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.style.cssText = `position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;filter:drop-shadow(0 0 3px ${col[1]}) drop-shadow(0 0 6px ${col[2]});`;
+    mesh.lines.forEach(pts => {
+        const pl = document.createElementNS(NS, 'polyline');
+        pl.setAttribute('points', pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' '));
+        pl.setAttribute('fill', 'none'); pl.setAttribute('stroke', '#fff'); pl.setAttribute('stroke-width', big ? '2.2' : '2.8'); pl.setAttribute('stroke-linejoin', 'round');
+        pl.setAttribute('pathLength', '100'); pl.style.strokeDasharray = '100';
+        svg.appendChild(pl);
+        pl.animate([{ strokeDashoffset: 100 }, { strokeDashoffset: 0 }], { duration: crackMs * 0.8, delay, easing: 'cubic-bezier(.2,.9,.3,1)', fill: 'both' });
+    });
+    ghost.appendChild(svg);
+    const k = (big ? 5 : 4) * (0.7 + I * 0.5);
+    ghost.animate([
+        { transform: 'scale(1)', filter: 'brightness(2.6) saturate(.6)' },
+        { transform: `translate(${-k}px, ${k * 0.5}px) scale(1.07) rotate(-1.5deg)`, filter: 'brightness(1.6)', offset: .25 },
+        { transform: `translate(${k}px, ${-k * 0.4}px) scale(1.05) rotate(1.5deg)`, filter: 'brightness(1.3) sepia(.4) saturate(2)', offset: .5 },
+        { transform: `translate(${-k * 0.6}px, 0) scale(1.06)`, filter: 'brightness(1.5) sepia(.5) saturate(2.5)', offset: .75 },
+        { transform: 'scale(1)', filter: 'brightness(2.2)' }
+    ], { duration: crackMs, delay, fill: 'backwards' });
+    floatShock(r, cx, cy, col, delay, 0.35, 160);                                        // kleiner Einschlag-Ring
+    // 2) Bruch: Splitter (je ein beschnittener Klon der Karte) fliegen auseinander
+    const fly = mesh.shards.map(poly => {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = `position:absolute;inset:0;pointer-events:none;visibility:hidden;will-change:transform,opacity;filter:drop-shadow(0 0 ${big ? 5 : 3}px ${col[big ? 1 : 2]});`;
+        const inner = document.createElement('div');
+        inner.style.cssText = `position:absolute;inset:0;clip-path:polygon(${poly.map(p => `${p[0].toFixed(1)}px ${p[1].toFixed(1)}px`).join(',')});`;
+        inner.appendChild(node.cloneNode(true)); wrap.appendChild(inner); ghost.appendChild(wrap);
+        // Schwerpunkt (auf die Karte begrenzt) → Flugrichtung weg vom Einschlag
+        const mx = Math.max(0, Math.min(W, poly.reduce((a, p) => a + p[0], 0) / poly.length)), my = Math.max(0, Math.min(H, poly.reduce((a, p) => a + p[1], 0) / poly.length));
+        wrap.style.transformOrigin = `${mx}px ${my}px`;
+        const len = Math.hypot(mx - cx, my - cy) || 1;
+        return { wrap, vx: (mx - cx) / len, vy: (my - cy) / len };
+    });
+    setTimeout(() => { node.style.visibility = 'hidden'; svg.style.display = 'none'; fly.forEach(f => { f.wrap.style.visibility = 'visible'; }); }, boom);
+    let end = 0;
+    fly.forEach(f => {
+        const dur = big ? 750 + Math.random() * 450 : 950 + Math.random() * 300;
+        const dist = big ? W * (0.6 + Math.random() * 1.1) * (0.8 + I * 0.7) : W * (0.12 + Math.random() * 0.2);
+        const g = big ? H * (0.9 + Math.random() * 0.8) : H * (1.4 + Math.random() * 0.6);      // Schwerkraft
+        const lift = big ? -H * (0.25 + Math.random() * 0.35) * I : -H * 0.05;                // Splitter fliegen erst etwas hoch
+        const rot = (Math.random() < 0.5 ? -1 : 1) * (big ? 160 + Math.random() * 420 * I : 15 + Math.random() * 35);
+        const kf = [];
+        for (let s = 0; s <= 6; s++) {
+            const t = s / 6, ease = 1 - Math.pow(1 - t, 2.2);                                // Luftwiderstand: schnell los, dann langsamer
+            const x = f.vx * dist * ease, y = f.vy * dist * ease + lift * Math.sin(Math.PI * Math.min(1, t * 1.4)) + g * t * t;
+            kf.push({ transform: `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${(rot * ease).toFixed(1)}deg) scale(${(1 - t * (big ? 0.45 : 0.2)).toFixed(3)})`,
+                opacity: t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45, filter: s === 0 ? 'brightness(2)' : s === 1 ? 'brightness(1.3)' : 'brightness(.9)' });
+        }
+        f.wrap.animate(kf, { duration: dur, delay: boom, fill: 'both', easing: 'linear' });
+        end = Math.max(end, boom + dur);
+    });
+    setTimeout(() => ghost.remove(), end + 50);
+    // 3) Wucht drumherum
+    const R = { left: r.left + cx - W / 2, top: r.top + cy - H / 2, width: W, height: H };
+    setTimeout(() => screenShake(big ? Math.min(2.4, 0.7 + I * 0.8) : 0.45 + I * 0.4), boom);
+    if (big) {
+        floatShock(r, cx, cy, col, boom, 1.6 + I * 0.9, 520);                              // Druckwelle
+        floatShock(r, cx, cy, ['#fff', '#fff', col[0]], boom + 60, 1 + I * 0.5, 380);
+        flashBloom(r, cx, cy, col, boom, 1.2 + I * 0.6);
+        burstParticles({ ...R, width: W * (1.2 + I * 0.6), height: H * (1.2 + I * 0.6) }, ['#fff', ...col], Math.round(18 + I * 16), boom);   // Funken
+        burstParticles(R, ['#f97316', '#fbbf24', '#fde68a', col[1]], Math.round(8 + I * 8), boom + 120, true);                          // Glut steigt auf
+        debrisChips(r, cx, cy, Math.round(10 + I * 10), boom, W * (0.9 + I * 0.6));
+        if (I > 1.15) screenFlash(col[0], boom, Math.min(0.2, 0.08 + (I - 1.15) * 0.2));
+        if (typeof spxPlaySnd === 'function') { spxPlaySnd('explosive_trap', boom, Math.min(1, 0.45 + I * 0.3)); if (I > 1.2) spxPlaySnd('thunderclap', boom + 40, 0.35); }
+    } else {
+        flashBloom(r, cx, cy, col, boom, 0.8 + I * 0.3);
+        burstParticles(R, col, Math.round(10 + I * 6), boom);
+        debrisChips(r, cx, cy, Math.round(6 + I * 5), boom, W * 0.45);
+        burstParticles(r, ['#57534e', '#a8a29e', '#292524'], 14, boom + 350, true);         // Staub
+        if (typeof spxPlaySnd === 'function') spxPlaySnd('shield_bash', boom, 0.4 + I * 0.25);
+    }
+}
+// Ring, der sich vom Einschlag ausbreitet (Druckwelle)
+function floatShock(r, cx, cy, col, delay, size, dur) {
+    const d = Math.max(r.width, r.height) * size, el = document.createElement('div');
+    el.className = 'fx-shock';
+    el.style.cssText = `left:${r.left + cx - d / 2}px;top:${r.top + cy - d / 2}px;width:${d}px;height:${d}px;border-color:${col[0]};box-shadow:0 0 18px ${col[1]}, inset 0 0 14px ${col[1]};`;
+    document.body.appendChild(el);
+    el.animate([{ transform: 'scale(.1)', opacity: 1, borderWidth: '10px' }, { transform: 'scale(1)', opacity: 0, borderWidth: '1px' }],
+        { duration: dur, delay, easing: 'cubic-bezier(.1,.8,.3,1)', fill: 'both' }).finished.then(() => el.remove());
+}
+// Grelles Aufleuchten im Einschlag
+function flashBloom(r, cx, cy, col, delay, size) {
+    const d = Math.max(r.width, r.height) * size, el = document.createElement('div');
+    el.className = 'fx-shock';
+    el.style.cssText = `left:${r.left + cx - d / 2}px;top:${r.top + cy - d / 2}px;width:${d}px;height:${d}px;border:0;mix-blend-mode:screen;background:radial-gradient(circle, #fff 0%, ${col[0]} 22%, ${col[1]}88 45%, transparent 70%);`;
+    document.body.appendChild(el);
+    el.animate([{ transform: 'scale(.3)', opacity: 0 }, { transform: 'scale(1)', opacity: 1, offset: .15 }, { transform: 'scale(1.25)', opacity: 0 }],
+        { duration: 420, delay, easing: 'ease-out', fill: 'both' }).finished.then(() => el.remove());
+}
+// Kleine eckige Bruchstücke mit Schwerkraft
+function debrisChips(r, cx, cy, n, delay, spread) {
+    const x0 = r.left + cx, y0 = r.top + cy;
+    for (let i = 0; i < n; i++) {
+        const p = document.createElement('div'); p.className = 'fx-particle';
+        const w = 3 + Math.random() * 7, h = 2 + Math.random() * 5;
+        p.style.cssText = `width:${w}px;height:${h}px;left:${x0}px;top:${y0}px;border-radius:1px;background:${['#3f2a1a', '#6b4a2b', '#c8a670', '#1c1917'][i % 4]};`;
+        document.body.appendChild(p);
+        const a = Math.random() * Math.PI * 2, dist = spread * (0.4 + Math.random() * 0.8), g = 140 + Math.random() * 160, rot = (Math.random() - 0.5) * 900;
+        const dx = Math.cos(a) * dist, dy = Math.sin(a) * dist * 0.8;
+        p.animate([{ transform: 'translate(0,0) rotate(0)', opacity: 1 },
+            { transform: `translate(${dx * 0.7}px, ${dy * 0.7 + g * 0.15}px) rotate(${rot * 0.6}deg)`, opacity: 1, offset: .45 },
+            { transform: `translate(${dx}px, ${dy + g}px) rotate(${rot}deg)`, opacity: 0 }],
+            { duration: 800 + Math.random() * 400, delay, easing: 'cubic-bezier(.2,.6,.4,1)', fill: 'backwards' }).finished.then(() => p.remove());
+    }
+}
+// Ganzer Bildschirm blitzt kurz auf (nur bei gewaltigen Treffern)
+function screenFlash(color, delay, peak) {
+    const el = document.createElement('div'); el.className = 'fx-screenflash'; el.style.background = color;
+    document.body.appendChild(el);
+    el.animate([{ opacity: 0 }, { opacity: peak, offset: .12 }, { opacity: 0 }], { duration: 380, delay, fill: 'both' }).finished.then(() => el.remove());
+}
+// Held fällt: zerbricht auf dem Feld (Stufe je nach letztem Treffer, mindestens 2); sein Platz bleibt danach leer
+function heroDeathAnim(node, r, delay, d) {
+    const c = findCharacter(G, node.dataset.uid); if (!c) return;
+    const { ghost, node: cn } = deathGhost(r, c, { imageMode: c.flipped ? 'back' : 'ea' });
+    ghost.style.visibility = 'hidden';
+    setTimeout(() => {
+        ghost.style.visibility = ''; UI.heroFallen = { g: G, uid: c.uid };
+        document.querySelectorAll(`#arena [data-uid="${c.uid}"]`).forEach(n => { n.style.visibility = 'hidden'; });
+    }, delay);
+    shatterCard(ghost, cn, r, delay, d);
 }
 // Held wird umgedreht (Flip): fliegt groß in die Mitte, der Kartentext (die Flip-Kraft) leuchtet auf, erst dann dreht
 // er sich auf die neue Seite, bleibt kurz stehen und fliegt zurück. UI.flipWait: die CPU wartet, bis das vorbei ist.
@@ -1063,6 +1257,7 @@ function flipShowAnim(node, r, uid, from, to, glowTop) {
 function playFxEvents(prevRects) {
     const evs = G.fxq; if (!evs || !evs.length) return;
     G.fxq = [];
+    const deaths = deathPlan(evs), hitAt = {};                                              // Tod-Animation je nach tödlichem Treffer (deathAnim)
     let k = 0, spellAt = null;                                                           // spellAt: Zahlen erst beim Einschlag des Zaubers (spellfx.js)
     let occ = {}, bolts = 0, spellSrc = null;                                                           // Treffer je Ziel / Geschosse ohne Zauber (spxDmgBolt)
     for (let i = 0; i < evs.length; i++) {
@@ -1090,14 +1285,17 @@ function playFxEvents(prevRects) {
         if (e.t === 'dmg') {
             const st = DMG_STYLE[e.dt] || DMG_STYLE.Melee;
             burstParticles(r, st.c, 18, delay);
-            floatNumber(r, `−${e.amt}`, '#ef4444', st.icon, delay);
+            const kill = deaths.get(e.uid), lethal = kill && kill.hit === e;
+            floatNumber(r, `−${e.amt}`, '#ef4444', st.icon, delay, lethal ? 1 + kill.tier * 0.18 : 1);   // tödlicher Treffer: größere Zahl
             if (node) hitFlash(node, st.c[1], delay);
+            if (lethal) { hitAt[e.uid] = delay; if (kill.hero && node) heroDeathAnim(node, r0, delay + 60, kill); }
             if (e.hero && e.amt >= 5) setTimeout(() => screenShake(Math.min(2, e.amt / 5)), delay);
         } else if (e.t === 'heal') {
             burstParticles(r, HEAL_STYLE.c, 14, delay, true);
             floatNumber(r, `+${e.amt}`, '#4ade80', HEAL_STYLE.icon, delay);
         } else if (e.t === 'leave' && (e.dest === 'graveyard' || e.dest === 'removed' || e.dest === 'token') && !node) {
-            deathAnim(e, r, delay + 350);
+            const d = deaths.get(e.uid) || { tier: 0, I: 0 }, hd = hitAt[e.uid];
+            deathAnim(e, r, d.tier >= 2 && hd != null ? hd + 60 : Math.max(delay, hd || 0) + (d.tier === 1 ? 200 : 350), d);
         } else if (e.t === 'flip' && node) {
             heroFlipAnim(node, r, e);
         } else if (e.t === 'stash' && node) {
@@ -1326,6 +1524,7 @@ function renderHeroCard(p, containerId) {
     decorateInPlay(h, p.hero);
     showHeroForms(h, p);
     if (UI.flipHide === p.hero.uid) h.style.visibility = 'hidden';                     // fliegt gerade als Flip-Animation
+    if (UI.heroFallen && UI.heroFallen.g === G && UI.heroFallen.uid === p.hero.uid) h.style.visibility = 'hidden';   // zerbrochen (heroDeathAnim)
     box.appendChild(h);
     box.appendChild(heroHpBar(p));
 }

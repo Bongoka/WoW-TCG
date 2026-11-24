@@ -470,6 +470,8 @@ button.danger { color: #e6a3a3; border-color: #7a2d2d; }
 .dmg-number .dmg-icon { font-size: 26px; margin-right: 4px; vertical-align: middle; -webkit-text-stroke: 0; }
 .fx-ghost { position: fixed; z-index: 9700; pointer-events: none; }
 .fx-ghost .card-wrapper { width: 100%; }
+.fx-shock { position: fixed; z-index: 9790; pointer-events: none; border-radius: 50%; border: 6px solid; box-sizing: border-box; }
+.fx-screenflash { position: fixed; inset: 0; z-index: 9795; pointer-events: none; mix-blend-mode: screen; }
 
 /* ===== Ziel-/Angriffspfeil ===== */
 #aim-arrow { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9900; pointer-events: none; display: none; overflow: visible; }
