@@ -176,6 +176,37 @@
     };
     // cls = englischer Klassenname (z. B. "Warrior"). act = 1..4; ohne act = alle Akte.
     // opts: heroId, talent, scourge, traitorCards, race.
+    // Waffen, die nicht zur Spielweise des Talentbaums passen, gibt es im Roguelike nicht (Draft, Beute, Händler, Ereignisse,
+    // Gegner-Decks) – erlaubt bleiben sie nach den Regeln trotzdem. Vorgaben des Nutzers:
+    //  - Schamane Enhancement: keine Stäbe.
+    //  - Jäger: von den Stäben nur solche für Fernkampfwaffen (Lok'delar, Stave of the Ancient Keepers).
+    //  - Druide Feral: Cat/Bear Form enden, sobald er mit einer Waffe zuschlägt – nur Waffen mit einem Effekt, der ohne Zuschlagen
+    //    und ohne Erschöpfen des Helden wirkt (Braxxis' Staff of Slumber, Zerstören für einen Effekt, Aktivieren, Dauereffekte).
+    R.weaponFitsStyle = function (cd, cls, talent) {
+        if (!cd || cd.type !== 'Weapon') return true;
+        const staff = cd.wsub === 'Staff';
+        if (cls === 'Shaman' && talent === 'Enhancement') return !staff;
+        if (cls === 'Hunter' && staff) return /Ranged weapons?/i.test(cd.text || '');
+        if (cls === 'Druid' && talent === 'Feral') return R.weaponWorksUnstruck(cd);
+        return true;
+    };
+    // Hat die Waffe einen Effekt, der wirkt, ohne mit ihr zuzuschlagen und ohne den Helden zu erschöpfen?
+    // Je Absatz (<p>): Kräfte "Kosten >>> Effekt" zählen, wenn die Kosten den Helden nicht erschöpfen; sonstige Absätze, wenn sie
+    // sich nicht nur auf das Zuschlagen/den Kampf mit dieser Waffe beziehen (Strike, Kampfschaden, ATK der Waffe, Keywords).
+    R.weaponWorksUnstruck = function (cd) {
+        const txt = String((cd && cd.text) || '').replace(/\([^)]*\)/g, ' ');           // Erinnerungstexte in Klammern ignorieren
+        if (/\bForm\b/.test(txt)) return true;                                           // Braxxis: verbessert ihn in Gestalt
+        for (const raw of txt.split(/<p>/i)) {
+            const s = raw.trim(); if (!s) continue;
+            const strikeOnly = x => /\bstrike|(?<!non-)combat damage|(dealt|damage) with this weapon|this weapon has|ATK counter|Long-?Range|Dual Wield|Thrown/i.test(x);
+            if (s.includes('>>>')) { const [cost, eff] = s.split('>>>'); if (!/Exhaust your hero/i.test(cost) && !strikeOnly(eff)) return true; continue; }
+            // "When your hero attacks" / "while attacking": wirkt auch beim Angriff in Gestalt ohne Zuschlagen (Hammer of the Naaru)
+            if (strikeOnly(s) && !/When your hero attacks|while (your hero is )?attacking/i.test(s.replace(/this weapon has[^.]*\./gi, ''))) continue;
+            if (/enters play exhausted|^[A-Z][a-z]+ Reputation$/i.test(s)) continue;
+            return true;
+        }
+        return false;
+    };
     R.poolFor = function (cls, faction, act, opts = {}) {
         const sets = new Set(R.actSets(act));
         const talent = opts.talent !== undefined ? opts.talent : null;
@@ -196,7 +227,7 @@
             // Todesritter gibt es erst ab scourgewar: ihre Klassenkarten gehören von Anfang an zum Pool
             if (!sets.has(R.setOf(cd)) && !(cls === 'Death Knight' && (cd.allowedClasses || []).includes(cls))) continue;
             let ok = false;
-            try { ok = cardMatchesPlayer(cd, fake) && talentReqOk(cd, hero); } catch (e) { ok = false; }
+            try { ok = cardMatchesPlayer(cd, fake) && talentReqOk(cd, hero) && R.weaponFitsStyle(cd, cls, talent); } catch (e) { ok = false; }
             if (ok) out.push(cd);
         }
         R.CARD_CACHE[key] = out;
