@@ -2558,6 +2558,16 @@ function runRuleTests() {
         for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
             assert(d && d.action && d.action.type === 'ATTACK' && d.action.attackerUid === att.uid, 'CPU greift nicht an: ' + (d && d.action ? d.action.desc : 'Zug beenden'));
     });
+    test(207, "Pflichtangriff mit Angriffskosten (Winter's Grasp): ohne Bezahlung kein Zwang, der Zug kann enden (CR 600.3)", () => {
+        const vanilla = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk > 0);
+        for (const ready of [0, 2]) {
+            const s = fresh(); s.real = false; const a = put(s, 1, vanilla.id); addTM(a, { k: 'mustAttack', turn: s.turn }); res(s, 1, ready);
+            assert(mustAttack(s, 1).includes(a), 'Testaufbau: kein Zwang ohne Winter\'s Grasp');
+            put(s, 2, 60);
+            assert(!mustAttack(s, 1).length && !validateAction(s, { type: 'END_TURN' }, 1), `${ready} Ressourcen: Zugende trotz Angriffskosten verboten`);
+            assert(getAttackActions(s, 1).some(x => x.attackerUid === a.uid) === !!ready, `${ready} Ressourcen: Angriff des Allys falsch angeboten`);
+        }
+    });
     return results;
 }
 

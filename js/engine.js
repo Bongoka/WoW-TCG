@@ -2795,7 +2795,14 @@ const ATTACK_ONLY = [];
 function mustAttack(s, pid) {
     const p = getPlayer(s, pid);
     const ch = pes(s, null, 'challenge').some(m => m.pid !== pid);
-    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch || auraAny(s, 'mustAttack', c)) && canAttackNow(s, c, p) && attackTargets(s, c).length);   // Curse of Frenzy, Bolvar (Set 7)
+    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch || auraAny(s, 'mustAttack', c)) && canAttackNow(s, c, p) && attackFree(s, c));   // Curse of Frenzy, Bolvar (Set 7)
+}
+// CR 600.3: "can't attack unless its controller [pays a cost]" + "must attack if able" – ohne Bezahlung kann der Charakter nicht
+// angreifen und muss es deshalb auch nicht (Winter's Grasp, Grace of Air Totem, Frostweaver Dakar'sith). Erzwungen ist der
+// Angriff nur, wenn er ein Ziel ohne Zusatzkosten hat – sonst konnte der Zug nicht enden (die CPU hing, ohne Ressourcen endlos).
+function attackFree(s, c) {
+    if (ATTACK_EXHAUST.some(f => (f(s, c) || 0) > 0)) return false;
+    return attackTargets(s, c).some(d => !winterCost(s, c, d));
 }
 function isAttackTargetLegal(att, def) { return !!att && !!def && !attackTargetError(G, att, def); }
 function winterCost(s, att, def) {
