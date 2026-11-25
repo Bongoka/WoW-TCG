@@ -3736,7 +3736,7 @@ var I18N_EN = {
     'Deine anderen Dämonen haben +1 Angriff.': 'Your other Demons have +1 ATK.',
     // ---- Roguelike: Artefakte
     'Dein Held hat +1 Angriff. Wenn er Schaden erleidet, ziehe 1 Karte (1x/Zug).': 'Your hero has +1 ATK. When your hero is dealt damage, draw a card (once per turn).',
-    'Die erste Fähigkeit pro Zug kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.': 'The first ability you play each turn costs (2) less. Each ability you play deals 1 Arcane damage to a random enemy.',
+    'Die erste Fähigkeit pro Zug kostet (1) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen gegnerischen Ally 1 Arkanschaden zu.': 'The first ability you play each turn costs (1) less. Each ability you play deals 1 Arcane damage to a random enemy ally.',
     'Der erste Ally pro Zug kommt mit +1/+1 ins Spiel.': 'The first ally you play each turn enters play with +1/+1.',
     'Ende deines Zuges: heile 2 und füge dem gegnerischen Helden 1 Heiligschaden zu. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.': 'At the end of your turn: heal 2 and deal 1 Holy damage to the opposing hero. Once per fight: survive lethal damage with 1 health.',
     'Die erste Fähigkeit pro Zug kostet (1) weniger und kommt als Kopie auf die Hand.': 'The first ability you play each turn costs (1) less and a copy of it is put into your hand.',

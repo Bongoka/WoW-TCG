@@ -1677,8 +1677,8 @@
     function heroOfPid(s, pid) { return s && (pid === 1 ? s.p1.hero : s.p2.hero); }
     function isHero(s, uid) { const c = findCharacter(s, uid); return !!(c && c.type === 'Hero'); }
     function enemyChars(s) { return partyOf(getOpponent(s, 1)); }
-    function pingEnemy(s, amt, dt) {
-        const list = enemyChars(s).filter(c => c);
+    function pingEnemy(s, amt, dt, alliesOnly) {
+        const list = enemyChars(s).filter(c => c && (!alliesOnly || c.type !== 'Hero'));   // alliesOnly: kein Ziel ohne gegnerischen Ally
         if (!list.length) return;
         const c = R.pick(list);
         dealDamage(s, { src: s.p1.hero.uid, tgt: c.uid, amt, dt: dt || 'Arcane', ability: true });
@@ -1755,12 +1755,12 @@
         },
         {
             id: 'overload_core', name: 'Überladungskern', cls: 'Mage', rarity: 'common', price: 110,
-            text: 'Die erste Fähigkeit, die du in einem Zug spielst, kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.',
-            cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -2 : 0,
+            text: 'Die erste Fähigkeit pro Zug kostet (1) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen gegnerischen Ally 1 Arkanschaden zu.',
+            cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -1 : 0,   // Nutzer: (2) war zu stark
             cardPlayed: (s, p, card) => {
                 if (p !== 1 || card.type !== 'Ability') return;
                 setFlag(s, 't:overload_core');
-                q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Arcane' } });   // Balance-Simulation: Magier war zu schwach
+                q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Arcane', allies: true } });   // nur gegnerische Allies, nie der Held (Nutzer)
             }
         },
         {
@@ -2550,7 +2550,7 @@
     // ids bleiben stabil (Saves/Tests), nur Name, Icon und Text ändern sich.
     const ART_META = {
         bloodpact: ['Deep Wounds', 'Abilities/BloodRage.png', 'Dein Held hat +1 Angriff. Wenn er Schaden erleidet, ziehe 1 Karte (1x/Zug).'],
-        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.'],
+        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (1) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen gegnerischen Ally 1 Arkanschaden zu.'],
         beastbond: ['Animal Handler', 'Abilities/AnimalHandler.png', 'Der erste Ally pro Zug kommt mit +1/+1 ins Spiel.'],
         sanctuary: ['Guardian Spirit', 'Spells/GuardianSpirit.png', 'Ende deines Zuges: heile 2 und füge dem gegnerischen Helden 1 Heiligschaden zu. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.'],
         echo_sigil: ['Honor Among Thieves', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kostet (1) weniger und kommt als Kopie auf die Hand.'],
@@ -3401,7 +3401,7 @@
         EK['rladdCard'] = (s, a) => { const p = getPlayer(s, a.pid); if (p && p.hand.length < 10 && CARDS[a.id]) p.hand.push(makeCardInst(a.id, false, p.id)); };
         EK['rlhealHero'] = (s, a) => { const p = getPlayer(s, a.pid); heal(s, p.hero.uid, p.hero.uid, a.amt); };
         EK['rlheroDamage'] = (s, a) => { const p = getPlayer(s, a.pid); dealDamage(s, { src: p.hero.uid, tgt: p.hero.uid, amt: a.amt, sp: p.id }); };
-        EK['rlpingEnemy'] = (s, a) => pingEnemy(s, a.amt, a.dt);
+        EK['rlpingEnemy'] = (s, a) => pingEnemy(s, a.amt, a.dt, !!a.allies);
         EK['rlpingHero'] = (s, a) => { const o = getOpponent(s, a.pid); dealDamage(s, { src: getPlayer(s, a.pid).hero.uid, tgt: o.hero.uid, amt: a.amt, dt: a.dt || 'Arcane', ability: true }); };
         EK['rlpingUid'] = (s, a) => { const c = findCharacter(s, a.uid); if (c) dealDamage(s, { src: getPlayer(s, 1).hero.uid, tgt: c.uid, amt: a.amt, dt: a.dt || 'Melee', ability: true }); };   // Quelle: dein Held (vorher fügte sich das Ziel den Schaden selbst zu)
     };
