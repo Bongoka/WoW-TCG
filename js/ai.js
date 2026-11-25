@@ -350,7 +350,11 @@ function simApply(s, act, pid) { const c = cloneState(s); if (!applyAction(c, ac
 // durch. Das sieht die Bewertung nach nur einer Aktion nicht. Zwei Reihenfolgen: schwächste Angreifer zuerst
 // (opfern sich in die Protectors) bzw. stärkste zuerst. Ergebnis: erster Angriff + Zustand nach dem ganzen Plan.
 function attackPlans(s, pid) {
-    const hasHeroAttack = st => getAttackActions(st, pid).filter(a => a.defenderUid === getOpponent(st, pid).hero.uid);
+    // Angreifer ohne ATK (Held ohne Waffe) gehören nicht in den Plan: sie machen keinen Schaden, erschöpfen sich aber – in der
+    // Reihenfolge "schwächste zuerst" war sonst der Held mit 0 ATK der erste Angriff, obwohl erst die übrigen etwas brachten.
+    // Ob ein 0-ATK-Angriff für sich etwas bringt (Auslöser beim Angriff), bewertet die Suche als Einzelaktion.
+    const hasHeroAttack = st => getAttackActions(st, pid).filter(a => { if (a.defenderUid !== getOpponent(st, pid).hero.uid) return false;
+        const x = findCharacter(st, a.attackerUid); return !x || atkOf(st, x, { attacking: true }) > 0; });
     if (hasHeroAttack(s).length < 2) return [];
     const plans = [];
     for (const order of ['weak', 'strong']) {

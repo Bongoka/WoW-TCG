@@ -2490,7 +2490,7 @@ function runRuleTests() {
         assert(toks.some(t => t.exhausted || !P(s, 2).allies.includes(t)), 'Kein Peasant hat geschützt');
     });
     test(201, 'KI erkennt Sieg und Lebensgefahr: tödliche Angriffe (auch zu zweit gegen Protector), Schaden aus der Hand, Instant gegen tödlichen Angriff', () => {
-        const vanilla = (atk, ok = () => true) => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk === atk && ok(c)).id;
+        const vanilla = (atk, ok = () => true) => Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && !c.isPet && c.atk === atk && ok(c)).id;
         const prot = Object.values(CARDS).find(c => c.type === 'Ally' && !c.isToken && !c.unique && (c.text || '').trim() === 'Protector').id;
         const setup = (a, b, active) => {
             const s = fresh(a, b, active); s.real = false; s.humans = [];
@@ -2532,6 +2532,17 @@ function runRuleTests() {
         for (const h of [6021, 6022, 6023, 6024]) assert(!ok(h, scReq.id), `${CARDS[h].name}: ${scReq.name} (Scourge Hero Required) erlaubt`);
         const prof = Object.values(CARDS).filter(c => c.profReq);
         for (const h of [13011, 13012, 13013, 13014, 13015]) { const bad = prof.find(c => ok(h, c.id)); assert(!bad, `${CARDS[h].name}: ${bad && bad.name} (Beruf Hero Required) erlaubt`); }
+    });
+    test(205, 'KI: Held ohne Waffe greift nicht für 0 an (auch nicht im Angriffsplan); Protector blockt keinen harmlosen Angriff', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter'); s.real = false;
+        put(s, 1, 262); put(s, 1, 262); put(s, 2, 180);
+        assert(atkOf(s, P(s, 1).hero, { attacking: true }) === 0 && !strikeOptions(s, 1).length, 'Testaufbau');
+        for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
+            assert(!d || d.action.type !== 'ATTACK' || d.action.attackerUid !== P(s, 1).hero.uid, 'Held greift mit 0 ATK an: ' + (d && d.action.desc));
+        // Igvand (0 ATK) blockt den 0-ATK-Helden nicht, solange noch bereite Angreifer folgen
+        const a = getAttackActions(s, 1).find(x => x.attackerUid === P(s, 1).hero.uid && x.defenderUid === P(s, 2).hero.uid);
+        assert(a && act(s, a, 1), 'Angriff nicht möglich');
+        assert(!P(s, 2).allies[0].exhausted, 'Protector blockt harmlosen Angriff');
     });
     return results;
 }

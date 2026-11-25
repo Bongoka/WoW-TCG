@@ -3418,6 +3418,13 @@ function aiProtectValue(s, pr, att, def) {
     if (pr.type === 'Hero') v -= aAtk * 0.8;
     else if (aAtk >= prLeft) v -= doomed ? 0 : cardValue(s, pr); else v += 1;
     if (aDefAtk >= attLeft) v += cardValue(s, att) * 0.8;
+    // Harmloser Angriff (0 ATK, z. B. Held ohne Waffe): Schützen verhindert nichts. Es lohnt nur, wenn der Protector den Angreifer
+    // tötet oder einen angreifenden Helden trifft, ohne dass danach noch bereite Angreifer kommen (sonst lockt der Angriff den
+    // Protector nur weg). Vorher schützte die KI immer (+1) – und die Angreifer-KI griff deshalb mit 0 ATK an, um ihn zu erschöpfen.
+    if (aAtk <= 0 && aDefAtk < attLeft) {
+        const more = alliesOf(getPlayer(s, ctrlOf(s, att))).some(a => a.uid !== att.uid && !a.isTotem && !a.exhausted);
+        return att.type === 'Hero' && aDefAtk > 0 && !more ? aDefAtk * 0.5 : -1;
+    }
     return v;
 }
 // KI-Entscheidungen (Ja/Nein, Ziel, Modus …): jede Option in einer Kopie durchspielen und die Spiellage danach bewerten
