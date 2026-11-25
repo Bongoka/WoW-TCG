@@ -381,6 +381,7 @@
     R.DRAFT_SIZE = 34;
     R.REWARD_OFFER = 5; R.REWARD_PICKS = 2;          // Beute nach Kampf/Elite: 2 aus 5 (vorher 1 aus 3)
     R.REWARD_SKIP_GOLD = 8;                          // Gold je nicht genommener Beute-Karte
+    R.ACT_SKIP_GOLD = 25;                            // dasselbe nach dem Boss (Beute aus dem neuen Set-Block, ebenfalls 2 aus 5)
     R.DECK_WARN = 5;                                 // Kampf: Warnung, sobald nur noch so viele Karten im eigenen Deck liegen
     const dTxt = cd => (cd && cd.text) || '';
     const dHas = (cd, re) => re.test(dTxt(cd));

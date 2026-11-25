@@ -4284,6 +4284,7 @@ var I18N_EN = {
     'Fertig (+{0} 🪙)': 'Done (+{0} 🪙)',
     'Wähle {0} Karten für dein Deck. Jede Karte, die du nicht nimmst, bringt {1} Gold.': 'Choose {0} cards for your deck. Each card you don\'t take gives {1} gold.',
     'Wähle noch {0} Karte(n).': 'Choose {0} more card(s).',
+    'Wähle {0} Karten aus dem neuen Kartenpool. Jede Karte, die du nicht nimmst, bringt {1} Gold.': 'Choose {0} cards from the new card pool. Each card you don\'t take gives {1} gold.',
     '⚠ Nur noch {0} Karten in deinem Deck! Musst du aus dem leeren Deck ziehen, verlierst du.': '⚠ Only {0} cards left in your deck! If you have to draw from an empty deck, you lose.',
     '‹ Zurück': '‹ Back',
     '🔄 Sortiment neu': '🔄 New stock',

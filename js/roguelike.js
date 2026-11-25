@@ -692,28 +692,41 @@
     function openActReward() {
         if (!run) return;
         ensureRoot(); showRoot();
-        const cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8, blockOnly: true });
+        const cards = R.rewardCards(run, R.REWARD_OFFER, { minCost: 0, maxCost: 8, blockOnly: true });
+        const picks = Math.min(R.REWARD_PICKS, cards.length), gold = R.ACT_SKIP_GOLD;
         setMain(`
             <div class="rl-modal-screen">
                 ${hudHtml()}
                 <div class="rl-panel wide">
                     <div class="rl-panel-head"><div><div class="rl-kicker">Neuer Akt</div><h2>Beute aus dem neuen Set-Block</h2></div></div>
-                    <p class="rl-lead">Wähle eine Karte aus dem neuen Kartenpool. Sie ist sofort Teil deines Decks.</p>
-                    <div class="rl-reward-row" id="rl-act-reward-row"></div>
-                    <div class="rl-panel-actions"><button class="rl-btn ghost" id="rl-act-skip">Überspringen (+25 🪙)</button></div>
+                    <p class="rl-lead" id="rl-act-lead">${tr`Wähle ${picks} Karten aus dem neuen Kartenpool. Jede Karte, die du nicht nimmst, bringt ${gold} Gold.`}</p>
+                    <div class="rl-reward-row${cards.length > 3 ? ' many' : ''}" id="rl-act-reward-row"></div>
+                    <div class="rl-panel-actions"><button class="rl-btn ghost" id="rl-act-skip"></button></div>
                 </div>
             </div>`);
         wireHud();
         const row = mainEl.querySelector('#rl-act-reward-row');
+        let left = picks;
+        const skipBtn = mainEl.querySelector('#rl-act-skip'), lead = mainEl.querySelector('#rl-act-lead');
+        const updSkip = () => { if (skipBtn) skipBtn.textContent = left === picks ? tr`Überspringen (+${left * gold} 🪙)` : tr`Fertig (+${left * gold} 🪙)`; };
+        updSkip();
         cards.forEach(id => {
             const slot = document.createElement('button');
             slot.className = 'rl-reward-card';
             slot.dataset.card = id;
-            slot.appendChild(cardNode(id, 175));
-            slot.onclick = () => { addCardToRun(id); toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`); afterActReward(); };
+            slot.appendChild(cardNode(id, cards.length > 3 ? 150 : 175));
+            slot.onclick = () => {
+                if (slot.disabled || left <= 0) return;
+                slot.disabled = true; slot.classList.add('picked');
+                addCardToRun(id); left--;
+                toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`);
+                if (left <= 0) { afterActReward(); return; }
+                if (lead) lead.textContent = tr`Wähle noch ${left} Karte(n).`;
+                updSkip();
+            };
             row.appendChild(slot);
         });
-        on('#rl-act-skip', 'click', () => { run.gold += 25; saveRun(); afterActReward(); });
+        on('#rl-act-skip', 'click', () => { run.gold += left * gold; left = 0; saveRun(); afterActReward(); });
     }
 
     // Nach dem Boss: ein Boss-Artefakt (stark, mit Nachteil) aus drei
