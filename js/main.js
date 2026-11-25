@@ -480,7 +480,12 @@ async function driveCpu() {
             if (!dec || !dec.action) {
                 updateCpuStatus(true, tr("CPU beendet Zug."));
                 await cpuSleep(400);
-                applyAction(G, { type: 'END_TURN', actorId: pid }, false, pid);
+                if (!applyAction(G, { type: 'END_TURN', actorId: pid }, false, pid)) {
+                    // Zugende abgelehnt (Pflichtangriff, CR 600.2): sonst fragte die CPU endlos neu und das Spiel hing
+                    const forced = getAttackActions(G, pid)[0];
+                    if (forced) { await flashArrow(forced.attackerUid, forced.defenderUid); await animateAttack(forced.attackerUid, forced.defenderUid); applyAction(G, forced, false, pid); }
+                    else { console.error('CPU kann den Zug nicht beenden', validateAction(G, { type: 'END_TURN' }, pid)); render(); break; }
+                }
                 render(); playEventAnimations();
                 if (G.activePlayer === 1 && isIdle(G) && isHuman(G, 1)) showTurnBanner(tr("Dein Zug!"));
                 continue;

@@ -2544,6 +2544,20 @@ function runRuleTests() {
         assert(a && act(s, a, 1), 'Angriff nicht möglich');
         assert(!P(s, 2).allies[0].exhausted, 'Protector blockt harmlosen Angriff');
     });
+    test(206, 'Lynda Steele im Zugende-Fenster: CPU muss danach angreifen statt endlos das Zugende zu versuchen (CR 502.2, 600.2)', () => {
+        const s = fresh(); s.humans = [2]; s.stopAll = true; s.real = false;
+        const small = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk === 1 && c.hp <= 2);
+        const att = put(s, 1, small.id); put(s, 2, 1178); res(s, 2, 2);                     // Lynda (3/5, Protector) würde den 1/1 blocken und töten
+        assert(applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1), 'Zugende nicht möglich');
+        process(s);
+        const lyn = s.pending && s.pending.kind === 'priority' && s.pending.pid === 2 && getPriorityActions(s, 2).find(a => a.type === 'ACTIVATE' && (a.targets || []).flat().includes(att.uid));
+        assert(lyn, 'Lynda-Kraft auf den CPU-Ally nicht anbietbar');
+        applyAction(s, { ...lyn, actorId: 2 }, true, 2); autoResolve(s);
+        assert(canActMain(s, 1) && mustAttack(s, 1).includes(att), 'CPU nicht wieder in der Aktionsphase mit Pflichtangriff');
+        assert(validateAction(s, { type: 'END_TURN' }, 1), 'Zugende trotz Pflichtangriff erlaubt');
+        for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
+            assert(d && d.action && d.action.type === 'ATTACK' && d.action.attackerUid === att.uid, 'CPU greift nicht an: ' + (d && d.action ? d.action.desc : 'Zug beenden'));
+    });
     return results;
 }
 
