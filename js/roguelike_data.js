@@ -344,8 +344,13 @@
     // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
     // Ablauf: Held (je Talentbaum einer, mit 1 seltenen + 2 passenden Karten) → Paket → Quest-Runde (3 Quests) → Paket → seltene Einzelkarte
     // → Paket → Quest-Runde → Paket → seltene Einzelkarte → Paket = 26 Karten, davon genau 6 Quests. Jedes Paket höchstens zweimal angeboten.
-    R.DRAFT_STEPS = ['hero', 'pack', 'quest', 'pack', 'rare', 'pack', 'quest', 'pack', 'rare', 'pack'];   // 2 Quest-Runden = 6 Quests
-    R.DRAFT_SIZE = 26;
+    // Held 3 + 7 Pakete à 3 + 2 Quest-Runden à 3 (6 Quests) + 4 seltene Einzelkarten = 34 Karten. Vorher 26: langsame Decks
+    // zogen ihr Deck nach ~15 Zügen leer und verloren in Führung (CR 410.6b), die Gegner-Decks haben 28–38 Karten.
+    R.DRAFT_STEPS = ['hero', 'pack', 'quest', 'pack', 'rare', 'pack', 'pack', 'quest', 'rare', 'pack', 'rare', 'pack', 'pack', 'rare'];
+    R.DRAFT_SIZE = 34;
+    R.REWARD_OFFER = 5; R.REWARD_PICKS = 2;          // Beute nach Kampf/Elite: 2 aus 5 (vorher 1 aus 3)
+    R.REWARD_SKIP_GOLD = 8;                          // Gold je nicht genommener Beute-Karte
+    R.DECK_WARN = 5;                                 // Kampf: Warnung, sobald nur noch so viele Karten im eigenen Deck liegen
     const dTxt = cd => (cd && cd.text) || '';
     const dHas = (cd, re) => re.test(dTxt(cd));
     const dAlly = cd => cd.type === 'Ally';

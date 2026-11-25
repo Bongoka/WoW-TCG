@@ -1608,7 +1608,7 @@ function runRuleTests() {
         const bad = all.filter(t => /\b(Eifer|Protektor|Beschützer)\b/.test(t));
         assert(!bad.length, 'Erfundene Keyword-Namen: ' + bad.slice(0, 3).join(' · '));
     });
-    test(144, 'Roguelike-Draft: Held je Talentbaum, legale Karten, 26 Karten, kein Paket öfter als zweimal', () => {
+    test(144, 'Roguelike-Draft: Held je Talentbaum, legale Karten, 34 Karten, kein Paket öfter als zweimal', () => {
         if (typeof RL === 'undefined' || !RL.draftNew) return;
         for (const cls of RL.CLASSES) {
             const offers = RL.draftHeroOffers(cls.key);
