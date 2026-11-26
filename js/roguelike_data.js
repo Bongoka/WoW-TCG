@@ -210,6 +210,10 @@
         }
         return false;
     };
+    // Karten, die der Spieler im Roguelike nie angeboten bekommt (Draft, Beute, Händler, Ereignisse) – Gegner dürfen sie spielen.
+    // Nutzer: Karten, deren einziger Effekt eine Karte "aus der Sammlung" holt – Auswahl aus ~1400 Karten ohne Suche.
+    // Rite of Vision (1306), Ritual of Summoning (8074), Flash of Brilliance (12045)
+    R.PLAYER_BANNED = new Set([1306, 8074, 12045]);
     R.poolFor = function (cls, faction, act, opts = {}) {
         const sets = new Set(R.actSets(act));
         const talent = opts.talent !== undefined ? opts.talent : null;
@@ -343,7 +347,7 @@
         });
         const owned = {};
         for (const e of run.deck) { const b = e.upgradedFrom || e.id; owned[b] = (owned[b] || 0) + 1; }
-        let list = pool.filter(c => !opts.noUpgrade && c.id && (owned[c.id] || 0) < 2);
+        let list = pool.filter(c => !opts.noUpgrade && c.id && (owned[c.id] || 0) < 2 && !R.PLAYER_BANNED.has(c.id));
         if (opts.blockOnly) {
             const bs = new Set(R.block(act).sets);
             const only = list.filter(c => bs.has(R.setOf(c)));
@@ -351,7 +355,7 @@
         }
         const lo = opts.minCost === undefined ? 0 : opts.minCost, hi = opts.maxCost === undefined ? 9 : opts.maxCost;
         list = list.filter(c => (c.cost || 0) >= lo && (c.cost || 0) <= hi);
-        if (!list.length) list = pool.slice();
+        if (!list.length) list = pool.filter(c => !R.PLAYER_BANNED.has(c.id));
         const curSets = new Set(R.block(act).sets);
         const out = [], used = new Set();
         let guard = 0;
@@ -496,7 +500,7 @@
     R.draftPool = function (heroId) {
         const h = CARDS[heroId]; if (!h) return [];
         return R.poolFor(h.class, h.faction, 1, { heroId, talent: h.talent || null, scourge: !!h.scourge, traitorCards: !!h.traitorCards })
-            .filter(cd => cd.type !== 'Hero' && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]));
+            .filter(cd => cd.type !== 'Hero' && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]) && !R.PLAYER_BANNED.has(cd.id));
     };
     const dQual = { Common: 1, Uncommon: 1.2, Rare: 1.5, Epic: 1.6, Legendary: 1.6 };
     const dCount = (deck, id) => deck.filter(x => x === id).length;
