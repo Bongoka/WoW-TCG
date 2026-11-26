@@ -2651,7 +2651,7 @@
         bulwark: ['Bulwark of Azzinoth', 'Armour/Shield_Naxxramas_D_01.png'],
         titanheart: ['Heart of the Titans', 'Trade/Titansteel_red.png'],
         oracle: ['Atiesh', 'Weapons/Medivh.png', 'Zu Beginn deines Zuges: ziehe 1 Karte und erhalte 2 Gold.'],
-        legion: ['Shadow Council', 'Spells/GatherShadows.png', 'Ein Ally kommt mit +1 Angriff pro anderem Ally ins Spiel.'],
+        legion: ['Shadow Council', 'Spells/GatherShadows.png', 'Einmal pro Zug: Kommt ein befreundeter Ally ins Spiel, darfst du ihm +1 Angriff für jeden anderen Ally geben, den du kontrollierst.'],
         soulharvest: ['Soul Reaper', 'Spells/DeathCoil.png'],
         timewarp: ['Time Warp', 'Spells/TimeStop.png'],
         inferno: ['Cataclysm', 'Spells/MeteorStorm.png'],

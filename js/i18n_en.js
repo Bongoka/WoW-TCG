@@ -3789,7 +3789,6 @@ var I18N_EN = {
     'Dein Held erleidet 1 Schaden weniger aus allen Quellen.': 'Your hero is dealt 1 less damage from all sources.',
     'Dein maximales Leben ist um 10 erhöht (sofort beim Erhalt).': 'Your maximum health is increased by 10 (immediately when gained).',
     'Zu Beginn deines Zuges: ziehe 1 Karte und erhalte 2 Gold.': 'At the start of your turn: draw a card and gain 2 gold.',
-    'Ein Ally kommt mit +1 Angriff pro anderem Ally ins Spiel.': 'An ally enters play with +1 ATK for each other ally.',
     'Wenn ein befreundeter Ally stirbt, erhält dein Held dauerhaft +1 Angriff und heilt 1 Schaden.': 'When a friendly ally is destroyed, your hero gets +1 ATK permanently and heals 1 damage.',
     'Zu Beginn deines Zuges: Wenn du weniger Karten auf der Hand hast als dein Gegner, ziehe zwei Karten.': 'At the start of your turn: if you have fewer cards in hand than your opponent, draw two cards.',
     'Dein Feuerschaden ist um 1 erhöht.': 'Your Fire damage is increased by 1.',
