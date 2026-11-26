@@ -165,6 +165,9 @@
     R.isPoolCard = function (cd) {
         if (!cd || !cd.id || typeof cd.id !== 'number') return false;
         if (!['Ally', 'Ability', 'Weapon', 'Armor', 'Item', 'Quest', 'Location'].includes(cd.type)) return false;
+        // Karten, die nicht (vollständig) umgesetzt sind (CARD_ISSUES, cards.js: Hearthstone, Lady Katrana Prestor, Through the
+        // Dark Portal …), gibt es im Roguelike nicht – weder im Draft noch in Beute, Händler, Ereignissen oder Gegner-Decks (Nutzer)
+        if (typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]) return false;
         // Set 1 (Heroes of Azeroth) hat kein set/num – dort dient die ID als Kartennummer.
         const set = R.setOf(cd);
         if (!cd.num && set !== 1) return false;
