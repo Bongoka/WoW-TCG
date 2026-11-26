@@ -1018,6 +1018,14 @@ function podiumAward(pl) {
         + `<circle cx="32" cy="40" r="17" fill="url(#${g})" stroke="${c}" stroke-width="2"/><circle cx="32" cy="40" r="12" fill="none" stroke="${c}" stroke-width="1" opacity=".6"/>`
         + `<text x="32" y="46" text-anchor="middle" font-family="Georgia,serif" font-size="17" font-weight="bold" fill="${c}">${pl}</text></svg>`;
 }
+// Deck-Archiv: fehlende Decks (nach ID) in die eigenen Decks übernehmen; Rückgabe = Anzahl neu, −1 = Speichern fehlgeschlagen
+const DECK_ARCHIVE_KEY = 'wow_tcg_deck_archive';
+function deckArchiveImport(decks) {
+    const list = loadCustomDecks(), have = new Set(list.map(d => d.id));
+    const add = decks.filter(d => !have.has(d.id)).map(d => ({ ...d, cards: [...d.cards] }));
+    if (add.length && !saveCustomDecks([...list, ...add])) return -1;
+    return add.length;
+}
 function openDeckOverview(opts = {}) {
     const modal = document.getElementById("deck-overview-modal"), grid = document.getElementById("deck-overview-grid");
     const pick = typeof opts.pick === 'function' ? opts.pick : null;
@@ -1060,6 +1068,40 @@ function openDeckOverview(opts = {}) {
     order.forEach(f => f.decks.sort((a, b) => a.m.place - b.m.place));
     const cur = opts.current && order.find(f => f.decks.some(x => x.deck.id === opts.current));
     let folder = cur ? cur.key : null;
+    // Deck-Archiv (js/deckarchive.js, erzeugt von bin/deckexport.js): die eigenen Decks zum Mitnehmen auf andere Adressen
+    // (Cloudflare Pages: leerer localStorage). Versteckter Ordner – erst nach 5× Antippen des Titels sichtbar (je Gerät
+    // gemerkt, nochmal 5× = wieder versteckt). Ein Deck daraus wählen = in die eigenen Decks übernehmen (gleiche ID), dann wie gewohnt.
+    const archive = (typeof DECK_ARCHIVE !== 'undefined' ? DECK_ARCHIVE : []).filter(d => d && CARDS[d.hero] && Array.isArray(d.cards) && d.cards.length);
+    const archOn = () => { try { return localStorage.getItem(DECK_ARCHIVE_KEY) === '1'; } catch (e) { return false; } };
+    const archMissing = () => { const have = new Set(loadCustomDecks().map(d => d.id)); return archive.filter(d => !have.has(d.id)); };
+    const archTile = (deck) => {
+        const el = tile(deck);
+        el.onclick = () => {
+            const n = deckArchiveImport([deck]); if (n < 0) return;
+            if (n) showToast(tr('In deine Decks übernommen'), false, 2000);
+            const d = loadCustomDecks().find(x => x.id === deck.id) || deck;
+            choose(el, () => { if (pick) pick(d); else openDeckBuilder(d); });
+        };
+        return el;
+    };
+    const archFolderTile = () => {
+        const el = document.createElement('div'); el.className = 'deck-tile folder';
+        el.innerHTML = `<div class="wfold"><div class="wfold-back"></div><div class="wfold-papers"><i></i><i></i><i></i></div><div class="wfold-front"><span class="wfold-text">${esc(tr('Archiv'))}</span></div></div>`
+            + `<div class="deck-tile-name">${esc(tr('Deck-Archiv'))}</div><div class="deck-tile-sub">${tr`${archive.length} Decks`}</div>`;
+        el.dataset.q = archive.map(d => `${d.name} ${(CARDS[d.hero] || {}).name || ''} ${d.class || ''}`).join(' ').toLowerCase() + ' archiv archive';
+        el.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); folder = 'archive'; render(); };
+        return el;
+    };
+    const titleEl = document.getElementById('deck-overview-title'); let taps = [];
+    titleEl.onclick = () => {
+        const now = Date.now(); taps = taps.filter(t => now - t < 2000); taps.push(now);
+        if (taps.length < 5 || !archive.length) return;
+        taps = []; const on = !archOn();
+        try { localStorage.setItem(DECK_ARCHIVE_KEY, on ? '1' : '0'); } catch (e) {}
+        showToast(on ? tr('Deck-Archiv sichtbar') : tr('Deck-Archiv versteckt'), false, 2000);
+        if (!on && folder === 'archive') folder = null;
+        render();
+    };
     const lockedTile = (deck) => {
         const el = document.createElement('div'); el.className = 'deck-tile locked';
         el.innerHTML = deckBoxHTML(deck) + `<span class="deck-lock" title="${esc(tr('Noch nicht spielbar'))}">🔒</span>`
@@ -1086,7 +1128,20 @@ function openDeckOverview(opts = {}) {
     const render = () => {
         grid.innerHTML = ''; grid.classList.toggle('in-folder', !!folder);
         const f = folder && folders[folder];
-        if (f) {
+        if (folder === 'archive') {
+            const hd = document.createElement('div'); hd.className = 'deck-folder-head';
+            const miss = archMissing().length;
+            hd.innerHTML = `<button class="deck-folder-back">‹ ${esc(tr('Zurück'))}</button>`
+                + `<div class="dfh-info"><span class="dfh-year dfh-name">${esc(tr('Deck-Archiv'))}</span><span class="dfh-sub">${tr`${archive.length} Decks`} · ${esc(tr`Stand ${typeof DECK_ARCHIVE_DATE !== 'undefined' ? DECK_ARCHIVE_DATE : '?'}`)}</span></div>`
+                + `<button class="deck-archive-all"${miss ? '' : ' disabled'}>${esc(miss ? tr`Alle übernehmen (${miss})` : tr('Alle in deinen Decks'))}</button>`;
+            hd.querySelector('.deck-folder-back').onclick = () => { folder = null; render(); };
+            hd.querySelector('.deck-archive-all').onclick = () => {
+                const n = deckArchiveImport(archive); if (n < 0) return;
+                showToast(tr`${n} Decks übernommen`, false, 2600); render();
+            };
+            grid.appendChild(hd);
+            archive.forEach(d => grid.appendChild(archTile(d)));
+        } else if (f) {
             // Ordner offen: Kopf mit Zurück, Worlds-Schriftzug, Jahr und Ort – darunter die Decks nach Platz
             const w = f.worlds, hd = document.createElement('div'); hd.className = 'deck-folder-head' + (w ? ' worlds' : '');
             hd.innerHTML = `<button class="deck-folder-back">‹ ${esc(tr('Zurück'))}</button>`
@@ -1130,6 +1185,7 @@ function openDeckOverview(opts = {}) {
                 grid.appendChild(nb);
             }
             own.forEach(d => grid.appendChild(tile(d)));
+            if (archive.length && archOn()) grid.appendChild(archFolderTile());
             if (order.length) { head(tr('Turnier-Decks')); order.forEach(f => grid.appendChild(folderTile(f))); }
             }
         }

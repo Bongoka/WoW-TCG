@@ -1308,6 +1308,7 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 .wflag { width: 17px; height: 9px; vertical-align: -1px; margin-right: 5px; border-radius: 1px; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
 .deck-folder-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 2px 4px 12px; border-bottom: 1px solid var(--border); animation: deckTileIn .45s cubic-bezier(.2,1.25,.4,1) both; }
 .deck-folder-back { flex: none; }
+.deck-archive-all { margin-left: auto; flex: none; }
 .dfh-text { height: 92px; width: auto; min-width: 0; flex: 0 1 auto; max-width: 52%; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.8)); }
 .dfh-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .dfh-year { font: 900 36px/1 Georgia, serif; background: linear-gradient(#fff3b0, #f2b632 45%, #c2561b); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 1px #000); }

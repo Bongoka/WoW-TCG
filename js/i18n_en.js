@@ -4823,4 +4823,14 @@ var I18N_EN = {
     'Fel Geyser: keine weitere offene Quest': 'Fel Geyser: no other face-up quest',
     'Fel Geyser: Welche weitere Quest verdeckt umdrehen?': 'Fel Geyser: which other quest to turn face down?',
     '{0} wird verdeckt umgedreht (Fel Geyser).': '{0} is turned face down (Fel Geyser).',
+    // Deck-Archiv (versteckter Ordner in der Deck-Übersicht)
+    'Archiv': 'Archive',
+    'Deck-Archiv': 'Deck archive',
+    'Stand {0}': 'As of {0}',
+    'Alle übernehmen ({0})': 'Add all ({0})',
+    'Alle in deinen Decks': 'All in your decks',
+    '{0} Decks übernommen': '{0} decks added',
+    'In deine Decks übernommen': 'Added to your decks',
+    'Deck-Archiv sichtbar': 'Deck archive shown',
+    'Deck-Archiv versteckt': 'Deck archive hidden',
 };
