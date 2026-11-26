@@ -1373,9 +1373,8 @@
         }
     });
     defArt({
-        id: 'rogue_stealth', text: 'Schurken-Allies haben Stealth.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); }
+        id: 'rogue_stealth', text: 'Wenn ein Schurken-Ally ins Spiel kommt: Er fügt einem erschöpften Ziel-Helden oder -Ally 1 unverhinderbaren Nahkampfschaden zu.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Rogue')) rlAskTarget(s, c, { char: true, exhausted: true }, tr`${c.name}: Welcher erschöpfte Charakter bekommt 1 unverhinderbaren Nahkampfschaden?`, 'E:rlRogueStab', t => ctrlOf(s, t) === 2 ? (t.type === 'Hero' ? 3 : (hpOf(s, t) - (t.damage || 0) <= 1 ? 10 : 2)) : -5); }
     });
     // Schaden an eigenen Klassen-Allies verringern (Earth Shield / Divine Shield): Marker am Ally – beim Zonenwechsel gelöscht
     const ownClassAlly = (s, uid, k) => { const c = findCharacter(s, uid); return c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, k) ? c : null; };
@@ -1414,6 +1413,7 @@
     EK.rlHunterShot = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Ranged' }); };
     EK.rlPriestHeal = (s, a, uid) => { if (findCharacter(s, uid)) heal(s, findCharacter(s, a.src) ? a.src : s.p1.hero.uid, uid, 2); };
     EK.rlDrainLife = (s, a) => { if (a.dealt > 0) heal(s, s.p1.hero.uid, s.p1.hero.uid, a.dealt); };
+    EK.rlRogueStab = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Melee', unprev: true }); };
     // ---- Auswahl / Anwendung -------------------------------------------------
     R.effectOf = function (cardOrId) {
         let cd;
