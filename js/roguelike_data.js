@@ -1438,6 +1438,7 @@
         addTM(t, { k: 'cantAttack', turn: s.turn + (pid === s.activePlayer ? 2 : 1) }); L(s, tr`❄ ${t.name} kann im nächsten Zug nicht angreifen.`, '', 1); };   // nächster Zug seines Spielers
     EK.rlHunterShot = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Ranged' }); };
     EK.rlPriestHeal = (s, a, uid) => { if (findCharacter(s, uid)) heal(s, findCharacter(s, a.src) ? a.src : s.p1.hero.uid, uid, 2); };
+    EK.rlShadowCouncil = (s, a, v) => { const x = findCharacter(s, a.uid); if (!v || !x || flag(s, 't:legion')) return; const n = getPlayer(s, 1).allies.filter(o => o.uid !== x.uid).length; if (n > 0) { setFlag(s, 't:legion'); addTM(x, { k: 'atk', v: n }); } };
     EK.rlTaurenHp = (s, a, uid) => { const x = findCharacter(s, uid); if (x) addTM(x, { k: 'hp', v: 1 }); };
     EK.rlSilence = (s, a, uid) => { const x = findCharacter(s, uid); if (!x) return; untilNextFoeTurn(s, x, { k: 'rlSilenced' }); L(s, tr`🤐 ${x.name} verliert seinen Kartentext bis zum Ende des nächsten gegnerischen Zuges.`, '', 1); };
     EK.rlForsakenPact = (s, a, v) => { const x = findCharacter(s, a.uid); if (!v || !x) return; s.rl.forsaken = (s.rl.forsaken || 0) + 1; addTM(x, { k: 'atk', v: 1 }); addTM(x, { k: 'hp', v: 1 }); };
@@ -1741,6 +1742,8 @@
     function addPrevent(s, n) { if (!s || !s.rl || !(n > 0)) return; addPE(s, 1, { k: 'rlGuard', v: n, untilTurn: s.turn }); }
     function flag(s, k) { return !!(s && s.rl && s.rl.f && s.rl.f[k]); }
     function setFlag(s, k) { if (!s || !s.rl) return; (s.rl.f || (s.rl.f = {}))[k] = 1; }
+    // Zähler pro Zug (Schlüssel 't:…' werden zu Zugbeginn gelöscht); add > 0 erhöht
+    function turnCount(s, k, add) { if (!s || !s.rl) return 0; const f = s.rl.f || (s.rl.f = {}); if (add) f[k] = (f[k] || 0) + add; return f[k] || 0; }
     function hasArt(s, id) { return !!(s && s.rl && s.rl.arts && s.rl.arts.indexOf(id) >= 0); }
     function artList(s) {
         if (!s || !s.rl || !s.rl.arts || !s.rl.arts.length) return [];
@@ -1928,8 +1931,10 @@
         },
         {
             id: 'wardrum', name: 'Kriegstrommel', rarity: 'rare', price: 115,
-            text: 'Deine Allies kosten (1) weniger.',
-            cost: (s, p, card) => card.type === 'Ally' ? -1 : 0
+            // Nutzer: nur die ersten beiden Allies pro Zug, kein Minimum
+            text: 'Die ersten beiden Allies, die du in einem Zug spielst, kosten (1) weniger.',
+            cost: (s, p, card) => (card.type === 'Ally' && turnCount(s, 't:wardrum') < 2) ? -1 : 0,
+            cardPlayed: (s, p, card) => { if (p === 1 && card && card.type === 'Ally') turnCount(s, 't:wardrum', 1); }
         },
         {
             id: 'gravecaller', name: 'Grabrufer', rarity: 'common', price: 75,
@@ -2016,13 +2021,14 @@
         },
         {
             id: 'legion', name: 'Legion des Schattenrats', rarity: 'rare', price: 125,
-            text: 'Wenn ein befreundeter Ally ins Spiel kommt, erhält er +1 Angriff für jeden anderen Ally, den du kontrollierst.',
+            // Nutzer: einmal pro Zug, du entscheidest bei welchem Ally (Frage bei jedem Ally, solange es in diesem Zug noch frei ist)
+            text: 'Einmal pro Zug: Kommt ein befreundeter Ally ins Spiel, darfst du ihm +1 Angriff für jeden anderen Ally geben, den du kontrollierst.',
             allyEnters: (s, p, uid) => {
-                if (p !== 1) return;
+                if (p !== 1 || flag(s, 't:legion')) return;
                 const c = findCharacter(s, uid);
                 if (!c || c.type !== 'Ally') return;
                 const n = getPlayer(s, 1).allies.filter(a => a.uid !== c.uid).length;
-                if (n > 0) addTM(c, { k: 'atk', v: n });
+                if (n > 0) yesNo(s, 1, tr`Shadow Council jetzt nutzen? ${c.name} erhält +${n} Angriff (einmal pro Zug).`, 'Shadow Council', 'E:rlShadowCouncil', { uid: c.uid }, true);
             }
         },
         {
@@ -2056,8 +2062,10 @@
         // ---- Weitere Artefakte (thematisch an die Akte angelehnt)
         {
             id: 'warbanner', name: 'Kriegsbanner der Arena', rarity: 'rare', price: 120, acts: [3],
-            text: 'Deine Allies mit Kosten (2) oder weniger kosten (1) weniger. Kombiniert mit Kriegstrommel kosten sie gar nichts.',
-            cost: (s, p, card) => (card.type === 'Ally' && (card.cost || 0) <= 2) ? -1 : 0
+            // Nutzer: nur die ersten beiden solchen Allies pro Zug, kein Minimum
+            text: 'Die ersten beiden Allies mit Kosten (2) oder weniger, die du in einem Zug spielst, kosten (1) weniger.',
+            cost: (s, p, card) => (card.type === 'Ally' && (card.cost || 0) <= 2 && turnCount(s, 't:warbanner') < 2) ? -1 : 0,
+            cardPlayed: (s, p, card) => { if (p === 1 && card && card.type === 'Ally' && (CARDS[card.id] ? CARDS[card.id].cost || 0 : card.cost || 0) <= 2) turnCount(s, 't:warbanner', 1); }
         },
         {
             id: 'soulforge', name: 'Seelenamboss', rarity: 'rare', price: 125, acts: [2],
@@ -2648,7 +2656,7 @@
         timewarp: ['Time Warp', 'Spells/TimeStop.png'],
         inferno: ['Cataclysm', 'Spells/MeteorStorm.png'],
         momentum: ['Mark of the Champion', 'Miscellaneous/AhnQirajTrinket_02.png'],
-        warbanner: ['Arena Grand Master', 'Miscellaneous/Trophy_Argent.png', 'Allies mit Kosten (2) oder weniger kosten (1) weniger.'],
+        warbanner: ['Arena Grand Master', 'Miscellaneous/Trophy_Argent.png', 'Die ersten beiden Allies mit Kosten (2) oder weniger, die du in einem Zug spielst, kosten (1) weniger.'],
         soulforge: ['Soulforge', 'Trade/AdamantiteFrame.png', 'Wenn du eine Fähigkeit spielst, erhält ein zufälliger Ally +1 Angriff.'],
         deathlord: ['Naxxramas', 'Spells/NightOfTheDead.png', 'Einmal pro Zug: Wenn ein Ally stirbt, beschwöre einen 3/3-Ghul.'],
         warlord: ['High Warlord', 'Weapons/PVP330_D_01.png'],
