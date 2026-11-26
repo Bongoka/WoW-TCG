@@ -69,6 +69,7 @@ function openMainMenu(boot) {
     el.classList.remove('out'); el.classList.toggle('boot', !!boot); el.style.display = 'flex';   // boot: beim Seitenstart ohne Einblenden (sonst schiene das Spielfeld durch)
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open', 'pf-game');                              // Menü: Hochformat-Hinweis wieder an
+    try { if (document.fullscreenElement || document.webkitFullscreenElement) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}   // Menü: im Vollbild wieder Querformat
     mmBackground(true);
     if (!MM.raf) MM.raf = requestAnimationFrame(mmTick);
 }
@@ -76,6 +77,7 @@ function mmHide() {
     if (!MM.el || MM.el.style.display === 'none') return;
     mmCloseOptions(); closePlaySetup();
     document.body.classList.add('pf-game');                                             // Spielfeld darf ins Hochformat
+    try { screen.orientation.unlock(); } catch (e) {}                                   // Vollbild-Sperre aufs Querformat lösen
     MM.el.classList.remove('in'); MM.el.classList.add('out');
     clearInterval(MM.bgTimer); MM.bgTimer = 0;
     setTimeout(() => { if (MM.el.classList.contains('out')) { MM.el.style.display = 'none'; cancelAnimationFrame(MM.raf); MM.raf = 0; } }, 450);

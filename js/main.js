@@ -658,7 +658,7 @@ function bootGame() {
     // Vollbild (ohne Browserleisten): Knopf im Menü; auf Touch-Geräten automatisch beim ersten Antippen, dazu Querformat
     const fsBtn = document.getElementById("btn-fullscreen");
     const fsEl = document.documentElement, fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
-    const enterFs = () => { const r = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen; if (!r || fsOn()) return; Promise.resolve(r.call(fsEl)).then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {}); };
+    const enterFs = () => { const r = fsEl.requestFullscreen || fsEl.webkitRequestFullscreen; if (!r || fsOn()) return; Promise.resolve(r.call(fsEl)).then(() => { try { if (!document.body.classList.contains('pf-game')) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {}); };
     const updFs = () => { fsBtn.textContent = fsOn() ? tr('Vollbild aus') : tr('Vollbild'); };
     fsBtn.onclick = () => { if (fsOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else enterFs(); };
     document.addEventListener('fullscreenchange', updFs); document.addEventListener('webkitfullscreenchange', updFs);
