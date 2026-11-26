@@ -4886,8 +4886,10 @@ Tokens small/*
 # Kartenprüfung (bin/cardcheck.js): Berichte lokal
 /reports/
 
-# WoW-Addon: TGA-Kartenbilder (≈720 MB) bleiben lokal
-addon/WoWTCG/Art/
+# WoW-Addon liegt nicht mehr in diesem Repo, sondern in G:\downloads\WoW-TCG-Addon.
+# /addon/ ist hier hoechstens eine optionale Verknuepfung zum Entwickeln:
+#   cmd /c mklink /J "G:\downloads\WoW TCG Game 3\addon" "G:\downloads\WoW-TCG-Addon"
+/addon/
 
 # WoW Icon Pack: in Git nur die Icons, die der Spielcode nennt (node bin/iconpack.js nimmt neue auf, alte heraus)
 /WoW Icon Pack/

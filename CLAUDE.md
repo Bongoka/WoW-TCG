@@ -27,6 +27,10 @@ Wichtige Engine-Konzepte:
 - Quest-Belohnungen sind eigene Kettenglieder (`kind: 'reward'`). Auch das Legen einer Ressource ist ein Kettenglied (`kind: 'resource'`, Karte in `res`, nicht unterbrechbar, CR 412.1a).
 - `cloneState` (eigene Tiefenkopie `deepCopy`, schneller als `structuredClone`) teilt nur die statischen Kartenlisten (`CLONE_SHARED`: `limitTags`, `allowedClasses`, `allowedFactions`, `subtypes`, `allyTypes`) – diese dürfen nie verändert werden. Kartenobjekte selbst werden beim Zonenwechsel verändert und müssen kopiert werden.
 
+## WoW-Addon (eigenes Projekt)
+
+Das WoW-Addon (Lua-Addon `WoWTCG/` plus Simulations- und Test-Werkzeuge `_test.js`, `_ui.js`, `_simworker.js`) liegt **nicht** in diesem Repo, sondern in `G:\downloads\WoW-TCG-Addon` mit eigenem Git-Repo. Die TGA-Kartenbilder dort (`WoWTCG/Art/`, ≈720 MB) bleiben lokal. Nichts wieder unter `addon/` anlegen. Die Werkzeuge laden ihren Code über `/addon/...` vom Entwicklungsserver; wenn sie gebraucht werden, im Spielordner eine Verknüpfung setzen: `cmd /c mklink /J "G:\downloads\WoW TCG Game 3\addon" "G:\downloads\WoW-TCG-Addon"` (in `.gitignore` ausgenommen).
+
 ## Veröffentlichen (Details: `docs/veroeffentlichen.md` – Kartenbilder, EA-Doppel, Tablet/App, Deck-Sync)
 
 Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuern (Browser-Cache):
