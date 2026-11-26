@@ -3206,15 +3206,14 @@
         soulharvest: 3, timewarp: 3, deathlord: 3, warlord: 3, gravelord: 3, combo: 3, bloodmagic: 3, frontier: 3,
         warbanner: 3, soulforge: 3, bladedance: 3, art_necropolis: 3, art_ghouls: 3, art_drums: 3, gold_shop: 3,
         prism: 3, armsmaster: 3, open_veins: 3, art_knell: 3, auraweaver: 3,
-        troll_cost: 3, undead_cost: 3, hunter_cost: 3, demon_cost: 3, totem_cost: 3, rogue_stealth: 3, shaman_ferocity: 3,
-        pet_slot: 3, totem_slot: 3, aura_slot: 3, seal_slot: 3, nightveil: 3, warpath: 3, frenzy: 3,
+        troll_cost: 3, undead_cost: 3, demon_cost: 3, totem_cost: 3, pet_slot: 3, totem_slot: 3, aura_slot: 3, seal_slot: 3, nightveil: 3, warpath: 3, frenzy: 3,
         // 2 – gewöhnlich, solide
         thorns: 2, gravecaller: 2, momentum: 2, claim: 2, oath_archive: 2, tithe: 2, resource_pyre: 2, bloodrush: 2,
         veil: 2, bastion: 2, guardianangel: 2, assassin: 2, smoke: 2, sniper: 2, quiver: 2, warbringer: 2, spring: 2,
         bloodbloom: 2, spiked: 2, hive: 2, soultax: 2, recycle: 2, echoes: 2, spellbook: 2, frostbite: 2, toxic: 2,
         shadowlink: 2, holylight: 2, veteran: 2, tribal: 2, alliances: 2, wither: 2, duelist: 2, ironhide: 2, aegis: 2,
         eternalflame: 2, inferno: 2, emberheart: 2, troll_atk: 2, orc_berserk: 2, draenei_inspire: 2, dwarf_protector: 2,
-        nightelf_elusive: 2, tauren_atk: 2, gnome_draw: 2, warrior_atk: 2, priest_heal: 2, paladin_protector: 2,
+        nightelf_elusive: 2, tauren_atk: 2, gnome_draw: 2, warrior_atk: 2, hunter_cost: 2, rogue_stealth: 2, shaman_ferocity: 2, mage_hp: 2, druid_hp: 2, priest_heal: 2, paladin_protector: 2,
         warlock_draw: 2, dk_atk: 2, pet_bond: 2, demon_bond: 2, art_totems: 2, art_ironwall: 2, art_swordboard: 2,
         art_combo: 2, art_shatter: 2, art_flurry: 2, art_hoj: 2, art_potency: 2, art_throwing: 2, art_contagion: 2,
         art_worms: 2, art_bloodcraze: 2, art_devast: 2, art_soulstone: 2, art_valor: 2, art_citrine: 2, art_vigil: 2,
@@ -3227,8 +3226,7 @@
         // 1 – gewöhnlich, Nische
         goldgier: 1, atlas: 1, loc_compass: 1, phantom: 1, mirror_dance: 1, shieldwall: 1, ghostwalk: 1, charge: 1,
         martyrium: 1, swarm: 1, waste: 1, library: 1, idol: 1, gold_start: 1, gold_resource: 1, gold_death: 1,
-        gold_weapon: 1, art_counter: 1, art_orb: 1, art_soulfrag: 1, art_static: 1, art_soulwell: 1, mage_hp: 1,
-        druid_hp: 1, human_hp: 1, troll_hp: 1, bloodelf_ping: 1, pet_call: 1, form_draw: 1
+        gold_weapon: 1, art_counter: 1, art_orb: 1, art_soulfrag: 1, art_static: 1, art_soulwell: 1, human_hp: 1, troll_hp: 1, bloodelf_ping: 1, pet_call: 1, form_draw: 1
     };
     const TIER_RARITY = { 1: 'common', 2: 'common', 3: 'rare', 4: 'legendary' };
     const TIER_PRICE = { 1: 85, 2: 110, 3: 160, 4: 240 };
