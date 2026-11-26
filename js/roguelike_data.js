@@ -1815,11 +1815,12 @@
         },
         {
             id: 'lightning_overload', name: 'Lightning Overload', icon: 'Spells/LightningOverload.png', cls: 'Shaman', rarity: 'common', price: 110,
-            text: 'Die erste Fähigkeit, die du in einem Zug spielst, fügt einem zufälligen Gegner 2 Naturschaden zu.',
-            cardPlayed: (s, p, card) => {
-                if (p !== 1 || card.type !== 'Ability' || flag(s, 't:lightning')) return;
-                setFlag(s, 't:lightning'); q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } });
-            }
+            // Nutzer: "erste Fähigkeit pro Zug" lief in Zügen ohne Fähigkeit leer. Jetzt Totem-Artefakt für alle drei Talentbäume.
+            // Totems greifen nie an (CR-Glossar "Totem", 305.3) – +1 ATK wirkt, wenn sie verteidigen. "Zerstört" = Ereignis died
+            // (engine.js destroy), also nicht Death Rattle (Friedhof von irgendwo); Ziel zufällig: Held oder Ally.
+            text: 'Deine Totems haben +1 Angriff. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.',
+            stat: (s, c, kind) => (kind === 'atk' && c && c.isTotem && ctrlOf(s, c) === 1) ? 1 : 0,
+            died: (s, snap) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem)) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } }); }
         },
         {
             id: 'demonic_pact', name: 'Demonic Pact', icon: 'Spells/DemonicPact.png', cls: 'Warlock', rarity: 'common', price: 110,

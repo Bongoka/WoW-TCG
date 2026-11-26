@@ -4467,7 +4467,7 @@ var I18N_EN = {
     'Runen & Seuchen': 'Runes & Plagues',
     'Jeder gefallene Gegner nährt den Todesritter.': 'Every fallen enemy feeds the death knight.',
     'Der erste Ally, den du in einem Zug spielst, kommt mit +2 Gesundheit ins Spiel.': 'The first ally you play each turn enters play with +2 Health.',
-    'Die erste Fähigkeit, die du in einem Zug spielst, fügt einem zufälligen Gegner 2 Naturschaden zu.': 'The first ability you play each turn deals 2 Nature damage to a random enemy.',
+    'Deine Totems haben +1 Angriff. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.': 'Your Totems have +1 ATK. When one of your Totems is destroyed, it deals 2 Nature damage to a random enemy.',
     'Zu Beginn deines Zuges: Wenn dein Held mindestens 10 Leben hat, erleidet er 2 Schaden und du ziehst 1 Karte.': 'At the start of your turn: if your hero has at least 10 health, it is dealt 2 damage and you draw a card.',
     'Die erste Karte mit Kosten (4) oder mehr, die du in einem Zug spielst, kostet (2) weniger.': 'The first card that costs (4) or more you play each turn costs (2) less.',
     'Dein Held hat +1 Angriff. Einmal pro Zug: Wenn ein gegnerischer Ally stirbt, heile 2 Schaden von deinem Helden.': 'Your hero has +1 ATK. Once per turn: when an opposing ally is destroyed, heal 2 damage from your hero.',
