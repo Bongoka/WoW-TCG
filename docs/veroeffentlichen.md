@@ -11,6 +11,14 @@ V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\
 
 Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von `main.js`.
 
+## Cloudflare Pages (https://wowtcg.pages.dev)
+
+`node bin/cfdeploy.js` baut `G:\downloads\wowtcg-cfdeploy` (Hardlinks, außerhalb des Spielordners, damit der Tablet-Sync ihn nicht mitnimmt) und lädt ihn mit `npx wrangler pages deploy` ins Pages-Projekt `wowtcg` hoch – nur geänderte Dateien. `--build` = nur bauen. Wrangler muss angemeldet sein (`npx.cmd wrangler login`, im Browser bestätigen; PowerShell blockiert `npx.ps1`).
+- Inhalt: nur Spieldateien **aus Git** (`GAME_PATHS` im Skript – kein `bin`, `docs`, `android`, `tools`, Addon). Neue Dateien also erst `git add`.
+- Kartenbilder: alle Scans (`<set> scans`, `<set> scans small`); Karten ohne Scan (Treasure, Crafted, Promo, Starter, Badge …) bekommen das normale Bild (`<set>`, `<set> small`, Helden mit Rückseite). Keine Extended Art, kein `big`. Das Skript schreibt dafür ein eigenes `js/imgindex.js` (nur hochgeladene Ordner) – das Spiel schaltet dann von selbst auf „Original-Scans“.
+- Limit von Pages: 20.000 Dateien je Projekt (jetzt ≈ 8.600), 25 MB je Datei; kein Speicher- oder Traffic-Limit. Alle Bilder (≈ 24.000) passen nicht – dafür wäre R2 + eigene Domain nötig.
+- `_headers`: Bilder, Töne usw. 30 Tage im Browser-Cache.
+
 ### Kartenbilder
 Ordner je Set (`SET_IMG` in main.js): `cards/<set>` (716×1000), `<set> small` (358×500), `<set> big` (1432×2000), `<set> scans` (745×1040) und `<set> scans small` (372×519), alles WebP mit Qualität 92. Auf GitHub liegen nur `<set>` und `<set> small`. Dateinamen überall `<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp` (`cardImgBase`/`imgFileName` in main.js), z. B. `AZEROTH-100 Lobotomize (EA).webp`.
 
