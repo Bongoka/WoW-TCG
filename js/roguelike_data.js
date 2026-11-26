@@ -165,6 +165,9 @@
     R.isPoolCard = function (cd) {
         if (!cd || !cd.id || typeof cd.id !== 'number') return false;
         if (!['Ally', 'Ability', 'Weapon', 'Armor', 'Item', 'Quest', 'Location'].includes(cd.type)) return false;
+        // Karten, die nicht (vollständig) umgesetzt sind (CARD_ISSUES, cards.js: Hearthstone, Lady Katrana Prestor, Through the
+        // Dark Portal …), gibt es im Roguelike nicht – weder im Draft noch in Beute, Händler, Ereignissen oder Gegner-Decks (Nutzer)
+        if (typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]) return false;
         // Set 1 (Heroes of Azeroth) hat kein set/num – dort dient die ID als Kartennummer.
         const set = R.setOf(cd);
         if (!cd.num && set !== 1) return false;
@@ -176,6 +179,41 @@
     };
     // cls = englischer Klassenname (z. B. "Warrior"). act = 1..4; ohne act = alle Akte.
     // opts: heroId, talent, scourge, traitorCards, race.
+    // Waffen, die nicht zur Spielweise des Talentbaums passen, gibt es im Roguelike nicht (Draft, Beute, Händler, Ereignisse,
+    // Gegner-Decks) – erlaubt bleiben sie nach den Regeln trotzdem. Vorgaben des Nutzers:
+    //  - Schamane Enhancement: keine Stäbe.
+    //  - Jäger: von den Stäben nur solche für Fernkampfwaffen (Lok'delar, Stave of the Ancient Keepers).
+    //  - Druide Feral: Cat/Bear Form enden, sobald er mit einer Waffe zuschlägt – nur Waffen mit einem Effekt, der ohne Zuschlagen
+    //    und ohne Erschöpfen des Helden wirkt (Braxxis' Staff of Slumber, Zerstören für einen Effekt, Aktivieren, Dauereffekte).
+    R.weaponFitsStyle = function (cd, cls, talent) {
+        if (!cd || cd.type !== 'Weapon') return true;
+        const staff = cd.wsub === 'Staff';
+        if (cls === 'Shaman' && talent === 'Enhancement') return !staff;
+        if (cls === 'Hunter' && staff) return /Ranged weapons?/i.test(cd.text || '');
+        if (cls === 'Druid' && talent === 'Feral') return R.weaponWorksUnstruck(cd);
+        return true;
+    };
+    // Hat die Waffe einen Effekt, der wirkt, ohne mit ihr zuzuschlagen und ohne den Helden zu erschöpfen?
+    // Je Absatz (<p>): Kräfte "Kosten >>> Effekt" zählen, wenn die Kosten den Helden nicht erschöpfen; sonstige Absätze, wenn sie
+    // sich nicht nur auf das Zuschlagen/den Kampf mit dieser Waffe beziehen (Strike, Kampfschaden, ATK der Waffe, Keywords).
+    R.weaponWorksUnstruck = function (cd) {
+        const txt = String((cd && cd.text) || '').replace(/\([^)]*\)/g, ' ');           // Erinnerungstexte in Klammern ignorieren
+        if (/\bForm\b/.test(txt)) return true;                                           // Braxxis: verbessert ihn in Gestalt
+        for (const raw of txt.split(/<p>/i)) {
+            const s = raw.trim(); if (!s) continue;
+            const strikeOnly = x => /\bstrike|(?<!non-)combat damage|(dealt|damage) with this weapon|this weapon has|ATK counter|Long-?Range|Dual Wield|Thrown/i.test(x);
+            if (s.includes('>>>')) { const [cost, eff] = s.split('>>>'); if (!/Exhaust your hero/i.test(cost) && !strikeOnly(eff)) return true; continue; }
+            // "When your hero attacks" / "while attacking": wirkt auch beim Angriff in Gestalt ohne Zuschlagen (Hammer of the Naaru)
+            if (strikeOnly(s) && !/When your hero attacks|while (your hero is )?attacking/i.test(s.replace(/this weapon has[^.]*\./gi, ''))) continue;
+            if (/enters play exhausted|^[A-Z][a-z]+ Reputation$/i.test(s)) continue;
+            return true;
+        }
+        return false;
+    };
+    // Karten, die der Spieler im Roguelike nie angeboten bekommt (Draft, Beute, Händler, Ereignisse) – Gegner dürfen sie spielen.
+    // Nutzer: Karten, deren einziger Effekt eine Karte "aus der Sammlung" holt – Auswahl aus ~1400 Karten ohne Suche.
+    // Rite of Vision (1306), Ritual of Summoning (8074), Flash of Brilliance (12045)
+    R.PLAYER_BANNED = new Set([1306, 8074, 12045]);
     R.poolFor = function (cls, faction, act, opts = {}) {
         const sets = new Set(R.actSets(act));
         const talent = opts.talent !== undefined ? opts.talent : null;
@@ -196,7 +234,7 @@
             // Todesritter gibt es erst ab scourgewar: ihre Klassenkarten gehören von Anfang an zum Pool
             if (!sets.has(R.setOf(cd)) && !(cls === 'Death Knight' && (cd.allowedClasses || []).includes(cls))) continue;
             let ok = false;
-            try { ok = cardMatchesPlayer(cd, fake) && talentReqOk(cd, hero); } catch (e) { ok = false; }
+            try { ok = cardMatchesPlayer(cd, fake) && talentReqOk(cd, hero) && R.weaponFitsStyle(cd, cls, talent); } catch (e) { ok = false; }
             if (ok) out.push(cd);
         }
         R.CARD_CACHE[key] = out;
@@ -309,7 +347,7 @@
         });
         const owned = {};
         for (const e of run.deck) { const b = e.upgradedFrom || e.id; owned[b] = (owned[b] || 0) + 1; }
-        let list = pool.filter(c => !opts.noUpgrade && c.id && (owned[c.id] || 0) < 2);
+        let list = pool.filter(c => !opts.noUpgrade && c.id && (owned[c.id] || 0) < 2 && !R.PLAYER_BANNED.has(c.id));
         if (opts.blockOnly) {
             const bs = new Set(R.block(act).sets);
             const only = list.filter(c => bs.has(R.setOf(c)));
@@ -317,7 +355,7 @@
         }
         const lo = opts.minCost === undefined ? 0 : opts.minCost, hi = opts.maxCost === undefined ? 9 : opts.maxCost;
         list = list.filter(c => (c.cost || 0) >= lo && (c.cost || 0) <= hi);
-        if (!list.length) list = pool.slice();
+        if (!list.length) list = pool.filter(c => !R.PLAYER_BANNED.has(c.id));
         const curSets = new Set(R.block(act).sets);
         const out = [], used = new Set();
         let guard = 0;
@@ -344,8 +382,14 @@
     // ---------------------------------------------------------------- Deck-Draft (wie die Hearthstone-Arena)
     // Ablauf: Held (je Talentbaum einer, mit 1 seltenen + 2 passenden Karten) → Paket → Quest-Runde (3 Quests) → Paket → seltene Einzelkarte
     // → Paket → Quest-Runde → Paket → seltene Einzelkarte → Paket = 26 Karten, davon genau 6 Quests. Jedes Paket höchstens zweimal angeboten.
-    R.DRAFT_STEPS = ['hero', 'pack', 'quest', 'pack', 'rare', 'pack', 'quest', 'pack', 'rare', 'pack'];   // 2 Quest-Runden = 6 Quests
-    R.DRAFT_SIZE = 26;
+    // Held 3 + 7 Pakete à 3 + 2 Quest-Runden à 3 (6 Quests) + 4 seltene Einzelkarten = 34 Karten. Vorher 26: langsame Decks
+    // zogen ihr Deck nach ~15 Zügen leer und verloren in Führung (CR 410.6b), die Gegner-Decks haben 28–38 Karten.
+    R.DRAFT_STEPS = ['hero', 'pack', 'quest', 'pack', 'rare', 'pack', 'pack', 'quest', 'rare', 'pack', 'rare', 'pack', 'pack', 'rare'];
+    R.DRAFT_SIZE = 34;
+    R.REWARD_OFFER = 5; R.REWARD_PICKS = 2;          // Beute nach Kampf/Elite: 2 aus 5 (vorher 1 aus 3)
+    R.REWARD_SKIP_GOLD = 8;                          // Gold je nicht genommener Beute-Karte
+    R.ACT_SKIP_GOLD = 25;                            // dasselbe nach dem Boss (Beute aus dem neuen Set-Block, ebenfalls 2 aus 5)
+    R.DECK_WARN = 5;                                 // Kampf: Warnung, sobald nur noch so viele Karten im eigenen Deck liegen
     const dTxt = cd => (cd && cd.text) || '';
     const dHas = (cd, re) => re.test(dTxt(cd));
     const dAlly = cd => cd.type === 'Ally';
@@ -456,7 +500,7 @@
     R.draftPool = function (heroId) {
         const h = CARDS[heroId]; if (!h) return [];
         return R.poolFor(h.class, h.faction, 1, { heroId, talent: h.talent || null, scourge: !!h.scourge, traitorCards: !!h.traitorCards })
-            .filter(cd => cd.type !== 'Hero' && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]));
+            .filter(cd => cd.type !== 'Hero' && !(typeof CARD_ISSUES !== 'undefined' && CARD_ISSUES[cd.id]) && !R.PLAYER_BANNED.has(cd.id));
     };
     const dQual = { Common: 1, Uncommon: 1.2, Rare: 1.5, Epic: 1.6, Legendary: 1.6 };
     const dCount = (deck, id) => deck.filter(x => x === id).length;
@@ -1242,50 +1286,85 @@
         id: 'gold_weapon', text: 'Wenn dein Held mit einer Waffe zuschlägt: erhalte 4 Gold (1x/Zug).',
         strike: (s, d) => { if (!d || d.pid !== 1 || flag(s, 't:gold_wpn')) return; setFlag(s, 't:gold_wpn'); addRunGold(s, 4); }
     });
-    // Rassen
-    defArt({ id: 'troll_cost', text: 'Trolle kosten (1) weniger.', cost: (s, p, card) => (card.type === 'Ally' && isRace(card, 'Troll')) ? -1 : 0 });
-    defArt({ id: 'troll_atk', text: 'Trolle haben +1 Angriff.', stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Troll')) ? 1 : 0 });
-    defArt({ id: 'troll_hp', text: 'Trolle haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Troll')) ? 1 : 0 });
-    defArt({ id: 'orc_berserk', text: 'Orcs haben +1 Angriff pro Schaden auf ihnen.', stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Orc')) ? (c.damage || 0) : 0 });
+    // Rassen (Nutzer): je Fraktionsrasse ein Artefakt mit einer kleinen, rassentypischen Fähigkeit für jeden eigenen Ally dieser Rasse,
+    // ohne Begrenzung pro Zug. Kostensenkungen mit "mindestens (1)" tragen costMin1 (artCost deckelt sie gemeinsam).
+    const RL_RACES = ['Human', 'Dwarf', 'Night Elf', 'Gnome', 'Draenei', 'Orc', 'Troll', 'Tauren', 'Undead', 'Blood Elf'];
+    // "bis zum Ende des nächsten gegnerischen Zuges" (Sicht des Spielers): Marker für jeden Zug bis dahin (Marker gelten je Zug, tms)
+    function untilNextFoeTurn(s, c, m) { const end = s.turn + (s.activePlayer === 1 ? 1 : 2); for (let tt = s.turn; tt <= end; tt++) addTM(c, { ...m, turn: tt }); }
+    const ownRaceAlly = (s, uid, r) => { const c = findCharacter(s, uid); return c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, r) ? c : null; };
     defArt({
-        id: 'draenei_inspire', text: 'Solange du einen Draenei kontrollierst: +1 Nichtkampfschaden.',
-        dmgPre: (s, o) => {
-            if (!o || o.amt <= 0 || o.combat || !o.src) return;
-            const src = findCharacter(s, o.src);
-            if (src && ctrlOf(s, src) === 1 && ctrlRace(s, 1, 'Draenei')) o.amt += 1;
+        id: 'human_hp', text: 'Du zahlst (1) weniger, um Menschen-Allies zu spielen, mindestens (1).', costMin1: true,
+        cost: (s, p, card) => (card.type === 'Ally' && isRace(card, 'Human')) ? -1 : 0
+    });
+    defArt({
+        id: 'dwarf_protector', text: 'Verteidigt ein Zwergen-Ally, wird 1 Kampfschaden an ihm verhindert.',
+        dmgPre: (s, o) => { if (!o || !o.combat || !(o.amt > 0) || !s.battle || s.battle.def !== o.tgt) return; if (ownRaceAlly(s, o.tgt, 'Dwarf')) o.amt -= 1; }
+    });
+    defArt({
+        id: 'nightelf_elusive', text: 'Kommt ein Nachtelfen-Ally ins Spiel, hat er Elusive bis zum Ende des nächsten gegnerischen Zuges. Hat er bereits Elusive, hat er stattdessen +0/+1.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = ownRaceAlly(s, uid, 'Night Elf'); if (!c) return;
+            if (hasElusive(s, c)) addTM(c, { k: 'hp', v: 1 }); else untilNextFoeTurn(s, c, { k: 'elusive' }); }
+    });
+    defArt({
+        id: 'gnome_draw', text: 'Kommt ein Gnomen-Ally ins Spiel, bekommst du ein 0/1-Mechanical-Token mit Protector. Das Token kann nicht angreifen.',
+        allyEnters: (s, p, uid) => { if (p !== 1 || !ownRaceAlly(s, uid, 'Gnome')) return; const k = makeToken(s, 9503, 1); if (k) { addTM(k, { k: 'protector' }); addTM(k, { k: 'cantAttack' }); } }
+    });
+    defArt({
+        id: 'draenei_inspire', text: 'Dein Held hat Mend 1 für jeden Draenei-Ally: Zu Beginn deines Zuges heilt er so viel Schaden von deinem Charakter mit dem meisten Schaden (bei Gleichstand dein Held). Zahlst du (2), wählst du das Ziel selbst.',
+        startTurn: (s, p) => {
+            if (p !== 1) return; const n = friendlyAllies(s).filter(a => isRace(a, 'Draenei')).length; if (!n) return;
+            const hero = myHero(s), hurt = [hero, ...friendlyAllies(s)].filter(c => (c.damage || 0) > 0); if (!hurt.length) return;
+            const max = Math.max(...hurt.map(c => c.damage)), auto = (hero.damage || 0) === max ? hero : hurt.find(c => c.damage === max);
+            if (hurt.length > 1 && getReadyRes(getPlayer(s, 1)) >= 2)
+                return yesNo(s, 1, tr`Gift of the Naaru: (2) zahlen, um das Ziel der Heilung (${n}) selbst zu wählen? Sonst wird ${auto.name} geheilt.`, 'Gift of the Naaru', 'E:rlNaaruPay', { n, auto: auto.uid }, false);
+            heal(s, hero.uid, auto.uid, n);
         }
     });
-    defArt({ id: 'undead_cost', text: 'Untote kosten (1) weniger.', cost: (s, p, card) => (card.type === 'Ally' && isRace(card, 'Undead')) ? -1 : 0 });
-    defArt({ id: 'human_hp', text: 'Menschen haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Human')) ? 1 : 0 });
     defArt({
-        id: 'dwarf_protector', text: 'Zwerge haben Protector.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Dwarf')) addTM(c, { k: 'protector' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isRace(c, 'Dwarf')) addTM(c, { k: 'protector' }); }
+        id: 'orc_berserk', text: 'Orc-Allies haben +1 Angriff, solange sie verletzt sind. Orc-Allies mit nur 1 Gesundheit haben zusätzlich +0/+1.',
+        stat: (s, c, kind) => { if (!c || c.type !== 'Ally' || ctrlOf(s, c) !== 1 || !isRace(c, 'Orc')) return 0;
+            if (kind === 'atk') return (c.damage || 0) > 0 ? 1 : 0; if (kind === 'hp') return (CARDS[c.id] && CARDS[c.id].hp === 1) ? 1 : 0; return 0; }
     });
     defArt({
-        id: 'nightelf_elusive', text: 'Nachtelfen haben Elusive.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Night Elf')) addTM(c, { k: 'elusive' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isRace(c, 'Night Elf')) addTM(c, { k: 'elusive' }); }
+        id: 'troll_atk', text: 'Troll-Allies haben +1 Angriff, solange dein Held 10 oder mehr Schaden hat.',
+        stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Troll') && (myHero(s).damage || 0) >= 10) ? 1 : 0
     });
     defArt({
-        id: 'bloodelf_ping', text: 'Wenn ein Blutelf ins Spiel kommt: 1 Schaden am gegnerischen Helden.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Blood Elf')) q(s, { op: 'call', k: 'E:rlpingHero', a: { pid: 1, amt: 1, dt: 'Arcane' } }); }
+        id: 'tauren_atk', text: 'Tauren-Allies haben +0/+1. Kommt einer ins Spiel, erhält ein anderer befreundeter Ziel-Ally dauerhaft +1 Gesundheit.',
+        stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Tauren')) ? 1 : 0,
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = ownRaceAlly(s, uid, 'Tauren'); if (!c) return;
+            rlAskTarget(s, c, { ally: true, side: 'friendly', filter: x => x.uid !== c.uid }, tr`${c.name}: Welcher andere Ally erhält dauerhaft +1 Gesundheit?`, 'E:rlTaurenHp', x => cardValue(s, x)); }
     });
-    defArt({ id: 'tauren_atk', text: 'Tauren haben +1 Angriff.', stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isRace(c, 'Tauren')) ? 1 : 0 });
     defArt({
-        id: 'gnome_draw', text: 'Wenn ein Gnom ins Spiel kommt: ziehe 1 Karte (1x/Zug).',
-        allyEnters: (s, p, uid) => { if (p !== 1 || flag(s, 't:gnome_draw')) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Gnome')) { setFlag(s, 't:gnome_draw'); drawFor(s, 1, 1); } }
+        id: 'undead_cost', text: 'Kommt ein Untoten-Ally ins Spiel, darfst du die Gesundheit deines Helden für diesen Kampf um 1 verringern. Tust du das, hat der Untoten-Ally +1/+1.',
+        stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Hero' && ctrlOf(s, c) === 1) ? -(s.rl.forsaken || 0) : 0,
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = ownRaceAlly(s, uid, 'Undead'); if (!c) return;
+            yesNo(s, 1, tr`${c.name}: Gesundheit deines Helden für diesen Kampf um 1 verringern? Dann hat ${c.name} +1/+1.`, 'Forsaken Pact', 'E:rlForsakenPact', { uid: c.uid }, true); }
+    });
+    defArt({
+        id: 'bloodelf_ping', text: 'Kommt ein Blutelfen-Ally ins Spiel, verliert ein gegnerischer Ziel-Ally seinen Kartentext bis zum Ende des nächsten gegnerischen Zuges. Dieser Effekt nutzt nicht die Kette.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = ownRaceAlly(s, uid, 'Blood Elf'); if (!c) return;
+            rlAskTarget(s, c, { ally: true, side: 'enemy' }, tr`${c.name}: Welcher gegnerische Ally verliert seinen Kartentext?`, 'E:rlSilence', x => cardValue(s, x)); }   // Ziel und Wirkung ohne Kette (Nutzer)
     });
     // Klassen
+    // Klassen-Artefakte (Nutzer): je Klasse eine kleine, klassentypische Fähigkeit für JEDEN eigenen Ally dieser Klasse – keine Werte-
+    // Boni, keine Begrenzung pro Zug (die Anzahl der Klassen-Allies lässt sich im Draft kaum steuern)
     defArt({
-        id: 'warrior_atk', text: 'Krieger-Allies und Waffen haben +1 Angriff.',
-        stat: (s, c, kind) => (kind === 'atk' && c && ctrlOf(s, c) === 1 && ((c.type === 'Ally' && isClass(c, 'Warrior')) || c.type === 'Weapon')) ? 1 : 0
+        id: 'warrior_atk', text: 'Krieger-Allies können in dem Zug, in dem sie ins Spiel kommen, einen Ally angreifen (keinen Helden).',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (!c || !isClass(c, 'Warrior') || hasFerocity(s, c)) return;
+            addTM(c, { k: 'ferocity', turn: s.turn }); addTM(c, { k: 'noHeroAttack', turn: s.turn }); }   // nur Allies (engine.js attackTargets)
     });
-    defArt({ id: 'mage_hp', text: 'Magier-Allies haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Mage')) ? 1 : 0 });
-    defArt({ id: 'hunter_cost', text: 'Jäger-Allies kosten (1) weniger.', cost: (s, p, card) => (card.type === 'Ally' && isClass(card, 'Hunter')) ? -1 : 0 });
     defArt({
-        id: 'priest_heal', text: 'Wenn du Leben heilst: heile 1 zusätzlich (1x/Zug).',
-        healed: (s, d) => { if (!d || d.hpid !== 1 || !(d.amt > 0) || flag(s, 't:priest_heal')) return; setFlag(s, 't:priest_heal'); healHeroFor(s, 1, 1); }
+        id: 'mage_hp', text: 'Wenn ein Magier-Ally ins Spiel kommt: Ein Ziel-Held oder -Ally kann in seinem nächsten Zug nicht angreifen.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Mage')) rlAskTarget(s, c, { char: true }, tr`${c.name}: Wer kann in seinem nächsten Zug nicht angreifen?`, 'E:rlMageFrost', t => ctrlOf(s, t) === 2 ? atkOf(s, t) + 1 : -5); }
+    });
+    defArt({
+        id: 'hunter_cost', text: 'Wenn ein Jäger-Ally ins Spiel kommt: Er fügt einem Ziel-Ally 1 Fernkampfschaden zu.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Hunter')) rlAskTarget(s, c, { ally: true }, tr`${c.name}: Welcher Ally bekommt 1 Fernkampfschaden?`, 'E:rlHunterShot', t => ctrlOf(s, t) === 2 ? (hpOf(s, t) - (t.damage || 0) <= 1 ? 10 : 2) : -5); }
+    });
+    defArt({
+        id: 'priest_heal', text: 'Wenn ein Priester-Ally ins Spiel kommt: Er heilt 2 Schaden von einem Ziel-Helden oder -Ally.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Priest')) rlAskTarget(s, c, { char: true }, tr`${c.name}: Wen heilst du um 2?`, 'E:rlPriestHeal', t => ctrlOf(s, t) === 1 ? Math.min(2, t.damage || 0) : -5); }
     });
     // Pets, Totems, Auren
     defArt({ id: 'pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', tagLimit: (s, t) => t === 'Pet' ? 1 : 0 });
@@ -1320,27 +1399,58 @@
         }
     });
     defArt({
-        id: 'rogue_stealth', text: 'Schurken-Allies haben Stealth.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); }
+        id: 'rogue_stealth', text: 'Wenn ein Schurken-Ally ins Spiel kommt: Er fügt einem erschöpften Ziel-Helden oder -Ally 1 unverhinderbaren Nahkampfschaden zu.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Rogue')) rlAskTarget(s, c, { char: true, exhausted: true }, tr`${c.name}: Welcher erschöpfte Charakter bekommt 1 unverhinderbaren Nahkampfschaden?`, 'E:rlRogueStab', t => ctrlOf(s, t) === 2 ? (t.type === 'Hero' ? 3 : (hpOf(s, t) - (t.damage || 0) <= 1 ? 10 : 2)) : -5); }
+    });
+    // Schaden an eigenen Klassen-Allies verringern (Earth Shield / Divine Shield): Marker am Ally – beim Zonenwechsel gelöscht
+    const ownClassAlly = (s, uid, k) => { const c = findCharacter(s, uid); return c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, k) ? c : null; };
+    defArt({
+        id: 'shaman_ferocity', text: 'Schamanen-Allies: Der erste Schaden, den einer in jedem Zug erleiden würde, wird um 1 verringert.',
+        dmgPre: (s, o) => { if (!o || !(o.amt > 0)) return; const c = ownClassAlly(s, o.tgt, 'Shaman'); if (!c || hasTM(s, c, 'rlEarthShield')) return;
+            addTM(c, { k: 'rlEarthShield', turn: s.turn }); o.amt -= 1; }
     });
     defArt({
-        id: 'shaman_ferocity', text: 'Schamanen-Allies haben Ferocity.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); }
+        id: 'paladin_protector', text: 'Paladin-Allies: Der erste Schaden, den einer erleiden würde, wird vollständig verhindert (einmal).',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Paladin')) addTM(c, { k: 'rlDivineShield' }); },
+        dmgPre: (s, o) => { if (!o || !(o.amt > 0)) return; const c = ownClassAlly(s, o.tgt, 'Paladin'); if (!c || !hasTM(s, c, 'rlDivineShield')) return;
+            c.tm = c.tm.filter(m => m.k !== 'rlDivineShield'); o.amt = 0; }
     });
     defArt({
-        id: 'paladin_protector', text: 'Paladin-Allies haben Protector.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); }
+        id: 'warlock_draw', text: 'Wenn ein Hexenmeister-Ally ins Spiel kommt: Er fügt dem gegnerischen Helden 1 Schattenschaden zu, und dein Held heilt so viel Schaden, wie zugefügt wurde.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (!c || !isClass(c, 'Warlock')) return;
+            dealDamage(s, { src: c.uid, tgt: s.p2.hero.uid, amt: 1, dt: 'Shadow', after: { k: 'E:rlDrainLife', a: {} } }); }
     });
     defArt({
-        id: 'warlock_draw', text: 'Wenn ein Hexer-Ally ins Spiel kommt: ziehe 1 Karte (1x/Zug).',
-        allyEnters: (s, p, uid) => { if (p !== 1 || flag(s, 't:warlock_draw')) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Warlock')) { setFlag(s, 't:warlock_draw'); drawFor(s, 1, 1); } }
+        id: 'druid_hp', text: 'Druiden-Allies heilen am Ende deines Zuges 1 Schaden von sich selbst.',
+        endTurn: (s, p) => { if (p !== 1) return; for (const c of getPlayer(s, 1).allies) if (c.type === 'Ally' && isClass(c, 'Druid') && c.damage > 0) heal(s, c.uid, c.uid, 1); }
     });
-    defArt({ id: 'druid_hp', text: 'Druiden-Allies haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Druid')) ? 1 : 0 });
-    defArt({ id: 'dk_atk', text: 'Todesritter-Allies haben +1 Angriff.', stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Death Knight')) ? 1 : 0 });
+    defArt({
+        id: 'dk_atk', text: 'Wenn ein Todesritter-Ally stirbt: 1 Schattenschaden an einen zufälligen gegnerischen Ally.',
+        died: (s, snap) => { if (!snap || snap.wasCtrl !== 1 || !isClass(CARDS[snap.id] || snap, 'Death Knight')) return; q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Shadow', allies: true } }); }
+    });
 
+    // Ziel für eine Artefakt-Fähigkeit eines Allys wählen (Spieler 1); keine Kandidaten → nichts. ai: Bewertung (nur Kopien/Auto)
+    function rlAskTarget(s, src, spec, prompt, k, aiFn) {
+        const cands = targetCands(s, 1, spec); if (!cands.length) return;                    // liefert uids
+        ask(s, { pid: 1, prompt, src: src.name, opts: cands.map(u => ({ label: targetLabel(s, u, 1), v: u, ai: aiFn(findCharacter(s, u)) })), k, a: { src: src.uid } });
+    }
+    EK.rlMageFrost = (s, a, uid) => { const t = findCharacter(s, uid); if (!t) return; const pid = ctrlOf(s, t);
+        addTM(t, { k: 'cantAttack', turn: s.turn + (pid === s.activePlayer ? 2 : 1) }); L(s, tr`❄ ${t.name} kann im nächsten Zug nicht angreifen.`, '', 1); };   // nächster Zug seines Spielers
+    EK.rlHunterShot = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Ranged' }); };
+    EK.rlPriestHeal = (s, a, uid) => { if (findCharacter(s, uid)) heal(s, findCharacter(s, a.src) ? a.src : s.p1.hero.uid, uid, 2); };
+    EK.rlShadowCouncil = (s, a, v) => { const x = findCharacter(s, a.uid); if (!v || !x || flag(s, 't:legion')) return; const n = getPlayer(s, 1).allies.filter(o => o.uid !== x.uid).length; if (n > 0) { setFlag(s, 't:legion'); addTM(x, { k: 'atk', v: n }); } };
+    EK.rlTaurenHp = (s, a, uid) => { const x = findCharacter(s, uid); if (x) addTM(x, { k: 'hp', v: 1 }); };
+    EK.rlSilence = (s, a, uid) => { const x = findCharacter(s, uid); if (!x) return; untilNextFoeTurn(s, x, { k: 'rlSilenced' }); L(s, tr`🤐 ${x.name} verliert seinen Kartentext bis zum Ende des nächsten gegnerischen Zuges.`, '', 1); };
+    EK.rlForsakenPact = (s, a, v) => { const x = findCharacter(s, a.uid); if (!v || !x) return; s.rl.forsaken = (s.rl.forsaken || 0) + 1; addTM(x, { k: 'atk', v: 1 }); addTM(x, { k: 'hp', v: 1 }); };
+    EK.rlNaaruPay = (s, a, v) => {
+        const hero = myHero(s);
+        if (!v || !payRes(getPlayer(s, 1), 2)) { if (findCharacter(s, a.auto)) heal(s, hero.uid, a.auto, a.n); return; }
+        const hurt = [hero, ...friendlyAllies(s)].filter(c => (c.damage || 0) > 0);
+        ask(s, { pid: 1, prompt: tr`Gift of the Naaru: Wen heilst du um ${a.n}?`, src: 'Gift of the Naaru', opts: hurt.map(c => ({ label: targetLabel(s, c.uid, 1), v: c.uid, ai: c.damage })), k: 'E:rlNaaruHeal', a });
+    };
+    EK.rlNaaruHeal = (s, a, uid) => { if (findCharacter(s, uid)) heal(s, myHero(s).uid, uid, a.n); };
+    EK.rlDrainLife = (s, a) => { if (a.dealt > 0) heal(s, s.p1.hero.uid, s.p1.hero.uid, a.dealt); };
+    EK.rlRogueStab = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Melee', unprev: true }); };
     // ---- Auswahl / Anwendung -------------------------------------------------
     R.effectOf = function (cardOrId) {
         let cd;
@@ -1632,6 +1742,8 @@
     function addPrevent(s, n) { if (!s || !s.rl || !(n > 0)) return; addPE(s, 1, { k: 'rlGuard', v: n, untilTurn: s.turn }); }
     function flag(s, k) { return !!(s && s.rl && s.rl.f && s.rl.f[k]); }
     function setFlag(s, k) { if (!s || !s.rl) return; (s.rl.f || (s.rl.f = {}))[k] = 1; }
+    // Zähler pro Zug (Schlüssel 't:…' werden zu Zugbeginn gelöscht); add > 0 erhöht
+    function turnCount(s, k, add) { if (!s || !s.rl) return 0; const f = s.rl.f || (s.rl.f = {}); if (add) f[k] = (f[k] || 0) + add; return f[k] || 0; }
     function hasArt(s, id) { return !!(s && s.rl && s.rl.arts && s.rl.arts.indexOf(id) >= 0); }
     function artList(s) {
         if (!s || !s.rl || !s.rl.arts || !s.rl.arts.length) return [];
@@ -1640,8 +1752,8 @@
     function heroOfPid(s, pid) { return s && (pid === 1 ? s.p1.hero : s.p2.hero); }
     function isHero(s, uid) { const c = findCharacter(s, uid); return !!(c && c.type === 'Hero'); }
     function enemyChars(s) { return partyOf(getOpponent(s, 1)); }
-    function pingEnemy(s, amt, dt) {
-        const list = enemyChars(s).filter(c => c);
+    function pingEnemy(s, amt, dt, alliesOnly) {
+        const list = enemyChars(s).filter(c => c && (!alliesOnly || c.type !== 'Hero'));   // alliesOnly: kein Ziel ohne gegnerischen Ally
         if (!list.length) return;
         const c = R.pick(list);
         dealDamage(s, { src: s.p1.hero.uid, tgt: c.uid, amt, dt: dt || 'Arcane', ability: true });
@@ -1718,12 +1830,12 @@
         },
         {
             id: 'overload_core', name: 'Überladungskern', cls: 'Mage', rarity: 'common', price: 110,
-            text: 'Die erste Fähigkeit, die du in einem Zug spielst, kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.',
-            cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -2 : 0,
+            text: 'Die erste Fähigkeit pro Zug kostet (1) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen gegnerischen Ally 1 Arkanschaden zu.',
+            cost: (s, p, card) => (card.type === 'Ability' && !flag(s, 't:overload_core')) ? -1 : 0,   // Nutzer: (2) war zu stark
             cardPlayed: (s, p, card) => {
                 if (p !== 1 || card.type !== 'Ability') return;
                 setFlag(s, 't:overload_core');
-                q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Arcane' } });   // Balance-Simulation: Magier war zu schwach
+                q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Arcane', allies: true } });   // nur gegnerische Allies, nie der Held (Nutzer)
             }
         },
         {
@@ -1778,11 +1890,14 @@
         },
         {
             id: 'lightning_overload', name: 'Lightning Overload', icon: 'Spells/LightningOverload.png', cls: 'Shaman', rarity: 'common', price: 110,
-            text: 'Die erste Fähigkeit, die du in einem Zug spielst, fügt einem zufälligen Gegner 2 Naturschaden zu.',
-            cardPlayed: (s, p, card) => {
-                if (p !== 1 || card.type !== 'Ability' || flag(s, 't:lightning')) return;
-                setFlag(s, 't:lightning'); q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } });
-            }
+            // Nutzer: "erste Fähigkeit pro Zug" lief in Zügen ohne Fähigkeit leer. Jetzt Totem-Artefakt für alle drei Talentbäume.
+            // Totems greifen nie an (CR-Glossar "Totem", 305.3) – +1 ATK wirkt, wenn sie verteidigen. "Zerstört" = Ereignis died
+            // (engine.js destroy), also nicht Death Rattle (Friedhof von irgendwo); Ziel zufällig: Held oder Ally.
+            text: 'Deine Totems haben +1 Angriff und machen Naturschaden. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.',
+            stat: (s, c, kind) => (kind === 'atk' && c && c.isTotem && ctrlOf(s, c) === 1) ? 1 : 0,
+            allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && c.isTotem) addTM(c, { k: 'dtAs', dt: 'Nature' }); },   // Kampfschaden als Natur (allyDt, engine.js)
+            // Nicht, wenn ein Totem nur ersetzt wird (zweites Totem desselben Elements, Tag-Limit CR 414.3b: cause 'limit') – Nutzer
+            died: (s, snap, d) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem) && !(d && d.cause === 'limit')) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } }); }
         },
         {
             id: 'demonic_pact', name: 'Demonic Pact', icon: 'Spells/DemonicPact.png', cls: 'Warlock', rarity: 'common', price: 110,
@@ -1816,8 +1931,10 @@
         },
         {
             id: 'wardrum', name: 'Kriegstrommel', rarity: 'rare', price: 115,
-            text: 'Deine Allies kosten (1) weniger.',
-            cost: (s, p, card) => card.type === 'Ally' ? -1 : 0
+            // Nutzer: nur die ersten beiden Allies pro Zug, kein Minimum
+            text: 'Die ersten beiden Allies, die du in einem Zug spielst, kosten (1) weniger.',
+            cost: (s, p, card) => (card.type === 'Ally' && turnCount(s, 't:wardrum') < 2) ? -1 : 0,
+            cardPlayed: (s, p, card) => { if (p === 1 && card && card.type === 'Ally') turnCount(s, 't:wardrum', 1); }
         },
         {
             id: 'gravecaller', name: 'Grabrufer', rarity: 'common', price: 75,
@@ -1904,13 +2021,14 @@
         },
         {
             id: 'legion', name: 'Legion des Schattenrats', rarity: 'rare', price: 125,
-            text: 'Wenn ein befreundeter Ally ins Spiel kommt, erhält er +1 Angriff für jeden anderen Ally, den du kontrollierst.',
+            // Nutzer: einmal pro Zug, du entscheidest bei welchem Ally (Frage bei jedem Ally, solange es in diesem Zug noch frei ist)
+            text: 'Einmal pro Zug: Kommt ein befreundeter Ally ins Spiel, darfst du ihm +1 Angriff für jeden anderen Ally geben, den du kontrollierst.',
             allyEnters: (s, p, uid) => {
-                if (p !== 1) return;
+                if (p !== 1 || flag(s, 't:legion')) return;
                 const c = findCharacter(s, uid);
                 if (!c || c.type !== 'Ally') return;
                 const n = getPlayer(s, 1).allies.filter(a => a.uid !== c.uid).length;
-                if (n > 0) addTM(c, { k: 'atk', v: n });
+                if (n > 0) yesNo(s, 1, tr`Shadow Council jetzt nutzen? ${c.name} erhält +${n} Angriff (einmal pro Zug).`, 'Shadow Council', 'E:rlShadowCouncil', { uid: c.uid }, true);
             }
         },
         {
@@ -1944,8 +2062,10 @@
         // ---- Weitere Artefakte (thematisch an die Akte angelehnt)
         {
             id: 'warbanner', name: 'Kriegsbanner der Arena', rarity: 'rare', price: 120, acts: [3],
-            text: 'Deine Allies mit Kosten (2) oder weniger kosten (1) weniger. Kombiniert mit Kriegstrommel kosten sie gar nichts.',
-            cost: (s, p, card) => (card.type === 'Ally' && (card.cost || 0) <= 2) ? -1 : 0
+            // Nutzer: nur die ersten beiden solchen Allies pro Zug, kein Minimum
+            text: 'Die ersten beiden Allies mit Kosten (2) oder weniger, die du in einem Zug spielst, kosten (1) weniger.',
+            cost: (s, p, card) => (card.type === 'Ally' && (card.cost || 0) <= 2 && turnCount(s, 't:warbanner') < 2) ? -1 : 0,
+            cardPlayed: (s, p, card) => { if (p === 1 && card && card.type === 'Ally' && (CARDS[card.id] ? CARDS[card.id].cost || 0 : card.cost || 0) <= 2) turnCount(s, 't:warbanner', 1); }
         },
         {
             id: 'soulforge', name: 'Seelenamboss', rarity: 'rare', price: 125, acts: [2],
@@ -2489,12 +2609,12 @@
             }
         },
         {
-            id: 'tribal', name: 'Stammesbanner', cat: 'Rassen', rarity: 'rare', price: 115,
-            text: 'Wenn du zwei oder mehr Allies derselben Rasse kontrollierst, kosten Allies dieser Rasse (1) weniger.',
+            id: 'tribal', name: 'Unity of the Races', cat: 'Rassen', rarity: 'rare', price: 160, costMin1: true,
+            text: 'Ein Ally kostet (1) weniger, mindestens (1), wenn sich gerade kein anderer Ally seiner Rasse in deiner Gruppe befindet. Es zählen nur die zehn Fraktionsrassen.',
             cost: (s, p, card) => {
-                if (card.type !== 'Ally' || !card.race) return 0;
-                const n = friendlyAllies(s).filter(a => a.race === card.race).length;
-                return n >= 2 ? -1 : 0;
+                if (card.type !== 'Ally') return 0;
+                const r = RL_RACES.find(x => isRace(card, x)); if (!r) return 0;
+                return friendlyAllies(s).some(a => isRace(a, r)) ? 0 : -1;
             }
         },
         {
@@ -2513,7 +2633,7 @@
     // ids bleiben stabil (Saves/Tests), nur Name, Icon und Text ändern sich.
     const ART_META = {
         bloodpact: ['Deep Wounds', 'Abilities/BloodRage.png', 'Dein Held hat +1 Angriff. Wenn er Schaden erleidet, ziehe 1 Karte (1x/Zug).'],
-        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (2) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen Gegner 1 Arkanschaden zu.'],
+        overload_core: ['Arcane Potency', 'Spells/ArcanePotency.png', 'Die erste Fähigkeit pro Zug kostet (1) weniger. Jede Fähigkeit, die du spielst, fügt einem zufälligen gegnerischen Ally 1 Arkanschaden zu.'],
         beastbond: ['Animal Handler', 'Abilities/AnimalHandler.png', 'Der erste Ally pro Zug kommt mit +1/+1 ins Spiel.'],
         sanctuary: ['Guardian Spirit', 'Spells/GuardianSpirit.png', 'Ende deines Zuges: heile 2 und füge dem gegnerischen Helden 1 Heiligschaden zu. Einmal pro Kampf: Überlebe tödlichen Schaden mit 1 Leben.'],
         echo_sigil: ['Honor Among Thieves', 'Abilities/Readiness.png', 'Die erste Fähigkeit pro Zug kostet (1) weniger und kommt als Kopie auf die Hand.'],
@@ -2531,12 +2651,12 @@
         bulwark: ['Bulwark of Azzinoth', 'Armour/Shield_Naxxramas_D_01.png'],
         titanheart: ['Heart of the Titans', 'Trade/Titansteel_red.png'],
         oracle: ['Atiesh', 'Weapons/Medivh.png', 'Zu Beginn deines Zuges: ziehe 1 Karte und erhalte 2 Gold.'],
-        legion: ['Shadow Council', 'Spells/GatherShadows.png', 'Ein Ally kommt mit +1 Angriff pro anderem Ally ins Spiel.'],
+        legion: ['Shadow Council', 'Spells/GatherShadows.png', 'Einmal pro Zug: Kommt ein befreundeter Ally ins Spiel, darfst du ihm +1 Angriff für jeden anderen Ally geben, den du kontrollierst.'],
         soulharvest: ['Soul Reaper', 'Spells/DeathCoil.png'],
         timewarp: ['Time Warp', 'Spells/TimeStop.png'],
         inferno: ['Cataclysm', 'Spells/MeteorStorm.png'],
         momentum: ['Mark of the Champion', 'Miscellaneous/AhnQirajTrinket_02.png'],
-        warbanner: ['Arena Grand Master', 'Miscellaneous/Trophy_Argent.png', 'Allies mit Kosten (2) oder weniger kosten (1) weniger.'],
+        warbanner: ['Arena Grand Master', 'Miscellaneous/Trophy_Argent.png', 'Die ersten beiden Allies mit Kosten (2) oder weniger, die du in einem Zug spielst, kosten (1) weniger.'],
         soulforge: ['Soulforge', 'Trade/AdamantiteFrame.png', 'Wenn du eine Fähigkeit spielst, erhält ein zufälliger Ally +1 Angriff.'],
         deathlord: ['Naxxramas', 'Spells/NightOfTheDead.png', 'Einmal pro Zug: Wenn ein Ally stirbt, beschwöre einen 3/3-Ghul.'],
         warlord: ['High Warlord', 'Weapons/PVP330_D_01.png'],
@@ -2599,7 +2719,7 @@
         holylight: ['Holy Guidance', 'Spells/HolyGuidance.png'],
         idol: ['Libram of Hope', 'Miscellaneous/LibramofHope.png'],
         veteran: ["Warchief's Blessing", 'Spells/WarsongFocus.png'],
-        tribal: ['Earthen Ring Totem', 'Spells/StrengthOfEarthTotem02.png'],
+        tribal: ['Unity of the Races', 'Spells/StrengthOfEarthTotem02.png'],
         alliances: ['Bonds of Azeroth', 'Spells/ChampionsBond.png']
     };
     R.ARTIFACTS.forEach(a => {
@@ -2615,28 +2735,26 @@
         return a;
     }
     R.ARTIFACTS.push(
-        newArtifact('troll_cost', "Zul'Aman Drums", 'Miscellaneous/Drum_02.png', 'Rassen', 'rare', 120, 'troll_cost'),
-        newArtifact('troll_atk', 'Trollblood', 'Abilities/Berserk.png', 'Rassen', 'rare', 115, 'troll_atk'),
-        newArtifact('troll_hp', 'Voodoo Charm', 'Spells/Hex.png', 'Rassen', 'common', 95, 'troll_hp'),
-        newArtifact('orc_berserk', 'Warsong Sash', 'Spells/BloodPresence.png', 'Rassen', 'rare', 120, 'orc_berserk'),
-        newArtifact('draenei_inspire', 'Exodar Life-Staff', 'Weapons/draenei_03.png', 'Rassen', 'rare', 125, 'draenei_inspire'),
-        newArtifact('undead_cost', 'Undercity Oath', 'Spells/PortalUnderCity.png', 'Rassen', 'rare', 115, 'undead_cost'),
-        newArtifact('human_hp', 'Lionheart', 'Miscellaneous/AhnQirajTrinket_04.png', 'Rassen', 'common', 95, 'human_hp'),
-        newArtifact('dwarf_protector', 'Dwarven Bunker', 'Places/Ironforge.png', 'Rassen', 'rare', 125, 'dwarf_protector'),
-        newArtifact('nightelf_elusive', 'Nightseye', 'Trade/Nightseye_01.png', 'Rassen', 'rare', 120, 'nightelf_elusive'),
-        newArtifact('bloodelf_ping', 'Mana Tap', 'Spells/ManaTap.png', 'Rassen', 'common', 100, 'bloodelf_ping'),
-        newArtifact('tauren_atk', 'Tauren Totem', 'Spells/AncestralGuardian.png', 'Rassen', 'rare', 115, 'tauren_atk'),
-        newArtifact('gnome_draw', 'Gnomish Harm Prevention Belt', 'Miscellaneous/EngGizmos_01.png', 'Rassen', 'rare', 120, 'gnome_draw'),
-        newArtifact('warrior_atk', 'Battle Trance', 'Abilities/Bloodsurge.png', 'Klassen', 'rare', 120, 'warrior_atk'),
-        newArtifact('mage_hp', 'Arcane Resilience', 'Spells/ArcaneResilience.png', 'Klassen', 'common', 95, 'mage_hp'),
-        newArtifact('hunter_cost', 'Pack Mentality', 'Abilities/Pathfinding.png', 'Klassen', 'rare', 120, 'hunter_cost'),
-        newArtifact('priest_heal', 'Blessed Recovery', 'Spells/BlessedRecovery.png', 'Klassen', 'rare', 115, 'priest_heal'),
-        newArtifact('rogue_stealth', 'Master of Subtlety', 'Abilities/MasterOfSubtlety.png', 'Klassen', 'rare', 125, 'rogue_stealth'),
-        newArtifact('shaman_ferocity', 'Elemental Oath', 'Spells/ElementalOath.png', 'Klassen', 'rare', 125, 'shaman_ferocity'),
-        newArtifact('paladin_protector', 'Aura of Light', 'Spells/AuraOfLight.png', 'Klassen', 'rare', 125, 'paladin_protector'),
-        newArtifact('warlock_draw', 'Demonic Tactics', 'Spells/DemonicTactics.png', 'Klassen', 'rare', 120, 'warlock_draw'),
-        newArtifact('druid_hp', 'Natural Perfection', 'Abilities/NaturalPerfection.png', 'Klassen', 'common', 95, 'druid_hp'),
-        newArtifact('dk_atk', 'Runeblade', 'Spells/Rune.png', 'Klassen', 'rare', 120, 'dk_atk'),
+        newArtifact('troll_atk', 'Troll Berserking', 'Abilities/Berserk.png', 'Rassen', 'rare', 115, 'troll_atk'),
+        newArtifact('orc_berserk', 'Orcish Fury', 'Spells/BloodPresence.png', 'Rassen', 'rare', 120, 'orc_berserk'),
+        newArtifact('draenei_inspire', 'Gift of the Naaru', 'Weapons/draenei_03.png', 'Rassen', 'rare', 125, 'draenei_inspire'),
+        newArtifact('undead_cost', 'Forsaken Pact', 'Spells/PortalUnderCity.png', 'Rassen', 'rare', 115, 'undead_cost'),
+        newArtifact('human_hp', 'Stormwind Diplomacy', 'Miscellaneous/AhnQirajTrinket_04.png', 'Rassen', 'common', 95, 'human_hp'),
+        newArtifact('dwarf_protector', 'Ironforge Stoneform', 'Places/Ironforge.png', 'Rassen', 'rare', 125, 'dwarf_protector'),
+        newArtifact('nightelf_elusive', 'Elune\'s Veil', 'Trade/Nightseye_01.png', 'Rassen', 'rare', 120, 'nightelf_elusive'),
+        newArtifact('bloodelf_ping', 'Silvermoon Silence', 'Spells/ManaTap.png', 'Rassen', 'common', 100, 'bloodelf_ping'),
+        newArtifact('tauren_atk', 'Mulgore Endurance', 'Spells/AncestralGuardian.png', 'Rassen', 'rare', 115, 'tauren_atk'),
+        newArtifact('gnome_draw', 'Gnomish Engineering', 'Miscellaneous/EngGizmos_01.png', 'Rassen', 'rare', 120, 'gnome_draw'),
+        newArtifact('warrior_atk', 'Improved Charge', 'Abilities/Bloodsurge.png', 'Klassen', 'rare', 120, 'warrior_atk'),
+        newArtifact('mage_hp', 'Improved Frost Nova', 'Spells/ArcaneResilience.png', 'Klassen', 'common', 95, 'mage_hp'),
+        newArtifact('hunter_cost', 'Lethal Shots', 'Abilities/Pathfinding.png', 'Klassen', 'rare', 120, 'hunter_cost'),
+        newArtifact('priest_heal', 'Inspiration', 'Spells/BlessedRecovery.png', 'Klassen', 'rare', 115, 'priest_heal'),
+        newArtifact('rogue_stealth', 'Cheap Shot', 'Abilities/MasterOfSubtlety.png', 'Klassen', 'rare', 125, 'rogue_stealth'),
+        newArtifact('shaman_ferocity', 'Improved Earth Shield', 'Spells/ElementalOath.png', 'Klassen', 'rare', 125, 'shaman_ferocity'),
+        newArtifact('paladin_protector', 'Divine Guardian', 'Spells/AuraOfLight.png', 'Klassen', 'rare', 125, 'paladin_protector'),
+        newArtifact('warlock_draw', 'Drain Life', 'Spells/DemonicTactics.png', 'Klassen', 'rare', 120, 'warlock_draw'),
+        newArtifact('druid_hp', 'Nurturing Instinct', 'Abilities/NaturalPerfection.png', 'Klassen', 'common', 95, 'druid_hp'),
+        newArtifact('dk_atk', 'Unholy Blight', 'Spells/Rune.png', 'Klassen', 'rare', 120, 'dk_atk'),
         newArtifact('gold_start', 'Buried Treasure', 'Miscellaneous/Coin_05.png', 'Ökonomie', 'common', 75, 'gold_start'),
         newArtifact('gold_shop', 'Cartel Ledger', 'Trade/GoblinBoomBox_01.png', 'Ökonomie', 'rare', 130, 'gold_shop'),
         newArtifact('gold_resource', 'Mithril Deposit', 'Trade/Mithril_01.png', 'Ökonomie', 'common', 95, 'gold_resource'),
@@ -3130,29 +3248,28 @@
         soulharvest: 3, timewarp: 3, deathlord: 3, warlord: 3, gravelord: 3, combo: 3, bloodmagic: 3, frontier: 3,
         warbanner: 3, soulforge: 3, bladedance: 3, art_necropolis: 3, art_ghouls: 3, art_drums: 3, gold_shop: 3,
         prism: 3, armsmaster: 3, open_veins: 3, art_knell: 3, auraweaver: 3,
-        troll_cost: 3, undead_cost: 3, hunter_cost: 3, demon_cost: 3, totem_cost: 3, rogue_stealth: 3, shaman_ferocity: 3,
-        pet_slot: 3, totem_slot: 3, aura_slot: 3, seal_slot: 3, nightveil: 3, warpath: 3, frenzy: 3,
+        demon_cost: 3, totem_cost: 3, pet_slot: 3, totem_slot: 3, aura_slot: 3, seal_slot: 3, nightveil: 3, warpath: 3, frenzy: 3,
         // 2 – gewöhnlich, solide
         thorns: 2, gravecaller: 2, momentum: 2, claim: 2, oath_archive: 2, tithe: 2, resource_pyre: 2, bloodrush: 2,
         veil: 2, bastion: 2, guardianangel: 2, assassin: 2, smoke: 2, sniper: 2, quiver: 2, warbringer: 2, spring: 2,
         bloodbloom: 2, spiked: 2, hive: 2, soultax: 2, recycle: 2, echoes: 2, spellbook: 2, frostbite: 2, toxic: 2,
-        shadowlink: 2, holylight: 2, veteran: 2, tribal: 2, alliances: 2, wither: 2, duelist: 2, ironhide: 2, aegis: 2,
-        eternalflame: 2, inferno: 2, emberheart: 2, troll_atk: 2, orc_berserk: 2, draenei_inspire: 2, dwarf_protector: 2,
-        nightelf_elusive: 2, tauren_atk: 2, gnome_draw: 2, warrior_atk: 2, priest_heal: 2, paladin_protector: 2,
+        shadowlink: 2, holylight: 2, veteran: 2, wither: 2, duelist: 2, ironhide: 2, aegis: 2,
+        eternalflame: 2, inferno: 2, emberheart: 2, warrior_atk: 2, hunter_cost: 2, rogue_stealth: 2, shaman_ferocity: 2, mage_hp: 2, druid_hp: 2, priest_heal: 2, paladin_protector: 2,
         warlock_draw: 2, dk_atk: 2, pet_bond: 2, demon_bond: 2, art_totems: 2, art_ironwall: 2, art_swordboard: 2,
         art_combo: 2, art_shatter: 2, art_flurry: 2, art_hoj: 2, art_potency: 2, art_throwing: 2, art_contagion: 2,
         art_worms: 2, art_bloodcraze: 2, art_devast: 2, art_soulstone: 2, art_valor: 2, art_citrine: 2, art_vigil: 2,
         gold_attack: 2, resonance: 2,
         // 11/2026: Verstärker, Zähler, Erschöpfen/Bereit, Hand
-        art_echoskull: 3, art_adrenaline: 3, art_unity: 3, art_callwild: 3, art_executioner: 3, art_diamond: 3,
+        art_echoskull: 3, art_adrenaline: 3, art_callwild: 3, art_executioner: 3, art_diamond: 3,
         art_horn: 2, art_hourglass: 2, art_edward: 2, art_darkpact: 2, art_pendulum: 2, art_bos: 2, art_bluedragon: 2,
         // Klassen-Artefakte (früher Start-Artefakte): nur für die eigene Klasse, eins davon in der ersten Artefaktwahl
+        // Rassen (Nutzer): gewöhnlich, Stufe 2; das allgemeine Rassen-Artefakt selten
+        human_hp: 2, dwarf_protector: 2, nightelf_elusive: 2, gnome_draw: 2, draenei_inspire: 2, orc_berserk: 2, troll_atk: 2, tauren_atk: 2, undead_cost: 2, bloodelf_ping: 2, tribal: 3,
         bloodpact: 2, overload_core: 2, beastbond: 2, sanctuary: 2, echo_sigil: 2, kings_blessing: 2, lightning_overload: 2, demonic_pact: 2, natures_grace: 2, rune_tap: 2,
         // 1 – gewöhnlich, Nische
         goldgier: 1, atlas: 1, loc_compass: 1, phantom: 1, mirror_dance: 1, shieldwall: 1, ghostwalk: 1, charge: 1,
         martyrium: 1, swarm: 1, waste: 1, library: 1, idol: 1, gold_start: 1, gold_resource: 1, gold_death: 1,
-        gold_weapon: 1, art_counter: 1, art_orb: 1, art_soulfrag: 1, art_static: 1, art_soulwell: 1, mage_hp: 1,
-        druid_hp: 1, human_hp: 1, troll_hp: 1, bloodelf_ping: 1, pet_call: 1, form_draw: 1
+        gold_weapon: 1, art_counter: 1, art_orb: 1, art_soulfrag: 1, art_static: 1, art_soulwell: 1, pet_call: 1, form_draw: 1
     };
     const TIER_RARITY = { 1: 'common', 2: 'common', 3: 'rare', 4: 'legendary' };
     const TIER_PRICE = { 1: 85, 2: 110, 3: 160, 4: 240 };
@@ -3167,6 +3284,8 @@
         if (R.EFFECTS[a.id] && R.EFFECTS[a.id].kind === 'art') Object.assign(R.EFFECTS[a.id], { tier: t, rarity: a.rarity, price: a.price, text: a.text });
     });
     R.ART_TIER = ART_TIER;
+    // Entfernt (Nutzer, Kategorie Rassen): je Rasse nur ein Artefakt, nur ein allgemeines. Gespeicherte Runs: unbekannte ids wirken nicht (artList)
+    R.ARTIFACTS = R.ARTIFACTS.filter(a => !['alliances', 'troll_cost', 'troll_hp', 'art_unity'].includes(a.id));
     R.artById = {};
     R.ARTIFACTS.forEach(a => { R.artById[a.id] = a; });
     R.BOSS_ARTIFACTS.forEach(a => { R.artById[a.id] = a; if (!R.EFFECTS[a.id]) R.EFFECTS[a.id] = { ...a, kind: 'art' }; });
@@ -3215,6 +3334,7 @@
         nightelf_elusive: raceNeed('Night Elf'), bloodelf_ping: raceNeed('Blood Elf'), tauren_atk: raceNeed('Tauren'), gnome_draw: raceNeed('Gnome'),
         mage_hp: clsNeed('Mage'), hunter_cost: clsNeed('Hunter'), rogue_stealth: clsNeed('Rogue'), shaman_ferocity: clsNeed('Shaman'),
         paladin_protector: clsNeed('Paladin'), druid_hp: clsNeed('Druid'),
+        warrior_atk: clsNeed('Warrior'), priest_heal: clsNeed('Priest'), warlock_draw: clsNeed('Warlock'), dk_atk: clsNeed('Death Knight'),
         art_callwild: isPetCard, art_bos: cd => cd.type === 'Ally' && cardKw(cd, 'protector'),
         art_edward: cd => cd.type === 'Ability' && isOngoing(cd),
         art_echoskull: cd => { const e = R.effectOf(cd); return !!(e && /^(Beim Ins-Spiel-Kommen|Wenn diese Karte stirbt)/.test(e.text || '')); },
@@ -3233,9 +3353,10 @@
     // ---------------------------------------------------------------- Engine-Hooks
     function artCost(s, pid, card) {
         if (!s || !s.rl || pid !== 1 || !card || card.type === 'Hero' || card.type === 'Quest') return 0;
-        let v = R.cardCost(s, pid, card);
-        for (const a of artList(s)) if (a.cost) v += (a.cost(s, pid, card) || 0);
-        return v;
+        let v = R.cardCost(s, pid, card), m1 = 0;
+        for (const a of artList(s)) if (a.cost) { const d = a.cost(s, pid, card) || 0; if (a.costMin1 || (R.EFFECTS[a.id] && R.EFFECTS[a.id].costMin1)) m1 += d; else v += d; }
+        if (m1 < 0) m1 = Math.max(m1, Math.min(0, 1 - (card.cost || 0)));                 // "mindestens (1)" (Diplomacy-Prinzip), gemeinsam gedeckelt
+        return v + m1;
     }
     function artStat(s, c, kind) {
         if (!s || !s.rl || !c) return 0;
@@ -3315,6 +3436,7 @@
         if (R._hooksInstalled) return;
         R._hooksInstalled = true;
         COST_MODS.push((s, pid, card) => artCost(s, pid, card));
+        NO_POWERS.push((s, c) => !!(s && s.rl && c && c.tm && c.tm.length && hasTM(s, c, 'rlSilenced')));   // Silvermoon Silence: Kartentext verloren
         STAT_MODS.push((s, c, kind) => artStat(s, c, kind));
         DMG_PRE.push((s, o) => artDmgPre(s, o));
         const evts = ['startOfTurn', 'endOfTurn', 'cardPlayed', 'allyEnters', 'died', 'damaged', 'healed', 'attacks', 'defends',
@@ -3364,7 +3486,7 @@
         EK['rladdCard'] = (s, a) => { const p = getPlayer(s, a.pid); if (p && p.hand.length < 10 && CARDS[a.id]) p.hand.push(makeCardInst(a.id, false, p.id)); };
         EK['rlhealHero'] = (s, a) => { const p = getPlayer(s, a.pid); heal(s, p.hero.uid, p.hero.uid, a.amt); };
         EK['rlheroDamage'] = (s, a) => { const p = getPlayer(s, a.pid); dealDamage(s, { src: p.hero.uid, tgt: p.hero.uid, amt: a.amt, sp: p.id }); };
-        EK['rlpingEnemy'] = (s, a) => pingEnemy(s, a.amt, a.dt);
+        EK['rlpingEnemy'] = (s, a) => pingEnemy(s, a.amt, a.dt, !!a.allies);
         EK['rlpingHero'] = (s, a) => { const o = getOpponent(s, a.pid); dealDamage(s, { src: getPlayer(s, a.pid).hero.uid, tgt: o.hero.uid, amt: a.amt, dt: a.dt || 'Arcane', ability: true }); };
         EK['rlpingUid'] = (s, a) => { const c = findCharacter(s, a.uid); if (c) dealDamage(s, { src: getPlayer(s, 1).hero.uid, tgt: c.uid, amt: a.amt, dt: a.dt || 'Melee', ability: true }); };   // Quelle: dein Held (vorher fügte sich das Ziel den Schaden selbst zu)
     };

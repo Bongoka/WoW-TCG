@@ -1608,7 +1608,7 @@ function runRuleTests() {
         const bad = all.filter(t => /\b(Eifer|Protektor|Beschützer)\b/.test(t));
         assert(!bad.length, 'Erfundene Keyword-Namen: ' + bad.slice(0, 3).join(' · '));
     });
-    test(144, 'Roguelike-Draft: Held je Talentbaum, legale Karten, 26 Karten, kein Paket öfter als zweimal', () => {
+    test(144, 'Roguelike-Draft: Held je Talentbaum, legale Karten, 34 Karten, kein Paket öfter als zweimal', () => {
         if (typeof RL === 'undefined' || !RL.draftNew) return;
         for (const cls of RL.CLASSES) {
             const offers = RL.draftHeroOffers(cls.key);
@@ -2543,6 +2543,30 @@ function runRuleTests() {
         const a = getAttackActions(s, 1).find(x => x.attackerUid === P(s, 1).hero.uid && x.defenderUid === P(s, 2).hero.uid);
         assert(a && act(s, a, 1), 'Angriff nicht möglich');
         assert(!P(s, 2).allies[0].exhausted, 'Protector blockt harmlosen Angriff');
+    });
+    test(206, 'Lynda Steele im Zugende-Fenster: CPU muss danach angreifen statt endlos das Zugende zu versuchen (CR 502.2, 600.2)', () => {
+        const s = fresh(); s.humans = [2]; s.stopAll = true; s.real = false;
+        const small = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk === 1 && c.hp <= 2);
+        const att = put(s, 1, small.id); put(s, 2, 1178); res(s, 2, 2);                     // Lynda (3/5, Protector) würde den 1/1 blocken und töten
+        assert(applyAction(s, { type: 'END_TURN', actorId: 1 }, true, 1), 'Zugende nicht möglich');
+        process(s);
+        const lyn = s.pending && s.pending.kind === 'priority' && s.pending.pid === 2 && getPriorityActions(s, 2).find(a => a.type === 'ACTIVATE' && (a.targets || []).flat().includes(att.uid));
+        assert(lyn, 'Lynda-Kraft auf den CPU-Ally nicht anbietbar');
+        applyAction(s, { ...lyn, actorId: 2 }, true, 2); autoResolve(s);
+        assert(canActMain(s, 1) && mustAttack(s, 1).includes(att), 'CPU nicht wieder in der Aktionsphase mit Pflichtangriff');
+        assert(validateAction(s, { type: 'END_TURN' }, 1), 'Zugende trotz Pflichtangriff erlaubt');
+        for (const d of [searchBestAction(s, 1, 'normal'), fastAiAction(s, 1)])
+            assert(d && d.action && d.action.type === 'ATTACK' && d.action.attackerUid === att.uid, 'CPU greift nicht an: ' + (d && d.action ? d.action.desc : 'Zug beenden'));
+    });
+    test(207, "Pflichtangriff mit Angriffskosten (Winter's Grasp): ohne Bezahlung kein Zwang, der Zug kann enden (CR 600.3)", () => {
+        const vanilla = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.isToken && !c.unique && c.atk > 0);
+        for (const ready of [0, 2]) {
+            const s = fresh(); s.real = false; const a = put(s, 1, vanilla.id); addTM(a, { k: 'mustAttack', turn: s.turn }); res(s, 1, ready);
+            assert(mustAttack(s, 1).includes(a), 'Testaufbau: kein Zwang ohne Winter\'s Grasp');
+            put(s, 2, 60);
+            assert(!mustAttack(s, 1).length && !validateAction(s, { type: 'END_TURN' }, 1), `${ready} Ressourcen: Zugende trotz Angriffskosten verboten`);
+            assert(getAttackActions(s, 1).some(x => x.attackerUid === a.uid) === !!ready, `${ready} Ressourcen: Angriff des Allys falsch angeboten`);
+        }
     });
     return results;
 }

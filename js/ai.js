@@ -411,7 +411,20 @@ function enablerPlans(s, pid, legal) {
     }
     return out;
 }
-function searchBestAction(state, playerId, difficulty = 'normal') {
+// "Must attack if able" (Lynda Steele, Mocking Blow, Curse of Frenzy …): solange ein Pflichtangriff möglich ist, darf der
+// Zugspieler bei leerer Kette nicht passen (CR 600.2). Die Suche vergleicht aber auch "Nichtstun" – fand sie den Angriff
+// schlecht, wollte die CPU den Zug beenden, das Zugende wurde abgelehnt, und sie fragte endlos neu (Lynda Steele im Zugende-Fenster).
+function aiForcedAttack(state, pid, dec) {
+    if ((dec && dec.action) || !state || state.gameOver || !canActMain(state, pid) || !mustAttack(state, pid).length) return dec;
+    let best = null, bv = -Infinity;
+    for (const a of getAttackActions(state, pid)) {
+        const sim = simApply(state, a, pid), v = sim ? evaluateState(sim, pid) : -Infinity;
+        if (!best || v > bv) { best = a; bv = v; }
+    }
+    return best ? { action: best, score: bv, reason: best.desc } : dec;
+}
+function searchBestAction(state, playerId, difficulty = 'normal') { return aiForcedAttack(state, playerId, searchBestActionCore(state, playerId, difficulty)); }
+function searchBestActionCore(state, playerId, difficulty = 'normal') {
     let legal = getLegalActions(state, playerId);
     if (legal.length === 0) return null;
     const oppId = playerId === 1 ? 2 : 1;
@@ -495,7 +508,8 @@ function searchBestAction(state, playerId, difficulty = 'normal') {
 
 // Schnelle KI für Simulationen: Ressource legen (Heuristik), dann gierig die
 // beste Aktion nach einem Zug Vorausschau – nur wenn sie die Lage verbessert.
-function fastAiAction(state, pid, maxCands = 40) {
+function fastAiAction(state, pid, maxCands = 40) { return aiForcedAttack(state, pid, fastAiActionCore(state, pid, maxCands)); }
+function fastAiActionCore(state, pid, maxCands = 40) {
     const legal = getLegalActions(state, pid);
     if (!legal.length) return null;
     const ra = chooseResourceAction(state, pid, legal);   // gleiche Ressourcen-Regel wie die große Suche

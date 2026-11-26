@@ -2741,6 +2741,8 @@ function attackTargets(s, att) {
     // Set 2/3: einzelne Angriffssperren (Wing Clip, Mind Soothe, Grace of Air ohne Bezahlung ist erlaubt → atkTax)
     list = list.filter(d => !(tms(s, att, 'cantAttackUid').some(m => m.uid === d.uid)) && !auraAny(s, 'atkBlock', att, d) && !(d.limitTags && d.limitTags.Mount));   // CR 302.3: Mounts können nicht angegriffen werden
     { const ao = tms(s, att, 'attackOnlyUid')[0] || ATTACK_ONLY.map(f => f(s, att)).filter(Boolean).map(uid => ({ uid }))[0]; if (ao) { const x = list.filter(d => d.uid === ao.uid); if (x.length) list = x; } }   // Karta Foultongue (Set gladiator)
+    // Roguelike-Artefakt (Krieger): Ally mit geliehener Ferocity darf in diesem Zug nur Allies angreifen, keinen Helden
+    if (hasTM(s, att, 'noHeroAttack')) list = list.filter(d => d.type !== 'Hero');
     // Mocking Blow: kann nur den Helden des Wirkers angreifen
     const mock = tms(s, att, 'mocked')[0];
     if (mock) { const h = getPlayer(s, mock.by).hero; if (list.includes(h)) list = [h]; }
@@ -2795,7 +2797,14 @@ const ATTACK_ONLY = [];
 function mustAttack(s, pid) {
     const p = getPlayer(s, pid);
     const ch = pes(s, null, 'challenge').some(m => m.pid !== pid);
-    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch || auraAny(s, 'mustAttack', c)) && canAttackNow(s, c, p) && attackTargets(s, c).length);   // Curse of Frenzy, Bolvar (Set 7)
+    return partyOf(p).filter(c => (hasTM(s, c, 'mocked') || hasTM(s, c, 'mustAttack') || ch || auraAny(s, 'mustAttack', c)) && canAttackNow(s, c, p) && attackFree(s, c));   // Curse of Frenzy, Bolvar (Set 7)
+}
+// CR 600.3: "can't attack unless its controller [pays a cost]" + "must attack if able" – ohne Bezahlung kann der Charakter nicht
+// angreifen und muss es deshalb auch nicht (Winter's Grasp, Grace of Air Totem, Frostweaver Dakar'sith). Erzwungen ist der
+// Angriff nur, wenn er ein Ziel ohne Zusatzkosten hat – sonst konnte der Zug nicht enden (die CPU hing, ohne Ressourcen endlos).
+function attackFree(s, c) {
+    if (ATTACK_EXHAUST.some(f => (f(s, c) || 0) > 0)) return false;
+    return attackTargets(s, c).some(d => !winterCost(s, c, d));
 }
 function isAttackTargetLegal(att, def) { return !!att && !!def && !attackTargetError(G, att, def); }
 function winterCost(s, att, def) {

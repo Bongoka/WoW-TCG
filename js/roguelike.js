@@ -579,6 +579,12 @@
     function checkBattleEnd() {
         if (!G || !G.rl || !battleCtx || battleCtx.finished) return;
         if (!G.gameOver) {
+            // Warnung: nur noch wenige Karten im eigenen Deck (einmal je Kampf) – aus dem leeren Deck ziehen heißt verlieren (CR 410.6b)
+            const left = G.p1.deck.length;
+            if (!battleCtx.deckWarned && left <= R.DECK_WARN && left > 0) {
+                battleCtx.deckWarned = true;
+                try { showToast(tr`⚠ Nur noch ${left} Karten in deinem Deck! Musst du aus dem leeren Deck ziehen, verlierst du.`, false, 7000); } catch (e) { }
+            }
             if (battleHud) {
                 const sig = (run.gold + (G.rl.goldEarned || 0)) + '|' + (R.preventOf ? R.preventOf(G) : 0) + '|' + (run.potions || []).join(',');
                 if (battleHud.dataset.sig !== sig) renderBattleHud();
@@ -632,7 +638,7 @@
         // Trank als Beute: Elites immer, normale Kämpfe mit 40 %
         let potion = null;
         if (ctx.node.type === 'elite' || Math.random() < 0.4) { potion = R.randomPotion(); if ((run.potions || []).length < R.POTION_SLOTS) { run.potions.push(potion); saveRun(); } else potion = null; }
-        const cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8 });
+        const cards = R.rewardCards(run, R.REWARD_OFFER, { minCost: 0, maxCost: 8 });
         // Artefakte: Elites immer; nach dem ersten Sieg des Runs eine Wahl aus drei (darunter das Klassen-Artefakt)
         const first = !run.firstArt && ctx.node.type !== 'elite';
         if (!run.firstArt) { run.firstArt = true; saveRun(); }
@@ -686,28 +692,41 @@
     function openActReward() {
         if (!run) return;
         ensureRoot(); showRoot();
-        const cards = R.rewardCards(run, 3, { minCost: 0, maxCost: 8, blockOnly: true });
+        const cards = R.rewardCards(run, R.REWARD_OFFER, { minCost: 0, maxCost: 8, blockOnly: true });
+        const picks = Math.min(R.REWARD_PICKS, cards.length), gold = R.ACT_SKIP_GOLD;
         setMain(`
             <div class="rl-modal-screen">
                 ${hudHtml()}
                 <div class="rl-panel wide">
                     <div class="rl-panel-head"><div><div class="rl-kicker">Neuer Akt</div><h2>Beute aus dem neuen Set-Block</h2></div></div>
-                    <p class="rl-lead">Wähle eine Karte aus dem neuen Kartenpool. Sie ist sofort Teil deines Decks.</p>
-                    <div class="rl-reward-row" id="rl-act-reward-row"></div>
-                    <div class="rl-panel-actions"><button class="rl-btn ghost" id="rl-act-skip">Überspringen (+25 🪙)</button></div>
+                    <p class="rl-lead" id="rl-act-lead">${tr`Wähle ${picks} Karten aus dem neuen Kartenpool. Jede Karte, die du nicht nimmst, bringt ${gold} Gold.`}</p>
+                    <div class="rl-reward-row${cards.length > 3 ? ' many' : ''}" id="rl-act-reward-row"></div>
+                    <div class="rl-panel-actions"><button class="rl-btn ghost" id="rl-act-skip"></button></div>
                 </div>
             </div>`);
         wireHud();
         const row = mainEl.querySelector('#rl-act-reward-row');
+        let left = picks;
+        const skipBtn = mainEl.querySelector('#rl-act-skip'), lead = mainEl.querySelector('#rl-act-lead');
+        const updSkip = () => { if (skipBtn) skipBtn.textContent = left === picks ? tr`Überspringen (+${left * gold} 🪙)` : tr`Fertig (+${left * gold} 🪙)`; };
+        updSkip();
         cards.forEach(id => {
             const slot = document.createElement('button');
             slot.className = 'rl-reward-card';
             slot.dataset.card = id;
-            slot.appendChild(cardNode(id, 175));
-            slot.onclick = () => { addCardToRun(id); toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`); afterActReward(); };
+            slot.appendChild(cardNode(id, cards.length > 3 ? 150 : 175));
+            slot.onclick = () => {
+                if (slot.disabled || left <= 0) return;
+                slot.disabled = true; slot.classList.add('picked');
+                addCardToRun(id); left--;
+                toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`);
+                if (left <= 0) { afterActReward(); return; }
+                if (lead) lead.textContent = tr`Wähle noch ${left} Karte(n).`;
+                updSkip();
+            };
             row.appendChild(slot);
         });
-        on('#rl-act-skip', 'click', () => { run.gold += 25; saveRun(); afterActReward(); });
+        on('#rl-act-skip', 'click', () => { run.gold += left * gold; left = 0; saveRun(); afterActReward(); });
     }
 
     // Nach dem Boss: ein Boss-Artefakt (stark, mit Nachteil) aus drei
@@ -722,8 +741,9 @@
     function openReward(r) {
         ensureRoot(); showRoot();
         run.gold = run.gold; saveRun();
+        const picks = Math.min(R.REWARD_PICKS, r.cards.length);
         const rows = r.cards.map((id, i) => {
-            return `<button class="rl-reward-card" data-card="${id}">${i === 0 ? '<span class="rl-reward-glow"></span>' : ''}</button>`;
+            return `<button class="rl-reward-card" data-card="${id}" data-idx="${i}">${i === 0 ? '<span class="rl-reward-glow"></span>' : ''}</button>`;
         }).join('');
         setMain(`
             <div class="rl-modal-screen">
@@ -734,26 +754,34 @@
                         <div class="rl-gold-big">+${r.gold} 🪙</div>
                     </div>
                     ${r.potion && R.potById(r.potion) ? `<div class="rl-loot-potion"><img src="${ICON(R.potById(r.potion).icon)}" alt=""><div><small>Trank erbeutet</small><b>${esc(R.potById(r.potion).name)}</b><span>${esc(R.potById(r.potion).text)}</span></div></div>` : ""}
-                    <p class="rl-lead">Wähle eine Karte für dein Deck. Du kannst auch überspringen – dann erhältst du 8 Gold.</p>
-                    <div class="rl-reward-row" id="rl-reward-row">${rows}</div>
+                    <p class="rl-lead" id="rl-reward-lead">${tr`Wähle ${picks} Karten für dein Deck. Jede Karte, die du nicht nimmst, bringt ${R.REWARD_SKIP_GOLD} Gold.`}</p>
+                    <div class="rl-reward-row${r.cards.length > 3 ? ' many' : ''}" id="rl-reward-row">${rows}</div>
                     <div class="rl-panel-actions">
-                        <button class="rl-btn ghost" id="rl-skip">Überspringen (+8 🪙)</button>
+                        <button class="rl-btn ghost" id="rl-skip"></button>
                     </div>
                 </div>
             </div>`);
         wireHud();
         const row = mainEl.querySelector('#rl-reward-row');
-        r.cards.forEach(id => {
-            const slot = row.querySelector(`[data-card="${id}"]`);
+        let left = picks;
+        const skipBtn = mainEl.querySelector('#rl-skip'), lead = mainEl.querySelector('#rl-reward-lead');
+        const updSkip = () => { if (skipBtn) skipBtn.textContent = left === picks ? tr`Überspringen (+${left * R.REWARD_SKIP_GOLD} 🪙)` : tr`Fertig (+${left * R.REWARD_SKIP_GOLD} 🪙)`; };
+        updSkip();
+        r.cards.forEach((id, i) => {
+            const slot = row.querySelector(`[data-idx="${i}"]`);
             if (!slot) return;
-            slot.appendChild(cardNode(id, 175));
+            slot.appendChild(cardNode(id, r.cards.length > 3 ? 150 : 175));
             slot.onclick = () => {
-                addCardToRun(id);
+                if (slot.disabled || left <= 0) return;
+                slot.disabled = true; slot.classList.add('picked');
+                addCardToRun(id); left--;
                 toast(tr`${CARDS[id] ? CARDS[id].name : tr('Karte')} wurde dem Deck hinzugefügt.`);
-                afterCardReward(r);
+                if (left <= 0) { afterCardReward(r); return; }
+                if (lead) lead.textContent = tr`Wähle noch ${left} Karte(n).`;
+                updSkip();
             };
         });
-        on('#rl-skip', 'click', () => { run.gold += 8; saveRun(); afterCardReward(r); });
+        on('#rl-skip', 'click', () => { run.gold += left * R.REWARD_SKIP_GOLD; left = 0; saveRun(); afterCardReward(r); });
     }
     function afterCardReward(r) {
         if (r.arts && r.arts.length) { openArtifactChoice(r.arts, () => finishNode(r.node), r.first); }
