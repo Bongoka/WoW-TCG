@@ -1820,7 +1820,8 @@
             // (engine.js destroy), also nicht Death Rattle (Friedhof von irgendwo); Ziel zufällig: Held oder Ally.
             text: 'Deine Totems haben +1 Angriff. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.',
             stat: (s, c, kind) => (kind === 'atk' && c && c.isTotem && ctrlOf(s, c) === 1) ? 1 : 0,
-            died: (s, snap) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem)) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } }); }
+            // Nicht, wenn ein Totem nur ersetzt wird (zweites Totem desselben Elements, Tag-Limit CR 414.3b: cause 'limit') – Nutzer
+            died: (s, snap, d) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem) && !(d && d.cause === 'limit')) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } }); }
         },
         {
             id: 'demonic_pact', name: 'Demonic Pact', icon: 'Spells/DemonicPact.png', cls: 'Warlock', rarity: 'common', price: 110,
