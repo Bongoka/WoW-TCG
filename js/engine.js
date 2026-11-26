@@ -2741,6 +2741,8 @@ function attackTargets(s, att) {
     // Set 2/3: einzelne Angriffssperren (Wing Clip, Mind Soothe, Grace of Air ohne Bezahlung ist erlaubt → atkTax)
     list = list.filter(d => !(tms(s, att, 'cantAttackUid').some(m => m.uid === d.uid)) && !auraAny(s, 'atkBlock', att, d) && !(d.limitTags && d.limitTags.Mount));   // CR 302.3: Mounts können nicht angegriffen werden
     { const ao = tms(s, att, 'attackOnlyUid')[0] || ATTACK_ONLY.map(f => f(s, att)).filter(Boolean).map(uid => ({ uid }))[0]; if (ao) { const x = list.filter(d => d.uid === ao.uid); if (x.length) list = x; } }   // Karta Foultongue (Set gladiator)
+    // Roguelike-Artefakt (Krieger): Ally mit geliehener Ferocity darf in diesem Zug nur Allies angreifen, keinen Helden
+    if (hasTM(s, att, 'noHeroAttack')) list = list.filter(d => d.type !== 'Hero');
     // Mocking Blow: kann nur den Helden des Wirkers angreifen
     const mock = tms(s, att, 'mocked')[0];
     if (mock) { const h = getPlayer(s, mock.by).hero; if (list.includes(h)) list = [h]; }

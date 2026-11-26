@@ -1321,15 +1321,24 @@
         allyEnters: (s, p, uid) => { if (p !== 1 || flag(s, 't:gnome_draw')) return; const c = findCharacter(s, uid); if (c && isRace(c, 'Gnome')) { setFlag(s, 't:gnome_draw'); drawFor(s, 1, 1); } }
     });
     // Klassen
+    // Klassen-Artefakte (Nutzer): je Klasse eine kleine, klassentypische Fähigkeit für JEDEN eigenen Ally dieser Klasse – keine Werte-
+    // Boni, keine Begrenzung pro Zug (die Anzahl der Klassen-Allies lässt sich im Draft kaum steuern)
     defArt({
-        id: 'warrior_atk', text: 'Krieger-Allies und Waffen haben +1 Angriff.',
-        stat: (s, c, kind) => (kind === 'atk' && c && ctrlOf(s, c) === 1 && ((c.type === 'Ally' && isClass(c, 'Warrior')) || c.type === 'Weapon')) ? 1 : 0
+        id: 'warrior_atk', text: 'Krieger-Allies können in dem Zug, in dem sie ins Spiel kommen, einen Ally angreifen (keinen Helden).',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (!c || !isClass(c, 'Warrior') || hasFerocity(s, c)) return;
+            addTM(c, { k: 'ferocity', turn: s.turn }); addTM(c, { k: 'noHeroAttack', turn: s.turn }); }   // nur Allies (engine.js attackTargets)
     });
-    defArt({ id: 'mage_hp', text: 'Magier-Allies haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Mage')) ? 1 : 0 });
-    defArt({ id: 'hunter_cost', text: 'Jäger-Allies kosten (1) weniger.', cost: (s, p, card) => (card.type === 'Ally' && isClass(card, 'Hunter')) ? -1 : 0 });
     defArt({
-        id: 'priest_heal', text: 'Wenn du Leben heilst: heile 1 zusätzlich (1x/Zug).',
-        healed: (s, d) => { if (!d || d.hpid !== 1 || !(d.amt > 0) || flag(s, 't:priest_heal')) return; setFlag(s, 't:priest_heal'); healHeroFor(s, 1, 1); }
+        id: 'mage_hp', text: 'Wenn ein Magier-Ally ins Spiel kommt: Ein Ziel-Held oder -Ally kann in seinem nächsten Zug nicht angreifen.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Mage')) rlAskTarget(s, c, { char: true }, tr`${c.name}: Wer kann in seinem nächsten Zug nicht angreifen?`, 'E:rlMageFrost', t => ctrlOf(s, t) === 2 ? atkOf(s, t) + 1 : -5); }
+    });
+    defArt({
+        id: 'hunter_cost', text: 'Wenn ein Jäger-Ally ins Spiel kommt: Er fügt einem Ziel-Ally 1 Fernkampfschaden zu.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Hunter')) rlAskTarget(s, c, { ally: true }, tr`${c.name}: Welcher Ally bekommt 1 Fernkampfschaden?`, 'E:rlHunterShot', t => ctrlOf(s, t) === 2 ? (hpOf(s, t) - (t.damage || 0) <= 1 ? 10 : 2) : -5); }
+    });
+    defArt({
+        id: 'priest_heal', text: 'Wenn ein Priester-Ally ins Spiel kommt: Er heilt 2 Schaden von einem Ziel-Helden oder -Ally.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Priest')) rlAskTarget(s, c, { char: true }, tr`${c.name}: Wen heilst du um 2?`, 'E:rlPriestHeal', t => ctrlOf(s, t) === 1 ? Math.min(2, t.damage || 0) : -5); }
     });
     // Pets, Totems, Auren
     defArt({ id: 'pet_slot', text: 'Du kannst 1 zusätzliches Pet kontrollieren.', tagLimit: (s, t) => t === 'Pet' ? 1 : 0 });
@@ -1368,23 +1377,43 @@
         allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); },
         battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Rogue')) addTM(c, { k: 'stealth' }); }
     });
+    // Schaden an eigenen Klassen-Allies verringern (Earth Shield / Divine Shield): Marker am Ally – beim Zonenwechsel gelöscht
+    const ownClassAlly = (s, uid, k) => { const c = findCharacter(s, uid); return c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, k) ? c : null; };
     defArt({
-        id: 'shaman_ferocity', text: 'Schamanen-Allies haben Ferocity.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Shaman')) addTM(c, { k: 'ferocity' }); }
+        id: 'shaman_ferocity', text: 'Schamanen-Allies: Der erste Schaden, den einer in jedem Zug erleiden würde, wird um 1 verringert.',
+        dmgPre: (s, o) => { if (!o || !(o.amt > 0)) return; const c = ownClassAlly(s, o.tgt, 'Shaman'); if (!c || hasTM(s, c, 'rlEarthShield')) return;
+            addTM(c, { k: 'rlEarthShield', turn: s.turn }); o.amt -= 1; }
     });
     defArt({
-        id: 'paladin_protector', text: 'Paladin-Allies haben Protector.',
-        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); },
-        battleStart: s => { for (const c of getPlayer(s, 1).allies) if (isClass(c, 'Paladin')) addTM(c, { k: 'protector' }); }
+        id: 'paladin_protector', text: 'Paladin-Allies: Der erste Schaden, den einer erleiden würde, wird vollständig verhindert (einmal).',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Paladin')) addTM(c, { k: 'rlDivineShield' }); },
+        dmgPre: (s, o) => { if (!o || !(o.amt > 0)) return; const c = ownClassAlly(s, o.tgt, 'Paladin'); if (!c || !hasTM(s, c, 'rlDivineShield')) return;
+            c.tm = c.tm.filter(m => m.k !== 'rlDivineShield'); o.amt = 0; }
     });
     defArt({
-        id: 'warlock_draw', text: 'Wenn ein Hexer-Ally ins Spiel kommt: ziehe 1 Karte (1x/Zug).',
-        allyEnters: (s, p, uid) => { if (p !== 1 || flag(s, 't:warlock_draw')) return; const c = findCharacter(s, uid); if (c && isClass(c, 'Warlock')) { setFlag(s, 't:warlock_draw'); drawFor(s, 1, 1); } }
+        id: 'warlock_draw', text: 'Wenn ein Hexenmeister-Ally ins Spiel kommt: Er fügt dem gegnerischen Helden 1 Schattenschaden zu, und dein Held heilt so viel Schaden, wie zugefügt wurde.',
+        allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (!c || !isClass(c, 'Warlock')) return;
+            dealDamage(s, { src: c.uid, tgt: s.p2.hero.uid, amt: 1, dt: 'Shadow', after: { k: 'E:rlDrainLife', a: {} } }); }
     });
-    defArt({ id: 'druid_hp', text: 'Druiden-Allies haben +1 Gesundheit.', stat: (s, c, kind) => (kind === 'hp' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Druid')) ? 1 : 0 });
-    defArt({ id: 'dk_atk', text: 'Todesritter-Allies haben +1 Angriff.', stat: (s, c, kind) => (kind === 'atk' && c && c.type === 'Ally' && ctrlOf(s, c) === 1 && isClass(c, 'Death Knight')) ? 1 : 0 });
+    defArt({
+        id: 'druid_hp', text: 'Druiden-Allies heilen am Ende deines Zuges 1 Schaden von sich selbst.',
+        endTurn: (s, p) => { if (p !== 1) return; for (const c of getPlayer(s, 1).allies) if (c.type === 'Ally' && isClass(c, 'Druid') && c.damage > 0) heal(s, c.uid, c.uid, 1); }
+    });
+    defArt({
+        id: 'dk_atk', text: 'Wenn ein Todesritter-Ally stirbt: 1 Schattenschaden an einen zufälligen gegnerischen Ally.',
+        died: (s, snap) => { if (!snap || snap.wasCtrl !== 1 || !isClass(CARDS[snap.id] || snap, 'Death Knight')) return; q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 1, dt: 'Shadow', allies: true } }); }
+    });
 
+    // Ziel für eine Artefakt-Fähigkeit eines Allys wählen (Spieler 1); keine Kandidaten → nichts. ai: Bewertung (nur Kopien/Auto)
+    function rlAskTarget(s, src, spec, prompt, k, aiFn) {
+        const cands = targetCands(s, 1, spec); if (!cands.length) return;                    // liefert uids
+        ask(s, { pid: 1, prompt, src: src.name, opts: cands.map(u => ({ label: targetLabel(s, u, 1), v: u, ai: aiFn(findCharacter(s, u)) })), k, a: { src: src.uid } });
+    }
+    EK.rlMageFrost = (s, a, uid) => { const t = findCharacter(s, uid); if (!t) return; const pid = ctrlOf(s, t);
+        addTM(t, { k: 'cantAttack', turn: s.turn + (pid === s.activePlayer ? 2 : 1) }); L(s, tr`❄ ${t.name} kann im nächsten Zug nicht angreifen.`, '', 1); };   // nächster Zug seines Spielers
+    EK.rlHunterShot = (s, a, uid) => { if (findCharacter(s, uid)) dealDamage(s, { src: findCharacter(s, a.src) ? a.src : s.p1.hero.uid, tgt: uid, amt: 1, dt: 'Ranged' }); };
+    EK.rlPriestHeal = (s, a, uid) => { if (findCharacter(s, uid)) heal(s, findCharacter(s, a.src) ? a.src : s.p1.hero.uid, uid, 2); };
+    EK.rlDrainLife = (s, a) => { if (a.dealt > 0) heal(s, s.p1.hero.uid, s.p1.hero.uid, a.dealt); };
     // ---- Auswahl / Anwendung -------------------------------------------------
     R.effectOf = function (cardOrId) {
         let cd;
@@ -3262,6 +3291,7 @@
         nightelf_elusive: raceNeed('Night Elf'), bloodelf_ping: raceNeed('Blood Elf'), tauren_atk: raceNeed('Tauren'), gnome_draw: raceNeed('Gnome'),
         mage_hp: clsNeed('Mage'), hunter_cost: clsNeed('Hunter'), rogue_stealth: clsNeed('Rogue'), shaman_ferocity: clsNeed('Shaman'),
         paladin_protector: clsNeed('Paladin'), druid_hp: clsNeed('Druid'),
+        warrior_atk: clsNeed('Warrior'), priest_heal: clsNeed('Priest'), warlock_draw: clsNeed('Warlock'), dk_atk: clsNeed('Death Knight'),
         art_callwild: isPetCard, art_bos: cd => cd.type === 'Ally' && cardKw(cd, 'protector'),
         art_edward: cd => cd.type === 'Ability' && isOngoing(cd),
         art_echoskull: cd => { const e = R.effectOf(cd); return !!(e && /^(Beim Ins-Spiel-Kommen|Wenn diese Karte stirbt)/.test(e.text || '')); },
