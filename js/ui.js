@@ -403,6 +403,7 @@ function barPlan({ start, nr, strip, nq, qw, minTray, X0, bound, hand }) {
     const cx = Math.min(Math.max(X0, L - lo), bound - hi);                                // nie über den Friedhof
     return { qs, ov: f.ov, ang: f.ang, shift: cx - X0 };
 }
+const PORTRAIT = () => matchMedia('(orientation: portrait)').matches;                  // Hochformat-Spielfeld (css/style.css)
 function layoutBar() {
     const hw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-w')) || 140;
     const sides = [
@@ -420,7 +421,11 @@ function layoutBar() {
         const sc = uiScale(), ws = sd.opp ? [...hand.children].map(() => 160 * sc) : [...hand.children].map(c => c.classList.contains('playable') ? hw * 1.1 : hw);
         const hand0 = sd.opp ? { ws, ov0: 45 * sc, ovMax: 65 * sc, ang: 5 } : { ws, ov0: 20 * sc, ovMax: Math.max(20 * sc, (hw - 30 * sc) / 2), ang: 6 };
         const plan = barPlan({ start: mx(sd.opp ? tr_.right - rr.left : tr_.left - rr.left), nr: stack ? stack.children.length : 0, strip: RES_STRIP, nq: quests.length, qw: hw,
-            minTray: sd.opp ? 0 : hw, X0: rr.width / 2, bound, hand: hand0 });
+            minTray: sd.opp ? 0 : hw, X0: rr.width / 2, bound, hand: PORTRAIT() ? { ...hand0, ws: [] } : hand0 });
+        if (PORTRAIT()) {                                                                  // Hochformat: Hand liegt unter der Leiste, volle Breite
+            const hp = barPlan({ start: 8, nr: 0, strip: RES_STRIP, nq: 0, qw: hw, minTray: 0, X0: rr.width / 2, bound: rr.width - 8, hand: hand0 });
+            Object.assign(plan, { ov: hp.ov, ang: hp.ang, shift: hp.shift });
+        }
         plans.push({ sd, hand, tray, quests, plan });
     }
     for (const { sd, hand, tray, quests, plan } of plans) {                                // schreiben

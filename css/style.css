@@ -1731,3 +1731,13 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 #hotseat .hs-menu { position: absolute; top: 14px; left: 14px; padding: 6px 14px; font-size: 13px; background: transparent; color: #8a7b5c; border-color: #3a3020; }
 @keyframes hsIn { from { opacity: 0; } }
 @keyframes hsPulse { 50% { opacity: .4; } }
+
+/* ===== Hochformat: nur das Spielfeld (Menüs bleiben im Querformat, dort weiter der Dreh-Hinweis) =====
+   Eigene Hand über die volle Breite ganz unten, Ressourcen/Friedhof/Held eine Etage darüber; oben gespiegelt.
+   Die Ally-Reihen weichen den Leisten wie gewohnt aus (layoutBoard), die Hand rechnet layoutBar (PORTRAIT). */
+@media (orientation: portrait) and (pointer: coarse) { body.pf-game:not(:has(#rl-root.on)) #rotate-hint { display: none; } }
+@media (orientation: portrait) {
+    #bot-hand { width: 100%; }
+    .bottom-row > .resource-tray, .bottom-row > .deck-zone, .bottom-row > .hero-dock { top: calc(var(--hand-h) * -.8); }
+    .top-row > .resource-tray, .top-row > .deck-zone, .top-row > .hero-dock { position: relative; top: calc(76px * var(--ui-scale, 1)); }
+}
