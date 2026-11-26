@@ -1818,8 +1818,9 @@
             // Nutzer: "erste Fähigkeit pro Zug" lief in Zügen ohne Fähigkeit leer. Jetzt Totem-Artefakt für alle drei Talentbäume.
             // Totems greifen nie an (CR-Glossar "Totem", 305.3) – +1 ATK wirkt, wenn sie verteidigen. "Zerstört" = Ereignis died
             // (engine.js destroy), also nicht Death Rattle (Friedhof von irgendwo); Ziel zufällig: Held oder Ally.
-            text: 'Deine Totems haben +1 Angriff. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.',
+            text: 'Deine Totems haben +1 Angriff und machen Naturschaden. Wenn eines deiner Totems zerstört wird, fügt es einem zufälligen Gegner 2 Naturschaden zu.',
             stat: (s, c, kind) => (kind === 'atk' && c && c.isTotem && ctrlOf(s, c) === 1) ? 1 : 0,
+            allyEnters: (s, p, uid) => { if (p !== 1) return; const c = findCharacter(s, uid); if (c && c.isTotem) addTM(c, { k: 'dtAs', dt: 'Nature' }); },   // Kampfschaden als Natur (allyDt, engine.js)
             // Nicht, wenn ein Totem nur ersetzt wird (zweites Totem desselben Elements, Tag-Limit CR 414.3b: cause 'limit') – Nutzer
             died: (s, snap, d) => { if (snap && snap.wasCtrl === 1 && (snap.isTotem || snap.totem) && !(d && d.cause === 'limit')) q(s, { op: 'call', k: 'E:rlpingEnemy', a: { amt: 2, dt: 'Nature' } }); }
         },
