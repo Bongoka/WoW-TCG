@@ -151,7 +151,7 @@ function initRaid(raidId, seats) {
     G = newRaidState(raidId, decks, humanIdx.length ? humanIdx[0] : 0);
     const raiders = G.pids.filter(i => i !== RAID_BOSS);                               // in Platz-Reihenfolge
     G.real = true; G.humans = humanIdx.map(k => raiders[k]);
-    raidArtPreload(raidId);
+    raidArtPreload(raidId); raidMusicReset(); raidMusicPreload(raidId);
     if (G.humans.length > 1) G.hotseat = { seat: G.raidSeat[1] };
     if (!G.humans.length) G.spectate = true;
     UI.reset(); UI.handOrder = null;
@@ -162,6 +162,7 @@ function initRaid(raidId, seats) {
     resetBanter();
     const go = () => {
         cpuSay('greet');                                                              // Boss begrüßt den Raid (vor dem ersten Event)
+        raidMusic('start');
         raidBegin(G); refreshDisplay(G); render(); playEventAnimations();
         if (G.hotseat) { G.hotseat.go = true; render(); }                             // Hotseat: ab jetzt Zwischenbildschirm bei jedem Wechsel
         if (G.activePlayer === 1 && isIdle(G) && isHuman(G, 1)) { showTurnBanner(tr("Dein Zug!")); return; }
@@ -285,6 +286,100 @@ function raidFxScan() {
         else if (e.t === 'raidStage') { raidTitle(tr`Stufe ${e.stage}`, raidDef(G).bossName); raidArtBg(raidArtUrl('Stage ' + e.stage), true); if (typeof screenShake === 'function') screenShake(1.6);
             const st = raidVoiceSet().stage; if (st && st.length) raidSpeak(st[Math.min(st.length - 1, Math.max(0, e.stage - 2))], raidSpeaker() + '/stage' + e.stage); }
         else if (e.t === 'play' && isBoss(G, e.pid)) { const c = findCharacter(G, e.uid) || (G.chain || []).map(x => x.card).find(x => x && x.uid === e.uid); if (!RAID_ART_SHOWN.delete(e.uid)) raidArtBg(c && raidArtUrl(c.name)); if (c) raidCardSay(c.name); }
+        // Musik: Stufenwechsel / neuer Boss / Ragnaros, teure Karte des Bosses (Kosten + X)
+        if (e.t === 'raidStage' && !e.down) raidMusic(e.name ? (e.name === 'Ragnaros' ? 'rag' : 'boss') : 'stage' + e.stage);
+        if (e.t === 'play' && isBoss(G, e.pid)) { const it = (G.chain || []).find(x => x.card && x.card.uid === e.uid), c = it ? it.card : findCharacter(G, e.uid);
+            if (c && (c.cost || 0) + ((it && it.x) || 0) >= RM_BIG) raidMusic('big'); }
+    }
+}
+
+// ---------------------------------------------------------------- Musik-Schnipsel (Ambiente statt Dauermusik)
+// Zu besonderen Momenten eine Passage aus einem WoW-Stück (music/raid/…): schnell einblenden, eine Weile spielen, ausblenden.
+// Immer nur EIN Stück: läuft schon eines, verfällt der neue Anlass (keine Warteschlange). Nur ein wichtigerer Anlass (Stufe,
+// neuer Boss, Spielende) löst ein laufendes, unwichtigeres Stück ab – das wird erst ausgeblendet, dann beginnt das neue.
+// Passage: [Datei, Start s, Länge s] – Stellen nach dem Lautstärkeverlauf gewählt (Start kurz vor einem Einsatz).
+// Nur Musik aus der Ära des Raids (Onyxia und Molten Core: Classic-Soundtrack), keine aus späteren Erweiterungen.
+const RAID_MUSIC = {
+    onyxia: {
+        start: [['dustwallow', 2, 22], ['frostwyrm_lair', 6, 20]],                               // Düstermarschen: Onyxias Hort
+        stage2: [['frostwyrm_lair', 59, 24], ['naxxramas', 74, 24]],
+        stage3: [['naxxramas', 2, 24], ['ruins_aq', 6, 18]],
+        big: [['haunted', 63, 14], ['battlegrounds', 56, 16], ['ruins_aq', 6, 16]],
+        low: [['frostwyrm_lair', 6, 18], ['dustwallow', 14, 16]],
+        win: [['legends', 1, 22]], lose: [['haunted', 1, 20]],
+    },
+    mc: {
+        start: [['molten_core', 1, 24], ['molten_core', 108, 22]],
+        boss: [['molten_core', 1, 20], ['molten_core', 108, 22], ['volcanic', 15, 18]],
+        rag: [['molten_core', 49, 30]],
+        big: [['battlegrounds', 56, 16], ['volcanic', 15, 14], ['molten_core', 60, 16]],
+        low: [['volcanic', 101, 18], ['molten_core', 112, 16]],
+        win: [['legends', 1, 22]], lose: [['volcanic', 1, 20]],
+    },
+};
+const RM_LVL = { win: 3, lose: 3, start: 2, boss: 2, rag: 2, stage2: 2, stage3: 2, big: 1, low: 1 };
+const RM_VOL = 0.4, RM_IN = 0.8, RM_OUT = 3.5, RM_GAP = 20000, RM_BIG = 5;   // Lautstärke, Ein-/Ausblenden (s), Pause vor Nebenanlässen (ms), „teure“ Karte ab
+const RM = { cur: null, end: 0, last: null, low: {}, over: false };
+const RM_SRC = {};
+// Ganze Datei als Blob laden: so lässt sich jede Stelle anspringen (der lokale Server kann keine Teil-Anfragen)
+function raidMusicSrc(f) {
+    if (!RM_SRC[f]) { const url = encodeURI(`music/raid/${f}.mp3`);
+        RM_SRC[f] = fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(b => URL.createObjectURL(b)).catch(() => location.protocol === 'file:' ? url : null); }
+    return RM_SRC[f];
+}
+function raidMusicPreload(id) {
+    const files = [...new Set(Object.values(RAID_MUSIC[id] || {}).flat().map(p => p[0]))];
+    files.reduce((pr, f) => pr.then(() => raidMusicSrc(f)), Promise.resolve());                      // nacheinander, Startstück zuerst
+}
+function raidMusicReset() { RM.low = {}; RM.over = false; RM.end = 0; if (RM.cur) raidMusicFade(RM.cur, 0.4); }
+// Stück ausblenden und anhalten (sec = Dauer); gibt ein Promise zurück, das danach erfüllt ist
+function raidMusicFade(me, sec) {
+    clearInterval(me.iv); me.dead = true;
+    if (RM.cur === me) { RM.cur = null; RM.end = performance.now(); }
+    const a = me.a; if (!a || a.paused) return Promise.resolve();
+    const v0 = a.volume, t0 = performance.now();
+    return new Promise(res => { const iv = setInterval(() => {
+        const k = sec > 0 ? (performance.now() - t0) / 1000 / sec : 1;
+        if (k >= 1) { clearInterval(iv); a.pause(); res(); } else a.volume = v0 * (1 - k);
+    }, 40); });
+}
+async function raidMusic(kind) {
+    if (!G || !G.raid || !G.real || typeof sfx === 'undefined' || sfx.muted) return;
+    const list = (RAID_MUSIC[G.raid.id] || {})[kind]; if (!list || !list.length) return;
+    const lvl = RM_LVL[kind] || 1, busy = RM.cur;
+    if (busy && lvl <= busy.lvl) return;                                                          // es läuft schon Musik: verfällt
+    if (!busy && lvl === 1 && performance.now() - RM.end < RM_GAP) return;                        // Nebenanlass kurz nach einem Stück: Ruhe
+    const pool = list.length > 1 ? list.filter(p => p !== RM.last) : list, p = pool[Math.floor(Math.random() * pool.length)];
+    const me = RM.cur = { lvl, a: null, iv: 0, dead: false }; RM.last = p;
+    if (busy) await raidMusicFade(busy, 0.6);                                                     // erst das alte aus, dann das neue
+    if (typeof MM_MUSIC !== 'undefined' && MM_MUSIC.el && !MM_MUSIC.el.paused) MM_MUSIC.el.pause();   // Menümusik nie darunter
+    const src = await Promise.race([raidMusicSrc(p[0]), new Promise(r => setTimeout(() => r(null), 6000))]);
+    const gone = () => me.dead || RM.cur !== me || !G || !G.raid || sfx.muted;
+    if (gone() || !src) { if (RM.cur === me) raidMusicFade(me, 0); return; }
+    const a = me.a = new Audio(src); a.volume = 0; a.preload = 'auto';
+    await new Promise(r => { if (a.readyState >= 1) return r(); a.addEventListener('loadedmetadata', r, { once: true }); a.addEventListener('error', r, { once: true }); setTimeout(r, 4000); });
+    if (gone()) { if (RM.cur === me) raidMusicFade(me, 0); return; }
+    try { a.currentTime = p[1]; await a.play(); } catch (e) { raidMusicFade(me, 0); return; }
+    if (gone()) { a.pause(); return; }
+    const t0 = performance.now(), len = p[2];
+    // Timer statt requestAnimationFrame: endet auch im Hintergrund-Tab sicher
+    me.iv = setInterval(() => {
+        const t = (performance.now() - t0) / 1000;
+        if (t >= len || a.ended) { raidMusicFade(me, 0); return; }
+        if (!G || !G.raid || sfx.muted) { raidMusicFade(me, 0.5); return; }                       // Raid verlassen / Ton aus
+        a.volume = RM_VOL * Math.max(0, Math.min(1, t / RM_IN, (len - t) / RM_OUT));
+    }, 50);
+}
+// Bei jeder Anzeige: Held eines Raiders fällt auf 30 % Leben (einmal je Held, nach Heilung über 50 % wieder), Spielende
+function raidMusicWatch() {
+    if (!G || !G.raid || !G.real) return;
+    if (G.gameOver) { if (!RM.over) { RM.over = true; raidMusic(G.winnerTeam === 'raid' ? 'win' : 'lose'); } return; }
+    for (const pid of G.pids) {
+        if (isBoss(G, pid)) continue;
+        const p = getPlayer(G, pid), h = p && p.hero; if (!h || p.out) continue;
+        const max = Math.max(1, hpOf(G, h)), r = (max - (h.damage || 0)) / max;
+        if (r > 0.5) delete RM.low[pid];
+        else if (r <= 0.3 && !RM.low[pid]) { RM.low[pid] = true; raidMusic('low'); }
     }
 }
 // Boss spielt eine Karte: das Artwork startet zusammen mit der großen Karte (Showcase vor dem Ausspielen), nicht erst danach
@@ -703,6 +798,7 @@ if (typeof render === 'function') {
         try { raidCamFollow(); } catch (e) { console.error('Raid-Kamera', e); }
         const r = _raidRender0.apply(this, arguments);
         try { renderRaidStrip(); } catch (e) { console.error('Raid-Leiste', e); }
+        try { raidMusicWatch(); } catch (e) { console.error('Raid-Musik', e); }
         return r;
     };
 }
