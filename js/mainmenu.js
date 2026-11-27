@@ -74,24 +74,37 @@ function openMainMenu(boot) {
     if (typeof initMatchBackground === 'function') initMatchBackground();             // Ordnerliste der Matten (über http)
     const el = mmBuild();
     mmFillProps();
-    el.classList.toggle('has-game', !!(G && !G.gameOver));                             // laufende Partie bleibt im Hintergrund erhalten
+    const hasGame = !!(G && !G.gameOver);
+    el.classList.toggle('has-game', hasGame);                                          // laufende Partie scheint durch (pausiert, nicht bedienbar; online läuft sie weiter)
+    document.body.classList.toggle('mm-board-off', !hasGame);                           // ohne Partie: Spielfeld nie sichtbar (auch nicht, wenn das Menü kurz verdeckt/ausgeblendet ist)
     MM.covered = undefined; el.style.visibility = '';
     el.classList.remove('out'); el.classList.toggle('boot', !!boot); el.style.display = 'flex';   // boot: beim Seitenstart ohne Einblenden (sonst schiene das Spielfeld durch)
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open', 'pf-game');                              // Menü: Hochformat-Hinweis wieder an
     try { if (document.fullscreenElement || document.webkitFullscreenElement) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}   // Menü: im Vollbild wieder Querformat
-    mmBackground(true);
+    if (!hasGame) mmBackground(true); else { clearInterval(MM.bgTimer); MM.bgTimer = 0; }
     if (!MM.raf) MM.raf = requestAnimationFrame(mmTick);
 }
 function mmHide() {
     if (!MM.el || MM.el.style.display === 'none') return;
     mmCloseOptions(); mmCloseNews(); closePlaySetup();
+    document.body.classList.remove('mm-board-off');
     document.body.classList.add('pf-game');                                             // Spielfeld darf ins Hochformat
     try { screen.orientation.unlock(); } catch (e) {}                                   // Vollbild-Sperre aufs Querformat lösen
     MM.el.classList.remove('in'); MM.el.classList.add('out');
     clearInterval(MM.bgTimer); MM.bgTimer = 0;
     setTimeout(() => { if (MM.el.classList.contains('out')) { MM.el.style.display = 'none'; cancelAnimationFrame(MM.raf); MM.raf = 0; } }, 450);
 }
+// Esc im Hauptmenü: offenes Unterfenster schließen, sonst zurück in die laufende Partie
+function mmEscape() {
+    if (!MM.el) return;
+    if (!MM.el.querySelector('.mm-play').hidden) closePlaySetup();
+    else if (!MM.el.querySelector('.mm-opt').hidden) mmCloseOptions();
+    else if (!MM.el.querySelector('.mm-news').hidden) mmCloseNews();
+    else if (MM.el.classList.contains('has-game') && G && !G.gameOver) mmHide();
+}
+// Partie pausiert, solange das Hauptmenü offen ist (Online-Partien laufen weiter)
+function mmGamePaused() { return mmVisible() && !!G && !G.gameOver && !G.online; }
 function mmVisible() { return !!(MM.el && MM.el.style.display !== 'none' && !MM.el.classList.contains('out')); }
 // Klick: kurzer Druck-Effekt + Lichtpuls an der Klickstelle, dann die Aktion
 function mmAction(btn, a, e) {
@@ -242,7 +255,7 @@ function mmBurst(x, y) {
 function mmCovered() {
     const z0 = parseInt(getComputedStyle(MM.el).zIndex) || 0;
     return [...document.body.children].some(e => {
-        if (e === MM.el || e.tagName === 'SCRIPT') return false;
+        if (e === MM.el || e.tagName === 'SCRIPT' || e.id === 'boot-cover') return false;   // Start-Abdeckung blendet aus: das Menü muss darunter schon sichtbar sein
         const cs = getComputedStyle(e);
         if (cs.display === 'none' || cs.visibility === 'hidden' || (parseInt(cs.zIndex) || 0) <= z0 || +cs.opacity < .99) return false;
         const r = e.getBoundingClientRect();
@@ -263,7 +276,8 @@ function mmSparkSprite() {
 function mmTick() {
     MM.raf = requestAnimationFrame(mmTick);
     if (!MM.el || MM.el.style.display === 'none') return;
-    if (++MM.frame % 5 === 0 || MM.covered === undefined) {
+    // Verdeckt: jedes Bild prüfen (sonst schien beim Schließen des Fensters bis zu 5 Bilder lang das Spielfeld durch)
+    if (++MM.frame % 5 === 0 || MM.covered !== false) {
         MM.covered = mmCovered();
         MM.el.style.visibility = MM.covered ? 'hidden' : '';
     }

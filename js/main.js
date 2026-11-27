@@ -456,9 +456,11 @@ const CPU_SPEED_KEY = 'wow_tcg_cpu_speed';
 function cpuSpeed() { try { return localStorage.getItem(CPU_SPEED_KEY) === 'fast' ? 'fast' : 'normal'; } catch (e) { return 'normal'; } }
 const CPU_SKIP = { on: false, wake: new Set() };
 function cpuSleep(ms) {
-    if (CPU_SKIP.on) return Promise.resolve();
-    return new Promise(r => { const t = setTimeout(() => { CPU_SKIP.wake.delete(w); r(); }, ms * (cpuSpeed() === 'fast' ? 0.35 : 1)); const w = () => { clearTimeout(t); r(); }; CPU_SKIP.wake.add(w); });
+    if (CPU_SKIP.on) return menuPauseGate();
+    return new Promise(r => { const t = setTimeout(() => { CPU_SKIP.wake.delete(w); r(); }, ms * (cpuSpeed() === 'fast' ? 0.35 : 1)); const w = () => { clearTimeout(t); r(); }; CPU_SKIP.wake.add(w); }).then(menuPauseGate);
 }
+// Hauptmenü offen: die CPU wartet, bis es wieder zu ist (mainmenu.js mmGamePaused; online keine Pause)
+async function menuPauseGate() { while (typeof mmGamePaused === 'function' && mmGamePaused()) await sleep(150); }
 function skipCpuPauses() { if (!_cpuRunning || CPU_SKIP.on) return; CPU_SKIP.on = true; CPU_SKIP.wake.forEach(w => w()); CPU_SKIP.wake.clear(); }
 function updCpuSpeedBtn() { const b = document.getElementById("btn-cpu-speed"); if (b) b.textContent = cpuSpeed() === 'fast' ? tr('CPU-Tempo: Schnell') : tr('CPU-Tempo: Normal'); }
 
@@ -493,6 +495,8 @@ async function driveCpu() {
     const game = G;
     try {
         while (!G.gameOver && G === game) {
+            await menuPauseGate();
+            if (G.gameOver || G !== game) break;
             if (UI.flipWait) await UI.flipWait;                       // Flip eines Helden erst ganz zeigen (heroFlipAnim)
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
@@ -669,9 +673,12 @@ function bootGame() {
             if (dm) { const b = [...dm.querySelectorAll('#decision-actions button')].find(x => x.textContent === tr('Abbrechen')); if (b) b.click(); return; }
             const close = open.find(m => ['sim-modal', 'deck-overview-modal', 'graveyard-modal'].includes(m.id));
             if (close) { if (close.id === 'sim-modal') { if (SIM_STOP.running) simToBackground(); else document.getElementById('sim-close-btn').click(); } else close.style.display = 'none'; }   // laufende Simulation: Esc = im Hintergrund weiter
+            else if (open.length) {}
+            else if (typeof mmVisible === 'function' && mmVisible()) mmEscape();               // im Hauptmenü: Unterfenster zu bzw. zurück ins Spiel
+            else if (typeof openMainMenu === 'function' && !['rl-root', 'raid-setup', 'learn-modal', 'mp-modal', 'hotseat'].some(id => { const x = document.getElementById(id); return x && getComputedStyle(x).display !== 'none'; })) openMainMenu();   // Esc im Spiel: Hauptmenü
             return;
         }
-        if (open.length || !G || G.gameOver) return;
+        if (open.length || !G || G.gameOver || (typeof mmVisible === 'function' && mmVisible())) return;   // Hauptmenü offen: Partie dahinter nicht bedienbar
         if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); if (canActMain(G, 1)) endTurn(); }
         else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (canUndo()) undoLastAction(); }
     });

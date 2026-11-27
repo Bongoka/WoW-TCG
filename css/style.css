@@ -1341,6 +1341,10 @@ button.mp-deckbox:hover .dbox-shadow { transform: scale(.8) translateY(4px); opa
 #main-menu.in { animation: mmIn 1.2s ease both; }
 #main-menu.out { animation: mmOut .45s ease forwards; pointer-events: none; }
 @keyframes mmIn { from { opacity: 0; } }
+/* Laufende Partie im Hintergrund (pausiert): abgedunkeltes Spielfeld statt Matten; ohne Partie bleibt das Spielfeld ganz verborgen */
+#main-menu.has-game { background: rgba(5,3,2,.55); }
+#main-menu.has-game .mm-bg { display: none; }
+body.mm-board-off #arena, body.mm-board-off #match-bg, body.mm-board-off #turn-banner { visibility: hidden; }
 @keyframes mmOut { to { opacity: 0; transform: scale(1.04); filter: brightness(1.6) blur(2px); } }
 /* Matten: klar und hell, wechseln mit Überblendung, langsamer Zoom (Ken Burns), Parallax zur Maus */
 .mm-bg { position: absolute; inset: -5%; transform: translate3d(calc(var(--px) * -16px), calc(var(--py) * -10px), 0); will-change: transform; }
