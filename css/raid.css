@@ -69,19 +69,25 @@
     .raid-hint { display: none; }
 }
 
-.rp-runeback { width: var(--field-w); aspect-ratio: 5 / 7; background: center / cover no-repeat; border-radius: 3px; }
+/* Runen des Bosses (Molten Core) in seiner Ressourcenreihe: überlappend wie die Ressourcen, die letzte ganz sichtbar */
+.raid-runes { display: flex; flex: 0 0 auto; margin-left: calc(14px * var(--ui-scale, 1)); }
+.top-row .raid-runes { flex-direction: row-reverse; margin-left: 0; margin-right: calc(14px * var(--ui-scale, 1)); }
+.raid-rune { position: relative; flex: 0 0 auto; width: calc(var(--hand-w) * .32); height: var(--hand-h); }
+.raid-rune:last-child { width: var(--hand-w); }
+.raid-rune:hover { z-index: 5; }
+.raid-rune > img, .raid-rune > .card-wrapper { position: absolute; top: 0; left: 0; width: var(--hand-w); height: var(--hand-h); margin: 0 !important; border-radius: 6px; }
+.top-row .raid-rune > img, .top-row .raid-rune > .card-wrapper { left: auto; right: 0; }
+.raid-rune > img { border: 1px solid var(--gold-dark); box-sizing: border-box; box-shadow: 0 2px 6px rgba(0, 0, 0, .6); }
+.raid-rune.exhausted > img, .raid-rune.exhausted > .card-wrapper > .cfx-rot { transform: rotate(90deg) scale(.82); }
+.raid-rune.exhausted > img, .raid-rune.exhausted > .card-wrapper { filter: brightness(.6) saturate(.7); }
 
 /* ===== Raid-Spielfeld (js/raidui.js): Spieler-Tafeln auf der Mittellinie, Kamerafahrt, Parallax ===== */
 @property --rs-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-#raid-strip { --pw: calc(var(--field-w) * .7); --ph: calc(var(--field-w) * .3); --rad: calc(var(--ph) * .2);
+#raid-strip { --pw: calc(var(--field-w) * .7); --pu: calc(var(--field-w) * .3); --ph: calc(var(--pu) * .72); --rad: calc(var(--pu) * .2);
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; display: flex; align-items: center; gap: 8px; pointer-events: none; }
 #raid-strip > * { pointer-events: auto; }
 .rs-team { display: flex; gap: 6px; padding: 4px; border-radius: calc(var(--rad) + 4px); background: rgba(8, 6, 5, .45); box-shadow: inset 0 0 0 1px rgba(255, 214, 140, .08); backdrop-filter: blur(3px); }
-.rs-vs { font: italic 900 calc(var(--ph) * .3) / 1 Georgia, serif; color: #e9c97a; letter-spacing: .04em; text-shadow: 0 1px 0 #000, 0 0 10px rgba(0, 0, 0, .9); }
-.rs-runes { display: flex; gap: 3px; --field-w: 26px; }
-.rs-runes[hidden] { display: none; }
-.rs-runes .card-wrapper { margin: 0 !important; }
-.rs-runes .rp-ex { opacity: .55; }
+.rs-vs { font: italic 900 calc(var(--pu) * .3) / 1 Georgia, serif; color: #e9c97a; letter-spacing: .04em; text-shadow: 0 1px 0 #000, 0 0 10px rgba(0, 0, 0, .9); }
 
 /* Tafel: getöntes Glas in Klassenfarbe mit Klassen-Wappen, Mini-Karten, schmaler Lebensbalken mit Zahl */
 .rs-pl { position: relative; width: var(--pw); height: var(--ph); border-radius: var(--rad); cursor: pointer;
@@ -93,22 +99,22 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc) 45%, rgba(255, 255, 255, .08)), inset 0 1px 0 rgba(255, 255, 255, .14), 0 3px 10px rgba(0, 0, 0, .65); }
 .rs-in::before { content: ''; position: absolute; left: 50%; top: 42%; width: calc(var(--ph) * .95); height: calc(var(--ph) * .95); transform: translate(-50%, -50%);
     background: var(--icon) center / contain no-repeat; opacity: .28; filter: drop-shadow(0 0 4px rgba(0, 0, 0, .6)); }
-.rs-field { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--ph) * .14); }
+.rs-field { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--pu) * .14); }
 .rs-left, .rs-right { position: absolute; inset: 0; }
-.rs-mc { position: absolute; top: 12%; width: calc(var(--ph) * .36); height: calc(var(--ph) * .5); border-radius: 2px; box-sizing: border-box;
+.rs-mc { position: absolute; top: calc(var(--pu) * .05); width: calc(var(--pu) * .36); height: calc(var(--pu) * .5); border-radius: 2px; box-sizing: border-box;
     box-shadow: 0 1px 3px rgba(0, 0, 0, .7), inset 0 0 0 1px rgba(255, 255, 255, .12); transition: transform .2s, opacity .2s; }
 .rs-mc.ally { background: linear-gradient(160deg, #3a332b, #0f0d0b 70%); border: 1px solid rgba(214, 178, 96, .75); }
 .rs-mc.abil { background: linear-gradient(160deg, #c48ae8, #6a2f98 70%); border: 1px solid rgba(236, 206, 255, .7); }
 .rs-mc.equip { background: linear-gradient(160deg, #d9dee3, #6b737c 70%); border: 1px solid rgba(245, 247, 250, .75); }
 .rs-mc.ex { opacity: .5; transform: rotate(12deg) scale(.92); }
-.rs-hp { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--ph) * .14); min-height: 5px; border-radius: 0 0 var(--rad) var(--rad); background: rgba(0, 0, 0, .75);
+.rs-hp { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--pu) * .14); min-height: 5px; border-radius: 0 0 var(--rad) var(--rad); background: rgba(0, 0, 0, .75);
     box-shadow: inset 0 1px 0 rgba(0, 0, 0, .9), inset 0 2px 3px rgba(0, 0, 0, .6); overflow: hidden; }
 .rs-hp-fill, .rs-hp-trail { position: absolute; left: 0; top: 0; bottom: 0; }
 .rs-hp-trail { background: rgba(255, 240, 220, .75); transition: width .6s ease-out; }
 .rs-hp-fill { background: linear-gradient(180deg, color-mix(in srgb, var(--hpc) 55%, #fff), var(--hpc) 50%, color-mix(in srgb, var(--hpc) 70%, #000));
     transition: width .35s cubic-bezier(.3, .7, .3, 1), background .4s; box-shadow: 0 0 6px color-mix(in srgb, var(--hpc) 70%, transparent); }
-.rs-num { position: absolute; left: 50%; bottom: calc(var(--ph) * .07); transform: translate(-50%, 0); min-width: calc(var(--ph) * .62); padding: 0 6px; box-sizing: border-box;
-    border-radius: 99px; background: #0d0b09; color: #fff; text-align: center; font: 800 calc(var(--ph) * .34) / 1.15 Georgia, serif; z-index: 3;
+.rs-num { position: absolute; left: 50%; bottom: calc(var(--pu) * .07); transform: translate(-50%, 0); min-width: calc(var(--pu) * .62); padding: 0 6px; box-sizing: border-box;
+    border-radius: 99px; background: #0d0b09; color: #fff; text-align: center; font: 800 calc(var(--pu) * .34) / 1.15 Georgia, serif; z-index: 3;
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--hpc) 80%, transparent), 0 1px 4px rgba(0, 0, 0, .8); transition: box-shadow .4s; }
 .rs-flash { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; }
 

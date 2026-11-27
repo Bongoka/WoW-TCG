@@ -192,6 +192,8 @@ function initRaid(raidId, seats) {
     // Starthand: jeder Mensch nacheinander (Hotseat: vorher der Zwischenbildschirm), dann beginnt der Raid.
     // Gemerkt werden die Plätze – die Spieler-IDs tauschen bei jedem Wechsel.
     const mull = (left) => {
+        // Hausregel (nicht in den Raid-Regeln): Hearthstone-Mulligan auch im Raid, wenn im Menü gewählt
+        if (mulliganMode() === 'hs') { UI.handSeen = new Set(G.p1.hand.map(c => c.uid)); render(); openHsMulligan(() => next(left)); return; }
         render();
         openDecisionModal(tr('Starthand'), tr('Möchtest du deine Starthand behalten oder einmal neu ziehen (Mulligan)?'), [
             { label: tr('Behalten'), cls: 'success', action: () => next(left) },
@@ -764,22 +766,13 @@ function renderRaidStrip() {
     const sd = raidSides(), teams = ['bot', 'top'].filter(s => sd[s].length > 1);
     const key = teams.map(s => s + ':' + sd[s].join(',')).join('|');
     if (bar.dataset.key !== key) {                                                      // Aufbau nur bei neuer Besetzung
-        bar.dataset.key = key; bar.innerHTML = '<div class="rs-runes"></div>';
+        bar.dataset.key = key; bar.innerHTML = '';
         teams.forEach((side, k) => {
             if (k) { const vs = document.createElement('div'); vs.className = 'rs-vs'; vs.textContent = 'VS'; bar.appendChild(vs); }
             const grp = document.createElement('div'); grp.className = 'rs-team ' + side;
             for (const pid of sd[side]) grp.appendChild(raidPanelNew(pid, side));
             bar.appendChild(grp);
         });
-    }
-    // Runen des Bosses (Molten Core) links in der Leiste – anklickbar wie alle Karten
-    const row = bar.querySelector('.rs-runes'), runes = getPlayer(G, G.raid.boss).runes || [];
-    row.innerHTML = ''; row.hidden = !runes.length;
-    {
-        for (const r of runes) {
-            if (r.faceUp) { const node = createCardDOM(r, true); if (r.exhausted) node.classList.add('rp-ex'); row.appendChild(node); }
-            else { const b = document.createElement('div'); b.className = 'card-wrapper rp-runeback' + (r.exhausted ? ' rp-ex' : ''); b.title = tr('Verdeckte Rune'); b.style.backgroundImage = `url('${encodeURI('cards/molten core raid small/Rune Back.webp')}')`; row.appendChild(b); }
-        }
     }
     bar.querySelectorAll('.rs-pl').forEach(raidPanelUpdate);
     raidBgSync(sd);
@@ -809,6 +802,21 @@ if (typeof renderResourceTray === 'function') {
                 if (stack && ![...stack.children].some(n => n.style.display !== 'none')) stack.remove();   // nur dieses Event: kein leerer Stapel
             }
         } catch (e) { console.error('Raid-Event-Ablage', e); }
+        // Runen des Bosses (Molten Core): neben seinen Ressourcen (zählen nicht als Ressourcen) – anklickbar wie alle Karten
+        try {
+            const runes = G && G.raid && isBoss(G, player.id) ? (player.runes || []) : [];
+            const box = runes.length && document.getElementById(containerId);
+            if (box) {
+                const row = document.createElement('div'); row.className = 'raid-runes';
+                for (const r of runes) {
+                    const w = document.createElement('div'); w.className = 'raid-rune' + (r.exhausted ? ' exhausted' : '');
+                    if (r.faceUp) w.appendChild(createCardDOM(r, false));
+                    else { const b = document.createElement('img'); b.src = encodeURI('cards/molten core raid small/Rune Back.webp'); b.alt = ''; b.draggable = false; w.title = tr('Verdeckte Rune'); w.appendChild(b); }
+                    row.appendChild(w);
+                }
+                box.insertBefore(row, box.querySelector('.mana-badge'));
+            }
+        } catch (e) { console.error('Raid-Runen', e); }
         return r;
     };
 }
