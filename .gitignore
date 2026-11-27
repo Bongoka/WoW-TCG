@@ -4914,3 +4914,6 @@ Tokens small/*
 
 # WoW Icon Pack: in Git nur die Icons, die der Spielcode nennt (node bin/iconpack.js nimmt neue auf, alte heraus)
 /WoW Icon Pack/
+
+# Cloudflare-Wrangler-Cache (Kontodaten, nur lokal)
+/.wrangler/
