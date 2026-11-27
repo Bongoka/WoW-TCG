@@ -4258,6 +4258,7 @@ var I18N_EN = {
     'Quests und Locations können nicht aufgewertet werden.': 'Quests and locations cannot be upgraded.',
     'Quests und Locations sind Ressourcen-Karten.': 'Quests and locations are resource cards.',
     'Roguelike: Schatten von Azeroth': 'Roguelike: Shadows of Azeroth',
+    'Roguelike': 'Roguelike',
     'Run aufgeben': 'Abandon run',
     'Run aufgeben und löschen': 'Abandon and delete run',
     'Run aufgeben?': 'Abandon the run?',

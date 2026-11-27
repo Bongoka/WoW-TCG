@@ -22,7 +22,8 @@ function uiZoom() { try { const v = +localStorage.getItem(UI_ZOOM_KEY); return v
 function applyUiZoom() {
     const s = uiZoom() / 100, st = document.documentElement.style;
     st.setProperty('--ui-scale', s);
-    st.setProperty('--field-w', 150 * s + 'px'); st.setProperty('--field-h', 210 * s + 'px');
+    const f = s * (matchMedia('(orientation: portrait)').matches ? 1.15 : 1);              // Hochformat: Feldkarten größer (4 passen noch nebeneinander)
+    st.setProperty('--field-w', 150 * f + 'px'); st.setProperty('--field-h', 210 * f + 'px');
     st.setProperty('--hand-w', 140 * s + 'px'); st.setProperty('--hand-h', 196 * s + 'px');
 }
 applyUiZoom();                                                                            // vor dem ersten Zeichnen
@@ -313,11 +314,25 @@ function stackUnits(aSlots, p, cards = p.allies) {
 function layoutBoard(animate = true) {
     layoutBar();                                                                           // zuerst die Leisten: ihre Breite bestimmt, wem die Reihe ausweicht
     const w = fieldW(), h = w * 1.4, RT = rowTop();
+    // Hochformat: die Reihen kleben nicht an der Mittellinie – der Raum zwischen oberer und unterer Leiste wird gleichmäßig verteilt
+    const RTs = { top: RT, bot: RT };
+    if (PORTRAIT()) {
+        const rects = sels => sels.map(s => document.querySelector(s)).filter(Boolean).map(e => e.getBoundingClientRect()).filter(r => r.width);
+        const top = rects(['#top-resource-tray', '#top-dock', '.top-row .deck-zone', '#top-resource-tray .mana-badge']);
+        const bot = rects(['#bot-resource-tray', '#bot-dock', '.bottom-row .deck-zone', '#bot-resource-tray .mana-badge']);
+        const ta = document.getElementById('top-allies'), ba = document.getElementById('bot-allies');
+        if (top.length && bot.length && ta && ba) {
+            const a = Math.max(...top.map(r => r.bottom)), b = Math.min(...bot.map(r => r.top)), c = ba.getBoundingClientRect().top;
+            const g = (b - a - 2 * h) / 3;
+            if (g > 0) { RTs.top = Math.max(RT, Math.round(c - (a + g + h))); RTs.bot = Math.max(RT, Math.round(b - g - h - c)); }
+        }
+    }
     const sides = [['top-allies', ['top-resource-tray', 'top-dock'], '.top-row .deck-zone', true], ['bot-allies', ['bot-resource-tray', 'bot-dock'], '.bottom-row .deck-zone', false]];
     const plans = [];
     for (const [rowId, ids, gySel, opp] of sides) {
         const row = document.getElementById(rowId); if (!row) continue;
         const rr = row.getBoundingClientRect(); if (!rr.width) continue;
+        const RT = RTs[opp ? 'top' : 'bot'];
         const band = opp ? [rr.bottom - RT - h, rr.bottom - RT] : [rr.top + RT, rr.top + RT + h];
         const mid = rr.width / 2;
         let L = 0, R = rr.width;
@@ -345,10 +360,10 @@ function layoutBoard(animate = true) {
         const SDX = 6, SDY = Math.round(w * 0.09), slots = [];
         units.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xa[i] + Math.min(k, 2) * (opp ? -SDX : SDX)), k, u.length, Math.min(k, 2) * SDX, Math.min(k, 2) * SDX])));
         eUnits.forEach((u, i) => u.forEach((s, k) => slots.push([s, flip(pos.xe[i]), k, u.length, Math.min(k, 2) * SDY, 0])));
-        plans.push({ rowId, opp, row, slots });
+        plans.push({ rowId, opp, row, slots, RT });
     }
     const next = new Map();
-    for (const { rowId, opp, row, slots } of plans) {
+    for (const { rowId, opp, row, slots, RT } of plans) {
         row.querySelectorAll('.stack-count').forEach(b => b.remove());
         // Überlagerung: eigene Seite – die weiter links liegende Karte oben; Gegner – die weiter rechts liegende; im Stapel die erste
         const base = i => slots[i][1] - slots[i][5];                                       // Platz ohne seitlichen Stapel-Versatz
@@ -428,8 +443,10 @@ function layoutBar() {
         const stack = tray.querySelector('.res-stack'), quests = [...tray.querySelectorAll('.active-quests-row > .quest-card-large')];
         const sc = uiScale(), ws = sd.opp ? [...hand.children].map(() => 160 * sc) : [...hand.children].map(c => c.classList.contains('playable') ? hw * 1.1 : hw);
         const hand0 = sd.opp ? { ws, ov0: 45 * sc, ovMax: 65 * sc, ang: 5 } : { ws, ov0: 20 * sc, ovMax: Math.max(20 * sc, (hw - 30 * sc) / 2), ang: 6 };
-        const plan = barPlan({ start: mx(sd.opp ? tr_.right - rr.left : tr_.left - rr.left), nr: stack ? stack.children.length : 0, strip: RES_STRIP, nq: quests.length, qw: hw,
-            minTray: sd.opp ? 0 : hw, X0: rr.width / 2, bound, hand: PORTRAIT() ? { ...hand0, ws: [] } : hand0 });
+        const S = mx(sd.opp ? tr_.right - rr.left : tr_.left - rr.left), k = tray.offsetWidth ? tr_.width / tray.offsetWidth : 1;   // k < 1: Ablage verkleinert (Hochformat, css)
+        const unk = x => S + (x - S) / k;                                                   // gemessene Lage → Lage in Ablage-px
+        const plan = barPlan({ start: S, nr: stack ? stack.children.length : 0, strip: RES_STRIP, nq: quests.length, qw: hw,
+            minTray: sd.opp ? 0 : hw, X0: unk(rr.width / 2), bound: unk(bound), hand: PORTRAIT() ? { ...hand0, ws: [] } : hand0 });
         if (PORTRAIT()) {                                                                  // Hochformat: Hand liegt unter der Leiste, volle Breite
             const hp = barPlan({ start: 8, nr: 0, strip: RES_STRIP, nq: 0, qw: hw, minTray: 0, X0: rr.width / 2, bound: rr.width - 8, hand: hand0 });
             Object.assign(plan, { ov: hp.ov, ang: hp.ang, shift: hp.shift });
@@ -447,7 +464,7 @@ function layoutBar() {
 }
 // Größe/Drehung des Fensters: neu anordnen (ohne Gleiten)
 let _layoutRaf = 0;
-addEventListener('resize', () => { cancelAnimationFrame(_layoutRaf); _layoutRaf = requestAnimationFrame(() => { if (G) layoutBoard(false); }); });
+addEventListener('resize', () => { cancelAnimationFrame(_layoutRaf); _layoutRaf = requestAnimationFrame(() => { applyUiZoom(); if (G) layoutBoard(false); }); });
 // Hand hoch/runter: Maus im unteren Viertel (oder über der Hand) ODER die Spielsituation verlangt es (handAutoUp)
 const HAND_UI = { hover: false, auto: false, key: '', dismissed: '' };
 function applyHandUp() { const h = document.getElementById('bot-hand'); if (h) h.classList.toggle('hand-up', HAND_UI.hover || HAND_UI.auto); }
@@ -2026,6 +2043,23 @@ function resetBanter() { _banter.last = 0; _banter.saidLow = false; _banter.end 
 // alle Karten an ihren Platz auf der Hand, während das Spielfeld scharf wird (Reihenfolge = Reihenfolge im Fächer).
 function hsMullLayout(row, slots) {
     const n = slots.length; if (!n) return;
+    row.classList.toggle('grid', PORTRAIT());
+    if (PORTRAIT()) {                                                                      // Hochformat: Raster statt Fächer – Spaltenzahl mit den größten Karten
+        const W = window.innerWidth * 0.94, H = window.innerHeight * 0.66, gap = 10;
+        let best = { w: 0, c: 1 };
+        for (let c = 1; c <= Math.min(n, 4); c++) {
+            const r = Math.ceil(n / c), w = Math.min(260, (W - (c - 1) * gap) / c, (H - (r - 1) * gap) / r / 1.4);
+            if (w > best.w + 1) best = { w, c };
+        }
+        row.style.setProperty('--mw', best.w + 'px'); row.style.setProperty('--mov', '0px');
+        row.style.width = (best.c * best.w + (best.c - 1) * gap) + 'px';
+        slots.forEach((s, i) => {
+            s._ang = 0; s.style.transform = ''; s.style.zIndex = 10 + i;
+            s.firstChild.style.setProperty('--bd', (-i * 0.55) + 's');
+        });
+        return;
+    }
+    row.style.width = '';
     const avail = window.innerWidth * 0.9, w0 = Math.min(340, window.innerHeight * 0.44 / 1.4);
     const fitOv = n > 1 ? (1 - (avail / w0 - 1) / (n - 1)) / 2 : 0;                        // Überlappung je Seite, mit der w0 passt
     const ov = Math.max(0.06, Math.min(window.innerWidth < 700 ? 0.3 : 0.12, fitOv));     // nur die Ränder überlappen (schmal: mehr)

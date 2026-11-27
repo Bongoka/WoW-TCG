@@ -22,7 +22,6 @@ function mmBuild() {
                     <button class="mm-btn" data-a="raid"><span>${tr('Raid')}</span><small>${tr('Gemeinsam gegen einen Raid-Boss')}</small></button>
                     <div class="mm-sep"></div>
                     <button class="mm-btn" data-a="learn"><span>${tr('Regeln lernen')}</span><small>${tr('Videos und Tutorial-Match')}</small></button>
-                    <button class="mm-btn" data-a="options"><span>${tr('Optionen')}</span></button>
                 </nav>
             </div>
             <div class="mm-props">
@@ -34,6 +33,7 @@ function mmBuild() {
             <div class="mp-versus"><div class="mp-side" data-seat="1"></div><button class="mp-vs mm-vs"></button><div class="mp-side" data-seat="2"></div></div>
             <div class="mm-play-mode"></div>
             <div class="mm-play-btns"><button class="mm-play-back">${tr('Zurück')}</button><button class="mm-play-go success">${tr('Spiel starten')}</button></div></div></div>
+        <button class="mm-gear-btn" title="${tr('Optionen')}">&#9881;&#xFE0E;</button>
         <button class="mm-news-btn" title="${tr('Neuigkeiten')}">${tr('Neuigkeiten')}<i></i></button>
         <div class="mm-options mm-news" hidden><div class="mm-opt-box mm-news-box"><h2>${tr('Neuigkeiten')}</h2>
             <div class="mm-news-tabs"><button data-t="top" class="on">${tr('Highlights')}</button><button data-t="days">${tr('Alle Änderungen')}</button><button data-t="fun">${tr('Pannen')}</button></div>
@@ -49,6 +49,7 @@ function mmBuild() {
         const r = p.getBoundingClientRect(); p.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); p.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); }));
     el.querySelector('.mm-opt-close').onclick = mmCloseOptions;
     el.querySelector('.mm-news-btn').onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); mmOpenNews(); };
+    el.querySelector('.mm-gear-btn').onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); mmOpenOptions(); };   // Zahnrad: Optionen auch, wenn die Knopfleiste nicht ganz passt (Handy)
     el.querySelector('.mm-news-close').onclick = mmCloseNews;
     el.querySelector('.mm-news').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseNews(); });
     el.querySelectorAll('.mm-news-tabs button').forEach(b => b.onclick = () => mmNewsTab(b.dataset.t));
@@ -119,7 +120,6 @@ function mmAction(btn, a, e) {
         online: () => openOnline(),
         raid: () => openRaidSetup(),
         learn: () => openLearnMenu(),
-        options: () => mmOpenOptions(),
         decks: () => openDeckOverview(),
         booster: () => { MM.el.querySelector('.mm-boosters').classList.add('burst'); setTimeout(() => { MM.el.querySelector('.mm-boosters').classList.remove('burst'); bModal().style.display = "flex"; boosterPicker(); }, 260); },
     }[a];

@@ -1386,7 +1386,7 @@
         if (!nav || nav.querySelector('.mm-rl')) return;
         const b = document.createElement('button');
         b.className = 'mm-btn mm-rl';
-        b.innerHTML = `<span>${tr("Roguelike: Schatten von Azeroth")}</span><small>${tr("4 Akte · Klassen · Artefakte · Aufwertungen")}</small>`;
+        b.innerHTML = `<span>${tr("Roguelike")}</span><small>${tr("Schatten von Azeroth")}</small>`;
         b.addEventListener('click', e => {
             e.preventDefault(); e.stopPropagation();
             try { if (typeof sfx !== 'undefined') sfx.play('click'); } catch (err) { }

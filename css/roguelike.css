@@ -27,7 +27,6 @@
 .mm-btn.mm-rl {
     border-color: rgba(124, 58, 237, .55) !important;
     background: linear-gradient(90deg, rgba(124, 58, 237, .28), rgba(201, 168, 76, .12) 60%, rgba(0, 0, 0, .1)) !important;
-    box-shadow: 0 0 0 1px rgba(201, 168, 76, .18), 0 10px 30px rgba(0, 0, 0, .35);
 }
 .mm-btn.mm-rl span::before { content: '✦ '; color: #c9a84c; }
 

@@ -65,6 +65,8 @@ const CHANGELOG = {
             ['Koop-Hotseat ohne Zwischenbildschirm: die Kamera wechselt zum Spieler am Zug, Reaktionen von Mitspielern als Tafel mit „Weiter“', 'Co-op hotseat without a pass screen: the camera follows the active player, teammates\' reactions shown on a panel with "Continue"'],
             ['Spielfeld im Hochformat: Hand in voller Breite unten, Held/Friedhof/Ressourcen eine Etage darüber', 'Portrait board: full-width hand at the bottom, hero/graveyard/resources one row above'],
             ['Menüs bleiben im Querformat und zeigen einen Dreh-Hinweis', 'Menus stay in landscape and show a rotate hint'],
+            ['Hochformat: größere Feldkarten, Ally-Reihen nutzen den freien Platz gleichmäßig, Ressourcen kleiner und höher; Starthand als großes Raster', 'Portrait: larger field cards, ally rows spread evenly over the free space, resources smaller and higher; opening hand as a large grid'],
+            ['Hauptmenü: Optionen jetzt als Zahnrad unten rechts neben „Neuigkeiten“ (beide größer), Roguelike-Knopf kompakter', 'Main menu: options are now a gear at the bottom right next to the news (both larger), compact Roguelike button'],
         ]],
         ['2026-11-26', [
             ['Roguelike: neue Klassen-Artefakte mit klassentypischer Fähigkeit für eigene Allies (Improved Charge, Lethal Shots, Cheap Shot …)', 'Roguelike: new class artifacts with a class ability for your allies (Improved Charge, Lethal Shots, Cheap Shot …)'],
