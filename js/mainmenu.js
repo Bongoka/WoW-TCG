@@ -76,19 +76,21 @@ function openMainMenu(boot) {
     mmFillProps();
     const hasGame = !!(G && !G.gameOver);
     el.classList.toggle('has-game', hasGame);                                          // laufende Partie scheint durch (pausiert, nicht bedienbar; online läuft sie weiter)
-    document.body.classList.toggle('mm-board-off', !hasGame);                           // ohne Partie: Spielfeld nie sichtbar (auch nicht, wenn das Menü kurz verdeckt/ausgeblendet ist)
+    el.classList.toggle('has-board', !!G);                                              // auch nach Partieende: letztes Spielfeld (Karten …) abgedunkelt dahinter
+    document.body.classList.toggle('mm-board-off', !G);                                 // ohne Partie (Seitenstart): Spielfeld nie sichtbar (auch nicht, wenn das Menü kurz verdeckt/ausgeblendet ist)
+    document.body.classList.add('mm-open');
     MM.covered = undefined; el.style.visibility = '';
     el.classList.remove('out'); el.classList.toggle('boot', !!boot); el.style.display = 'flex';   // boot: beim Seitenstart ohne Einblenden (sonst schiene das Spielfeld durch)
     void el.offsetWidth; el.classList.add('in');
     document.body.classList.remove('side-open', 'pf-game');                              // Menü: Hochformat-Hinweis wieder an
     try { if (document.fullscreenElement || document.webkitFullscreenElement) screen.orientation.lock('landscape').catch(() => {}); } catch (e) {}   // Menü: im Vollbild wieder Querformat
-    if (!hasGame) mmBackground(true); else { clearInterval(MM.bgTimer); MM.bgTimer = 0; }
+    if (!G) mmBackground(true); else { clearInterval(MM.bgTimer); MM.bgTimer = 0; }
     if (!MM.raf) MM.raf = requestAnimationFrame(mmTick);
 }
 function mmHide() {
     if (!MM.el || MM.el.style.display === 'none') return;
     mmCloseOptions(); mmCloseNews(); closePlaySetup();
-    document.body.classList.remove('mm-board-off');
+    document.body.classList.remove('mm-board-off', 'mm-open');
     document.body.classList.add('pf-game');                                             // Spielfeld darf ins Hochformat
     try { screen.orientation.unlock(); } catch (e) {}                                   // Vollbild-Sperre aufs Querformat lösen
     MM.el.classList.remove('in'); MM.el.classList.add('out');

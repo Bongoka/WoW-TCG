@@ -849,6 +849,7 @@ setInterval(() => {
     const arena = document.getElementById('arena'); if (!arena) return;
     const covered = [...document.querySelectorAll(COVER_SEL)].some(e => {
         const cs = getComputedStyle(e);
+        if (e.id === 'main-menu' && e.classList.contains('has-board')) return false;           // Hauptmenü mit Partie dahinter: Spielfeld scheint abgedunkelt durch
         return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > .99 && !e.classList.contains('out');
     });
     const v = covered ? 'hidden' : '';
