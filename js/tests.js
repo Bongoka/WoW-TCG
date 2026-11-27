@@ -2623,6 +2623,21 @@ function runRuleTests() {
         const per = {}; a.forEach(x => { per[x.pid] = (per[x.pid] || 0) + 1; });
         assert(Object.values(per).every(n => n <= 2) && a.length <= 6 && a.every(x => x.title && x.text), 'Grenzen verletzt: ' + JSON.stringify(per));
     });
+    // "opposing"/"opponent" im Raid = anderes Team, nicht "anderer Spieler" (Watcher Mal'wi schoss auf Allies der Mitspieler);
+    // KI: Schaden an Mitspielern zählt wie an Eigenem (aiBadTargets/aiTargetValue), Mitspieler stehen in der Bewertung
+    test(228, 'Raid: "opposing" = anderes Team (Watcher Mal\'wi trifft nur Boss-Allies), KI schadet Mitspielern nicht und bewertet sie mit', () => {
+        const s = raid(3);
+        const w = makeCardInst(269, false, 1); w.joinedTurn = 0; P(s, 1).allies.push(w);
+        const ally = Object.values(CARDS).find(c => c.type === 'Ally' && (c.hp || 0) >= 3 && !(FX[c.id] || {}).on && (c.set || 1) === 1);
+        const m = makeCardInst(ally.id, false, 3); putIntoPlay(s, m, 3); process(s); autoResolve(s);
+        assert(!(findCharacter(s, m.uid) || {}).damage, 'Watcher Mal\'wi traf den Ally eines Mitspielers');
+        const b = makeCardInst(ally.id, false, 2); putIntoPlay(s, b, 2); process(s); autoResolve(s);
+        assert((findCharacter(s, b.uid) || {}).damage === 1, 'Watcher Mal\'wi traf den Boss-Ally nicht');
+        assert(aiBadTargets(s, 1, [{ harm: true }], [[m.uid]], false) && !aiBadTargets(s, 1, [{ harm: true }], [[b.uid]], false), 'aiBadTargets: Mitspieler-Ally nicht als eigen erkannt');
+        assert(aiTargetValue(s, 1, m.uid, true) < 0 && aiTargetValue(s, 1, b.uid, true) > 0, 'aiTargetValue: Schaden am Mitspieler gilt als gut');
+        const e0 = evaluateState(s, 1); P(s, 3).hero.damage += 10; const e1 = evaluateState(s, 1);
+        assert(e1 < e0, 'Bewertung sieht Schaden am Mitspieler-Helden nicht');
+    });
     // Raid-Einrichtung: Spieler 1 darf auf jedem Platz sitzen (Zugreihenfolge = Plätze, R200.4); Hotseat tauscht 1 ⇄ Raider (pidSwap)
     if (typeof pidSwap === 'function') test(219, 'Raid-Hotseat: Spieler 1 auf Platz 3, Zugreihenfolge nach Plätzen, Tausch 1 ⇄ 4 und zurück = Original', () => {
         const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest', 'alliance_paladin'].map(deck);

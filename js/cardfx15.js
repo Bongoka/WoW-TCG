@@ -420,7 +420,7 @@ FX[3506] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), r
 FX[3507] = { aura: { assault: (s, src, sp, c) => { if (c.uid !== heroOf(s, sp).uid) return 0; const o = foe(s, sp); return [o.hero, ...o.allies, ...o.hero.weapons, ...o.hero.armors].filter(x => x.exhausted).length; } } };
 // Windshear Totem: "Ongoing: When this card enters play, you may interrupt target ability. <p> At the start of your turn, this card deals 1 nature damage to target hero or ally."
 FX[3508] = { enterTrig: (s, c, pid) => { const l = (s.chain || []).filter(i => i.kind === 'card' && i.card.type === 'Ability' && !i.interrupted && i.card.uid !== c.uid).map(i => i.card.uid);
-        if (l.length) mayPick(s, pid, tr('Windshear Totem: Ziel-Fähigkeit unterbrechen?'), 'Windshear Totem', l, '3508:int', { pid }, u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 3 : -3; }); },
+        if (l.length) mayPick(s, pid, tr('Windshear Totem: Ziel-Fähigkeit unterbrechen?'), 'Windshear Totem', l, '3508:int', { pid }, u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && isFoePid(s, pid, x.pl) ? 3 : -3; }); },
     on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3508, k: 'tick', a: { pid, uid: c.uid } }); } },
     k: { int: (s, a, u) => { if (u && interruptUid(s, u)) L(s, tr('Windshear Totem unterbricht die Fähigkeit.'), '', a.pid); },
         tick: (s, a) => { if (!findCharacter(s, a.uid)) return; mustPick(s, a.pid, tr('Windshear Totem: 1 Naturschaden an Ziel'), 'Windshear Totem', targetCands(s, a.pid, { char: true }), '3508:dmg', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2); },
@@ -549,7 +549,7 @@ FX[3709] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s,
     k: { tick: (s, a) => { if (findCharacter(s, a.h)) heroDmg(s, a.pid, a.h, 1, 'Frost', { abilityId: 3709, abilityUid: a.uid }); } },
     aura: { atk: (s, src, sp, c) => { if (!isAllyLike(c) || !src.attachedTo) return 0; const hl = locate(s, src.attachedTo); return hl && ctrlOf(s, c) === hl.pid ? -1 : 0; } } };
 // Mind Freeze: "Interrupt target ability or ally. If you do, exhaust all of its controller's resources."
-FX[3710] = { slots: (s, pid) => [{ label: tr('Fähigkeit oder Ally in der Kette'), cands: chainCards(s, c => c.type === 'Ability' || isAllyCard(c)), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }],
+FX[3710] = { slots: (s, pid) => [{ label: tr('Fähigkeit oder Ally in der Kette'), cands: chainCards(s, c => c.type === 'Ability' || isAllyCard(c)), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl) ? 5 : -10; } }],
     canPlay: s => chainCards(s, c => c.type === 'Ability' || isAllyCard(c)).length > 0 || tr('Keine Fähigkeit und kein Ally in der Kette'),
     resolve: (s, it) => { const u = T(it)[0]; const x = (s.chain || []).find(i => i.card && i.card.uid === u); if (!x || !interruptUid(s, u)) return; me(s, x.pl).resources.forEach(r => { r.exhausted = true; }); L(s, tr`Mind Freeze: Alle Ressourcen von ${me(s, x.pl).hero.name} werden erschöpft.`, '', it.pl); } };
 // Plague Strike: "Attach to target hero. <p> Ongoing: At the start of your turn, your hero deals 1 shadow damage to attached hero.

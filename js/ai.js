@@ -107,8 +107,19 @@ function evaluateStateNow(s, pid) {
     (me.ongoing || []).forEach(o => score += aiDefensive(o) ? 1 + 1.2 * infoOpp.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     (opp.ongoing || []).forEach(o => score -= aiDefensive(o) ? 1 + 1.2 * infoMe.attackers : 2.5 + (o.cost || 0) * 0.6 + aiFxWorth(o, 0.3));
     if (!aiOld(pid, 'cold')) score += aiColdTerm(s, pid, myHp, oppHp);
+    // Raid: Mitspieler (gleiches Team) zählen mit – Leben, Allies, Ausscheiden. Ohne diesen Posten traf die Raider-KI
+    // Mitspieler mit verteiltem Schaden ohne Abzug (Gok Stormhammer, Cleave) und half ihnen nie (Heilung, Schutz)
+    if (s.pids && !aiOld(pid, 'team')) for (const i of s.pids) {
+        if (i === pid || isFoePid(s, pid, i)) continue;
+        const t = getPlayer(s, i);
+        if (t.out) { score -= AI_TEAM_W * 30; continue; }
+        const hp = Math.max(0, hpOf(s, t.hero) - t.hero.damage);
+        score += AI_TEAM_W * (hp * awp(s, pid, 'hpMe') - (hp <= 6 ? (7 - hp) * 6 : 0));
+        alliesOf(t).forEach(a => { if (!doomed.has(a.uid)) score += AI_TEAM_W * allyVal(a, true); });
+    }
     return score;
 }
+const AI_TEAM_W = 0.6;
 // Everlasting Cold (Set honor): "At the start of your turn, your hero deals 1 frost damage to attached character, or 2 if that
 // character didn't attack on its controller's last turn." – im Zug des Betroffenen kostet "noch nicht angegriffen" einen
 // Schaden mehr. So greift die KI mit dem verfluchten Charakter an, wenn der Angriff sonst nichts kostet; ob er schadet

@@ -3380,11 +3380,12 @@ const AI_NO_OWN_TARGET = new Set([7040, 58, 11057, 5064, 12050, 6052]);
 const AI_BUFF_TEXT = /\+\d+ (ATK|\[Health\]|\[DEF\])|\+\d+ \/ \+\d+|\bhas (Protector|Elusive|Stealth|Untargetable|Long-Range|Ferocity|Assault)|\bprevent (all|the next)/i;
 const AI_HARM_TEXT = /damage to|destroy|-\d+ (ATK|\[Health\])|can't|exhaust|discard|remove|interrupt|deals? \d/i;
 function aiBadTargets(s, pid, slots, tg, helpful) {
-    const own = u => { const l = locate(s, u); return !!l && l.pid === pid; };
+    // Raid: Mitspieler zählen als eigene Seite (Team, s.team) – nie schaden, helfen erlaubt
+    const own = u => { const l = locate(s, u); return !!l && !isFoePid(s, pid, l.pid); };
     // Kräfte, die einen Anhang am Ziel verlangen (Remba, Abbess of Ash: Kontrolle über Ally mit Anhang): Hilfe-Regel aus
     if (helpful && [getPlayer(s, pid).hero, ...getPlayer(s, pid).allies].some(c => getPowers(s, c).some(pw => pw.needsAttach))) helpful = false;
     // Hilfe-Regel nur für Karten auf dem Feld (nicht Ressourcen – Optimize darf gegnerische Ressourcen erschöpfen)
-    const enemyOnField = u => { const l = locate(s, u); return !!l && l.pid !== pid && isInPlayZone(l.zone); };
+    const enemyOnField = u => { const l = locate(s, u); return !!l && isFoePid(s, pid, l.pid) && isInPlayZone(l.zone); };
     return slots.some((sl, i) => sl && ((sl.harm === true && sl.side !== 'friendly' && (tg[i] || []).some(own)) || (helpful && sl.harm === false && sl.side !== 'enemy' && (tg[i] || []).some(enemyOnField))));
 }
 function playVariants(s, pid, c, idx, instantOnly, gyUid) {
@@ -3406,7 +3407,7 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
             if (combos === null) continue;
             for (const tg of combos) {
                 if (f.aiSkip && f.aiSkip(s, pid, c, { x, mode, targets: tg })) continue;
-                if (AI_NO_OWN_TARGET.has(c.id) && tg.flat().some(u => { const l = locate(s, u); return l && l.pid === pid; })) continue;
+                if (AI_NO_OWN_TARGET.has(c.id) && tg.flat().some(u => { const l = locate(s, u); return l && !isFoePid(s, pid, l.pid); })) continue;
                 // Schädliche Anhänge (Ziel mit harm, z. B. Reclusion "Prevent all damage that attached ally would deal") nie auf Eigenes:
                 // ihre Wirkung sieht die Bewertung oft nicht, die eigene laufende Fähigkeit zählt aber als Plus
                 // … und hilfreiche Anhänge (harm: false, z. B. Blessing of the Martyr) nie auf gegnerische Karten
@@ -3555,14 +3556,14 @@ function cardHandValue(s, p, c) {
 }
 function aiTargetValue(s, pid, uid, harm) {
     const l = locate(s, uid); if (!l) return 0;
-    const mine = l.pid === pid;
+    const mine = !isFoePid(s, pid, l.pid);                                              // Raid: Mitspieler wie eigene Karten
     const c = l.c;
     let v = cardValue(s, c);
     if (c.type === 'Hero') { const left = hpOf(s, c) - (c.damage || 0); v = 6 + (left < 10 ? (10 - left) * 2 : 0); }
     if (harm === undefined) return mine ? v : -v;
     return harm ? (mine ? -v - 20 : v) : (mine ? v + (c.damage || 0) : -v - 20);
 }
-function healValue(s, pid, uid, amt) { const l = locate(s, uid); if (!l) return 0; const c = l.c; const v = Math.min(amt, c.damage || 0); return l.pid === pid ? v * 2 + (c.type === 'Hero' ? 1 : 0) : -v * 2 - 5; }
+function healValue(s, pid, uid, amt) { const l = locate(s, uid); if (!l) return 0; const c = l.c; const v = Math.min(amt, c.damage || 0); return !isFoePid(s, pid, l.pid) ? v * 2 + (c.type === 'Hero' ? 1 : 0) : -v * 2 - 5; }
 function aiProtectValue(s, pr, att, def) {
     const aAtk = atkOf(s, att, { attacking: true, target: pr });
     const prLeft = hpOf(s, pr) - (pr.damage || 0);

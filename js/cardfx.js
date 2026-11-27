@@ -674,7 +674,7 @@ FX[266] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id
     k: { ask: (s, a) => { const c = targetCands(s, a.pid, { char: true, filter: x => !x.exhausted }); if (!c.length) return; const opts = c.map(u => ({ label: targetLabel(s, u, a.pid), v: u, ai: aiTargetValue(s, a.pid, u, true) })); opts.push({ label: tr('Nein'), v: 0, ai: 0 });
             ask(s, { pid: a.pid, prompt: tr('Voss Treebender: Ziel erschöpfen?'), src: 'Voss', opts, k: '266:do', a, auto: false }); },
         do: (s, a, v) => { if (v) exhaust(s, findCharacter(s, v)); } } };
-FX[269] = { on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid && findCharacter(s, d.uid) && isAllyCard(findCharacter(s, d.uid))) dealDamage(s, { src: c.uid, tgt: d.uid, amt: 1, dt: 'Ranged' }); } } };
+FX[269] = { on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid) && findCharacter(s, d.uid) && isAllyCard(findCharacter(s, d.uid))) dealDamage(s, { src: c.uid, tgt: d.uid, amt: 1, dt: 'Ranged' }); } } };
 FX[270] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 270, k: 'go', a: { uid: c.uid, pid } }); } },
     k: { go: (s, a) => { const p = me(s, a.pid); [p.hero, ...alliesOf(p)].forEach(x => heal(s, a.uid, x.uid, 1)); } } };
 FX[271] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid && d.first) trig(s, { id: 271, k: 'ask', a: { pid, uid: c.uid } }); } },

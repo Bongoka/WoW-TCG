@@ -122,7 +122,7 @@ FX[4034] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const
 FX[4035] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'atk', v: -5, turn: s.turn }); } };
 FX[4036] = { aura: { kw: (s, src, sp, c, k) => k === 'rangedDualWield' && c.uid === heroOf(s, sp).uid } };
 FX[4037] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
-    on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid && c.attachedTo) trig(s, { id: 4037, k: 'shot', a: { src: c.attachedTo, tgt: d.uid } }); } },
+    on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid) && c.attachedTo) trig(s, { id: 4037, k: 'shot', a: { src: c.attachedTo, tgt: d.uid } }); } },
     k: { shot: (s, a) => { if (findCharacter(s, a.src) && findCharacter(s, a.tgt)) dealDamage(s, { src: a.src, tgt: a.tgt, amt: 1, dt: 'Ranged' }); } } };
 FX[4038] = { powers: [{ key: 'ripper', label: tr('+X ATK (X = eigener ATK)'), cost: 3, resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'atk', v: atkOf(s, c), turn: s.turn }); } }] };
 // Scraps: "At the start of your turn, destroy this ally unless you remove an ally in a graveyard from the game."
@@ -163,7 +163,7 @@ FX[4048] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), r
     aura: { grant: (s, src, sp, c) => src.attachedTo === c.uid ? ['mageTr'] : [] } };
 FX[4049] = { slots: slotChar(tr('5 Feuerschaden'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 5, 'Fire'); } };
 FX[4050] = { slots: (s, pid) => [{ label: tr('Fähigkeit, Ally oder Ausrüstung auf der Kette'), cands: chainCards(s, c => c.type === 'Ability' || c.type === 'Ally' || isEquip(c)), harm: true,
-    ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 5 : -10; } }],
+    ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && isFoePid(s, pid, x.pl) ? 5 : -10; } }],
     resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
 FX[4051] = { resolve: (s, it) => searchDeck(s, it.pl, 'Portal', 'ally') };
 FX[4052] = { slots: slotChar(tr('1 Frostschaden'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 1, 'Frost', { after: { k: '4052:skip', a: { uid: t } } }); },
@@ -290,7 +290,7 @@ FX[4095] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s,
     resolve: (s, it) => { const [h, a] = [T(it, 0)[0], T(it, 1)[0]]; if (h) heroDmg(s, it.pl, h, 3, 'Nature'); if (a) heroDmg(s, it.pl, a, 3, 'Nature'); } };
 FX[4096] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { k: 'draw', a: { pid, n: 1 } }); } } };
 FX[4097] = {};   // Reincarnation: Ersatzeffekt in engine.js (Prüfung "Held zerstört")
-FX[4098] = { on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 4098, k: 'ex', a: { uid: d.uid } }); } }, k: { ex: (s, a) => { const c = findCharacter(s, a.uid); if (c) exhaust(s, c); } } };
+FX[4098] = { on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 4098, k: 'ex', a: { uid: d.uid } }); } }, k: { ex: (s, a) => { const c = findCharacter(s, a.uid); if (c) exhaust(s, c); } } };
 FX[4099] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     on: { attacks: (s, c, d, pid) => { if (d.att === c.attachedTo && d.first) trig(s, { id: 4099, k: 'ask', a: { pid, uid: d.att } }); } },
     k: { ask: (s, a) => { const p = me(s, a.pid); if (getReadyRes(p) < 1 || !findCharacter(s, a.uid)) return;
@@ -329,7 +329,7 @@ FX[4110] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { it.attachT
 // Soul Inversion (+2 / -2): zweischneidig – eigener Angreifer oder gegnerischer 2-Leben-Ally, die Bewertung entscheidet (kein harm)
 FX[4111] = { slots: slotAlly(tr('Ziel-Ally')), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { atk: (s, src, sp, c) => c.uid === src.attachedTo ? 2 : 0, hp: (s, src, sp, c) => c.uid === src.attachedTo ? -2 : 0 } };
-FX[4112] = { slots: (s, pid) => [{ label: tr('Ally auf der Kette'), cands: chainCards(s, c => c.type === 'Ally'), harm: true, ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 5 : -10; } }],
+FX[4112] = { slots: (s, pid) => [{ label: tr('Ally auf der Kette'), cands: chainCards(s, c => c.type === 'Ally'), harm: true, ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && isFoePid(s, pid, x.pl) ? 5 : -10; } }],
     resolve: (s, it) => { const u = T(it)[0]; const x = u && s.chain.find(i => i.card && i.card.uid === u); if (x && interruptUid(s, u)) x.interruptTo = 'removed'; } };
 FX[4113] = { aura: { kwLose: (s, src, sp, c, k) => c.type === 'Ally' && ctrlOf(s, c) !== sp && (k === 'elusive' || k === 'stealth') } };
 FX[4114] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
@@ -367,7 +367,7 @@ FX[4123].k = { ask: (s, a) => { if (getReadyRes(me(s, a.pid)) < 1) return; ask(s
 FX[4124] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { attackOnlyAll: (s, src, sp, att) => isFoePid(s, ctrlOf(s, att), sp) && src.attachedTo ? src.attachedTo : null } };
 FX[4125] = { aura: { hp: (s, src, sp, c) => c.type === 'Ally' && ctrlOf(s, c) !== sp ? -1 : 0 } };
-FX[4126] = { slots: (s, pid) => [{ label: tr('Ausrüstung auf der Kette'), cands: chainCards(s, c => isEquip(c)), harm: true, ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && x.pl !== pid ? 5 : -10; } }],
+FX[4126] = { slots: (s, pid) => [{ label: tr('Ausrüstung auf der Kette'), cands: chainCards(s, c => isEquip(c)), harm: true, ai: u => { const x = s.chain.find(i => i.card && i.card.uid === u); return x && isFoePid(s, pid, x.pl) ? 5 : -10; } }],
     resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
 
 // ============================================================================
@@ -524,7 +524,7 @@ FX[4197] = { on: { dmg: (s, c, d, pid) => { const x = d.src && findCharacter(s, 
     k: { ready: (s, a) => me(s, a.pid).resources.filter(r => r.exhausted).slice(0, a.n).forEach(r => { r.exhausted = false; }) } };
 // Ossandran: "When an opposing ability, ally, equipment, or resource is destroyed, remove it from the game."
 FX[4198] = { on: { died: (s, c, d, pid) => { const sn = d.snap; if (sn.wasCtrl && sn.wasCtrl !== pid && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(CARDS[sn.id].type) && sn.uid !== c.uid) trig(s, { id: 4198, k: 'rfg', a: { uid: sn.uid } }); },
-        resDestroyed: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 4198, k: 'rfg', a: { uid: d.uid } }); } },
+        resDestroyed: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 4198, k: 'rfg', a: { uid: d.uid } }); } },
     k: { rfg: (s, a) => { if (gyCard(s, a.uid)) gyRemove(s, a.uid); } } };
 FX[4199] = { leave: onDestroyed(4199),
     k: { died: (s, a) => mayPick(s, a.pid, tr('"Poison Tongue" McGillicutty: Ressource zerstören?'), '"Poison Tongue" McGillicutty', allPl(s).flatMap(p => p.resources).map(r => r.card.uid), '4199:do', a, u => (locate(s, u) || {}).pid === a.pid ? -5 : 3),
@@ -568,7 +568,7 @@ FX[4214] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl === pid && isAll
 FX[4215] = { inspire: 'Hero' };
 FX[4216] = { inspire: 'Ally' };
 // Ishanah: "At the start of each opponent's turn, he chooses an ally he controls. Gain control of that ally."
-FX[4217] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 4217, k: 'ask', a: { pid, opp: d.pid } }); } },
+FX[4217] = { on: { startOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 4217, k: 'ask', a: { pid, opp: d.pid } }); } },
     k: { ask: (s, a) => { const cands = alliesOf(me(s, a.opp)).filter(x => x.type === 'Ally').map(x => x.uid); if (!cands.length) return;
             mustPick(s, a.opp, tr('Ishanah: Wähle einen eigenen Ally – der Gegner übernimmt ihn'), 'Ishanah, High Priestess of the Aldor', cands, '4217:do', a, u => -((findCharacter(s, u) || {}).cost || 0) - atkOf(s, findCharacter(s, u))); },
         do: (s, a, v) => { const t = v && findCharacter(s, v); if (t && ctrlOf(s, t) === a.opp) changeControl(s, t, a.pid); } } };

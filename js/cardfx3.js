@@ -85,7 +85,7 @@ FX[2029] = { alt: TRAP, slots: (s, pid) => [{ label: tr('Angreifender Ally'), ca
     aura: { kw: (s, src, sp, c, k) => (k === 'cantAttack' || k === 'cantProtect') && c.uid === src.attachedTo } };
 FX[2030] = { distinct: true, slots: (s, pid) => [{ label: tr('Eigenes Pet'), cands: targetCands(s, pid, { ally: true, side: 'friendly', filter: a => a.isPet }), harm: false, ai: u => atkOf(s, findCharacter(s, u)) }, { label: 'Ziel-Ally', cands: targetCands(s, pid, ALLY), harm: true }],
     resolve: (s, it) => { const pet = T1(s, it, 0), t = T(it, 1)[0]; if (pet && t) dealDamage(s, { src: pet.uid, tgt: t, amt: atkOf(s, pet), dt: 'Melee' }); } };
-FX[2031] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 2031, k: 'pick', a: { uid: c.uid, pid } }); } },
+FX[2031] = { on: { startOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 2031, k: 'pick', a: { uid: c.uid, pid } }); } },
     k: { pick: (s, a) => { const c = findCharacter(s, a.uid); if (!c) return; const al = alliesOf(me(s, a.pid)); if (!al.length) { c.counters = { ...(c.counters || {}), choice: null }; return; }
             ask(s, { pid: a.pid, prompt: tr('Misdirection: Welchen eigenen Ally müssen gegnerische Allies angreifen?'), src: 'Misdirection', opts: al.map(x => ({ label: targetLabel(s, x.uid, a.pid), v: x.uid, ai: hpOf(s, x) - x.damage + (hasProtector(s, x) ? 2 : 0) })), k: '2031:do', a }); },
         do: (s, a, v) => { const c = findCharacter(s, a.uid); if (c) c.counters = { ...(c.counters || {}), choice: v, choiceTurn: s.turn }; } },
@@ -164,7 +164,7 @@ FX[2057] = { resolve: (s, it) => q(s, { op: 'call', k: '2057:pick', a: { pid: it
         do: (s, a, v) => { if (v === '__done') return; const c = findCharacter(s, v); if (c) destroy(s, c); q(s, { op: 'call', k: '2057:pick', a }); } } };
 FX[2058] = { slots: slotAlly('Ziel-Ally', true), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     aura: { atkBlock: (s, src, sp, att, def) => att.uid === src.attachedTo && def.uid === heroOf(s, sp).uid } };
-FX[2059] = { on: { cardDiscarded: (s, c, d, pid) => { if (d.pid !== pid) mustPick(s, pid, tr('Pact of Shadow: 3 Schattenschaden an Ziel'), 'Pact of Shadow', targetCands(s, pid, CH), 'E:doDmg', { src: heroOf(s, pid).uid, pid, amt: 3, dt: 'Shadow', ability: true }); } } };
+FX[2059] = { on: { cardDiscarded: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) mustPick(s, pid, tr('Pact of Shadow: 3 Schattenschaden an Ziel'), 'Pact of Shadow', targetCands(s, pid, CH), 'E:doDmg', { src: heroOf(s, pid).uid, pid, amt: 3, dt: 'Shadow', ability: true }); } } };
 FX[2060] = { aura: { prevent: (s, src, sp, t) => t.uid === heroOf(s, sp).uid ? 1 : 0 } };
 FX[2061] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.src === c.uid && d.combat && t && t.type === 'Hero') { const r = me(s, pid).resources.find(x => x.exhausted); if (r) r.exhausted = false; } },
         endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { k: 'bounceUid', a: { uid: c.uid } }); } } };

@@ -224,7 +224,7 @@ const attachTick16 = (id, n, dt, after) => ({ on: { startOfTurn: (s, c, d, pid) 
 const tgtHero16 = (label, harm = true, extra = {}) => (s, pid) => [{ label, cands: targetCands(s, pid, { hero: true, ...extra }), harm }];
 const attachTo16 = (s, it) => { it.attachTo = T(it)[0]; };
 const attachedKw16 = (...ks) => ({ kw: (s, src, sp, c, k) => ks.includes(k) && !!src.attachedTo && c.uid === src.attachedTo });
-const interruptSlot16 = (label, pred) => (s, pid) => [{ label, cands: chainCards(s, c => c.type === 'Ability' && pred(s, pid, c)), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }];
+const interruptSlot16 = (label, pred) => (s, pid) => [{ label, cands: chainCards(s, c => c.type === 'Ability' && pred(s, pid, c)), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl) ? 5 : -10; } }];
 const tempResist16 = (c, dt, turn) => { addTM(c, { k: 'noDtIn', dt, turn }); addTM(c, { k: 'resist10', dt, turn }); };
 // "Look at the top N cards" / gezieltes Aufdecken: oberste Karten (Ende des Arrays = oben)
 const topN16 = (p, n) => p.deck.slice(-n).reverse();
@@ -257,7 +257,7 @@ FX[14029] = { slots: (s, pid) => [{ label: tr('Ally in deinem Friedhof'), cands:
 // Strangulate: "Interrupt target ability. <p> Stash: Opponents can't play abilities this turn."
 FX[14030] = fxMix({ slots: interruptSlot16(tr('Fähigkeit auf der Kette'), () => true), resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } },
     stash16(tr('Gegner können in diesem Zug keine Fähigkeiten spielen'), (s, a) => addPE(s, a.pid, { k: 'strang16' })));
-PLAY_BLOCK14.push((s, pid, card) => card.type === 'Ability' && pes(s, null, 'strang16').some(m => m.pid !== pid) ? tr('Strangulate: In diesem Zug kannst du keine Fähigkeiten spielen') : null);
+PLAY_BLOCK14.push((s, pid, card) => card.type === 'Ability' && pes(s, null, 'strang16').some(m => isFoePid(s, pid, m.pid)) ? tr('Strangulate: In diesem Zug kannst du keine Fähigkeiten spielen') : null);
 // Unholy Ground: "Ongoing: When a non-token ally you control is destroyed, put a 3/3 Ghoul ally token into play."
 FX[14031] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl === pid && !d.snap.isToken && isAllyCard(CARDS[d.snap.id])) trig(s, { id: 14031, k: 'go', a: { pid } }); } }, k: { go: (s, a) => makeToken(s, 14501, a.pid) } };
 // Withering Decay: "Attach to target hero. Ongoing: At the start of your turn, your hero deals 1 shadow damage to attached hero. On your turn, allies in attached hero's party have -1 [Health]."
@@ -328,7 +328,7 @@ FX[14050] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { cons
 FX[14053] = { slots: (s, pid) => [{ label: tr('Ziel-Fähigkeit oder -Ausrüstung'), cands: targetCands(s, pid, { ability: true, equipment: true }), harm: false, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? 3 : -3 }], resolve: attachTo16, aura: attachedKw16('indestructible') };
 // Extinguish: "Ongoing: When this ability enters play, you may interrupt target ability. <p> If your hero would be dealt magical damage …, prevent 1 of it."
 FX[14054] = { enterTrig: (s, c, pid) => trig(s, { id: 14054, k: 'go', a: { pid } }),
-    k: { go: (s, a) => mayPick(s, a.pid, tr('Extinguish: Fähigkeit unterbrechen?'), 'Extinguish', chainCards(s, c => c.type === 'Ability'), '14054:do', a, u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== a.pid ? 5 : -10; }),
+    k: { go: (s, a) => mayPick(s, a.pid, tr('Extinguish: Fähigkeit unterbrechen?'), 'Extinguish', chainCards(s, c => c.type === 'Ability'), '14054:do', a, u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, a.pid, i.pl) ? 5 : -10; }),
         do: (s, a, v) => { if (v) interruptUid(s, v); } },
     aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid === heroOf(s, sp).uid && MAGIC15.includes(o.dt) ? Math.min(1, amt) : 0 } };
 // Frost Wave: "Up to two target allies can't attack or exhaust this turn. Draw a card."
@@ -541,7 +541,7 @@ FX[14112] = { resolve: (s, it) => searchDeck(s, it.pl, 'Summoning Portal', 'ally
 // ============================================================================
 // Chaotic Rush: "Put target ally on top of its owner's deck. <p> Ongoing: Opposing allies enter play exhausted."
 FX[14113] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T1(s, it); if (t) leavePlay(s, t, 'deckTop', { destroyed: false }); },
-    on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid) { const a = findCharacter(s, d.uid); if (a && !a.exhausted) { a.exhausted = true; } } } } };
+    on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) { const a = findCharacter(s, d.uid); if (a && !a.exhausted) { a.exhausted = true; } } } } };
 // Crushing Strike: "Destroy target opposing equipment. If you do, your hero may deal 3 melee damage to its controller's hero."
 FX[14114] = { slots: (s, pid) => [{ label: tr('Gegnerische Ausrüstung'), cands: targetCands(s, pid, { equipment: true, side: 'enemy' }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const pid = ctrlOf(s, t); if (destroy(s, t)) yesNo(s, it.pl, tr('Crushing Strike: 3 Nahkampfschaden an dessen Helden?'), 'Crushing Strike', '14114:do', { pid: it.pl, h: heroOf(s, pid).uid }, pid !== it.pl); },

@@ -232,7 +232,7 @@ FX[11027] = { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s
         pick: (s, a) => mustPick(s, a.pid, tr('Icy Torment: Ziel-Ally -2 ATK'), 'Icy Torment', targetCands(s, a.pid, { ally: true, filter: c => ctrlOf(s, c) === a.opp }), '11027:do', a),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'atk', v: -2, turn: s.turn }); } } };
 FX[11028] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, ctrlDisease(s, it.pl) ? 4 : 2, 'Melee'); } };
-FX[11029] = { slots: (s, pid) => [{ label: tr('Gegnerischer Ally auf der Kette'), cands: chainCards(s, c => isAllyCard(c)).filter(u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid; }), harm: true }],
+FX[11029] = { slots: (s, pid) => [{ label: tr('Gegnerischer Ally auf der Kette'), cands: chainCards(s, c => isAllyCard(c)).filter(u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl); }), harm: true }],
     resolve: (s, it) => { const u = T(it)[0]; const x = s.chain.find(i => i.card && i.card.uid === u); if (!x || x.interrupted) return; if (interruptUid(s, u)) heroDmg(s, it.pl, heroOf(s, x.pl).uid, x.card.cost || 0, 'Shadow'); } };
 FX[11030] = { aura: { cost: (s, src, sp, pid, card) => pid === sp && card.type === 'Weapon' ? -1 : 0, strike: (s, src, sp, pid) => pid === sp ? -1 : 0 } };
 const gyAllyMine = (s, pid) => gyCands(s, pid, c => isAllyCard(CARDS[c.id]));
@@ -326,7 +326,7 @@ FX[11051] = { on: { drew: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 1
     k: { ping: (s, a) => mayPick(s, a.pid, tr('Arcane Tactics: 1 Arkanschaden an Ziel-Ally?'), 'Arcane Tactics', targetCands(s, a.pid, { ally: true }), '11051:do', a),
         do: (s, a, v) => { if (v) heroDmg(s, a.pid, v, 1, 'Arcane', { abilityId: 11051, abilityUid: a.uid }); } } };
 FX[11052] = { slots: FX[6046].slots, resolve: (s, it) => FX[6046].resolve(s, it),
-    on: { questDone: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 11052, k: 'stop', a: { pid, uid: c.uid, q: d.uid } }); } },
+    on: { questDone: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 11052, k: 'stop', a: { pid, uid: c.uid, q: d.uid } }); } },
     k: { stop: (s, a) => { const c = findCharacter(s, a.uid); if (!c || !destroy(s, c)) return; const x = (s.chain || []).find(i => i.kind === 'reward' && i.src === a.q && !i.interrupted); if (x) { x.interrupted = true; L(s, tr('Astral Denial unterbricht die Belohnung.'), '', a.pid); } } } };
 const freezeHost = (s, pid) => targetCands(s, pid, { side: 'enemy', ally: true }).concat(targetCands(s, pid, { equipment: true, filter: c => c.type === 'Weapon' && ctrlOf(s, c) !== pid }));
 FX[11053] = fxMix({ slots: (s, pid) => [{ label: tr('Gegnerischer Ally oder Waffe'), cands: freezeHost(s, pid), harm: true }], resolve: (s, it) => { it.attachTo = T(it)[0]; },
@@ -418,7 +418,7 @@ FX[11079] = { slots: (s, pid) => [{ label: tr('Ziel-Ally oder -Ausrüstung'), ca
     k: { kill: (s, a) => { const c = findCharacter(s, a.uid); if (c) destroy(s, c); } } };
 FX[11080] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), addCost: (s, it) => removeCombos(s, it),
     resolve: (s, it) => me(s, it.pl).hero.weapons.filter(w => w.wsub === 'Dagger').forEach(w => { addTM(w, { k: 'thrown', turn: s.turn }); if (it.x) addTM(w, { k: 'atk', v: it.x, turn: s.turn }); }) };
-FX[11081] = { slots: (s, pid) => [{ label: tr('Instant auf der Kette'), cands: chainCards(s, c => !!c.instant), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }],
+FX[11081] = { slots: (s, pid) => [{ label: tr('Instant auf der Kette'), cands: chainCards(s, c => !!c.instant), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl) ? 5 : -10; } }],
     resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
 FX[11082] = { powers: [actPow('shadow', tr('Ziel-Ally kann in diesem Zug keinen Schaden zufügen'), { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'noDamage12', turn: s.turn }); } })] };
 DMG_PRE.push((s, o) => { const src = o.src && findCharacter(s, o.src); if (src && hasTM(s, src, 'noDamage12')) o.amt = 0; });
@@ -465,7 +465,7 @@ FX[11093] = { powers: [actPow('walk', tr('Location oder Quest aus dem Friedhof a
     resolve: (s, it) => { const u = T(it)[0]; if (u) fromGyToHand(s, u); } })] };
 FX[11094] = { modes: (s) => { const ch = chainCards(s, c => c.type === 'Ability').length > 0; return [...(ch ? [{ label: tr('Ziel-Fähigkeit unterbrechen'), v: 1, ai: 3 }] : []), { label: tr('Ziel erschöpfen'), v: 2, ai: 2 }, ...(ch ? [{ label: tr('Beides'), v: 3, ai: 4 }] : [])]; },
     slots: (s, pid, card, ctx) => { const m = ctx.mode || 3, out = [];
-        if (m & 1) out.push({ label: tr('Fähigkeit auf der Kette'), cands: chainCards(s, c => c.type === 'Ability'), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } });
+        if (m & 1) out.push({ label: tr('Fähigkeit auf der Kette'), cands: chainCards(s, c => c.type === 'Ability'), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl) ? 5 : -10; } });
         if (m & 2) out.push({ label: tr('Ziel erschöpfen'), cands: targetCands(s, pid, { char: true }), harm: true });
         return out; },
     resolve: (s, it) => { let i = 0; const m = it.mode || 3; if (m & 1) { const u = T(it, i++)[0]; if (u) interruptUid(s, u); } if (m & 2) { const t = T1(s, it, i++); if (t) exhaust(s, t); } } };
@@ -818,7 +818,7 @@ FX[11230] = { powers: [{ key: 'pot', label: tr('Zerstören: Ziel erhält Shadow 
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'resist10', dt: 'Shadow', turn: s.turn }); } }] };
 FX[11231] = fxMix(onEnter(11231, 'go'), { k: { go: (s, a) => mayPick(s, a.pid, tr('Arm Blade of Augelmir: Ziel-Fähigkeit auf die Hand?'), 'Arm Blade of Augelmir', targetCands(s, a.pid, { ability: true }), '11231:b', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -2 : 3),
     b: (s, a, v) => { const c = v && findCharacter(s, v); if (c) bounce(s, c); } } });
-FX[11233] = { on: { resTurnedDown: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 11233, k: 'go', a: { pid } }); } },
+FX[11233] = { on: { resTurnedDown: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 11233, k: 'go', a: { pid } }); } },
     k: { go: (s, a) => yesNo(s, a.pid, tr('Crimson Cranium Crusher: Eine Karte ziehen?'), 'Crimson Cranium Crusher', '11233:d', a, true), d: (s, a, v) => { if (v) drawCards(s, me(s, a.pid), 1); } } };
 FX[11234] = { powers: [actPow('betray', tr('Gegner wählt einen Ally: Kontrolle tauschen'), { myTurn: true, canUse: (s, pid) => alliesOf(foe(s, pid)).length > 0 || tr('Gegner hat keinen Ally'),
     modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 3 }],

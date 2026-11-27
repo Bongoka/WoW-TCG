@@ -349,7 +349,7 @@ FX[16013] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, 
         selfCost: (s, it, src) => { it.extra.lw17 = [...(src.lw17 || [])]; const p = me(s, it.pl); [...p.hand].forEach(c => EK.discardDo(s, {}, c.uid)); destroy(s, src, { cause: 'cost' }); },
         resolve: (s, it) => { const p = me(s, it.pl); (it.extra.lw17 || []).forEach(u => { const i = (p.removed || []).findIndex(x => x.uid === u); if (i < 0) return; const c = p.removed.splice(i, 1)[0]; delete c.faceDown17; p.hand.push(c); }); } }] };
 // Wristwraps of the Cutthroat: "At the end of each opponent's turn, if a card didn't enter his graveyard this turn, he discards a card."
-FX[16014] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 16014, k: 'go', a: { pid, o: d.pid } }); } },
+FX[16014] = { on: { endOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 16014, k: 'go', a: { pid, o: d.pid } }); } },
     k: { go: (s, a) => { if ((s.gyIn17 || {})[a.o] !== s.turn) q(s, { op: 'call', k: 'E:discard', a: { pid: a.o, n: 1, src: 'Wristwraps of the Cutthroat' } }); } } };
 // Band of Channeled Magic: "At the start of your turn, you may pay (2). If you do, draw a card. Otherwise, destroy this item."
 FX[16021] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 16021, k: 'go', a: { pid, uid: c.uid } }); } },
@@ -373,9 +373,9 @@ FX[16032] = fxMix(mayEnter16(16032, tr('Bladebreaker Gauntlets: Rüstung oder Wa
     { aura: { watk: (s, src, sp, w) => ctrlOf(s, w) !== sp ? -1 : 0, def: (s, src, sp, a) => a.type === 'Armor' && ctrlOf(s, a) !== sp ? -1 : 0 } });
 FX[16032].k.do = (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c); };
 // Leggings of the Tireless Sentry: "Opposing heroes and allies enter play exhausted. <p> At the end of each opponent's turn, exhaust all heroes and allies he controls."
-FX[16033] = { on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid) { const a = findCharacter(s, d.uid); if (a) a.exhausted = true; } },
-        heroBecomes: (s, c, d, pid) => { if (d.pid !== pid) heroOf(s, d.pid).exhausted = true; },
-        endOfTurn: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 16033, k: 'go', a: { o: d.pid } }); } },
+FX[16033] = { on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) { const a = findCharacter(s, d.uid); if (a) a.exhausted = true; } },
+        heroBecomes: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) heroOf(s, d.pid).exhausted = true; },
+        endOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 16033, k: 'go', a: { o: d.pid } }); } },
     k: { go: (s, a) => partyOf(me(s, a.o)).filter(c => ctrlOf(s, c) === a.o).forEach(c => exhaust(s, c)) } };
 // Wraps of the Astral Traveler: "On your turn: (3), [Activate] >>> Remove target opposing ability, ally, or equipment from the game. Its owner puts it into play at the start of your next turn."
 FX[16034] = { powers: [actPow('astral', tr('Gegnerische Karte bis zu deinem nächsten Zug entfernen'), { cost: 3, myTurn: true, slots: (s, pid) => [{ label: tr('Gegnerische Fähigkeit, Ally oder Ausrüstung'), cands: targetCands(s, pid, { ally: true, ability: true, equipment: true, filter: c => ctrlOf(s, c) !== pid }), harm: true }],

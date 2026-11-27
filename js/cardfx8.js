@@ -237,7 +237,7 @@ FX[6068] = { slots: (s, pid) => [{ label: tr('Allies in deinem Friedhof'), cands
         budget: me(s, pid).resources.length, weight: u => { const g = gyCard(s, u); return g ? g.c.cost || 0 : 0; } }],
     resolve: (s, it) => { const l = T(it).filter(u => gyCard(s, u)); const sum = l.reduce((n, u) => n + (gyCard(s, u).c.cost || 0), 0); if (sum <= me(s, it.pl).resources.length) l.forEach(u => fromGyToPlay(s, u, it.pl)); } };
 FX[6069] = { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heal(s, heroOf(s, it.pl).uid, t, 3); } };
-FX[6070] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid && alliesOf(me(s, d.pid)).length) trig(s, { id: 6070, k: 'ask', a: { pid: d.pid } }); } },
+FX[6070] = { on: { startOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid) && alliesOf(me(s, d.pid)).length) trig(s, { id: 6070, k: 'ask', a: { pid: d.pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Levitate: Welcher deiner Allies kann in diesem Zug nicht angreifen?'), 'Levitate', alliesOf(me(s, a.pid)).map(c => c.uid), '6070:do', a, u => -atkOf(s, findCharacter(s, u))),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'cantAttack', turn: s.turn }); } } };
 FX[6071] = { resolve: (s, it) => { const o = foe(s, it.pl); let n = 0; o.resources.forEach(r => { if (r.exhausted) { r.exhausted = false; n++; } }); if (n) heroDmg(s, it.pl, o.hero.uid, n, 'Shadow'); } };
@@ -491,7 +491,7 @@ FX[6180] = { on: { inspired: (s, c, d, pid) => { const x = findCharacter(s, d.ui
 const targetsMine = (s, pid, it) => (it.targets || []).flat().some(u => { const l = locate(s, u); return l && l.pid === pid && isInPlayZone(l.zone); });
 FX[6181] = { powers: [{ key: 'kentho', label: tr('Zerstören: Karte/Effekt unterbrechen, der deine Karte anvisiert'), selfCost: selfDestroyThen,
     canUse: (s, pid) => (s.chain || []).some(i => i.pl !== undefined && targetsMine(s, pid, i) && !i.interrupted) || tr('Nichts auf der Kette zielt auf deine Karten'),
-    modes: (s, pid) => (s.chain || []).filter(i => targetsMine(s, pid, i) && !i.interrupted).map(i => ({ label: i.card ? i.card.name : (i.srcName || i.label || tr('Effekt')), v: i.id || (i.card && i.card.uid), ai: i.pl !== pid ? 5 : -5 })),
+    modes: (s, pid) => (s.chain || []).filter(i => targetsMine(s, pid, i) && !i.interrupted).map(i => ({ label: i.card ? i.card.name : (i.srcName || i.label || tr('Effekt')), v: i.id || (i.card && i.card.uid), ai: isFoePid(s, pid, i.pl) ? 5 : -5 })),
     resolve: (s, it) => { const x = (s.chain || []).find(i => (i.id || (i.card && i.card.uid)) === it.mode); if (x) { x.interrupted = true; L(s, tr`Vindicator Kentho unterbricht ${x.card ? x.card.name : (x.srcName || tr('einen Effekt'))}.`); } } }] };
 INSPIRE_KINDS.ArmorOrItem = p => p.hero.armors.filter(c => c.exhausted).map(c => c.uid);
 FX[6182] = { inspire: 'ArmorOrItem' };

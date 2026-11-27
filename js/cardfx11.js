@@ -11,7 +11,7 @@ function escapeWorth(s, a) {
     const y = after(true), n = after(false);
     return y === null || n === null ? true : y > n;
 }
-const escapeArtist = id => ({ on: { targeted: (s, c, d, pid) => { if (d.uids.includes(c.uid) && d.pl !== pid) trig(s, { id, k: 'escape', a: { pid, uid: c.uid } }); } },
+const escapeArtist = id => ({ on: { targeted: (s, c, d, pid) => { if (d.uids.includes(c.uid) && isFoePid(s, pid, d.pl)) trig(s, { id, k: 'escape', a: { pid, uid: c.uid } }); } },
     // KI: beide Ausgänge durchrechnen (bleiben und die Kette auflösen vs. auf die Hand) – flieht vor Entfernen, nicht vor einem Buff
     k: { escape: (s, a) => { const c = findCharacter(s, a.uid); if (c) yesNo(s, a.pid, tr`${c.name}: Escape Artist – auf die Hand nehmen?`, c.name, `${id}:esc`, a, isHuman(s, a.pid) || s.look ? true : escapeWorth(s, a)); },
         esc: (s, a, v) => { const c = findCharacter(s, a.uid); if (v && c) bounce(s, c); } } });
@@ -146,7 +146,7 @@ FX[10036] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, 
     k: { veins: (s, a) => { const o = foe(s, a.pid); ask(s, { pid: o.id, prompt: tr('Icy Veins: Welcher deiner Charaktere erhält 5 Frostschaden?'), src: 'Icy Veins', opts: partyOf(o).map(c => ({ label: targetLabel(s, c.uid, o.id), v: c.uid, ai: hpOf(s, c) - (c.damage || 0) - (c.type === 'Hero' ? 3 : 0) })), k: '10036:do', a }); },
         do: (s, a, v) => heroDmg(s, a.pid, v, 5, 'Frost') } };
 SKIP_DRAW_STEP.push((s, pid) => unattachedOngoing(me(s, pid), 10036).some(c => active(s, c)));
-FX[10037] = { noInterrupt: true, slots: (s, pid) => [{ label: tr('Karte auf der Kette'), cands: chainCards(s, () => true), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }], resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
+FX[10037] = { noInterrupt: true, slots: (s, pid) => [{ label: tr('Karte auf der Kette'), cands: chainCards(s, () => true), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && isFoePid(s, pid, i.pl) ? 5 : -10; } }], resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
 FX[10038] = { resolve: (s, it) => { const n = me(s, it.pl).hand.length; if (n) alliesOf(foe(s, it.pl)).forEach(c => heroDmg(s, it.pl, c.uid, n, 'Fire')); } };
 FX[10039] = { xRange: () => ({ min: 0, max: 12 }), xValues: (s, pid) => [...new Set([...alliesOf(foe(s, pid)), ...foe(s, pid).hero.weapons].map(c => c.cost || 0))].filter(x => x > 0),
     resolve: (s, it) => { it.card.enterCounters11 = it.x || 0; },
@@ -194,7 +194,7 @@ WRAPUP.push(s => { for (const m of (s.pe || []).filter(x => x.k === 'borrow11' &
 EK.giveBack11 = (s, a) => { const c = findCharacter(s, a.uid); if (!c || ctrlOf(s, c) !== a.from) return; if (c.type === 'Ability' && !isAllyLike(c)) moveOngoing(s, c, a.to); else if (isEquip(c)) moveEquip(s, c, a.to); else changeControl(s, c, a.to); };
 FX[10052] = { slots: (s, pid) => [{ label: tr('Befreundeter Held'), cands: targetCands(s, pid, { hero: true, side: 'friendly' }), harm: false }, { label: tr('Befreundeter Ally'), cands: targetCands(s, pid, { ally: true, side: 'friendly' }), harm: false }],
     resolve: (s, it) => [T(it, 0)[0], T(it, 1)[0]].forEach(u => { const c = u && findCharacter(s, u); if (c) addTM(c, { k: 'shield', v: 1, whole: true, turn: s.turn }); }) };
-FX[10053] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 10053, k: 'go', a: { pid, opp: d.pid } }); } },
+FX[10053] = { on: { cardPlayed: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 10053, k: 'go', a: { pid, opp: d.pid } }); } },
     k: { go: (s, a) => { heroDmg(s, a.pid, me(s, a.opp).hero.uid, 1, 'Shadow'); const h = heroOf(s, a.pid); heroHeal(s, a.pid, h.uid, 1); } } };
 FX[10054] = { slots: (s, pid) => [{ label: tr('Gegnerische Fähigkeiten, Allies und Ausrüstung'), cands: targetCands(s, pid, { ability: true, ally: true, equipment: true, side: 'enemy' }), min: 1, max: 99, harm: true }],
     resolve: (s, it) => T(it).forEach(u => { const c = findCharacter(s, u); if (!c) return; const from = ctrlOf(s, c); if (from === it.pl) return; if (c.type === 'Ability' && !isAllyLike(c)) moveOngoing(s, c, it.pl); else if (isEquip(c)) moveEquip(s, c, it.pl); else changeControl(s, c, it.pl); addPE(s, it.pl, { k: 'borrow11', uid: u, back: from, src: 10054, ...(s.activePlayer === it.pl ? { at: s.turn } : { ownEnd: true, until: 'game' }) }); }) };   // "until the end of your turn": im Gegnerzug gespielt = Ende des nächsten eigenen Zuges
@@ -330,7 +330,7 @@ FX[10111] = { on: { defends: (s, c, d, pid) => { if (d.def === c.uid) trig(s, { 
         dmg: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: 1, dt: 'Nature' }); mustPick(s, a.pid, tr('Naan the Selfless: zweites Ziel heilt 1'), 'Naan the Selfless', targetCands(s, a.pid, { char: true }).filter(u => u !== v), '10111:heal', a, u => aiTargetValue(s, a.pid, u, false)); },
         heal: (s, a, v) => { if (v && findCharacter(s, a.uid)) heal(s, a.uid, v, 1); } } };
 FX[10112] = fxMix(escapeArtist(10112), { aura: { kw: (s, src, sp, c, k) => k === 'untargetable' && c.uid === heroOf(s, sp).uid } });
-FX[10113] = fxMix(findTreasure(10113), { on: { cardDiscarded: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 10113, k: 'hit', a: { uid: c.uid, opp: d.pid } }); } },
+FX[10113] = fxMix(findTreasure(10113), { on: { cardDiscarded: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 10113, k: 'hit', a: { uid: c.uid, opp: d.pid } }); } },
     k: { hit: (s, a) => { if (findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: me(s, a.opp).hero.uid, amt: 3, dt: 'Shadow' }); } } });
 FX[10114] = { powers: [{ key: 'quenlan', label: tr('Zerstören: Heile 3'), selfCost: selfDestroyCost, slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heal(s, it.src, t, 3); } }] };
 FX[10115] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 10115, k: 'ask', a: { pid } }); } },
@@ -348,7 +348,7 @@ FX[10120] = fxMix(escapeArtist(10120), { leave: (s, snap) => pushTrig(s, snap.wa
 FX[10120].k.prot = (s, a) => mustPick(s, a.pid, tr('Zumbly Fiddlespark: Ziel-Ally erhält Protector'), 'Zumbly Fiddlespark', targetCands(s, a.pid, { ally: true }), '10120:do', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 2 : -2);
 FX[10120].k.do = (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'protector', turn: s.turn }); };
 FX[10121] = { powers: [{ key: 'haeleth', label: tr('Heile 2'), cost: 2, once: 'turn', slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t && findCharacter(s, it.src)) heal(s, it.src, t, 2); } }] };
-FX[10122] = { on: { allyEnters: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 10122, k: 'hit', a: { src: c.uid, tgt: d.uid } }); } }, k: { hit: (s, a) => { if (findCharacter(s, a.src) && findCharacter(s, a.tgt)) dealDamage(s, { src: a.src, tgt: a.tgt, amt: 1, dt: 'Ranged' }); } } };
+FX[10122] = { on: { allyEnters: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) trig(s, { id: 10122, k: 'hit', a: { src: c.uid, tgt: d.uid } }); } }, k: { hit: (s, a) => { if (findCharacter(s, a.src) && findCharacter(s, a.tgt)) dealDamage(s, { src: a.src, tgt: a.tgt, amt: 1, dt: 'Ranged' }); } } };
 FX[10123] = fxMix(forsaken, onEnter(10123, 'back'), { k: { back: (s, a) => [a.pid, oppPid(s, a.pid)].forEach(pid => q(s, { op: 'call', k: '10123:pick', a: { pid } })),
     pick: (s, a) => { const l = alliesOf(me(s, a.pid)); if (!l.length) return; ask(s, { pid: a.pid, prompt: tr('Charkov: Welcher deiner Allies geht auf die Hand?'), src: 'Charkov', opts: l.map(c => ({ label: c.name, v: c.uid, ai: -(c.cost || 0) + (c.damage || 0) })), k: '10123:do', a }); },
     do: (s, a, v) => { const c = findCharacter(s, v); if (c) bounce(s, c); } } });
@@ -508,7 +508,7 @@ FX[10189] = { questCond: myTurnQuest, reward: (s, pid) => { drawCards(s, me(s, p
 FX[10190] = { questCond: (s, pid) => partyOf(me(s, pid)).some(c => hasProtector(s, c)) ? null : tr('Du brauchst einen Protector'), reward: (s, pid) => { drawCards(s, me(s, pid), 1); addHonorMay(s, pid); } };
 PRED.locOrQuest = c => c.type === 'Location' || c.type === 'Quest';
 FX[10191] = { reward: (s, pid) => revealTop(s, pid, 3, 'Capture a Mine', { pred: 'locOrQuest', byQuest: true }) };
-FX[10192] = { questCond: (s, pid) => (s.pe || []).some(m => m.k === 'questDone' && m.pid !== pid && m.turn === s.turn) ? null : tr('Ein Gegner muss in diesem Zug eine Quest abgeschlossen haben'), reward: (s, pid) => drawCards(s, me(s, pid), 1) };
+FX[10192] = { questCond: (s, pid) => (s.pe || []).some(m => m.k === 'questDone' && isFoePid(s, pid, m.pid) && m.turn === s.turn) ? null : tr('Ein Gegner muss in diesem Zug eine Quest abgeschlossen haben'), reward: (s, pid) => drawCards(s, me(s, pid), 1) };
 FX[10193] = { questCond: myTurnQuest, reward: (s, pid) => drawCards(s, me(s, pid), 3) };
 FX[10194] = { questCond: myTurnQuest, reward: (s, pid) => q(s, { op: 'call', k: 'E:discard', a: { pid: oppPid(s, pid), n: 3, src: 'In Nightmares' } }) };
 FX[10195] = { reward: (s, pid) => { const o = foe(s, pid); const opts = [{ label: tr('Nichts umdrehen (Gegner zieht)'), v: 0, ai: 0 }]; if (!o.hero.flipped) opts.push({ label: tr`${o.hero.name} umdrehen`, v: o.hero.uid, ai: -1 });

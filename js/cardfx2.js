@@ -41,7 +41,7 @@ EK.doHeal = (s, a, v) => { if (v) heal(s, a.src, v, a.amt); };
 // Fähigkeiten / Allies auf der Kette (Interrupt)
 const chainCards = (s, pred) => (s.chain || []).filter(it => it.kind === 'card' && pred(it.card)).map(it => it.card.uid);
 function interruptUid(s, u) { const x = (s.chain || []).find(i => i.card && i.card.uid === u); if (x) { x.interrupted = true; return true; } return false; }
-const chainAbilitySlot = (label, pred = () => true) => (s, pid) => [{ label, cands: chainCards(s, c => c.type === 'Ability' && pred(c)), harm: true, ai: u => { const it = s.chain.find(i => i.card && i.card.uid === u); return it && it.pl !== pid ? 5 : -10; } }];
+const chainAbilitySlot = (label, pred = () => true) => (s, pid) => [{ label, cands: chainCards(s, c => c.type === 'Ability' && pred(c)), harm: true, ai: u => { const it = s.chain.find(i => i.card && i.card.uid === u); return it && isFoePid(s, pid, it.pl) ? 5 : -10; } }];
 // "Choose one: …; or draw a card. If your hero is a <Race>, you may choose both." (Quest-Belohnungen)
 function raceChoice(race, a /* {label, ai(s,pid), run(s,pid)} */) {
     return (s, pid) => {
@@ -604,7 +604,7 @@ FX[1220] = { enter: (s, c, pid) => { if (!me(s, pid).deck.some(id => CARDS[id].w
 FX[1221] = { on: { dmg: (s, c, d, pid) => { if (d.src === c.uid && d.combat) trig(s, { id: 1221, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Leeza: Karte in einem Friedhof aus dem Spiel entfernen?'), 'Leeza', allPl(s).flatMap(p => p.graveyard).map(c => c.uid), 'E:optRemoveGy', a, u => locate(s, u).pid === a.pid ? -1 : 1) } };
 FX[1222] = { selfCost: (s, pid) => -alliesOf(me(s, pid)).filter(a => !a.isToken && facIs(a, 'Horde') && a.type === 'Ally').length,
-    on: { startOfTurn: (s, c, d, pid) => { if (d.pid !== pid) partyOf(me(s, d.pid)).forEach(x => dealDamage(s, { src: c.uid, tgt: x.uid, amt: 2, dt: 'Frost', after: { k: 'E:frozen', a: { uid: x.uid } } })); } } };
+    on: { startOfTurn: (s, c, d, pid) => { if (isFoePid(s, pid, d.pid)) partyOf(me(s, d.pid)).forEach(x => dealDamage(s, { src: c.uid, tgt: x.uid, amt: 2, dt: 'Frost', after: { k: 'E:frozen', a: { uid: x.uid } } })); } } };
 FX[1224] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) { tDraw(s, s.activePlayer, 1); tDraw(s, oppId(s, s.activePlayer), 1); } } } };
 FX[1225] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && s.activePlayer === pid && d.card.type === 'Ability' && pes(s, pid, 'playedCard').filter(m => m.type === 'Ability').length === 1) drawCards(s, me(s, pid), 1); },
         endOfTurn: (s, c, d, pid) => { if (d.pid === pid && !pes(s, pid, 'playedCard').some(m => m.type === 'Ability')) trig(s, { k: 'destroyUid', a: { uid: c.uid } }); } } };
@@ -632,7 +632,7 @@ FX[1231] = { enter: (s, c, pid) => trig(s, { id: 1231, k: 'misha', a: { uid: c.u
     aura: { atk: (s, src, sp, c) => c === src && src.counters && src.counters.misha && ctrlOf(s, findCharacter(s, src.counters.misha)) === sp ? 3 : 0,
         hp: (s, src, sp, c) => c === src && src.counters && src.counters.misha && ctrlOf(s, findCharacter(s, src.counters.misha)) === sp ? 3 : 0 } };
 FX[1233] = { enter: (s, c, pid) => mayPick(s, pid, tr('Sister Rot: Ziel-Fähigkeit zerstören?'), 'Sister Rot', abilityInPlay(s, pid), 'E:optDestroy', {}, u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5) };
-FX[1234] = { on: { allyEnters: (s, c, d, pid) => { const a = findCharacter(s, d.uid); if (d.pid !== pid && a && isAllyCard(a)) exhaust(s, a); } } };
+FX[1234] = { on: { allyEnters: (s, c, d, pid) => { const a = findCharacter(s, d.uid); if (isFoePid(s, pid, d.pid) && a && isAllyCard(a)) exhaust(s, a); } } };
 FX[1236] = { on: { endOfTurn: (s, c, d) => { if (s.dmgTurn !== s.turn) trig(s, { id: 1236, k: 'go', a: { uid: c.uid, pid: d.pid } }); } },
     k: { go: (s, a) => { if (s.dmgTurn === s.turn) return; dealDamage(s, { src: a.uid, tgt: heroOf(s, a.pid).uid, amt: 3, dt: 'Fire' }); } } };
 FX[1237] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { k: 'bounceUid', a: { uid: c.uid } }); } } };
