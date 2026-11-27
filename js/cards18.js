@@ -178,9 +178,9 @@ const ONYXIA_EVENT_DECK = []; for (let n = 1; n <= 30; n++) ONYXIA_EVENT_DECK.pu
     }
 })();
 // Molten Core: Main Deck 45 (je 3 von 15), Ragnaros Deck 25 (je 2 von 12 + 1), Minion Deck 30 aus 8 Minions (Regelheft).
-// NICHT veröffentlicht: Anzahl je Minion und welche Ragnaros-Karte nur einmal vorkommt – Annahmen in MC_MINION_COUNTS / MC_RAG_SINGLE
+// Nicht im Regelheft, laut Nutzer: Anzahl je Minion (MC_MINION_COUNTS); die einzelne Ragnaros-Karte ist die mit Kosten 15.
 const MC_MAIN_DECK = []; for (let n = 18; n <= 32; n++) MC_MAIN_DECK.push(17300 + n, 17300 + n, 17300 + n);
-const MC_RAG_SINGLE = 17346;   // Annahme: Fury of the Firelord
+const MC_RAG_SINGLE = 17346;   // Fury of the Firelord (Kosten 15) – nur 1×
 const MC_RAG_DECK = []; for (let n = 41; n <= 53; n++) { MC_RAG_DECK.push(17300 + n); if (17300 + n !== MC_RAG_SINGLE) MC_RAG_DECK.push(17300 + n); }
-const MC_MINION_COUNTS = { 17333: 4, 17334: 4, 17335: 4, 17336: 4, 17337: 3, 17338: 4, 17339: 3, 17340: 4 };   // Annahme, Summe 30
+const MC_MINION_COUNTS = { 17333: 3, 17334: 3, 17335: 8, 17336: 4, 17337: 3, 17338: 4, 17339: 2, 17340: 3 };   // Summe 30
 const MC_MINION_DECK = []; for (const id in MC_MINION_COUNTS) for (let i = 0; i < MC_MINION_COUNTS[id]; i++) MC_MINION_DECK.push(+id);
