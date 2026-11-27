@@ -1783,3 +1783,9 @@ body:has(#decision-modal.peek[style*="flex"]) #bot-hand { transform: translate(c
 .mm-news-fun time { float: right; margin-left: 10px; color: var(--text-dim); font-size: 11px; }
 .mm-news-fun b { display: block; color: #f6dc92; font: bold 14px Georgia, serif; margin-bottom: 3px; }
 .mm-news-fun p { margin: 0; color: #d8ccb0; font-size: 13px; line-height: 1.45; }
+/* Partie-Start: Ladebalken der Kartenbilder (preloadMatchImages, main.js) */
+.match-loading { position: fixed; left: 50%; top: 50%; z-index: 9700; translate: -50% -50%; pointer-events: none; text-align: center;
+    padding: 18px 28px 20px; border-radius: 12px; background: rgba(10, 8, 6, .82); box-shadow: 0 0 0 1px rgba(255, 214, 150, .25), 0 10px 40px rgba(0, 0, 0, .6); }
+.match-loading small { display: block; margin-bottom: 12px; font: 700 13px Georgia, serif; letter-spacing: .2em; text-transform: uppercase; color: rgba(255, 214, 150, .9); }
+.match-loading i { display: block; width: min(320px, 70vw); height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.match-loading b { display: block; width: 0; height: 100%; background: linear-gradient(90deg, #b8792a, #ffd27a); transition: width .2s ease-out; }

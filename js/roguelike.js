@@ -516,6 +516,10 @@
         try { render(); } catch (e) { }
         showBattleHud(enemy);
         watcher = setInterval(checkBattleEnd, 450);
+        // Kartenbilder vorladen (main.js), dann Mulligan
+        if (typeof whenImagesReady === 'function') whenImagesReady(G, battleMulligan); else battleMulligan();
+    }
+    function battleMulligan() {
         // Mulligan (nutzt das vorhandene Fenster); Boss-Artefakt "Hoard of the Black Dragonflight": kein Mulligan
         if (R.noMulligan && R.noMulligan(run)) { if (typeof showTurnBanner === 'function') showTurnBanner(tr('Dein Zug!')); return; }
         try {

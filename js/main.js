@@ -243,6 +243,31 @@ let _lastDecks = null;   // für "Nochmal" auf dem Endbildschirm: [Deck 1, Deck 
 //    Spieler 1 im Zustand – beim Wechsel wird der ganze Zustand gespiegelt (netMirror wie beim Online-Gast), davor ein
 //    schwarzer Zwischenbildschirm (hotseatCheck). G.hotseat.seat = Platz, der gerade unten sitzt.
 //  - CPU gegen CPU (G.spectate): niemand entscheidet, driveCpu spielt beide Seiten; Platz 1 bleibt unten.
+// Kartenbilder einer neuen Partie vorladen (alle Modi): jede Karte aller Spieler in Spielfeld-/Handgröße (preloadCardImages,
+// renderer.js), zuerst Helden und Starthände, dann die Decks – sonst erscheinen aufgedeckte Karten kurz ohne Bild.
+// Ladebalken erst, wenn es dauert; nach spätestens 25 s geht es trotzdem los (der Rest lädt im Spiel nach).
+function preloadMatchImages(s) {
+    if (typeof preloadCardImages !== 'function' || !s) return Promise.resolve();
+    const first = [], rest = [];
+    const walk = (o, out, d) => {
+        if (!o || typeof o !== 'object' || d > 4) return;
+        if (Array.isArray(o)) { for (const x of o) walk(x, out, d + 1); return; }
+        if (o.id != null && CARDS[o.id]) out.push(o.id);
+        for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v, out, d + 1);
+    };
+    for (const pid of s.pids || [1, 2]) { const p = getPlayer(s, pid); if (!p) continue; walk(p.hero, first, 0); walk(p.hand, first, 0); walk(p, rest, 0); }
+    let bar = null, pct = 0;
+    const upd = () => { const b = bar && bar.querySelector('b'); if (b) b.style.width = pct + '%'; };
+    const t = setTimeout(() => {
+        bar = document.createElement('div'); bar.className = 'match-loading';
+        bar.innerHTML = `<small>${esc(tr('Kartenbilder werden geladen …'))}</small><i><b></b></i>`;
+        document.body.appendChild(bar); upd();
+    }, 300);
+    const done = preloadCardImages([...first, ...rest], (n, tot) => { pct = tot ? Math.round(100 * n / tot) : 100; upd(); });
+    return Promise.race([done, new Promise(r => setTimeout(r, 25000))]).then(() => { clearTimeout(t); if (bar) bar.remove(); });
+}
+// fn erst, wenn die Bilder da sind – und nur, wenn die Partie dann noch läuft (nicht inzwischen eine andere gestartet)
+function whenImagesReady(s, fn) { preloadMatchImages(s).then(() => { if (G === s) fn(); }); }
 function initGame(seedPlayerDeck = null, seedOppDeck = null, ctl = null) {
     if (typeof mmHide === 'function') mmHide();                                         // ein Spiel startet: Hauptmenü weg
     if (typeof netLeaveGame === 'function') netLeaveGame();                             // neues Spiel beendet eine Online-Partie
@@ -300,10 +325,13 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null, ctl = null) {
     // Startspieler zufällig (Hausregel statt CR 101.1 "Gewinner des Wurfs wählt" – erspart die Abfrage);
     // wer beginnt, zeigt das Banner nach dem Mulligan
     if (Math.random() < 0.5) { G.activePlayer = 2; G.lastTurnOf = { 1: 0, 2: 1 }; }
-    if (watch) { render(); startPlay(); return; }
-    // Hotseat: erst Platz 1, dann (nach dem Zwischenbildschirm) Platz 2 – jeder sieht nur seine eigene Starthand
-    if (hot) { mulligan(() => hotseatHandoff(tr('Starthand'), () => mulligan(startPlay))); return; }
-    mulligan(startPlay);
+    render();
+    whenImagesReady(G, () => {
+        if (watch) { render(); startPlay(); return; }
+        // Hotseat: erst Platz 1, dann (nach dem Zwischenbildschirm) Platz 2 – jeder sieht nur seine eigene Starthand
+        if (hot) { mulligan(() => hotseatHandoff(tr('Starthand'), () => mulligan(startPlay))); return; }
+        mulligan(startPlay);
+    });
 }
 
 // ---------------------------------------------------------------- Hotseat: Zwischenbildschirm und Brett-Flip

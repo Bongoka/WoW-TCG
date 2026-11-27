@@ -90,6 +90,7 @@ function startTutorial() {
     TUT.u = { ally: by(p.hand, T.ally) };
     TUT.active = true; TUT.i = 0; TUT.endShown = false;
     render();
+    preloadMatchImages(G);                                                            // Kartenbilder vorladen (main.js), läuft nebenher
     tutBuild();
     TUT.timer = setInterval(tutTick, 150);
     tutTick();

@@ -59,6 +59,7 @@ const CHANGELOG = {
     ],
     days: [
         ['2026-11-27', [
+            ['Kartenbilder werden vor jeder Partie vorgeladen (alle Modi) – aufgedeckte Karten erscheinen sofort mit Bild; dauert es länger, zeigt ein Ladebalken den Fortschritt', 'Card images are preloaded before every match (all modes) – revealed cards show their art right away; if loading takes longer, a progress bar shows how far along it is'],
             ['Raid: Hearthstone-Mulligan auch im Raid (Hausregel, wenn im Menü gewählt); Molten-Core-Runen liegen beim Boss neben den Ressourcen; Spieler-Tafeln in der Mitte niedriger', 'Raid: Hearthstone mulligan in raids too (house rule, if chosen in the menu); Molten Core runes sit next to the boss resources; player panels in the center are shorter'],
             ['Raid: Du kannst jetzt selbst den Boss spielen – im Raid-Setup beim Boss-Platz „Spieler“ wählen; gegen CPU-Raider oder als Hotseat gegen menschliche Raider', 'Raid: you can now play the boss yourself – choose "Player" on the boss seat in the raid setup; against CPU raiders or as hotseat against human raiders'],
             ['Auswahl-Hinweis in der Mitte auf eigener dunkler Tafel (besser lesbar); im Raid sitzt er über den Spieler-Tafeln statt sie zu verdecken', 'Selection prompt in the center sits on its own dark panel (easier to read); in raids it sits above the player panels instead of covering them'],

@@ -188,6 +188,8 @@ function initRaid(raidId, seats) {
         if (!isHuman(G, G.activePlayer)) { showTurnBanner(tr`${getPlayer(G, G.activePlayer).hero.name} ist am Zug!`); setTimeout(driveCpu, 900); }
     };
     render();
+    whenImagesReady(G, start);                                                       // Kartenbilder vorladen (main.js)
+    function start() {
     if (G.spectate) { go(); return; }
     // Starthand: jeder Mensch nacheinander (Hotseat: vorher der Zwischenbildschirm), dann beginnt der Raid.
     // Gemerkt werden die Plätze – die Spieler-IDs tauschen bei jedem Wechsel.
@@ -208,6 +210,7 @@ function initRaid(raidId, seats) {
     };
     const rest = G.humans.slice(1).map(pid => G.raidSeat[pid]);
     if (bossHuman && !R.bossMulligan) next(rest); else mull(rest);                    // Molten Core: kein Mulligan für den Boss (R300.5)
+    }
 }
 
 // ---------------------------------------------------------------- Raid-Hotseat: weiches Reaktionsfenster

@@ -191,6 +191,35 @@
         return wrap;
     }
     window.createCardDOM = createCardDOM;
+    // Kartenbilder vorladen (Raid-Start): dieselben Kandidaten wie createCardDOM (Modus 'ea', Qualität Spielfeld und Hand),
+    // das geladene Bild landet in IMG_OK – die Karte erscheint dann beim Aufdecken sofort. ids in Wunsch-Reihenfolge.
+    // onProgress(fertig, gesamt); Ergebnis: Promise, erfüllt, wenn alle geladen oder endgültig fehlgeschlagen sind.
+    window.preloadCardImages = (ids, onProgress) => {
+        const jobs = [], seen = new Set();
+        const qs = typeof imgQ === 'function' ? [...new Set([imgQ('field'), imgQ('hand')])] : [undefined];
+        for (const id of ids) for (const q of qs) {
+            if (typeof getImageCandidates !== 'function') break;
+            const cands = getImageCandidates(id, 'ea', q); if (!cands.length) continue;
+            const key = id + '|' + cands[0];
+            if (seen.has(key) || IMG_OK.has(key)) continue;
+            seen.add(key); jobs.push({ key, cands });
+        }
+        const total = jobs.length; let done = 0, next = 0;
+        if (onProgress) onProgress(0, total);
+        if (!total) return Promise.resolve();
+        return new Promise(res => {
+            const fin = () => { done++; if (onProgress) onProgress(done, total); if (done === total) res(); else run(); };
+            const run = () => {
+                if (next >= total) return;
+                const { key, cands } = jobs[next++]; let i = 0;
+                const img = new Image(); img.decoding = 'async';
+                img.onload = () => { IMG_OK.set(key, img.src); fin(); };
+                img.onerror = () => { if (typeof imgFailed === 'function') imgFailed(img.src); if (++i < cands.length) img.src = cands[i]; else fin(); };
+                img.src = cands[0];
+            };
+            for (let k = 0; k < Math.min(12, total); k++) run();                           // höchstens 12 Anfragen gleichzeitig
+        });
+    };
 
     const S = { live: null, pv: null, last: null, raf: 0 };
     const VARS = ['--rx', '--ry', '--lift', '--mx', '--my', '--h'];

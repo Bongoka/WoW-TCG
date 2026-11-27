@@ -171,7 +171,7 @@ function netStart() {
     netHideModal(); UI.reset(); UI.handOrder = null;
     netPub(netRoom(NET.code, 'h'), { t: 'start' });
     netPush();
-    netMulligan(() => { G.netReady[1] = true; netPush(); render(); netTurnBanner(); });
+    whenImagesReady(G, () => netMulligan(() => { G.netReady[1] = true; netPush(); render(); netTurnBanner(); }));   // Kartenbilder vorladen (main.js)
 }
 function netHostGuestMull(m) {
     if (!G || !G.netReady || G.netReady[2]) return;
@@ -262,7 +262,7 @@ function netGuestState(m) {
     const was = G ? G.activePlayer : null, first = !G;
     if (G) { for (const k of Object.keys(G)) delete G[k]; Object.assign(G, s); } else G = s;
     if (!own) (m.logs || []).forEach(l => addLog(l[0], l[1], l[2] ? 3 - l[2] : 0));       // Farben aus Sicht des Gasts
-    if (first) { refreshDisplay(G); render(); netMulligan(() => render()); return; }
+    if (first) { refreshDisplay(G); render(); whenImagesReady(G, () => netMulligan(() => render())); return; }
     if (own) { G.fxq = []; render(); } else { render(); playEventAnimations(); }
     if (was !== G.activePlayer || !NET.mullOpen) netTurnBanner();
 }

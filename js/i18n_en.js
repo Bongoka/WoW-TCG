@@ -1577,6 +1577,7 @@ var I18N_EN = {
     'Behalten': 'Keep',
     '{0} tauschen': 'Swap {0}',
     'Starthand': 'Opening hand',
+    'Kartenbilder werden geladen …': 'Loading card images …',
     '☠ {0} {1} verliert!': '☠ {0} {1} loses!',
     'Die ersten beiden Allies, die du in einem Zug spielst, kosten (1) weniger.': 'The first two allies you play each turn cost (1) less.',
     'Die ersten beiden Allies mit Kosten (2) oder weniger, die du in einem Zug spielst, kosten (1) weniger.': 'The first two allies with cost (2) or less you play each turn cost (1) less.',
