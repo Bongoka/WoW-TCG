@@ -39,6 +39,8 @@ Vor jedem Commit, der JS/CSS ändert, die Versionsnummer in `index.html` erneuer
 V=$(date +%Y%m%d%H%M) && sed -i -E "s#(src=\"js/[A-Za-z0-9_]+\.js)(\?v=[0-9]*)?\"#\1?v=$V\"#g; s#(href=\"(css/[A-Za-z0-9_]+\.css|manifest\.json))(\?v=[0-9]*)?\"#\1?v=$V\"#g" index.html && ! grep -q '?v="' index.html
 ```
 
+Spielrelevante Änderungen (nicht Tests/Werkzeuge/Doku) in `js/changelog.js` eintragen (zweisprachig): kurz in `days` unter dem Tag, große Neuerungen zusätzlich in `top` – erscheint im Hauptmenü unter „Neuigkeiten“.
+
 Icons aus `WoW Icon Pack/`: in Git nur die vom Code genannten – nach neuen Icons `node bin/iconpack.js`.
 
 ## Neue Sets

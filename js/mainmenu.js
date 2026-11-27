@@ -34,6 +34,10 @@ function mmBuild() {
             <div class="mp-versus"><div class="mp-side" data-seat="1"></div><button class="mp-vs mm-vs"></button><div class="mp-side" data-seat="2"></div></div>
             <div class="mm-play-mode"></div>
             <div class="mm-play-btns"><button class="mm-play-back">${tr('Zurück')}</button><button class="mm-play-go success">${tr('Spiel starten')}</button></div></div></div>
+        <button class="mm-news-btn" title="${tr('Neuigkeiten')}">${tr('Neuigkeiten')}<i></i></button>
+        <div class="mm-options mm-news" hidden><div class="mm-opt-box mm-news-box"><h2>${tr('Neuigkeiten')}</h2>
+            <div class="mm-news-tabs"><button data-t="top" class="on">${tr('Highlights')}</button><button data-t="days">${tr('Alle Änderungen')}</button><button data-t="fun">${tr('Pannen')}</button></div>
+            <div class="mm-news-body"></div><button class="mm-news-close success">${tr('Schließen')}</button></div></div>
         <div class="mm-options mm-opt" hidden><div class="mm-opt-box"><h2>${tr('Optionen')}</h2><div class="mm-opt-body"></div><button class="mm-opt-close success">${tr('Fertig')}</button></div></div>`;
     document.body.appendChild(el);
     MM.el = el;
@@ -44,6 +48,11 @@ function mmBuild() {
         if (e.pointerType === 'touch') return;                                          // Touch: kein Neigen (jede Bewegung zeichnete die Booster mit Schatten-Filter neu → Ruckeln)
         const r = p.getBoundingClientRect(); p.style.setProperty('--tx', ((e.clientX - r.left) / r.width - .5).toFixed(3)); p.style.setProperty('--ty', ((e.clientY - r.top) / r.height - .5).toFixed(3)); }));
     el.querySelector('.mm-opt-close').onclick = mmCloseOptions;
+    el.querySelector('.mm-news-btn').onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); mmOpenNews(); };
+    el.querySelector('.mm-news-close').onclick = mmCloseNews;
+    el.querySelector('.mm-news').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseNews(); });
+    el.querySelectorAll('.mm-news-tabs button').forEach(b => b.onclick = () => mmNewsTab(b.dataset.t));
+    mmNewsDot();
     el.querySelector('.mm-opt').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) mmCloseOptions(); });
     el.querySelector('.mm-play').addEventListener('click', e => { if (e.target.classList.contains('mm-options')) closePlaySetup(); });
     el.querySelector('.mm-play-back').onclick = closePlaySetup;
@@ -76,7 +85,7 @@ function openMainMenu(boot) {
 }
 function mmHide() {
     if (!MM.el || MM.el.style.display === 'none') return;
-    mmCloseOptions(); closePlaySetup();
+    mmCloseOptions(); mmCloseNews(); closePlaySetup();
     document.body.classList.add('pf-game');                                             // Spielfeld darf ins Hochformat
     try { screen.orientation.unlock(); } catch (e) {}                                   // Vollbild-Sperre aufs Querformat lösen
     MM.el.classList.remove('in'); MM.el.classList.add('out');
@@ -113,6 +122,44 @@ function mmCloseOptions() {
     if (!MM.el) return;
     const o = MM.el.querySelector('.mm-opt'); if (o.hidden) return;
     if (MM.moved) { MM.moved.nodes.forEach(x => MM.moved.parent.appendChild(x)); MM.moved = null; }
+    o.classList.remove('in'); o.hidden = true;
+}
+
+// ---------------------------------------------------------------- Neuigkeiten (Changelog aus js/changelog.js)
+// Dezenter Knopf unten rechts; Punkt am Knopf, solange es seit dem letzten Öffnen neue Highlights gibt.
+const NEWS_KEY = 'wow_tcg_news_seen';
+function mmNewsDate(d) {
+    try { return new Date(d + 'T12:00:00').toLocaleDateString(LANG === 'de' ? 'de-DE' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return d; }
+}
+function mmNewsDot() {
+    let seen = ''; try { seen = localStorage.getItem(NEWS_KEY) || ''; } catch (e) {}
+    const last = typeof CHANGELOG !== 'undefined' && CHANGELOG.top.length ? CHANGELOG.top[0][0] : '';
+    MM.el.querySelector('.mm-news-btn').classList.toggle('new', !!last && last > seen);
+}
+function mmNewsTab(t) {
+    const L = LANG === 'de' ? 0 : 1, body = MM.el.querySelector('.mm-news-body');
+    MM.el.querySelectorAll('.mm-news-tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+    const C = typeof CHANGELOG !== 'undefined' ? CHANGELOG : { top: [], days: [] };
+    if (t === 'top') {
+        // Highlights gleicher Tage unter einem Datum
+        const g = []; C.top.forEach(([d, de, en]) => { const x = g[g.length - 1]; if (x && x.d === d) x.l.push(L ? en : de); else g.push({ d, l: [L ? en : de] }); });
+        body.innerHTML = g.map(x => `<div class="mm-news-day"><time>${mmNewsDate(x.d)}</time><ul>${x.l.map(s => `<li>${esc(s)}</li>`).join('')}</ul></div>`).join('');
+    } else if (t === 'fun') {
+        const f = (C.fun || []).slice().sort((a, b) => a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0);
+        body.innerHTML = `<p class="mm-news-intro">${tr('Dinge, die schiefgingen – und inzwischen behoben sind.')}</p>`
+            + f.map(([d, de, en]) => { const [h, x] = L ? en : de; return `<div class="mm-news-fun"><time>${mmNewsDate(d)}</time><b>${esc(h)}</b><p>${esc(x)}</p></div>`; }).join('');
+    } else body.innerHTML = C.days.map(([d, l]) => `<div class="mm-news-day small"><time>${mmNewsDate(d)}</time><ul>${l.map(p => `<li>${esc(p[L])}</li>`).join('')}</ul></div>`).join('');
+    body.scrollTop = 0;
+}
+function mmOpenNews() {
+    mmNewsTab('top');
+    const o = MM.el.querySelector('.mm-news'); o.hidden = false; void o.offsetWidth; o.classList.add('in');
+    try { if (typeof CHANGELOG !== 'undefined' && CHANGELOG.top.length) localStorage.setItem(NEWS_KEY, CHANGELOG.top[0][0]); } catch (e) {}
+    mmNewsDot();
+}
+function mmCloseNews() {
+    if (!MM.el) return;
+    const o = MM.el.querySelector('.mm-news'); if (o.hidden) return;
     o.classList.remove('in'); o.hidden = true;
 }
 

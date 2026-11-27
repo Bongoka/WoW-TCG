@@ -5120,4 +5120,9 @@ var I18N_EN = {
     "{0} kann reagieren – antippen, um zu wechseln": "{0} can respond – tap to switch",
     "Weiter": "Continue",
     "{0} kann reagieren – tippe auf die leuchtende Tafel, spiel einfach weiter oder tippe auf „Weiter“.": "{0} can respond – tap the glowing panel, just keep playing or tap “Continue”.",
+    "Neuigkeiten": "What's new",
+    "Highlights": "Highlights",
+    "Alle Änderungen": "All changes",
+    "Pannen": "Bloopers",
+    "Dinge, die schiefgingen – und inzwischen behoben sind.": "Things that went wrong – and have since been fixed.",
 };
