@@ -4899,6 +4899,8 @@ var I18N_EN = {
     "📜 {0} wird aufgedeckt.": "📜 {0} is revealed.",
     "Baron Geddon: Ressource zerstören (nur fünf bleiben)": "Baron Geddon: destroy a resource (only five remain)",
     "Gehennas wählt zufällig {0}.": "Gehennas randomly chooses {0}.",
+    "Shazzrah landet zufällig auf {0}.": "Shazzrah randomly lands on {0}.",
+    "Rückseite: Shazzrah kann digital nicht \"fallen gelassen\" werden (körperliche Aktion mit der Karte). Hausregel: Er landet auf einem zufälligen gegnerischen Helden oder Ally und fügt ihm 5 Arkanschaden zu.": "Back side: Shazzrah can't be physically \"dropped\" in the digital game. House rule: he lands on a random opposing hero or ally and deals 5 arcane damage to it.",
     "Rune of Kress: gewürfelt {0}.": "Rune of Kress: rolled {0}.",
     "💣 {0} ist The Bomb.": "💣 {0} is The Bomb.",
     "Ancient Core Hound: gewürfelt {0}.": "Ancient Core Hound: rolled {0}.",

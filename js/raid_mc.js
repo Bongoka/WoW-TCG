@@ -237,7 +237,11 @@ FX[17305] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid && !c.flipp
           canUse: (s, pid, src) => !src.flipped ? tr('Nur auf der Rückseite') : src.damage >= 12 || tr('Erst ab 12 Schaden'),
           selfCost: (s, it, src) => mcDestroyBoss(s),
           resolve: (s, it) => [...oppHeroes(s, it.pl), ...oppAllies(s, it.pl)].forEach(c => dealDamage(s, { src: mcHero(s).uid, tgt: c.uid, amt: 12, dt: 'Fire', ability: false })) }] };
-FX[17306] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.flipped) trig(s, { k: 'mcFlip', a: {} }); } },   // Shazzrah
+FX[17306] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.flipped) trig(s, { k: 'mcFlip', a: {} }); },   // Shazzrah
+        // Rückseite "drop him from at least three feet above play …": HAUSREGEL – statt Fallenlassen landet er auf einem zufälligen gegnerischen Helden oder Ally
+        heroFlipped: (s, c, d, pid) => { if (d.pid === pid && d.uid === c.uid && c.flipped) pushTrig(s, pid, 17306, [{ op: 'trig', id: 17306, k: 'drop', a: { pid } }], c.uid); } },
+    k: { drop: (s, a) => { const l = [...oppHeroes(s, a.pid), ...oppAllies(s, a.pid)]; if (!l.length) return; const t = l[Math.floor(Math.random() * l.length)];
+        L(s, tr`Shazzrah landet zufällig auf ${t.name}.`, '', a.pid); bossDmg(s, t.uid, 5, 'Arcane'); } },
     powers: [{ key: 'flip', label: tr('Shazzrah umdrehen'), cost: 1, once: 'turn', canUse: (s, pid, src) => !src.flipped || tr('Nur auf der Vorderseite'), resolve: (s) => { if (!mcBack(s)) mcFlip(s); } }] };
 FX[17307] = { powers: [{ key: 'flip', label: tr('Aktivieren: Sulfuron Harbinger umdrehen'), act: true, myTurn: true, cost: 0, canUse: (s, pid, src) => !src.flipped || tr('Nur auf der Vorderseite'), resolve: (s) => { if (!mcBack(s)) mcFlip(s); } }] };
 FX[17308] = { on: {   // Golemagg
@@ -397,4 +401,4 @@ FX[17353] = { slots: slotAlly(tr('Ziel-Ally'), true),   // Wrath of Ragnaros
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const o = me(s, ctrlOf(s, t)), cost = t.cost || 0; if (destroy(s, t) && o && !o.out && cost > 0) bossDmg(s, o.hero.uid, cost, 'Fire'); } };
 
 // Shazzrah (Rückseite): "drop him from at least three feet above play …" ist eine körperliche Handlung und digital nicht exakt umsetzbar
-CARD_ISSUES[17306] = 'Rückseite: Shazzrah wird beim Umdrehen nicht "fallen gelassen" (körperliche Aktion mit der Karte) – die 5 Arkanschaden entfallen.';
+CARD_ISSUES[17306] = 'Rückseite: Shazzrah kann digital nicht "fallen gelassen" werden (körperliche Aktion mit der Karte). Hausregel: Er landet auf einem zufälligen gegnerischen Helden oder Ally und fügt ihm 5 Arkanschaden zu.';

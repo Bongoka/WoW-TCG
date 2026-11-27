@@ -2832,6 +2832,17 @@ function runRuleTests() {
         b.hero.damage = 50; process(s);
         assert(s.gameOver && s.winner === 1, 'Ragnaros tot ohne Sieg der Raider');
     });
+    test(226, 'Molten Core: Shazzrah (Rückseite) – Hausregel statt "drop him from three feet": beim Umdrehen 5 Arkanschaden an genau einem zufälligen gegnerischen Helden oder Ally, Zurückdrehen löst nichts aus', () => {
+        const s = mcRaid(2), b = P(s, 2); mcNewHero(s, 17306); process(s); autoResolve(s);
+        const foes = () => [P(s, 1).hero, P(s, 3).hero, ...P(s, 1).allies, ...P(s, 3).allies];
+        put(s, 1, ctVanilla(2).id); put(s, 3, ctVanilla(2).id);
+        mcFlip(s); flushBatch(s); process(s); autoResolve(s);
+        const hit = foes().filter(c => c.damage > 0);
+        assert(b.hero.flipped && hit.length === 1 && hit[0].damage === 5, 'Treffer falsch: ' + hit.map(c => c.name + ' ' + c.damage).join(', '));
+        assert(!b.allies.some(a => a.damage > 0), 'Eigener Ally getroffen');
+        mcFlip(s); flushBatch(s); process(s); autoResolve(s);
+        assert(!b.hero.flipped && foes().reduce((n, c) => n + (c.damage || 0), 0) === 5, 'Vorderseite löst erneut aus');
+    });
     return results;
 }
 
