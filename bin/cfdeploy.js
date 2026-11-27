@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm'), { execSync
 // Upload-Ordner außerhalb des Spielordners (sonst holt der Tablet-Sync ihn mit), gleiches Laufwerk für Hardlinks
 const ROOT = path.join(__dirname, '..'), OUT = path.join(ROOT, '..', 'wowtcg-cfdeploy'), PROJECT = 'wowtcg';
 const GAME_PATHS = ['index.html', 'manifest.json', 'js/', 'css/', 'sounds/', 'music/', 'backgrounds/', 'booster/', 'icons/',
-    'Bottom Icons/', 'Class Icons/', 'Tokens/', 'Tokens small/', 'WoW Icon Pack/', 'Worlds Logo.png', 'Worlds Text ai.png'];
+    'Bottom Icons/', 'Class Icons/', 'Tokens/', 'Tokens small/', 'WoW Icon Pack/', 'Worlds Logo.png', 'Worlds Text ai.png', 'raidart/'];
 process.chdir(ROOT);
 fs.rmSync(OUT, { recursive: true, force: true });
 let n = 0;
@@ -36,7 +36,7 @@ for (const d of fs.readdirSync('cards')) if (/ scans( small)?$/.test(d)) {
     for (const f of fs.readdirSync('cards/' + d)) if (f.endsWith('.webp')) put(`cards/${d}/${f}`);
     dirs.add(d);
 }
-for (const [id, cd] of Object.entries(ctx.CARDS)) {
+for (const id of Object.getOwnPropertyNames(ctx.CARDS)) { const cd = ctx.CARDS[id];   // auch nicht aufzählbare Raid-Karten (cards18.js)
     if (cd.isToken || ctx.TOKEN_IMG[id]) continue;
     const si = ctx.SET_IMG[cd.set || 1]; if (!si) continue;
     const base = ctx.cardImgBase(cd), dir = si[0];
@@ -48,6 +48,10 @@ for (const [id, cd] of Object.entries(ctx.CARDS)) {
     }
     if (!any) noImg.push(base);
 }
+// Zusatzbilder in hochgeladenen Kartenordnern ohne Kartennamen (z. B. "Rune Back.webp" der Molten-Core-Runen)
+const prefixes = Object.values(ctx.SET_IMG).map(s => s[1] + '-'), extra = [];
+for (const d of dirs) if (!/ scans( small)?$/.test(d))
+    for (const f of fs.readdirSync('cards/' + d)) if (f.endsWith('.webp') && !prefixes.some(p => f.startsWith(p))) { put(`cards/${d}/${f}`); extra.push(`${d}/${f}`); }
 // 3. Bildindex nur für den Upload: keine Extended Art, nur vorhandene Ordner
 const idx = ['// Erzeugt von bin/cfdeploy.js (Cloudflare-Upload): keine Extended Art, nur hochgeladene Bildordner.',
     'const IMG_EA = {', ...Object.values(ctx.SET_IMG).map(([d]) => `    ${JSON.stringify(d)}: "",`), '};',
@@ -57,6 +61,7 @@ fs.writeFileSync(path.join(OUT, 'js/imgindex.js'), idx); n++;
 fs.writeFileSync(path.join(OUT, '_headers'), ['/cards/*', '/backgrounds/*', '/booster/*', '/icons/*', '/sounds/*', '/music/*',
     '/Tokens/*', '/Tokens%20small/*', '/WoW%20Icon%20Pack/*', '/Class%20Icons/*', '/Bottom%20Icons/*']
     .map(p => `${p}\n  Cache-Control: public, max-age=2592000`).join('\n') + '\n'); n++;
+if (extra.length) console.log('Zusatzbilder:', extra.join('; '));
 console.log(`${OUT}: ${n} Dateien` + (noImg.length ? `, ${noImg.length} Karten ganz ohne Bild: ${noImg.slice(0, 10).join('; ')}` : ''));
 if (n > 20000) { console.error('Mehr als 20.000 Dateien – Cloudflare Pages lehnt das ab.'); process.exit(1); }
 if (process.argv.includes('--build')) process.exit(0);
