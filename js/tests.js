@@ -2598,6 +2598,31 @@ function runRuleTests() {
         s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 2: 5, 1: 6 }; s.placedResource = true; s.phase = 'main';
         return s;
     };
+    // Ergebnisbildschirm mit mehreren Spielern (matchresult.js): Statistik je Spieler (engine.js ms*) und Auswahl der Errungenschaften
+    if (typeof partyAchievements === 'function') test(225, 'Spiel-Statistik je Spieler (nur echte Partien) und Errungenschaften: nur klar führende Werte, kein Gleichstand, höchstens 2 je Spieler', () => {
+        const q0 = raid(3); dealDamage(q0, { src: P(q0, 1).hero.uid, tgt: P(q0, 2).hero.uid, amt: 3 }); process(q0); autoResolve(q0);
+        assert(!q0.mstats, 'KI-/Simulationskopie zählt Statistik');
+        const s = raid(3); s.real = true; s.humans = [];
+        const boss = P(s, 2).hero.uid, log0 = addLog; addLog = () => {};               // echte Partie ohne Log-Fenster (Node)
+        try {
+        dealDamage(s, { src: P(s, 1).hero.uid, tgt: boss, amt: 7 }); process(s); autoResolve(s);
+        dealDamage(s, { src: P(s, 1).hero.uid, tgt: boss, amt: 5 }); process(s); autoResolve(s);
+        dealDamage(s, { src: P(s, 3).hero.uid, tgt: boss, amt: 2 }); process(s); autoResolve(s);
+        dealDamage(s, { src: boss, tgt: P(s, 4).hero.uid, amt: 4 }); process(s); autoResolve(s);
+        heal(s, P(s, 3).hero.uid, P(s, 4).hero.uid, 3);
+        drawCards(s, P(s, 3), 2);
+        } finally { addLog = log0; }
+        const M = s.mstats;
+        assert(M[1].dmg === 12 && M[1].bestTurn.n === 12 && M[1].hit.n === 7 && M[1].fb === 1 && !M[3].fb, 'Schaden/Zug/Treffer/Erstes Blut falsch: ' + JSON.stringify(M[1]));
+        assert(M[2].taken === 14 && M[2].lhBy === 3 && M[4].taken === 4 && M[3].heal === 3 && M[3].drawn === 2, 'Erhalten/Heilung/Ziehen falsch: ' + JSON.stringify(M));
+        M[3].kills = 3; M[4].kills = 3;                                                     // Gleichstand: kein "Schlächter"
+        M[4].drawn = 9;                                                                     // 9 gegen Schnitt 0,67 → "Bücherwurm"
+        const a = partyAchievements(s, () => 0.5);
+        const has = (pid, id) => a.some(x => x.pid === pid && x.id === id);
+        assert((has(1, 'dmg') || has(1, 'turn')) && has(4, 'draw') && !a.some(x => x.id === 'kills') && !a.some(x => x.id === 'heal'), 'Auswahl falsch: ' + a.map(x => x.pid + ':' + x.id).join(' '));
+        const per = {}; a.forEach(x => { per[x.pid] = (per[x.pid] || 0) + 1; });
+        assert(Object.values(per).every(n => n <= 2) && a.length <= 6 && a.every(x => x.title && x.text), 'Grenzen verletzt: ' + JSON.stringify(per));
+    });
     // Raid-Einrichtung: Spieler 1 darf auf jedem Platz sitzen (Zugreihenfolge = Plätze, R200.4); Hotseat tauscht 1 ⇄ Raider (pidSwap)
     if (typeof pidSwap === 'function') test(219, 'Raid-Hotseat: Spieler 1 auf Platz 3, Zugreihenfolge nach Plätzen, Tausch 1 ⇄ 4 und zurück = Original', () => {
         const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest', 'alliance_paladin'].map(deck);

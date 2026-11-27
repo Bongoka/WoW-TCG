@@ -936,7 +936,10 @@ function showGameOver() {
     document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (G.winnerTeam === 'raid' ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
     box.innerHTML = ''; cap.textContent = '';
-    const best = draw ? null : bestCardOf(G.winner);
+    const party = allPl(G).length > 2 && typeof showPartyResult === 'function';                    // mehr als zwei Spieler: alle Mitspieler mit Errungenschaften (matchresult.js)
+    document.getElementById('go-main').style.display = party ? 'none' : '';
+    if (typeof hidePartyResult === 'function') hidePartyResult();
+    const best = draw || party ? null : bestCardOf(G.winner);
     if (best) {
         const n = createCardDOM({ ...CARDS[best.id], uid: 'go_' + best.uid }, false);
         n.classList.add('no-fx'); box.appendChild(n);
@@ -951,11 +954,12 @@ function showGameOver() {
     document.getElementById('go-new').style.display = G.online ? 'none' : '';
     ov.style.display = 'flex';
     ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 500 });
+    if (party) showPartyResult(ov);
     if (best) box.animate([{ transform: 'rotate(-7deg) scale(.3) translateY(200px)', opacity: 0 }, { transform: 'rotate(-7deg) scale(1.08)', opacity: 1, offset: .7 }, { transform: 'rotate(-7deg) scale(1)', opacity: 1 }],
         { duration: 900, delay: 250, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     if (won) screenShake(0.6);
 }
-function hideGameOver() { const ov = document.getElementById('gameover'); if (ov) ov.style.display = 'none'; }
+function hideGameOver() { const ov = document.getElementById('gameover'); if (ov) ov.style.display = 'none'; if (typeof hidePartyResult === 'function') hidePartyResult(); }
 // Debug-Spawn: am Spielende alle per Debug erzeugten Karten wieder aus dem Spiel entfernen
 // (Decks speichern nur Karten-IDs – dort landet durch das Spawnen ohnehin nichts)
 function removeDebugSpawnedCards(s) {

@@ -512,6 +512,55 @@ function addValue(s, uid, kind, n, val = n, victimPid = null) {
     if (victimPid && victimPid === pid) return;
     const v = (s.vals || (s.vals = {}))[uid] || (s.vals[uid] = { uid, id: c.id, name: c.name, pid, dmg: 0, heal: 0, kills: 0, v: 0 });
     v[kind] += n; v.v += val;
+    if (kind === 'kills') msAdd(s, pid, 'kills', n);
+}
+// Spiel-Statistik je Spieler für den Ergebnisbildschirm mit mehr als zwei Spielern (matchresult.js) – nur echte Partien,
+// ohne Wirkung auf die Regeln. s.mstats[Spieler-ID] = { dmg, heal, drawn, … }; Höchstwerte als { n, … }.
+let MS_NODRAW = false;   // Starthand und Mulligan zählen nicht als gezogene Karten
+function ms(s, pid) { if (!isReal(s) || !pid) return null; const m = s.mstats || (s.mstats = {}); return m[pid] || (m[pid] = {}); }
+function msAdd(s, pid, k, n = 1) { const m = ms(s, pid); if (m && n > 0) m[k] = (m[k] || 0) + n; }
+function msMax(s, pid, k, n, extra) { const m = ms(s, pid); if (m && n > ((m[k] || {}).n || 0)) m[k] = { n, ...(extra || {}) }; }
+function msDmg(s, st, t, tpid, amt) {
+    if (!isReal(s)) return;
+    const src = st.src ? findCharacter(s, st.src) : null, sp = src ? ctrlOf(s, src) : st.sp;
+    if (t.type === 'Hero') msAdd(s, tpid, 'taken', amt);
+    if (st.combat && s.battle && s.battle.protecting === t.uid) msAdd(s, tpid, 'prot', amt);          // Bollwerk: Protector fängt ab
+    if (!sp || !isFoePid(s, sp, tpid)) return;
+    const m = ms(s, sp);
+    m.dmg = (m.dmg || 0) + amt;
+    if (st.combat && st.weapon) m.wdmg = (m.wdmg || 0) + amt;
+    if (amt > ((m.hit || {}).n || 0)) m.hit = { n: amt, name: src ? src.name : '' };
+    if (!m.td || m.td.turn !== s.turn) m.td = { turn: s.turn, n: 0 };
+    m.td.n += amt;
+    if (m.td.n > ((m.bestTurn || {}).n || 0)) m.bestTurn = { n: m.td.n, turn: s.turn };
+    if (t.type === 'Hero') { ms(s, tpid).lhBy = sp; if (!s.msFB) { s.msFB = true; m.fb = 1; } }        // letzter Treffer / erstes Blut
+}
+// Karte löst auf (gespielt): Abilities, Reaktionen im fremden Zug, Karten je Zug, teuerste Karte
+function msPlayed(s, it) {
+    const m = ms(s, it.pl); if (!m) return;
+    const c = it.card;
+    m.cards = (m.cards || 0) + 1;
+    if (c.type === 'Ability') m.abil = (m.abil || 0) + 1;
+    if (it.pl !== s.activePlayer) m.react = (m.react || 0) + 1;
+    if (it.fromGy) m.gy = (m.gy || 0) + 1;
+    if (!m.tc || m.tc.turn !== s.turn) m.tc = { turn: s.turn, n: 0 };
+    m.tc.n++; msMax(s, it.pl, 'combo', m.tc.n, { turn: s.turn });
+    if (c.type !== 'Hero') msMax(s, it.pl, 'big', c.cost || 0, { id: c.id, name: c.name });
+}
+// Momentaufnahme: stärkster Ally, größte Armee, langlebigster Ally (Züge seit dem Betreten)
+function msSample(s) {
+    if (!isReal(s)) return;
+    const inn = s.msIn || (s.msIn = {});
+    for (const p of allPl(s)) {
+        if (!p || p.out) continue;
+        const al = p.allies.filter(a => a.type === 'Ally');
+        msMax(s, p.id, 'army', al.length);
+        for (const a of al) {
+            msMax(s, p.id, 'titan', atkOf(s, a), { id: a.id, name: a.name });
+            if (inn[a.uid] === undefined) inn[a.uid] = s.turn;
+            msMax(s, p.id, 'vet', s.turn - inn[a.uid], { id: a.id, name: a.name });
+        }
+    }
 }
 const HEAL_BLOCK = [];   // (s, Ziel) => true: kann nicht geheilt werden
 function heal(s, healerUid, tgtUid, amt) {
@@ -527,6 +576,7 @@ function heal(s, healerUid, tgtUid, amt) {
     t.damage -= v;
     if (v > 0) {
         L(s, tr`💚 ${t.name} +${v}`, "log-heal", pidOf(s, t)); fxEvent(s, { t: 'heal', uid: t.uid, amt: v }); addValue(s, valueCredit(s, healerUid, false), 'heal', v);
+        msAdd(s, healer ? ctrlOf(s, healer) : (s.resolvingPl || pidOf(s, t)), 'heal', v);
         const hp = healer ? ctrlOf(s, healer) : null;
         if (healer && healer.type === 'Hero' && hp) addPE(s, hp, { k: 'heroHealed' });   // Faith Healer's Boots
         evt(s, 'healed', { healer: healerUid, hpid: hp, tgt: t.uid, tpid: ctrlOf(s, t), amt: v, abilityId: s.resolvingCard ? s.resolvingCard.id : null });
@@ -557,7 +607,7 @@ function drawCards(s, p, n) {
         if (p.deck.length === 0 && DECK_REFILL.some(f => f(s, p))) { i--; continue; }      // Raid-Boss: Friedhof wird ins Deck gemischt (Raid Rules R101.3c)
         if (p.deck.length === 0) { if (!NO_DECKOUT.some(f => f(s, p))) p.decked = true; return got; }
         const c = makeCardInst(p.deck.pop(), false, p.deckOwner || p.id);
-        p.hand.push(c); got++; p.drawn = { turn: s.turn, n: ((p.drawn || {}).turn === s.turn ? p.drawn.n : 0) + 1 };
+        p.hand.push(c); got++; if (!MS_NODRAW) msAdd(s, p.id, 'drawn'); p.drawn = { turn: s.turn, n: ((p.drawn || {}).turn === s.turn ? p.drawn.n : 0) + 1 };
         s._hidden = true;
         if (isReal(s) && typeof sfx !== 'undefined') sfx.play('draw');
         evt(s, 'drew', { pid: p.id, uid: c.uid });                                          // "When a player draws a card" (Set 2/3)
@@ -606,6 +656,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     const p = getPlayer(s, l.pid);
     const hpEff = isReal(s) && l.zone === 'party' ? hpOf(s, c) : null;                   // nur Anzeige: Stärke der Tod-Animation (deathAnim, ui.js)
     if (l.zone === 'party' && c.allyRes6) noaliRestore(s, p, c, true);   // Imp Mistress Noali (Set 6): Ressource verlässt zugleich die Ressourcenreihe
+    if (l.zone === 'party' && s.msIn) delete s.msIn[c.uid];
     if (l.zone === 'party') { p.allies.splice(p.allies.indexOf(c), 1); if (c.allyItem9) { const i = p.hero.armors.indexOf(c); if (i >= 0) p.hero.armors.splice(i, 1); delete c.allyItem9; } }
     else if (l.zone === 'equip') { const arr = p.hero.weapons.includes(c) ? p.hero.weapons : p.hero.armors; arr.splice(arr.indexOf(c), 1); }
     else if (l.zone === 'ongoing') p.ongoing.splice(p.ongoing.indexOf(c), 1);
@@ -661,6 +712,7 @@ function destroy(s, c, info = {}) {
     }
     L(s, tr`💀 ${c.name}`, "log-hit", pidOf(s, c));
     if (isAllyLike(c)) addValue(s, s.lastCard, 'kills', 1, 2 + (c.cost || 0), l.pid);
+    if (s.resolvingPl === l.pid) msAdd(s, l.pid, 'sacr');                                          // Statistik: eigene Karte durch eigenen Effekt zerstört
     return leavePlay(s, c, 'graveyard', { ...info, destroyed: true });
 }
 function removeFromGame(s, c) { if (cantLeavePlay(s, c) || auraAny(s, 'noRemove', c)) return false;   // Netherbane (Set drums)
@@ -690,6 +742,7 @@ function changeControl(s, c, toPid) {
     to.allies.push(c);
     c.joinedTurn = s.turn;   // muss seit Beginn des eigenen Zuges in der Party sein
     L(s, tr`🔀 ${c.name}`, '', to.id);
+    if (isFoePid(s, l.pid, toPid)) msAdd(s, toPid, 'steal');
     if (s.battle && (s.battle.att === c.uid || s.battle.def === c.uid)) endBattle(s, tr('Kontrollwechsel'));
     const fc = FX[c.id]; if (fc && fc.ctrlChanged) fc.ctrlChanged(s, c, l.pid, toPid);   // Nyn'jah (Set 2)
 }
@@ -1912,12 +1965,14 @@ EK.finishPrep = (s) => finishPrep(s);
 
 const NO_INTERRUPT = [];   // (s, Kettenglied) => true: kann nicht unterbrochen werden
 function resolveTop(s) {
+    if (isReal(s) && s.chain.length) { msMax(s, s.chain[0].pl, 'chain', s.chain.length); msSample(s); }   // Statistik: Kettenlänge, Momentaufnahme
     const it = s.chain.pop(); if (!it) return;
     s.resolvingPl = it.pl;                                                                 // wer die gerade auflösende Wirkung kontrolliert (Nerves of Steel, Set drums)
     s._logPid = it.pl;                                                                     // Wirkungen gehören dem Controller des Links
     const p = getPlayer(s, it.pl);
     s.resolvingCard = null; s.trigSrcId = null;
     s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
+    if (it.kind === 'card') msPlayed(s, it); else if (it.kind === 'reward') msAdd(s, it.pl, 'quests');
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
         p.resources.push({ card: it.res, faceUp: it.faceUp, exhausted: !!(it.exh || (it.faceUp && FX[it.res.id] && FX[it.res.id].resExhausted)) });   // exh: zusätzliche Ressource "exhausted" (CR 412.1c)
@@ -2415,6 +2470,7 @@ function dmgApply(s, st) {
     if (!tl || !isInPlayZone(tl.zone) || s.gameOver) { if (st.after) q(s, { op: 'call', k: st.after.k, a: { ...st.after.a, dealt: 0 } }); return; }
     const t = tl.c; const amt = st.amt;
     const wasDamaged = (t.damage || 0) > 0;
+    if (st.pre > amt) msAdd(s, tl.pid, 'prev', st.pre - amt);                                     // Statistik: verhinderter Schaden
     if (st.pre > amt) evt(s, 'dmgPrevented', { tgt: t.uid, tpid: tl.pid, src: st.src || null, amt: st.pre - amt });   // Divine Riposte (Set 7)
     if (amt > 0) {
         t.damage = (t.damage || 0) + amt;
@@ -2427,7 +2483,7 @@ function dmgApply(s, st) {
             fxEvent(s, { t: 'dmg', uid: t.uid, amt, dt: st.dt || null, combat: !!st.combat, hero: t.type === 'Hero', src: st.src || null,
                 sid: sc ? sc.id : null, wsub: wc ? wc.wsub || null : null, wslot: wc ? wc.slot || null : null });
         }
-        if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; }
+        if (isReal(s)) { const cu = valueCredit(s, st.src, st.combat, st.weapon); addValue(s, cu, 'dmg', amt, amt, tl.pid); if (cu) t.lastHitBy = cu; msDmg(s, st, t, tl.pid, amt); }
         const src = st.src ? findCharacter(s, st.src) : null;
         if (src && src.type === 'Hero' && st.dt === 'Fire') addPE(s, ctrlOf(s, src), { k: 'heroFire' });   // Eye of Flame
         if (st.dt) addTM(t, { k: 'dealtDt', dt: st.dt, turn: s.turn });                  // "was dealt fire damage this turn" (Blaize Brightspark, Set 6)
@@ -2963,6 +3019,7 @@ function battleStep(s, step) {
         addTM(att, { k: 'attacked', def: def.uid, turn: s.turn });                          // Revenge, Relics of Wakening (Set 2)
         L(s, tr`⚔ ${att.name} → ${b.sabotage ? sabotageLabel(s, def) : def.name}`, "log-combat", b.apid);
         s.lastAttack = { att: att.uid, def: def.uid, t: Date.now() };
+        msSample(s);
         evt(s, 'attacks', { att: att.uid, def: def.uid, apid: b.apid, first: !(att.attackCount && att.attackCount.turn === s.turn) });
         att.attackCount = { turn: s.turn, n: (att.attackCount && att.attackCount.turn === s.turn ? att.attackCount.n : 0) + 1 };
         b.step = 'strikeA';
@@ -3564,14 +3621,14 @@ function aiPick(s, d) {
 function humanPriorityOptions() { return G && G.pending && G.pending.kind === 'priority' ? getPriorityActions(G, G.pending.pid) : []; }
 
 // ---------------------------------------------------------------- Spielstart / Mulligan (CR 101.2: einmal)
-function dealOpeningHands(s) { for (const p of allPl(s)) drawCards(s, p, 7); s._batch = []; }
+function dealOpeningHands(s) { MS_NODRAW = true; for (const p of allPl(s)) drawCards(s, p, 7); MS_NODRAW = false; s._batch = []; }
 function doMulligan(s, pid) {
     const p = getPlayer(s, pid);
     if (p.mulliganed) return false;
     p.mulliganed = true;
     p.deck = shuffleDeck(p.deck.concat(p.hand.map(c => c.id)));
     p.hand = [];
-    drawCards(s, p, 7);
+    MS_NODRAW = true; drawCards(s, p, 7); MS_NODRAW = false;
     L(s, tr('🔄 Mulligan'), "log-turn", p.id);
     return true;
 }
@@ -3586,7 +3643,7 @@ function doPartialMulligan(s, pid, uids) {
     const old = p.hand, swap = old.filter(c => uids.includes(c.uid));
     if (!swap.length) return true;
     p.hand = [];
-    drawCards(s, p, swap.length);
+    MS_NODRAW = true; drawCards(s, p, swap.length); MS_NODRAW = false;
     const fresh = p.hand;
     p.hand = old.map(c => uids.includes(c.uid) ? fresh.shift() : c).filter(Boolean);
     p.deck = shuffleDeck(p.deck.concat(swap.map(c => c.id)));

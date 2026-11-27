@@ -42,8 +42,8 @@ function gyCard(s, uid) { const l = locate(s, uid); return l && l.zone === 'grav
 // Adyen the Lightwarden (Set 6): "Cards can't leave opposing graveyards." – gilt für Friedhöfe von Gegnern eines Adyen-Controllers
 const GY_LOCK = [];   // (s, ownerPid) => true: Karten können diesen Friedhof nicht verlassen (Raid Rules R101.3c)
 function gyLocked(s, ownerPid) { return GY_LOCK.some(f => f(s, ownerPid)) || allPl(s).some(p => p.id !== ownerPid && p.allies.some(a => a.id === 4212 && active(s, a))); }
-function fromGyToHand(s, uid) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); me(s, l.c.owner || l.pid).hand.push(l.c); L(s, tr`↩ ${l.c.name} aus dem Friedhof auf die Hand.`); }
-function fromGyToPlay(s, uid, pid, o = {}) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); putIntoPlay(s, l.c, pid, o); }
+function fromGyToHand(s, uid) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); me(s, l.c.owner || l.pid).hand.push(l.c); msAdd(s, s.resolvingPl || l.pid, 'gy'); L(s, tr`↩ ${l.c.name} aus dem Friedhof auf die Hand.`); }
+function fromGyToPlay(s, uid, pid, o = {}) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); msAdd(s, pid || l.pid, 'gy'); putIntoPlay(s, l.c, pid, o); }
 function gyRemove(s, uid) { const l = gyCard(s, uid); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.removed.push(l.c); }
 function canNotPlayHere(msg) { return msg; }
 function cardPower(id, key) { return (FX[id].powers || []).find(p => p.key === key); }
