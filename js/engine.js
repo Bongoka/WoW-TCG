@@ -1061,7 +1061,18 @@ function priorityStep(s) {
     }
     // Kartentests (stopAll): der Mensch hält in jedem Fenster an, in dem er etwas tun kann
     const stopAll = stopAllOf(s, pid);
-    let opts = stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    // Echte Partie (Browser, cpuAsyncRespond in main.js): die Antwort-Vorausschau einer CPU (respondOptions, bis zu 300 ms je Spieler, im Raid
+    // für jeden CPU-Spieler) rechnet die Oberfläche im Hintergrund (Web Worker, main.js cpuThink) – sonst stand die Seite bei jeder
+    // Karte still (Tablet/Handy erst recht). s.pending 'think' gehört niemandem (pid 0): keiner kann handeln, bis respondDecide weiterläuft.
+    // Gleiche Entscheidung wie hier: der Worker ruft dieselbe respondOptions auf demselben Zustand auf.
+    if (isReal(s) && !isHuman(s, pid) && typeof cpuAsyncRespond === 'function' && cpuAsyncRespond(s) && respondMoment(s, pid) && getPriorityActions(s, pid).length) { s.pending = { kind: 'think', pid: 0, who: pid }; return false; }
+    const opts = stopAll && isHuman(s, pid) ? getPriorityActions(s, pid).map(a => ({ a })) : respondOptions(s, pid);
+    return respondDecide(s, pid, opts, stopAll);
+}
+// Rest des Prioritätsschritts mit den Antworten opts (beste zuerst): passen, den Menschen fragen oder die beste Antwort spielen.
+// true = weiter verarbeiten (process). Auch nach der Hintergrund-Rechnung (s.pending 'think', main.js cpuThink).
+function respondDecide(s, pid, opts, stopAll) {
+    const w = s.win;
     // Einmal pro Situation fragen: was der Mensch für diesen Link, diesen Angriff bzw. diesen Zugbeginn schon gepasst hat, kommt
     // dort nicht noch einmal (im Browser: 25 Fragen in einem Gegnerzug, dieselbe viermal je Angriff)
     const ctx = isHuman(s, pid) ? respondCtx(s, pid) : null;
@@ -1159,7 +1170,9 @@ function respondOptions(s, pid) {
     // Wirkungen "this turn" reichen über den laufenden Kampf hinaus (Divine Shield: "Prevent all damage that would be dealt to
     // your hero this turn" gegen alle folgenden Angriffe): für die übrigen Karten den Gegnerzug ausspielen – für Mensch und KI
     // (die KI vergleicht dabei mit dem halben Haltewert der Karte). In Simulationen genauso wie in der echten Partie.
-    if (moment === 'react' && s.activePlayer !== pid && !aiOld(pid, 'react')) {
+    // Nur im Zug eines Gegners (wie 'start'/'end' in respondMoment): respondPlayout spielt den Zug des Gegners aus – im Zug eines
+    // Mitspielers (Raid) gibt es keinen, die Kopie übersprang nur Züge (im Browser bis zu 1–2 s je Karte des Menschen)
+    if (moment === 'react' && isFoePid(s, pid, s.activePlayer) && !aiOld(pid, 'react')) {
         const have = new Set(out.map(o => respondKey(s, pid, o.a)));
         let rest = acts.filter(a => !have.has(respondKey(s, pid, a)));
         out.push(...respondTurnOptions(s, pid, rest, false, vPass));

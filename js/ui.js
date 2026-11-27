@@ -502,6 +502,7 @@ document.addEventListener('pointerdown', e => {
 // ---------------------------------------------------------------- Hauptzeichnen
 function render() {
     if (!G) return;
+    if (G.pending && G.pending.kind === 'think' && typeof cpuThink === 'function' && !CPU_THINK.busy) setTimeout(cpuThink, 0);   // CPU-Antwort im Hintergrund (main.js) nie liegen lassen
     G.stopAll = prioManual();                                                            // Einstellung: in jedem Prioritätsfenster anhalten
     // Positionen vor dem Neuzeichnen merken: Karten, die das Spiel verlassen, sterben an ihrem alten Platz
     const prevRects = new Map();

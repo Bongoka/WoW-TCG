@@ -2638,6 +2638,56 @@ function runRuleTests() {
         const e0 = evaluateState(s, 1); P(s, 3).hero.damage += 10; const e1 = evaluateState(s, 1);
         assert(e1 < e0, 'Bewertung sieht Schaden am Mitspieler-Helden nicht');
     });
+    // Echte Partie im Browser: die Antwort einer CPU rechnet der Worker (s.pending 'think', main.js cpuThink) – danach muss es
+    // genauso weitergehen wie mit der Rechnung im Hauptthread (respondDecide). Hier: CPU-Jäger snipet den gerade gespielten Ally.
+    test(240, 'CPU-Antwort im Hintergrund (s.pending "think"): niemand kann handeln, Ergebnis wie ohne Hintergrund (Snipe auf den Ally)', () => {
+        const heroOf = k => Object.values(CARDS).find(c => c.type === 'Hero' && c.class === k && !c.set);
+        const fill = Array(40).fill(ctVanilla(2).id);
+        const s0 = newGameState(heroOf('Warrior').id, fill, heroOf('Hunter').id, fill); s0.turn = 6; s0.activePlayer = 1; s0.lastTurnOf = { 1: 6, 2: 5 };
+        s0.placedResource = true; s0.phase = 'main'; s0.humans = [1];
+        for (const p of [s0.p1, s0.p2]) for (let i = 0; i < 6; i++) p.resources.push({ card: makeCardInst(ctVanilla(1).id, false, p.id), faceUp: false, exhausted: false });
+        s0.p1.hand = [makeCardInst(ctVanilla(3).id, false, 1)]; s0.p2.hand = [makeCardInst(7031, false, 2)];   // Snipe
+        const rnd0 = Math.random, log0 = addLog, had = typeof cpuAsyncRespond === 'function' ? cpuAsyncRespond : null;
+        const run = (async) => {
+            const s = JSON.parse(JSON.stringify(s0)); s.real = true; s._batch = [];
+            Math.random = seededRandom(240); globalThis.cpuAsyncRespond = () => async;
+            applyAction(s, { type: 'PLAY_CARD', handIdx: 0, actorId: 1 }, false, 1);
+            let thinks = 0;
+            for (let n = 0; n < 10 && s.pending && s.pending.kind === 'think'; n++) {
+                thinks++; const d = s.pending;
+                assert(d.pid === 0 && validateAction(s, { type: 'PASS' }, 1) && validateAction(s, { type: 'PASS' }, d.who), 'jemand kann während der Hintergrund-Rechnung handeln');
+                const c = deepCopy(s); c.pending = null; c.real = false;                     // wie main.js cpuRespond / aiworker.js
+                const o = respondOptions(c, d.who)[0];
+                s.pending = null; if (respondDecide(s, d.who, o ? [o] : [], false)) process(s);
+            }
+            return { thinks, gy: s.p1.graveyard.map(c => c.id).join(','), allies: s.p1.allies.length, snipe: s.p2.graveyard.some(c => c.id === 7031) };
+        };
+        try {
+            addLog = () => {};
+            const a = run(true), b = run(false);
+            assert(a.thinks >= 1 && b.thinks === 0, 'Hintergrund-Rechnung nicht angehalten: ' + a.thinks + '/' + b.thinks);
+            assert(b.snipe && a.snipe && a.gy === b.gy && a.allies === b.allies && a.allies === 0, 'Ergebnis weicht ab: ' + JSON.stringify([a, b]));
+        } finally { Math.random = rnd0; addLog = log0; if (had) globalThis.cpuAsyncRespond = had; else delete globalThis.cpuAsyncRespond; }
+    });
+    // Zug-Vorausschau einer Antwort (respondTurnOptions) nur im Zug eines Gegners: im Zug eines Mitspielers spielte sie keinen Zug
+    // aus, kostete aber je CPU-Raider bis zu 300 ms bei jeder Karte des Menschen (Molten Core: 1–2 s Hänger)
+    test(227, 'Raid: Antwort-Vorausschau (respondTurnOptions) nur im Zug eines Gegners, nicht im Zug eines Mitspielers', () => {
+        const run = (active) => {
+            const s = raid(3); s.activePlayer = active; s.lastTurnOf = { 2: 5, 1: 5, 3: 5, 4: 5, [active]: 6 };
+            for (let i = 0; i < 6; i++) s.p1.resources.push({ card: makeCardInst(ctVanilla(1).id, false, 1), faceUp: false, exhausted: false });
+            s.p1.hand = [makeCardInst(7031, false, 1)];                                     // Snipe (Instant)
+            const foe = makeCardInst(ctVanilla(3).id, false, 2); foe.joinedTurn = 1; P(s, 2).allies.push(foe);
+            s.chain = [{ kind: 'card', pl: active, id: 'L_t227', card: makeCardInst(ctVanilla(2).id, false, active), targets: [] }];
+            s.win = { prio: 1, passes: 0 };
+            assert(getPriorityActions(s, 1).length, 'Snipe nicht spielbar – Testaufbau');
+            let n = 0; const rt0 = respondTurnOptions;
+            respondTurnOptions = function () { n++; return rt0.apply(this, arguments); };
+            try { respondOptions(s, 1); } finally { respondTurnOptions = rt0; }
+            return n;
+        };
+        assert(run(3) === 0, 'Vorausschau im Zug des Mitspielers');
+        assert(run(2) === 1, 'keine Vorausschau im Zug des Bosses');
+    });
     // Raid-Einrichtung: Spieler 1 darf auf jedem Platz sitzen (Zugreihenfolge = Plätze, R200.4); Hotseat tauscht 1 ⇄ Raider (pidSwap)
     if (typeof pidSwap === 'function') test(219, 'Raid-Hotseat: Spieler 1 auf Platz 3, Zugreihenfolge nach Plätzen, Tausch 1 ⇄ 4 und zurück = Original', () => {
         const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest', 'alliance_paladin'].map(deck);

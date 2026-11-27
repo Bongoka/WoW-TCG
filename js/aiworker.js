@@ -31,6 +31,16 @@ self.onmessage = (e) => {
     const { id, state, pid, difficulty, lang } = e.data;
     try {
         LANG = lang || LANG;
+        // Antwort-Vorausschau einer CPU im Prioritätsfenster (engine.js priorityStep → s.pending 'think'): dieselbe respondOptions
+        // wie sonst im Hauptthread, auf dem Zustand vor dem Anhalten (Menschen bleiben Menschen, Spielstile wie in der echten Partie)
+        if (e.data.respond) {
+            rlPrepare(state);
+            if (typeof aiHumanNoPersona === 'function') aiHumanNoPersona(state);
+            state.pending = null; state.real = false;
+            const o = respondOptions(state, pid)[0];
+            self.postMessage({ id, opts: o ? [{ a: o.a, gain: o.gain }] : [] });
+            return;
+        }
         state.real = false; state.humans = [];
         rlPrepare(state);
         const dec = searchBestAction(state, pid, difficulty);

@@ -176,6 +176,7 @@ function describeUndoAction(snap, action) {
     return tr('Aktion');
 }
 function commitUndoSnapshot(snap, action) {
+    if (G.pending && G.pending.kind === 'think') { UNDO.deferred = { snap, action, g: G }; return; }   // CPU rechnet noch (cpuThink): danach einordnen
     const v = undoVerdict(snap, G, action, 1);
     if (v === 'clear') { UNDO.stack = []; return; }
     // Abgeschlossene Aktionen der eigenen Aktionsphase und eigene offene Entscheidungen landen im Verlauf
@@ -496,12 +497,22 @@ function updCpuSpeedBtn() { const b = document.getElementById("btn-cpu-speed"); 
 // (z. B. index.html direkt von der Festplatte geöffnet) oder antwortet er nicht, rechnet das Spiel wie bisher selbst.
 const CPU_WORKER = { w: null, broken: false, seq: 0, wait: new Map() };
 function cpuDecide(s, pid, difficulty) {
-    const sync = () => searchBestAction(s, pid, difficulty);
-    if (CPU_WORKER.broken || typeof Worker === 'undefined') return Promise.resolve(sync());
+    return cpuWorkerCall(s, { pid, difficulty }, () => searchBestAction(s, pid, difficulty));
+}
+// Antwort-Vorausschau einer CPU (s.pending 'think', engine.js priorityStep) im Worker: [{a, gain}] oder []
+function cpuRespond(s, pid) {
+    const st = () => { const c = deepCopy({ ...s, _undo: null, fxq: null }); c.pending = null; return c; };   // Zustand vor dem Anhalten, Menschen bleiben (wie im Hauptthread)
+    return cpuWorkerCall(s, { pid, respond: true, state: st() }, () => { const c = st(); c.real = false; const o = respondOptions(c, pid)[0]; return o ? [o] : []; });
+}
+// Antwort-Vorausschau im Hintergrund: nur die laufende Partie im Browser mit Worker (nicht online, nicht im Tutorial)
+function cpuAsyncRespond(s) { return s === G && !s.online && cpuWorkerUsable() && !(typeof TUT !== 'undefined' && TUT.active); }
+function cpuWorkerUsable() { return !CPU_WORKER.broken && typeof Worker !== 'undefined'; }
+function cpuWorkerCall(s, msg, sync) {
+    if (!cpuWorkerUsable()) return Promise.resolve(sync());
     if (!CPU_WORKER.w) {
         try {
             CPU_WORKER.w = new Worker('js/aiworker.js' + ((document.querySelector('script[src*="main.js"]') || {}).src || '').replace(/^[^?]*/, ''));   // gleiche Version wie die Seite (Cache)
-            CPU_WORKER.w.onmessage = (e) => { const r = CPU_WORKER.wait.get(e.data.id); if (!r) return; CPU_WORKER.wait.delete(e.data.id); r(e.data.error ? 'error' : e.data.dec); };
+            CPU_WORKER.w.onmessage = (e) => { const r = CPU_WORKER.wait.get(e.data.id); if (!r) return; CPU_WORKER.wait.delete(e.data.id); r(e.data.error ? 'error' : e.data.opts || e.data.dec); };
             CPU_WORKER.w.onerror = () => { CPU_WORKER.broken = true; for (const r of CPU_WORKER.wait.values()) r('error'); CPU_WORKER.wait.clear(); };
         } catch (e) { CPU_WORKER.broken = true; return Promise.resolve(sync()); }
     }
@@ -510,8 +521,31 @@ function cpuDecide(s, pid, difficulty) {
         const done = (dec) => { clearTimeout(t); if (dec === 'error') { CPU_WORKER.broken = true; resolve(sync()); } else resolve(dec); };
         const t = setTimeout(() => { if (CPU_WORKER.wait.delete(id)) done('error'); }, 15000);
         CPU_WORKER.wait.set(id, done);
-        CPU_WORKER.w.postMessage({ id, state: cloneState(s), pid, difficulty, lang: LANG });
+        CPU_WORKER.w.postMessage({ ...msg, state: msg.state || cloneState(s), id, lang: LANG });
     });
+}
+// Offene Antwort-Vorausschauen (s.pending 'think') der Reihe nach im Hintergrund rechnen, dann läuft die Partie dort weiter, wo
+// priorityStep angehalten hat (respondDecide, process). Rückgängig: die eigene Aktion davor wird erst danach eingeordnet (UNDO.deferred).
+const CPU_THINK = { busy: null };
+function cpuThink() { return CPU_THINK.busy || (CPU_THINK.busy = cpuThinkRun()); }
+async function cpuThinkRun() {
+    try {
+        while (G && !G.gameOver && G.pending && G.pending.kind === 'think') {
+            const g0 = G, d = G.pending;
+            const slow = setTimeout(() => updateCpuStatus(true, tr("CPU analysiert...")), 250);
+            const opts = await cpuRespond(G, d.who);
+            clearTimeout(slow);
+            if (G !== g0 || G.pending !== d) break;                                         // neues Spiel / Rückgängig
+            G.pending = null;
+            if (respondDecide(G, d.who, opts || [], false)) process(G);
+            refreshDisplay(G);
+            if (!(G.pending && G.pending.kind === 'think')) updateCpuStatus(false);
+            render(); playEventAnimations();
+        }
+    } catch (e) { console.error('CPU-Antwort-Fehler:', e); }
+    finally { CPU_THINK.busy = null; }
+    if (G && !(G.pending && G.pending.kind === 'think') && UNDO.deferred) { const u = UNDO.deferred; UNDO.deferred = null; if (u.g === G) { commitUndoSnapshot(u.snap, u.action); render(); } }
+    if (G && !G.gameOver) { if (G.hotseat) hotseatCheck(); setTimeout(driveCpu, 30); }
 }
 
 // CPU steuern: läuft, solange die CPU am Zug ist und keine Entscheidung des Menschen offen ist
@@ -526,6 +560,7 @@ async function driveCpu() {
             await menuPauseGate();
             if (G.gameOver || G !== game) break;
             if (UI.flipWait) await UI.flipWait;                       // Flip eines Helden erst ganz zeigen (heroFlipAnim)
+            if (G.pending && G.pending.kind === 'think') { await cpuThink(); continue; }   // Antwort einer CPU im Hintergrund (cpuThink)
             if (G.pending) break;                                     // Mensch muss entscheiden
             if (!isIdle(G)) { process(G); render(); if (G.pending || !isIdle(G)) break; }
             const pid = G.activePlayer;                               // CPU gegen CPU: beide Seiten, sonst nur Spieler 2
