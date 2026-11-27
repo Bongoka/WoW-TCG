@@ -59,6 +59,7 @@ const CHANGELOG = {
     ],
     days: [
         ['2026-11-27', [
+            ['Auswahl-Hinweis in der Mitte auf eigener dunkler Tafel (besser lesbar); im Raid sitzt er über den Spieler-Tafeln statt sie zu verdecken', 'Selection prompt in the center sits on its own dark panel (easier to read); in raids it sits above the player panels instead of covering them'],
             ['Hauptmenü: eine laufende Partie bleibt abgedunkelt im Hintergrund und pausiert (online läuft sie weiter); Esc öffnet das Hauptmenü und kehrt zurück; das Spielfeld blitzt beim Start nicht mehr durch', 'Main menu: a running match stays dimmed in the background and is paused (online matches keep running); Esc opens the main menu and returns; the board no longer flashes on startup'],
             ['Raid-Modus: Onyxia\'s Lair und Molten Core (Raid-Regeln, Boss-Decks, Events, Runen, Minions)', 'Raid mode: Onyxia\'s Lair and Molten Core (raid rules, boss decks, events, runes, minions)'],
             ['Raid-Setup mit Raid-Kacheln und 5 Plätzen (Deck-Box, Spieler/CPU/frei)', 'Raid setup with raid tiles and 5 seats (deck box, player/CPU/empty)'],

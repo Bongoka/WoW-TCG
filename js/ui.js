@@ -2433,7 +2433,7 @@ function renderAimBanner(d) {
     if (!d) { if (el) el.classList.remove('show'); UI.bannerSrc = null; return; }
     if (!el) {
         el = document.createElement('div'); el.id = 'aim-banner';
-        el.innerHTML = '<div class="ab-card"></div><b class="ab-title"></b><div class="ab-prompt"></div><div class="ab-warn"></div><div class="ab-btns"></div>';
+        el.innerHTML = '<div class="ab-card"></div><div class="ab-box"><b class="ab-title"></b><div class="ab-prompt"></div><div class="ab-warn"></div><div class="ab-btns"></div></div>';
         document.body.appendChild(el);
     }
     const prep = G.chainPrep, card = prep && prep.kind === 'card' && prep.card ? prep.card : null;
@@ -2463,6 +2463,10 @@ function renderAimBanner(d) {
     if (d.limit) addUndoButton(d, (label, cls, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'pointer-events:auto;margin-left:10px;padding:2px 10px;font-size:13px';
         b.onclick = (e) => { e.stopPropagation(); fn(); }; el.querySelector('.ab-prompt').appendChild(b); });
     else addUndoButton(d, add);
+    // Raid: Auf der Mittellinie liegen die Spieler-Tafeln (#raid-strip) – der Hinweis rückt darüber, damit sie sichtbar und anklickbar bleiben
+    const strip = document.getElementById('raid-strip'), sr = strip && strip.offsetParent ? strip.getBoundingClientRect() : null;
+    el.classList.toggle('above-strip', !!(sr && sr.height));
+    el.style.top = sr && sr.height ? Math.max(8, sr.top - 8) + 'px' : '';
     el.classList.add('show');
 }
 // Würde eine eigene Karte sich dadurch selbst zerstören (Formen, Mind Control, Shadowform, Tree of Life …)?

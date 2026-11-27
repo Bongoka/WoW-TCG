@@ -1066,12 +1066,18 @@ body.side-open #side-tab { opacity: 0; pointer-events: none; }
 #aim-banner { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9300; pointer-events: none; display: none;
     flex-direction: column; align-items: center; gap: 6px; text-align: center; max-width: min(520px, 90vw); }
 #aim-banner.show { display: flex; }
+#aim-banner.above-strip { transform: translate(-50%, -100%); }   /* Raid: unterkante über den Spieler-Tafeln (top per JS) */
 #aim-banner .ab-card { width: clamp(90px, 8vw, 140px); filter: drop-shadow(0 12px 30px rgba(0,0,0,.9)) drop-shadow(0 0 18px rgba(201,168,76,.5)); }
 #aim-banner .ab-card:empty { display: none; }
 #aim-banner .ab-card.fly-in { animation: abFly .45s cubic-bezier(.2,.8,.2,1); }
 @keyframes abFly { from { transform: translateY(45vh) scale(.6); opacity: .3; } to { transform: none; opacity: 1; } }
-#aim-banner .ab-title { font: bold 26px Georgia, serif; color: var(--gold-light); text-shadow: 0 2px 8px #000, 0 0 18px rgba(0,0,0,.9); }
-#aim-banner .ab-prompt { font-size: 14px; color: #e7e2d6; text-shadow: 0 1px 6px #000, 0 0 12px #000; }
+/* Texte und Knöpfe auf eigener dunkler Tafel – lesbar über Karten, Lebenspunkten und Zielmarken */
+#aim-banner .ab-box { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 20px 10px;
+    background: rgba(12,10,7,.88); border: 1px solid rgba(201,168,76,.55); border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.75); backdrop-filter: blur(3px); }
+#aim-banner .ab-title { font: bold 22px Georgia, serif; line-height: 1.15; color: var(--gold-light); text-shadow: 0 2px 6px #000; }
+#aim-banner .ab-prompt { font-size: 14px; line-height: 1.3; color: #e7e2d6; }
+#aim-banner .ab-prompt:empty { display: none; }
 #aim-banner .ab-warn { color: #f87171; font-weight: bold; text-shadow: 0 1px 6px #000; }
 #aim-banner .ab-warn:empty { display: none; }
 #aim-banner .ab-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
