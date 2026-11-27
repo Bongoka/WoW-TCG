@@ -22,7 +22,7 @@ function uiZoom() { try { const v = +localStorage.getItem(UI_ZOOM_KEY); return v
 function applyUiZoom() {
     const s = uiZoom() / 100, st = document.documentElement.style;
     st.setProperty('--ui-scale', s);
-    const f = s * (matchMedia('(orientation: portrait)').matches ? 1.15 : 1);              // Hochformat: Feldkarten größer (4 passen noch nebeneinander)
+    const f = s * (matchMedia('(orientation: portrait)').matches ? 1.3 : 1);               // Hochformat: Feldkarten deutlich größer (ab 4 Allies rücken sie zusammen)
     st.setProperty('--field-w', 150 * f + 'px'); st.setProperty('--field-h', 210 * f + 'px');
     st.setProperty('--hand-w', 140 * s + 'px'); st.setProperty('--hand-h', 196 * s + 'px');
 }
