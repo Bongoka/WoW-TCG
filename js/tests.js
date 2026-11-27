@@ -1029,6 +1029,27 @@ function runRuleTests() {
         ({ s, lashan } = run(true));
         assert(P(s, 2).resources.length === 3, 'Trotz Protector wurde sabotiert');
     });
+    test(218, 'Sabotage: Player/Deck (CR 601.2b, Glossar): der Held vertritt den Spieler – normaler Angriff und Sabotage stehen beide zur Wahl, Allies bleiben normal angreifbar; Thalodien/Thelis/Ryn wirken auf den sabotierten Spieler', () => {
+        const run = (id, setup) => {
+            const s = fresh('alliance_mage', 'horde_warrior'); s.real = false; s.p2.allies = []; s.p1.allies = [];
+            const a = put(s, 1, id), d = put(s, 2, 262); if (setup) setup(s);
+            const l = getLegalActions(s, 1).filter(x => x.type === 'ATTACK' && x.attackerUid === a.uid);
+            assert(l.some(x => !x.sabotage && x.defenderUid === d.uid), `${CARDS[id].name}: kann den Ally nicht normal angreifen`);
+            assert(l.some(x => !x.sabotage && x.defenderUid === P(s, 2).hero.uid), `${CARDS[id].name}: kann den Helden nicht normal angreifen`);
+            const sab = l.find(x => x.sabotage && x.defenderUid === P(s, 2).hero.uid);
+            assert(sab, `${CARDS[id].name}: keine Sabotage über den Helden`);
+            act(s, sab, 1); let n = 0;
+            while (s.pending && n++ < 30) { const p = s.pending; applyAction(s, { type: p.kind === 'priority' ? 'PASS' : 'CHOOSE', v: p.kind === 'priority' ? undefined : aiPick(s, p), actorId: p.pid }, true, p.pid); autoResolve(s); }
+            assert(!(P(s, 2).hero.damage > 0) && !(a.damage > 0), `${CARDS[id].name}: Sabotage verteilte Kampfschaden`);
+            return s;
+        };
+        let s = run(5207, s => { P(s, 2).deck.push(CARDS[192].id); });   // oben eine Nicht-Quest
+        assert(P(s, 2).removed.length === 1, 'Spymaster Thalodien: keine Karte aus dem Spiel entfernt');
+        s = run(6186);
+        assert(P(s, 1).deckOwner === 2 && P(s, 2).deckOwner === 1, 'Arcanist Thelis: Decks nicht getauscht');
+        let n0 = 0; s = run(5205, s => { n0 = P(s, 2).deck.length; });
+        assert(P(s, 2).deck.length === n0 + 1 && P(s, 2).deck[P(s, 2).deck.length - 1] === 262, 'Retainer Ryn: Ally nicht oben auf das Deck gelegt');
+    });
     test(111, 'Inspire (CR 501.1b): im Ready-Schritt des Gegners macht Vindicator Kaldel einen eigenen erschöpften Ally bereit', () => {
         const s = fresh('alliance_mage', 'horde_warrior', 1); s.real = false;
         const kaldel = put(s, 2, 4222, { exhausted: true }), other = put(s, 2, 262, { exhausted: true }), mine = put(s, 1, 262, { exhausted: true });
@@ -2567,6 +2588,191 @@ function runRuleTests() {
             assert(!mustAttack(s, 1).length && !validateAction(s, { type: 'END_TURN' }, 1), `${ready} Ressourcen: Zugende trotz Angriffskosten verboten`);
             assert(getAttackActions(s, 1).some(x => x.attackerUid === a.uid) === !!ready, `${ready} Ressourcen: Angriff des Allys falsch angeboten`);
         }
+    });
+
+    // ---------------- Raid (Raid Rules R100–R203, raid.js)
+    // Raid mit Onyxia (Spieler 2) gegen n Raider (1, 3, 4 …), Aktionsphase des ersten Raiders
+    const raid = (n = 3) => {
+        const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest', 'alliance_paladin', 'alliance_warrior'].map(deck).filter(Boolean).slice(0, n);
+        const s = newRaidState('onyxia', ds); s.real = false;
+        s.turn = 6; s.activePlayer = 1; s.lastTurnOf = { 2: 5, 1: 6 }; s.placedResource = true; s.phase = 'main';
+        return s;
+    };
+    // Raid-Einrichtung: Spieler 1 darf auf jedem Platz sitzen (Zugreihenfolge = Plätze, R200.4); Hotseat tauscht 1 ⇄ Raider (pidSwap)
+    if (typeof pidSwap === 'function') test(219, 'Raid-Hotseat: Spieler 1 auf Platz 3, Zugreihenfolge nach Plätzen, Tausch 1 ⇄ 4 und zurück = Original', () => {
+        const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest', 'alliance_paladin'].map(deck);
+        const s = newRaidState('onyxia', ds, 2); s.real = false;
+        assert(s.p1.hero.id === ds[2].hero && s.p3.hero.id === ds[0].hero && s.p4.hero.id === ds[1].hero && s.p5.hero.id === ds[3].hero, 'Decks falsch verteilt');
+        assert(JSON.stringify(s.pids) === '[2,3,4,1,5]' && s.raidSeat[1] === 3 && s.raidSeat[3] === 1, 'Zugreihenfolge folgt nicht den Plätzen: ' + JSON.stringify(s.pids));
+        const mc = newRaidState('mc', ds, 2);
+        assert(mc.activePlayer === 3 && mc.lastTurnOf[3] === 1 && mc.lastTurnOf[1] === 0, 'Molten Core: nicht der Raider links vom Boss beginnt (R300.6)');
+        s.activePlayer = 4; s.lastTurnOf = { 2: 5, 4: 6 };
+        const st = JSON.parse(JSON.stringify(s)), m = pidSwap(JSON.parse(JSON.stringify(s)), 1, 4);
+        assert(m.p1.hero.uid === s.p4.hero.uid && m.p1.id === 1 && m.p4.id === 4 && m.p4.hero.uid === s.p1.hero.uid && m.p1.hero.owner === 1, 'Spieler nicht getauscht');
+        assert(JSON.stringify(m.pids) === '[2,3,1,4,5]' && m.activePlayer === 1 && m.lastTurnOf[1] === 6 && m.raidSeat[1] === 2 && m.raidSeat[4] === 3 && m.team[1] === 'raid', 'Spieler-IDs nicht getauscht');
+        assert(JSON.stringify(pidSwap(m, 1, 4)) === JSON.stringify(st), 'Zweimal getauscht ≠ Original');
+    });
+    test(208, 'Raid: Zugreihenfolge Boss → Raider im Uhrzeigersinn (R200.4), Priorität erst nach dem Passen aller Spieler, Boss legt keine Ressourcen, Handlimit 10 (R100.3/4), zieht so viele Karten wie die Stufe (R201.1)', () => {
+        const s = raid(3);
+        assert(s.pids.join() === '2,1,3,4' && teamOf(s, 1) === teamOf(s, 3) && isFoePid(s, 1, 2), 'Spieler/Teams falsch: ' + s.pids.join());
+        assert(nextPid(s, 2) === 1 && nextPid(s, 1) === 3 && nextPid(s, 4) === 2, 'Uhrzeigersinn falsch');
+        assert(getOpponent(s, 3).id === 2 && foePids(s, 2).join() === '1,3,4', 'Gegner falsch');
+        // Priorität: ein Link des Raiders, dann müssen alle vier passen
+        s.win = { prio: 1, passes: 0 }; let n = 0;
+        while (s.win && n < 10) { passPriority(s); n++; if (s.win.passes >= livePids(s).length) break; }
+        assert(n === 4, `Fenster schließt nach ${n} Pässen statt 4`);
+        s.win = null;
+        hand(s, 2, 17008); assert(validateAction(s, { type: 'PLACE_RESOURCE', handIdx: 0 }, 2), 'Boss darf eine Ressource legen');
+        assert(maxHandSize(s, P(s, 2)) === 10 && maxHandSize(s, P(s, 1)) === 7, 'Handlimits falsch');
+        // Zugwechsel: nach dem letzten Raider der Boss; er zieht 2 Karten in Stufe 2 und deckt danach ein Event auf
+        const s2 = raid(2); s2.activePlayer = 3; s2.raid.stage = 2; s2.raid.events = s2.raid.events.filter(id => id !== 17101); s2.raid.events.push(17101); const h0 = P(s2, 2).hand.length, ev0 = s2.raid.events.length;   // Battle Plan oben (kein zweites Event)
+        advanceTurn(s2, true);
+        assert(s2.activePlayer === 2, 'Boss nicht am Zug');
+        assert(P(s2, 2).hand.length >= h0 + 2 - 1 && s2.raid.events.length === ev0 - 1, `Draw/Event falsch: Hand ${h0}→${P(s2, 2).hand.length}, Events ${ev0}→${s2.raid.events.length}`);
+        assert(P(s2, 2).resources.length >= 1 && P(s2, 2).resources.every(r => !r.faceUp && r.card.raidEvent), 'Event nicht verdeckt in der Ressourcenreihe (R201.2a)');
+    });
+    test(209, 'Raid: Onyxia wechselt bei tödlichem Schaden die Stufe (R101.4, R202.1) – gleiche Karte, unbeschädigt, Anhänge/Bereitschaft bleiben; "destroy" wirkt nicht (R101.3a); Stufe 3 tot = Sieg der Raider', () => {
+        const s = raid(2); const h = P(s, 2).hero, uid = h.uid;
+        const curse = put(s, 1, 121, { attachedTo: uid }); h.exhausted = true;   // Curse of Agony an Onyxia
+        destroy(s, h); process(s);
+        assert(!s.gameOver && s.raid.stage === 1, 'destroy zerstört den Boss');
+        h.damage = 20; process(s);
+        assert(s.raid.stage === 2 && P(s, 2).hero.uid === uid && P(s, 2).hero.damage === 0 && hpOf(s, P(s, 2).hero) === 30, `Stufe 2 falsch: Stufe ${s.raid.stage}, Schaden ${P(s, 2).hero.damage}`);
+        assert(P(s, 2).hero.exhausted && attachedTo(s, uid, 121).length === 1, 'Bereitschaft/Anhang nicht übernommen');
+        assert(kwHas(s, P(s, 2).hero, 'longRange') || hasLongRange(s, P(s, 2).hero), 'Stufe 2 ohne Long-Range');
+        P(s, 2).hero.damage = 99; process(s);
+        assert(s.raid.stage === 3 && !s.gameOver, 'Stufe 3 fehlt');
+        P(s, 2).hero.damage = 50; process(s);
+        assert(s.gameOver && s.winner === 1 && s.winnerTeam === 'raid', 'Raider gewinnen nicht');
+        // Onyxia greift mit Stufen-Bonus an: +1 (Stufe 1), +5 Tooth and Claw
+        const s2 = raid(2); put(s2, 2, 17028);
+        assert(atkOf(s2, P(s2, 2).hero, { attacking: true }) === 6 && atkOf(s2, P(s2, 2).hero, {}) === 0, 'ATK beim Angriff falsch: ' + atkOf(s2, P(s2, 2).hero, { attacking: true }));
+        assert(evaluateState(s2, 2) > AI_LOSS && evaluateState(s2, 1) > AI_LOSS, 'KI-Bewertung im Raid kaputt');
+    });
+    test(210, 'Raid: Raider mit zerstörtem Helden scheidet aus – alle seine Karten verlassen das Spiel (auch Anhänge an fremden Karten), das Spiel läuft weiter; fallen alle Raider, gewinnt der Boss (R100.2)', () => {
+        const s = raid(3);
+        const al = put(s, 3, 107); put(s, 3, 121, { attachedTo: P(s, 2).hero.uid }); hand(s, 3, 107);
+        P(s, 3).hero.damage = 99; process(s);
+        assert(P(s, 3).out && !s.gameOver, 'Raider 3 nicht ausgeschieden oder Spiel vorbei');
+        assert(!P(s, 3).allies.length && !P(s, 3).hand.length && !attachedTo(s, P(s, 2).hero.uid, 121).length, 'Karten des Ausgeschiedenen noch im Spiel');
+        assert(!livePids(s).includes(3) && nextPid(s, 1) === 4, 'Ausgeschiedener noch in der Zugreihenfolge');
+        assert(!foePids(s, 2).includes(3), 'Ausgeschiedener noch Gegner');
+        P(s, 1).hero.damage = 99; P(s, 4).hero.damage = 99; process(s);
+        assert(s.gameOver && s.winner === 2, 'Boss gewinnt nicht');
+    });
+    test(211, 'Raid: Angriffe auf jeden gegnerischen Charakter, Protect Point (CR 602.2): jeder dem Angreifer gegenüberstehende Spieler darf mit eigenem Protector schützen – auch für Mitspieler', () => {
+        const s = raid(3); s.activePlayer = 2; s.lastTurnOf = { 2: 6, 1: 5 }; s.humans = [1];
+        const tank = put(s, 3, 1); P(s, 3).allies.pop(); const pr = put(s, 3, Object.values(CARDS).find(c => c.type === 'Ally' && c.protector && !c.text.includes('can\'t') && !c.unique).id);
+        const tg = attackTargets(s, P(s, 2).hero).map(c => c.uid);
+        assert(tg.includes(P(s, 1).hero.uid) && tg.includes(P(s, 3).hero.uid) && tg.includes(pr.uid), 'Boss kann nicht alle Raider angreifen');
+        assert(attackTargets(s, pr).every(c => ctrlOf(s, c) === 2), 'Raider kann Mitspieler angreifen');
+        // Onyxia greift Spieler 1 an, der Protector von Spieler 3 schützt
+        P(s, 2).hero.b.atk = 0;
+        assert(applyAction(s, { type: 'ATTACK', attackerUid: P(s, 2).hero.uid, defenderUid: P(s, 1).hero.uid, actorId: 2 }, true, 2), 'Angriff nicht möglich');
+        let guard = 0; while (s.pending && guard++ < 30) { const d = s.pending; s.pending = null; if (d.kind === 'priority') passPriority(s); else s.queue.unshift({ op: 'call', k: d.k, a: d.a, v: d.protect ? (d.opts.find(o => o.v === pr.uid) || {}).v : aiPick(s, d) }); process(s); }
+        assert(pr.exhausted && P(s, 1).hero.damage === 0, `Mitspieler-Protector schützt nicht (erschöpft ${pr.exhausted}, Schaden am Helden ${P(s, 1).hero.damage})`);
+    });
+    test(212, 'Raid: Events (R201.2) – nicht unterbrechbar, danach verdeckt und bereit in der Ressourcenreihe; Karten "Stage X Only" (R203.1b); Flame Breath trifft jeden gegnerischen Helden und Ally mit X = Stufe', () => {
+        const s = raid(2); s.activePlayer = 2; s.lastTurnOf = { 2: 6, 1: 5 };
+        s.raid.events.push(17115);                                              // He Who Hesitates ...: Gegner erschöpfen alle Ressourcen
+        res(s, 1, 2);
+        q(s, { op: 'call', k: 'E:raidEvent', a: { then: [] } }); process(s); autoResolve(s);
+        assert(P(s, 1).resources.every(r => r.exhausted), 'Event nicht aufgelöst');
+        const r = P(s, 2).resources.find(x => x.card.id === 17115);
+        assert(r && !r.faceUp && !r.exhausted, 'Event nicht verdeckt/bereit in der Ressourcenreihe');
+        assert(NO_INTERRUPT.some(f => f(s, { kind: 'card', card: makeCardInst(17101, false, 2), pl: 2 })), 'Event unterbrechbar');
+        hand(s, 2, 17006); res(s, 2, 5);
+        assert(validateAction(s, { type: 'PLAY_CARD', handIdx: P(s, 2).hand.length - 1 }, 2), 'Brood of Onyxia in Stufe 1 spielbar');
+        s.raid.stage = 2;
+        assert(!validateAction(s, { type: 'PLAY_CARD', handIdx: P(s, 2).hand.length - 1 }, 2), 'Brood of Onyxia in Stufe 2 nicht spielbar: ' + validateAction(s, { type: 'PLAY_CARD', handIdx: P(s, 2).hand.length - 1 }, 2));
+        const a3 = put(s, 3, Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && c.hp >= 4 && !c.unique).id);
+        const i = hand(s, 2, 17015);
+        assert(act(s, { type: 'PLAY_CARD', handIdx: i }, 2), 'Flame Breath nicht spielbar');
+        assert(P(s, 1).hero.damage === 2 && P(s, 3).hero.damage === 2 && a3.damage === 2 && P(s, 2).hero.damage === 0, `Flame Breath falsch: ${P(s, 1).hero.damage}/${P(s, 3).hero.damage}/${a3.damage}`);
+    });
+    test(213, 'Raid: "friendly" schließt Mitspieler ein (CR-Glossar Friendly), "you control" nicht – Dauereffekte, "each friendly player", Ziele "target friendly ally", Spellshield nur gegen Gegner', () => {
+        const s = raid(3); const vanilla = Object.values(CARDS).find(c => c.type === 'Ally' && !c.text && !c.unique && c.hp >= 3);
+        const mine = put(s, 1, vanilla.id), mate = put(s, 3, vanilla.id), boss = put(s, 2, vanilla.id);
+        put(s, 1, 3023);                                                          // Onyxia Blood Talisman: "Friendly allies have +2 [Health]"
+        assert(hpOf(s, mine) === vanilla.hp + 2 && hpOf(s, mate) === vanilla.hp + 2 && hpOf(s, boss) === vanilla.hp, 'Talisman: Mitspieler-Ally ohne Bonus oder Boss-Ally mit Bonus');
+        const h1 = P(s, 1).hand.length, h3 = P(s, 3).hand.length, h4 = P(s, 4).hand.length, h2 = P(s, 2).hand.length;
+        FX[3001].resolve(s, { pl: 1 }); process(s);   // Arcane Revelation (Mage): "Each friendly player draws a card."
+        assert(P(s, 1).hand.length === h1 + 1 && P(s, 3).hand.length === h3 + 1 && P(s, 4).hand.length === h4 + 1 && P(s, 2).hand.length === h2, 'Arcane Revelation: nicht jeder befreundete Spieler zieht');
+        // "target friendly ally" (Mark of the Wild ist "target ally"; Emerald-Scale Greaves 2196: "Ready target friendly ally") – Mitspieler-Ally ist Ziel
+        const tgt = targetSlots(s, 1, FX[2196].powers[0], makeCardInst(2196, false, 1), {})[0].cands;
+        assert(tgt.includes(mate.uid) && tgt.includes(mine.uid) && !tgt.includes(boss.uid), 'friendly-Ziel ohne Mitspieler');
+        // "ally you control" bleibt eigen: Sacrifice-Kosten u. ä. – targetCands ohne friendly-Quelle
+        assert(!targetCands(s, 1, { ally: true, side: 'friendly' }).includes(mate.uid), '"you control" schließt Mitspieler ein');
+        // Spellshield ("can't be targeted by opponents"): Mitspieler dürfen zielen, der Boss nicht
+        addTM(mate, { k: 'spellshield', turn: s.turn });
+        assert(!untargetableBy(s, mate, 1) && untargetableBy(s, mate, 2), 'Spellshield gegen Mitspieler/Boss falsch');
+        // 1 gegen 1 unverändert: friendPids = nur der eigene Spieler
+        const s1 = fresh(); assert(friendPids(s1, 1).join() === '1' && !isFriendPid(s1, 1, 2) && foePids(s1, 1).join() === '2', '1 gegen 1 verändert');
+    });
+    test(216, 'Spieler als Ziel ("target player"/"target opponent"): 1 gegen 1 Du selbst/Gegner, im Raid je Gegner und bei "target player" auch die Mitspieler; jede Option zeigt auf den Helden (anklickbar)', () => {
+        const s1 = fresh(); const o1 = modeOpts(s1, 1, FX[1074], makeCardInst(1074, false, 1), {});   // playerModes ("target player")
+        assert(o1.length === 2 && o1.every(o => o.heroUid === P(s1, o.v).hero.uid) && o1.some(o => o.v === 1) && o1.some(o => o.v === 2), '1 gegen 1: Spieler-Optionen falsch');
+        const s = raid(3); const o = modeOpts(s, 1, FX[1074], makeCardInst(1074, false, 1), {});
+        assert(o.map(x => x.v).sort().join() === '1,2,3,4' && o.every(x => x.heroUid === P(s, x.v).hero.uid), 'Raid "target player": ' + o.map(x => x.v).join());
+        const f = expandPlayerOpts(s, 2, [{ label: 'Gegner', v: 1, plFoe: true, ai: 1 }]);                       // "target opponent" aus Sicht des Bosses
+        assert(f.map(x => x.v).sort().join() === '1,3,4', 'Raid "target opponent" (Boss): ' + f.map(x => x.v).join());
+        const r = expandPlayerOpts(s, 3, [{ label: 'Gegner', v: 2, plFoe: true, ai: 1 }]);
+        assert(r.length === 1 && r[0].v === 2, 'Raid "target opponent" (Raider) nicht nur der Boss');
+    });
+    test(217, 'Vindicator Aluumen/Falaan ("Inspire: All friendly …"): der Kartentext geht der Inspire-Regel vor (CR 103.1) – im Raid werden auch die Protectors der Mitspieler bereit', () => {
+        const s = raid(3); const prot = Object.values(CARDS).find(c => c.type === 'Ally' && c.protector && !c.unique && !(FX[c.id] || {}).on);
+        put(s, 1, 6178); const mine = put(s, 1, prot.id, { exhausted: true }), mate = put(s, 3, prot.id, { exhausted: true }), boss = put(s, 2, prot.id, { exhausted: true });
+        q(s, { op: 'call', k: 'E:inspire', a: { pid: 1, done: [] } }); process(s); autoResolve(s);
+        assert(!mine.exhausted && !mate.exhausted && boss.exhausted, `Inspire: eigener ${!mine.exhausted}, Mitspieler ${!mate.exhausted}, Boss ${!boss.exhausted}`);
+    });
+    // Molten Core: Raid mit n Raidern, nach raidBegin (Raider 1 am Zug)
+    const mcRaid = (n = 2) => {
+        const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest'].map(deck).slice(0, n);
+        const s = newRaidState('mc', ds); s.real = false; raidBegin(s); autoResolve(s); return s;
+    };
+    test(214, 'Molten Core: Aufbau (R300: Lucifron mit 2 Flamewaker Protectors, 3 Runen aufsteigend, Raider beginnt), Boss-Zerstörung (R302: Runen verdeckt, Minions werden Allies), New-Boss-Phase mit Rune und Tokens (R301.5), Runen bezahlen, zählen aber nicht als Ressourcen (R303.3a)', () => {
+        const s = mcRaid(2), b = P(s, 2);
+        assert(b.hero.id === 17301 && b.allies.filter(a => a.id === 17405).length === 2, 'Lucifron/Protectors fehlen');
+        assert(s.activePlayer === 1 && s.raid.runeDeck.length === 3 && s.raid.runeDeck.every((r, i, a) => !i || a[i - 1] < r), 'Startspieler/Runen falsch');
+        // Rune-Boss Garr vorgeben, zwei Minions in der Ressourcenreihe, Lucifron fällt
+        s.raid.runeDeck = [17313, 17315, 17316];
+        b.resources.push({ card: makeCardInst(17335, false, 2), faceUp: false, exhausted: false }, { card: makeCardInst(17340, false, 2), faceUp: false, exhausted: false });
+        b.hero.damage = 6; process(s); autoResolve(s);
+        assert(b.hero.raidGone && s.raid.gone && !b.resources.length, 'Lucifron nicht zerstört oder Ressourcen nicht geleert');
+        assert(b.allies.some(a => a.id === 17335) && b.allies.some(a => a.id === 17340), 'Minions nicht als Allies im Spiel');
+        assert(!attackTargets(s, P(s, 1).hero).some(c => c.uid === b.hero.uid) && untargetableBy(s, b.hero, 1), 'Besiegter Boss angreifbar/Ziel');
+        // Boss-Zug: New-Boss-Phase bringt Garr (Boss 4) mit Rune of Blaz und 8 Firesworn
+        s.activePlayer = 4; s.pids = [2, 1, 3]; s.activePlayer = 3; advanceTurn(s, true);
+        assert(s.activePlayer === 2 && b.hero.id === 17304 && !b.hero.raidGone, 'Garr nicht im Spiel: ' + b.hero.name);
+        assert(b.allies.filter(a => a.id === 17401).length === 8 && b.runes.length === 1 && b.runes[0].id === 17313 && b.runes[0].faceUp, 'Firesworn/Rune fehlen');
+        assert(b.resources.length === 1, 'Minion-Phase legt keine Ressource');
+        assert(getReadyRes(b) === 2 && b.resources.length === 1, 'Rune bezahlt nicht mit oder zählt als Ressource');
+        assert(atkOf(s, b.hero, { attacking: true }) === 3 && attackTargets(s, b.hero).every(c => c.type === 'Hero'), 'Garr: ATK oder "only heroes" falsch');
+        // Minions verlassen das Spiel nur durch Zerstörung; zerstört gehen sie in den Minion-Friedhof
+        const m = b.allies.find(a => a.id === 17335); bounce(s, m);
+        assert(b.allies.includes(m), 'Minion verließ das Spiel ohne Zerstörung');
+        destroy(s, m); assert(s.raid.minionGy.some(c => c.id === 17335) && !b.graveyard.some(c => c.id === 17335), 'Minion nicht im Minion-Friedhof');
+    });
+    test(215, 'Molten Core: Majordomo kann nicht zerstört werden, ohne Allies erwacht Ragnaros (R303.1: Hand/Main Deck/Allies weg, Minion-Ressourcen werden Allies, 7 Karten Ragnaros-Deck); Ragnaros untergetaucht: kein Schaden, Untargetable, Boss kann nicht spielen', () => {
+        const s = mcRaid(2), b = P(s, 2);
+        b.hero.damage = 6; process(s); autoResolve(s);
+        s.raid.runeDeck = []; s.pids = [2, 1, 3]; s.activePlayer = 3; advanceTurn(s, true);
+        assert(b.hero.id === 17309, 'Majordomo kommt nicht: ' + b.hero.name);
+        assert(b.allies.filter(a => a.id === 17403).length === 4 && b.allies.filter(a => a.id === 17404).length === 4, 'Elites/Healer fehlen');
+        b.hero.damage = 99; process(s); assert(!s.gameOver && b.hero.id === 17309 && !b.hero.raidGone, 'Majordomo zerstört');
+        b.resources.push({ card: makeCardInst(17335, false, 2), faceUp: false, exhausted: false });
+        s.raid.force = true; [...b.allies].forEach(a => removeFromGame(s, a)); s.raid.force = false;
+        advanceTurn(s, true);                                                     // Zugende ohne Allies: Majordomo dreht um → Ragnaros erwacht
+        let g = 0; while (b.hero.id !== 17310 && g++ < 5) { process(s); autoResolve(s); }
+        assert(b.hero.id === 17310 && !b.hero.flipped, 'Ragnaros nicht (untergetaucht) im Spiel: ' + b.hero.name);
+        assert(b.hand.length === 7 && b.allies.some(a => a.id === 17335) && !b.resources.length && b.deck.length === 25 - 7, 'Erwachen falsch: Hand ' + b.hand.length + ', Deck ' + b.deck.length);
+        dealDamage(s, { src: P(s, 1).hero.uid, tgt: b.hero.uid, amt: 5, dt: 'Melee', unprev: true }); process(s);
+        assert(b.hero.damage === 0 && kwHas(s, b.hero, 'untargetable'), 'Untergetauchter Ragnaros nimmt Schaden / ist Ziel');
+        const i = hand(s, 2, 17345); assert(playBlocked(s, 2, b.hand[i]), 'Boss darf untergetaucht Karten spielen');
+        b.hero.flipped = true; dealDamage(s, { src: P(s, 1).hero.uid, tgt: b.hero.uid, amt: 4, dt: 'Fire' }); dealDamage(s, { src: P(s, 1).hero.uid, tgt: b.hero.uid, amt: 3, dt: 'Melee' }); process(s);
+        assert(b.hero.damage === 3, 'Aufgetauchter Ragnaros: Feuerschaden nicht verhindert oder Nahkampf verhindert (' + b.hero.damage + ')');
+        b.hero.damage = 50; process(s);
+        assert(s.gameOver && s.winner === 1, 'Ragnaros tot ohne Sieg der Raider');
     });
     return results;
 }

@@ -294,27 +294,31 @@ function netModeIdx(s, pid, a) { const ms = netModes(s, pid, a); return ms ? ms.
 // Spieler-IDs tauschen: Spieler 1 ⇄ 2 in allen Feldern, die eine Spieler-ID tragen
 // NET_PID_KEYS: Wert ist eine Spieler-ID (auch Listen davon, z. B. order: [1, 2]); nur die Werte 1 und 2 werden getauscht
 const NET_PID_KEYS = new Set(['pid', 'prio', 'actorId', 'srcPl', 'pl', 'owner', 'by', 'opp', 'first', 'wantedBy', 'onTurnOf', 'chooser', 'apid', 'dpid', 'activePlayer', 'winner', 'firstPid',
-    'resolvingPl', '_logPid', 'lastTurnPid9', 'sp', 'tp', 'tpid', 'hpid', 'spid', 'wasCtrl', 'from', 'to', 'ctrl', 'who', 'o', 'horrid', 'reveal', 'alashon8', 'mcFrom', 'helwenFrom', 'vunFrom13', 'order']);
+    'resolvingPl', '_logPid', 'pids', 'lastTurnPid9', 'sp', 'tp', 'tpid', 'hpid', 'spid', 'wasCtrl', 'from', 'to', 'ctrl', 'who', 'o', 'horrid', 'reveal', 'alashon8', 'mcFrom', 'helwenFrom', 'vunFrom13', 'order']);
 // NET_PID_MAPS: Schlüssel ist eine Spieler-ID ("1"/"2") oder beginnt damit ("1:ally", "2:hero_1" …)
 const NET_PID_MAPS = new Set(['lastTurnOf', 'firstTurnOf', 'halion15', 'widow15', 'urn15', 'skip', 'netReady', 'chosen', 'bids',
     'abil9', 'allyDmg12', 'died11', 'disc9', 'gyIn17', 'healed13', 'heroAtk17', 'heroDmg13', 'heroHit10', 'heroHurtBy11', 'holy13', 'left13', 'q9', 'questRes12', 'sh12', 'shHero12', 'nature',
-    'cd9', 'demon9', 'played14', 'declined', 'stopAllP']);
+    'cd9', 'demon9', 'played14', 'declined', 'stopAllP', 'team', 'raidSeat']);
 // NET_PID_VALS: Werte der Karte (uid → Spieler-ID bzw. Liste von Spieler-IDs); NET_PID_PREFIX: Text, der mit "Spieler-ID:" beginnt
 const NET_PID_VALS = new Set(['enslave', 'heroHit']);
 const NET_PID_PREFIX = new Set(['ctx']);
-function netMirror(st) {
-    const sw = v => v === 1 ? 2 : v === 2 ? 1 : v;
-    const swKey = k => k === '1' ? '2' : k === '2' ? '1' : /^[12]:/.test(k) ? (k[0] === '1' ? '2' : '1') + k.slice(1) : k;
+function netMirror(st) { return pidSwap(st, 1, 2); }
+// Spieler a ⇄ b tauschen (Online-Gast und Hotseat: 1 ⇄ 2; Raid-Hotseat: 1 ⇄ der Raider, der handelt). Zweimal getauscht = Original.
+// Spieler-Optionen einer offenen Wahl (pl/plSelf/plFoe aus expandPlayerOpts) tragen die Spieler-ID auch in v.
+function pidSwap(st, a, b) {
+    const sw = v => v === a ? b : v === b ? a : v;
+    const swKey = k => { const m = /^(\d+)(:.*)?$/.exec(k); return m ? sw(+m[1]) + (m[2] || '') : k; };
     const walk = (v, key) => {
         if (v === null || typeof v !== 'object') return NET_PID_KEYS.has(key) ? sw(v) : NET_PID_PREFIX.has(key) && typeof v === 'string' ? swKey(v) : v;
         if (Array.isArray(v)) return v.map(x => walk(x, NET_PID_KEYS.has(key) ? key : null));
         const o = {};
         for (const k in v) o[k] = NET_PID_VALS.has(key) ? walk(v[k], 'pid') : walk(v[k], k);
+        if ((v.plSelf || v.plFoe || (v.pl !== undefined && v.heroUid !== undefined)) && typeof v.v === 'number') o.v = sw(v.v);
         if (NET_PID_MAPS.has(key)) { const r = {}; for (const k in o) r[swKey(k)] = o[k]; return r; }
         return o;
     };
     const m = walk(st, null);
-    const p1 = m.p2, p2 = m.p1; m.p1 = p1; m.p2 = p2; m.p1.id = 1; m.p2.id = 2;
+    const pa = m['p' + b], pb = m['p' + a]; m['p' + a] = pa; m['p' + b] = pb; pa.id = a; pb.id = b;
     return m;
 }
 

@@ -164,7 +164,7 @@ CARDS[4471].mend = 1; CARDS[4471].text = 'Mend 1';   // Seedling Pod "with Mend 
 // Friedhofs-Wächter: welche Karten sind in diesem Zug in welchen Friedhof gekommen (Angrathar, Wristwraps of the Cutthroat)
 STATE_FIX.push(s => {
     let ch = false;
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         const g = p.graveyard, e = p.gy17 || (p.gy17 = { n: -1, last: '' }); const last = g.length ? g[g.length - 1].uid : '';
         if (e.n === g.length && e.last === last) continue;
         const seen = new Set(e.uids || []), fresh = g.filter(c => !seen.has(c.uid));
@@ -173,7 +173,7 @@ STATE_FIX.push(s => {
         if (!fresh.length) continue;
         (s.gyIn17 = s.gyIn17 || {})[p.id] = s.turn;
         // Angrathar the Wrathgate: "When a card enters an opposing graveyard from anywhere, add a rattle counter."
-        const o = p.id === 1 ? s.p2 : s.p1;
+        const o = getOpponent(s, p.id);
         locsOf(o).filter(r => r.card.id === 12220 && active(s, r.card)).forEach(r => fresh.forEach(() => pushTrig(s, o.id, 12220, [{ op: 'trig', id: 12220, k: 'add', a: { uid: r.card.uid } }], r.card.uid)));
     }
     return ch;
@@ -293,7 +293,7 @@ FX[15005] = { questCond: (s, pid) => { const h = heroOf(s, pid); return !h.exhau
 FX[15008] = { questCond: (s, pid) => alliesOf(me(s, pid)).filter(c => ctrlOf(s, c) === pid).length > alliesOf(foe(s, pid)).filter(c => ctrlOf(s, c) !== pid).length ? null : tr('Du brauchst mehr Allies als der Gegner'), reward: (s, pid) => drawCards(s, me(s, pid), 1) };
 // "Batter Brains" McGillicutty: "When this ally is destroyed, target player discards a card."
 FX[15167] = { leave: (s, snap, dest, info) => { if (info && info.destroyed && snap.wasCtrl) pushTrig(s, snap.wasCtrl, 15167, [{ op: 'trig', id: 15167, k: 'go', a: { pid: snap.wasCtrl } }]); },
-    k: { go: (s, a) => ask(s, { pid: a.pid, prompt: tr('"Batter Brains" McGillicutty: Wer wirft eine Karte ab?'), src: '"Batter Brains" McGillicutty', opts: [{ label: tr('Gegner'), v: oppPid(s, a.pid), ai: 2 }, { label: tr('Du selbst'), v: a.pid, ai: -2 }], k: '15167:do', a }),
+    k: { go: (s, a) => ask(s, { pid: a.pid, prompt: tr('"Batter Brains" McGillicutty: Wer wirft eine Karte ab?'), src: '"Batter Brains" McGillicutty', opts: [{ label: tr('Gegner'), v: oppPid(s, a.pid), plFoe: true, ai: 2 }, { label: tr('Du selbst'), v: a.pid, plSelf: true, ai: -2 }], k: '15167:do', a }),
         do: (s, a, v) => q(s, { op: 'call', k: 'E:discard', a: { pid: v, n: 1, src: '"Batter Brains" McGillicutty' } }) } };
 
 // ============================================================================
@@ -421,7 +421,7 @@ FX[16061] = { powers: [flipPow(tr('Dämon aus dem Friedhof auf die Hand'), 4, { 
 // Kirox Butcherblade: "On your turn: (4), Flip Kirox >>> Kirox deals 4 melee damage to target exhausted ally."
 FX[16062] = { powers: [flipPow(tr('4 Nahkampfschaden an erschöpften Ally'), 4, { myTurn: true, slots: slotAlly(tr('Erschöpfter Ally'), true, { exhausted: true }), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, 4, 'Melee', { ability: false }); } })] };
 // Conqueror Kagon Blackskull: "Protector <p> (3) >>> Remove target ally in a graveyard from the game, and this ally deals 1 frost damage to target hero or ally. A character dealt damage this way can't attack this turn."
-const gyAllyAny17 = s => [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid);
+const gyAllyAny17 = s => allPl(s).flatMap(p => p.graveyard).filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid);
 FX[16071] = { powers: [{ key: 'kagon', label: tr('Ally im Friedhof entfernen: 1 Frostschaden, Ziel kann nicht angreifen'), cost: 3,
     slots: (s, pid) => [{ label: tr('Ally in einem Friedhof'), cands: gyAllyAny17(s), harm: true, ai: u => locate(s, u).pid === pid ? -1 : 1 }, { label: tr('Ziel'), cands: targetCands(s, pid, { char: true }), harm: true }],
     resolve: (s, it) => { const g = T(it, 0)[0], t = T(it, 1)[0]; if (g) gyRemove(s, g); if (t && findCharacter(s, it.src)) dealDamage(s, { src: it.src, tgt: t, amt: 1, dt: 'Frost', after: { k: '16071:m', a: { uid: t } } }); } }],
@@ -438,7 +438,7 @@ FX[16081] = { enterCounters: { eye: 2 }, aura: { watk: (s, src, sp, w) => w.uid 
 FX[16082] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.src === c.uid && d.combat && d.amt > 0 && t && isAllyLike(t) && s.battle && s.battle.att === c.uid) trig(s, { id: 16082, k: 'go', a: { pid, uid: c.uid, t: t.uid } }); } },
     k: { go: (s, a) => { const t = findCharacter(s, a.t), c = findCharacter(s, a.uid); if (!t || !c || ctrlOf(s, c) !== a.pid || ctrlOf(s, t) === a.pid) return; const from = ctrlOf(s, t); changeControl(s, t, a.pid); t.kwee17 = { src: c.uid, ctrl: a.pid, from }; } } };
 STATE_FIX.push(s => { let ch = false;
-    for (const p of [s.p1, s.p2]) for (const t of [...p.allies]) { const m = t.kwee17; if (!m) continue; const k = findCharacter(s, m.src), l = k && locate(s, k.uid);
+    for (const p of allPl(s)) for (const t of [...p.allies]) { const m = t.kwee17; if (!m) continue; const k = findCharacter(s, m.src), l = k && locate(s, k.uid);
         if (!k || !l || l.zone !== 'party' || ctrlOf(s, k) !== m.ctrl) { delete t.kwee17; if (ctrlOf(s, t) === m.ctrl && m.from !== m.ctrl) { changeControl(s, t, m.from); ch = true; } } }
     return ch; });
 // Mrglrglmrglmrrrlggg: "When this ally attacks, say 'Mrglrglmrglmrrrlggg!' Then, put two 1/1 Murloc ally tokens into play with Ferocity."

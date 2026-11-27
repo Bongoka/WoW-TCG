@@ -1,0 +1,523 @@
+WOW MC RB.indd 1  3/9/07 10:45:28 AM
+                   TABLE OF CON TEN TS
+
+                  Overview........................................................1
+                  What's in this Box?.........................................1
+                  Object of the Game..........................................2
+                  Two Modes of Play..........................................2
+                  Setup .........................................................3
+                  Gameplay........................................................4
+
+                       Overview..................................................4
+                       Ten Bosses...............................................5
+                       Separate Graveyards..................................7
+                       Boss Turn Sequence.................................8.
+                       Minions, Runes & Resources....................9
+                       Boss Destruction......................................11
+                       Endgame..................................................11.
+                  The Allies.......................................................12
+                       Two Kinds of Allies...................................12
+                       Special Ally Rules....................................13
+                  The Treasure Pack..........................................14
+                  Credits .........................................................16
+
+WOW MC RB.indd 2                                                                       3/9/07 10:45:32 AM
+              Overview
+
+Under the towering Blackrock Mountain, beneath even the throne of the Dark Iron
+
+Emperor Dagran Thaurissan, lie the fiery depths of the Molten Core. Ruled by the
+ancient Firelord Ragnaros and watched over tirelessly by his elemental lieutenants,
+the Molten Core is a deadly place where only the mightiest adventurers dare to tread.
+Gather together your bravest companions and prepare for the challenge of a lifetime!
+
+In this game, one player will pilot the Molten CoreTM Bosses, and the other players
+will take on the role of a raiding party. The Boss player will play the Molten CoreTM
+Main deck and the Ragnaros deck, and the raiding players will play their own decks
+built from the World of Warcraft® TCG card pool.
+
+The Molten CoreTM Raid Deck is designed to be played against three to five players.
+
+For complete World of Warcraft® TCG game rules and an interactive demo, visit
+www.ude.com/wow.
+
+                  What's in this Box?
+
+· 45-card Main deck (3 copies each of 15 different cards)
+· 30-card Minion deck
+· 25-card Ragnaros deck (2 copies each of 12 different cards, plus 1 more card)
+· 10 two-sided, oversize hero cards (1 for each Boss)
+· 7 rune cards
+· 20 two-sided ally tokens
+· 10-card treasure pack
+
+                  Main      2 Wrath of Ragnaros                                                                                            Ragnaros  Rune
+                  Deck                                                                                                                     Deck
+                  Card         Ability -- Ragnaros                                                                                         Card
+                          Destroy target ally. Ragnaros deals fire
+                          damage equal to that ally's cost to a hero
+                          in that ally's party.
+
+                                          MOLTEN CORE RAID 53/53 ©2007 UDC ©2007 Blizzard Entertainment, Inc. Art by: Michael Komarck
+
+                  Minion  Shazzrah                                                                                                         Hero      Ally Token
+
+                          Hero -- Flamewaker     Boss 6
+
+                          Shazzrah has +2 ATK while attacking and can
+                          attack only heroes.
+
+                          1 Flip Shazzrah. Use only once per turn.
+
+                          MOLTEN CORE RAID 6/53  Art by: Randy Gallegos                                                                13                        1
+                                                 ©2007 UDC ©2007 Blizzard Entertainment, Inc.
+
+WOW MC RB.indd 3                                                                                                                                           3/9/07 10:45:40 AM
+       Object of the Game
+
+For the Boss player, the object of the game is simple: destroy all who dare to oppose
+
+you. A raiding player is destroyed if his or her hero takes fatal damage (damage
+greater than or equal to its health), or if that player has to draw a card from an
+empty deck.
+
+For the raiding players, the object of the game is to work together to defeat the many
+Bosses of the Molten CoreTM Raid Deck. The endgame is an epic battle against
+Ragnaros the Firelord. Deal fatal damage to Ragnaros, and the Boss player will
+be defeated.
+
+If Ragnaros is destroyed, it's a victory for all raiding players, even those who fell
+before the Firelord was defeated.
+
+        Two Modes of Play
+
+ There are two ways to explore the depths of the Molten CoreTM Raid Deck: the
+
+  standard game and the "full clear" mode.
+
+  In the standard game, the raiding players will first face Lucifron, followed by three
+  of the rune Bosses chosen at random. If any of the raiding players survive, they'll
+  challenge Majordomo Executus and, finally, Ragnaros.
+
+  In the full clear mode of play, the raiding players will face all ten Bosses in order. This
+  mode takes more time to play and is more difficult to master, so only the bravest and
+  most prepared of adventurers should embark on it.
+
+  Note: The following rules assume the raiding players are playing the standard game.
+  The full clear mode uses the same rules as the standard game, with one exception:
+  instead of randomizing which rune Bosses the raiding players will face, the raiding
+  players must defeat all of them in order.
+
+2
+
+WOW MC RB.indd 4  3/9/07 10:45:54 AM
+                Setup
+
+Each raiding player brings a standard 60-card (minimum) deck and hero. The
+
+raiding players' heroes must belong to the same faction, either Horde or Alliance.
+
+Players should also bring a six-sided die for cards that require die rolls.
+
+The Boss player shuffles the 45-card Main deck and the 30-card Minion deck. Keep
+these decks separate. Set aside the 25-card Ragnaros deck and the ally tokens.
+
+Next, the Boss player randomizes the seven rune cards and draws three of them to
+determine which rune Bosses the raiding players will face. The identities of these
+Bosses should be kept secret from the raiding players. Once the rune Bosses have
+been selected, set aside the other four runes. They will not be used during the game.
+
+                                  Lucifron is the starting Boss. (The "Boss 1" on his
+                                  type line is a reminder.) Put Lucifron into play at the
+                                  start of the game.
+
+        Lucifron enters play with two Flamewaker Protector               3
+        ally tokens. (The "Lucifron: 2" on Flamewaker         3/9/07 10:46:09 AM
+        Protector's type line tells you that Lucifron enters
+        play with two copies of the ally.)
+
+WOW MC RB.indd 5
+Each player (including the Boss player) draws a starting hand of seven cards. The
+Boss player must keep his or her starting hand. The raiding players may choose to
+mulligan as normal.
+
+The Boss player draws a starting hand from the Main deck, not the Minion deck.
+Unlike the raiding players, the Boss player's maximum hand size is ten cards. Each
+raiding player's maximum hand size is seven cards.
+
+The raiding player to the Boss player's left goes first, and then play proceeds
+clockwise. Unlike in a traditional game, the first player does not skip drawing a card
+during the first draw step.
+
+              Gameplay
+
+Overview
+
+In many ways, the game plays like a traditional multiplayer game of the WoW® TCG.
+
+· For the raiding team, a hero or ally with protector can protect any friendly
+    character. A friendly character is controlled either by you or the players on
+    your team.
+        Example: Bulkas Wildhorn has the ability Vigilance, which gives
+        him protector. Ragnaros attacks Morganis Blackvein, a friendly hero.
+        Bulkas can exhaust to protect Morganis, forcing Ragnaros to fight
+        him instead.
+
+· If a raiding player's hero is destroyed, all of his or her cards are removed from
+    the game. This includes abilities attached to other players' cards.
+
+· The Molten CoreTM Bosses, Minions, and ally tokens can attack any opposing
+    character. (However, many of the Bosses have powers restricting which
+    characters they can attack.)
+
+· Players from the raiding team can choose to attack the current Boss or any of his
+    Minions or ally tokens.
+
+· Each raiding player's turn follows the phases and steps of a traditional game,
+    as described by the diagram on the next page:
+
+        4         3/9/07 10:46:12 AM
+WOW MC RB.indd 6
+        (Note: The Boss player follows a different turn sequence. See the
+        "Boss Turn Sequence" section for more information.)
+
+While there are many similarities, there are several important differences between a
+traditional multiplayer game and a raid scenario.
+
+Ten Bosses
+
+O v er v ie w
+There are ten Bosses in the Molten CoreTM Raid Deck. Each Boss has the word
+"Boss" followed by a number (1 through 9) on the right side of his type line. The
+raiding players always start the game facing Lucifron (Boss 1), and they always end
+the game facing Majordomo Executus (Boss 9) and, finally, Ragnaros.
+
+                                                                                                                           5
+
+WOW MC RB.indd 7  3/9/07 10:46:16 AM
+  The middle Bosses (Bosses 2-8) are called rune
+  Bosses because each has a rune card. You can tell
+  which rune goes with which Boss by reading the left
+  side of the rune's type line. For example, Rune of
+  Kress belongs to Magmadar.
+
+  In the standard game, the raiding players need
+  to defeat only three of the rune Bosses to reach
+  Majordomo Executus. The three they must defeat
+  are chosen at random before the game begins, and
+  only the Boss player knows their identities until they
+  enter play.
+
+  While the three rune Bosses are selected at random, they are fought in
+  numerical order.
+
+           Example: The Boss player randomly selects the runes for Baron
+           Geddon (Boss 5), Magmadar (Boss 2), and Garr (Boss 4). The raiding
+           players will face the rune Bosses in the following order: Magmadar,
+           Garr, and Baron Geddon.
+
+  Each Boss has a flip power, but unlike traditional heroes, the Molten CoreTM Bosses
+  often have ways to flip back and forth. Each Boss has different powers on either side
+  of his card. The first few times you play, it's recommended that the Boss player does
+  not show the raiding players the back of a Boss card until it flips over.
+
+  Each of the Bosses has his own powers and health, and many of them enter play with
+  ally tokens to help them incinerate, crush, or devour the raiding players.
+
+  Entering Play
+  Each Boss enters play with his associated ally
+  tokens.
+
+  You can tell which ally tokens enter play with each
+  Boss by reading the right side of the token's type
+  line. The number following the Boss's name tells you
+  how many copies of that ally token enter play with
+  the Boss. For example, eight Firesworn enter play
+  with Garr.
+
+6
+
+WOW MC RB.indd 8  3/9/07 10:46:29 AM
+When a rune Boss enters play, put his rune face up into your rune row, which is next
+to--but separate from--your resource row. (See "The Runes" in the "Minions,
+Runes, and Resources" section for more information.)
+
+The rune Bosses are Magmadar, Gehennas, Garr, Baron Geddon, Shazzrah, Sulfuron
+Harbinger, and Golemagg the Incinerator.
+
+Separate Graveyards
+
+The Molten CoreTM Main deck, Minion deck, and Ragnaros deck each has a separate
+graveyard. When a card from one of these decks is destroyed or discarded, it goes to
+that deck's graveyard. These graveyards must be kept separate.
+
+Players can't remove cards from these graveyards. Once a card goes to any of a Boss
+player's graveyards, it can't leave that zone.
+
+Running out of Cards
+If the Molten CoreTM Main deck, Minion deck, or Ragnaros deck ever runs out of
+cards, the Boss player replenishes it by shuffling the deck's graveyard and turning it
+face down.
+
+WOW MC RB.indd 9             7
+                  3/9/07 10:46:46 AM
+Boss Turn Sequence
+
+The Boss player's turn sequence is shown below:
+
+        8                                        3/9/07 10:47:03 AM
+WOW MC RB.indd 10
+The Boss player readies all of his or her cards during his or her ready step, including
+all runes.
+
+At the start of his or her draw step, the Boss player draws one card.
+
+If there is no Boss in play during the new Boss phase, reveal the next Boss, along
+with his associated ally tokens and rune (where applicable). Bosses enter the game
+in ascending order by the number on the right side of their type line. (See "Entering
+Play" in the "Ten Bosses" section for more information.) Players have the chance to
+respond to this. Then, the Boss, ally tokens, and rune enter play at the same time.
+
+During the Minion phase, the Boss player puts the top card of the Minion deck face
+down into his or her resource row without looking at it.
+
+Minions, Runes, and Resources
+
+The Boss player does not place resources like the raiding players do. Instead, he or
+she has two ways to pay resource costs.
+
+The Minion Deck
+During the Minion phase of the Boss player's turn, he or she takes the top card of the
+Minion deck and puts it face down into his or her resource row without looking at it.
+
+These face-down cards work just like ordinary resources, with two important
+exceptions:
+· They can't be destroyed or otherwise leave the Boss player's resource row until
+
+    the current Boss is destroyed.
+· When the current Boss is destroyed, all of the Boss player's resources (the face-
+
+    down Minions) leave play and then re-enter play face up as allies under the Boss
+    player's control. (Note: Just like normal allies, Minions can't attack or use
+    powers until they've been under the Boss player's control since the start of his or
+    her most recent turn.)
+
+WOW MC RB.indd 11             9
+                   3/9/07 10:47:20 AM
+The Runes
+Runes are a new card type in the WoW® TCG. When a rune Boss enters play, put that
+Boss's rune face up next to the Boss player's resource row.
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               Art by: Steve Tappin
+
+  Each face-up rune has powers that can help the Boss player.
+
+  Runes can be exhausted to pay resource costs just like ordinary resources. However,
+  a rune is not considered a resource. Effects that count resources do not count runes.
+
+           Example: You have Volcanic Lair in play, an ongoing ability that
+           reads, "At the start of your turn, if you have five or more resources,
+           destroy target opposing hero." You have four face-down Minions in
+           your resource row and one face-up rune in your rune row. While you
+           can exhaust the rune to pay resource costs, it doesn't count as a
+           resource, so you're considered to have only four resources in play.
+           Because of this, Volcanic Lair's power doesn't trigger this turn.
+
+  As a rune Boss is destroyed, turn his rune face down but leave it next to the resource
+  row. A face-down rune can still be exhausted to pay resource costs, though it still
+  doesn't count as a resource.
+
+  A face-down rune no longer has active powers.
+
+  Recap
+
+  The Boss player puts the top card of the Minion deck face down into his or her
+
+  resource row during the Minion phase of his or her turn. Every time a Boss is
+  destroyed, the Boss player loses all of his or her resources (as they become allies).
+
+  Every time a rune Boss enters play, the Boss player gets an additional rune with
+  which to pay resource costs. Runes remain in play even after a Boss is destroyed.
+
+10
+
+WOW MC RB.indd 12  3/9/07 10:47:37 AM
+Boss Destruction
+
+When a Boss is destroyed, the Boss player does the following in order:
+· Removes the Boss from the game.
+· If the Boss has a rune, the Boss player turns the rune face down. The face-down
+
+    rune remains in the rune row and can be exhausted to pay resource costs.
+· Removes all of his or her resources (the face-down Minions) from the game, then
+
+    puts them into play face up as allies.
+
+The next Boss will enter play on the Boss player's next turn. (See the "Boss Turn
+Sequence" section for more information.)
+
+All Minions and ally tokens remain in play even if the current Boss is destroyed.
+
+Endgame
+
+Majordomo Executus
+Majordomo Executus is the last Boss the raiding players
+must face before Ragnaros awakens. Majordomo
+Executus has no health value in his lower right corner
+because there's no way for him to take fatal damage. The
+only way to defeat him is by destroying all of his Minions
+and ally tokens. Once that happens, Majordomo Executus
+flips and announces the awakening of Ragnaros.
+
+Ragnaros Awakens
+When Majordomo Executus flips, he tells the players that
+Ragnaros awakens. When this happens, the Boss player
+immediately does the following in order:
+· Removes Majordomo Executus from the game.
+· Removes the Main deck and its graveyard
+
+    from the game.
+· Removes his or her hand from the game.
+· Removes his or her allies (Minions and ally tokens)
+
+    from the game.
+· Removes his or her resources (the face-down
+
+                                                                                                                           11
+
+WOW MC RB.indd 13  3/9/07 10:47:57 AM
+Minions) from the game, then puts
+    them into play face up as allies.
+
+· Puts Ragnaros into play with his Submerged side (the side with "Submerged" on
+    the right side of the type line) face up.
+
+· Shuffles the Ragnaros deck and draws a starting hand of seven cards.
+    Ragnaros's maximum hand size is ten. Note: Ragnaros can't mulligan his
+    starting hand.
+
+Fire Damage
+Ragnaros and his associated ally token, Son of Flame, have a special power in their
+text box:
+"This character can't be dealt fire ( ) damage."
+
+This means they can't be dealt damage from a card that deals fire damage, nor can
+they be dealt combat damage from a character or weapon with the ATK icon.
+
+                                     The Allies
+
+Two Kinds of Allies
+
+Two kinds of allies assist the Molten CoreTM Bosses against the raiding players: the
+Minions and the ally tokens.
+
+The Molten CoreTM ally tokens are two sided. Most of them enter play with their
+associated Bosses. (See "Entering Play" in the "Ten Bosses" section for more
+information.) Like all ally tokens, they cease to exist outside of the play zone.
+
+                   Ally Token Front  Ally Token Back
+
+                                              Flamewaker Priest
+
+                                     Ally Token -- Flamewaker Sulfuron Harbinger: 4
+
+                                     Flamewaker Priest heals 4 damage from
+
+                                     target hero or ally. Use only on your turn.
+
+                                     1 5 MOLTEN CORE
+                                                              TOKEN 2/6
+                                                 Eric Browning
+
+       12                                                                            3/9/07 10:48:10 AM
+WOW MC RB.indd 14
+The Minions start the game in the Minion deck. Minions enter play first as resources,
+then as allies when a Boss is destroyed. (See "The Minion Deck" in the "Minions,
+Runes, and Resources" section for more information.) When a Minion is destroyed, it
+goes to the graveyard for the Minion deck, not the Main deck's graveyard.
+
+                   Minion Front  Minion Back
+
+Just like normal allies, Molten CoreTM ally tokens and Minions can't attack or use
+     powers until they've been under the Boss player's control since the start of his
+
+or her most recent turn.
+
+Special Ally Rules
+
+Much like the Boss player's resources are immune to removal (see "The Minion Deck"
+in "Minions, Runes, and Resources"), the Minions and ally tokens are immune to
+some forms of leaving play. The only way for them to leave play is by taking fatal
+damage or specifically being destroyed. If an effect would have you put a Molten
+CoreTM Minion or ally token into its owner's hand or on top of its owner's deck, or
+otherwise remove it from play, leave it in play instead.
+
+Minions and ally tokens can change controllers.
+
+WOW MC RB.indd 15                                       13
+                                              3/9/07 10:48:24 AM
+       The Treasure Pack
+
+The treasure pack comes with ten randomized cards.
+
+Some of the treasure pack cards are especially good in raid scenarios. All of the
+treasure pack cards are playable in traditional games.
+
+You can save opening the treasure pack to reward raiding players who finally defeat
+Ragnaros, or you can choose to open it right away. It's up to you.
+
+       14          3/9/07 10:48:41 AM
+WOW MC RB.indd 16
+                   NO TES
+
+WOW MC RB.indd 17                    15
+                           3/9/07 10:48:56 AM
+  Upper Deck Entertainment TCG Credits
+
+  Molten CoreTM Design Lead: Danny Mandel, Mike Girard
+  Molten CoreTM Development Lead: Brian Kibler, Ken Ho
+  Molten CoreTM Design and Development Team: Eric Bess, Ben Cichoski, Mike
+  Hummel, Ken Ho, Jeff Liu, Morgan Whitmont
+  Additional Design and Development: Ben Brode, Shawn Carnes, Jeff Donais,
+  Cory Jones
+  World of Warcraft® TCG Engine Design: Mike Hummel, Brian Kibler, Danny Mandel
+  Additional Engine Design: Eric Bess, Ben Brode, Shawn Carnes, Ben Cichoski, Jeff
+  Donais, Dave Hewitt, Ken Ho, Cory Jones, Paul Ross, Kate Sullivan, Morgan Whitmont
+  Brand Management: Dan Bojanowski (lead), Eric Schumann
+  Editing: Cate Muscat (lead), Nicholas Rogone, Kate Sullivan, Rob Vaux
+  Graphic Design: Brian Bateman (lead), David Lomeli, Michele Mejia, Scott Reyes
+  Creative Content Manager: Stan!
+  Flavor Text: Brian Kibler, Jeff Grubb, Brandon Male, Drew Walker
+  Rulebook: Danny Mandel, Cate Muscat
+  Rules Team: Paul Ross (lead), Edwin Teh
+  Art Direction: Jeremy Cranford
+  Production: Louise Bateman, Rudy Diaz, Mike Eggleston, Kim Forrai, Adam Kelzer,
+  Angel Sanchez, Anita Spangler, Luis Sumano, Gordon Tucker, Wendy Wagner,
+  Armando Villalobos
+  Project Management: Sean Dillon, Jennifer Perrigo
+  Chairman and CEO, Upper Deck Company: Richard McWilliam
+  Director, Game Development Group: Jeff Donais
+  UDE Special Thanks: Dives of Wipe Club, Farmer Brode, Captain Volume, Tony "Idea
+  Man" Hsu, Ben George, Dark Talisman, Lost Anarchy, The Girl Scouts, Ragnrok the
+  Heavy, the Orclings (Ruby Emma Reed-Elliott, Jubilee Nation Bojanowski, Augustus
+  Erik Cichoski, Hailey Marie Hummel), Monkey & Kitty
+
+16
+
+WOW MC RB.indd 18  3/9/07 10:49:11 AM
+  Blizzard Entertainment TCG Credits
+
+Lead Developer: Shawn Carnes
+Art Director: Glenn Rane
+Producer: Ben Brode
+Director of Global Licensing: Cory Jones
+Licensing Manager: Brian Hsieh
+Playtesters: Sean Wang, Tony Hsu, Shane Cargilo, Clayton Dubin, Brian Fattorini
+Blizzard Special Thanks: Chris Metzen, Gloria Soto, Joanna Cleland-Jolly, Evelyn
+Fredericksen, Samwise Didier, Gil Shif, J. Allen Brack & the World of Warcraft®
+Development Team, and all of the Blizzard employee TCG fanatics!
+
+WOW MC RB.indd 19            17
+                   3/9/07 10:49:30 AM
+WOW MC RB.indd 20  3/9/07 10:49:36 AM
+

@@ -1,0 +1,315 @@
+WOW Onyxia RB.indd 3  9/13/06 10:47:02 AM
+   Table of Contents
+
+Overview........................................................1
+What's in this Box?.........................................1
+Object of the Game..........................................1
+Setup .........................................................2
+Gameplay........................................................2
+Playing the Event Deck....................................6
+Playing the Onyxia Raid Deck.............................7
+Whelps .........................................................7.
+Building Your Own Onyxia .
+Raid Deck.......................................................8.
+The Treasure Pack..........................................8
+Credits .........................................................9
+
+WOW Onyxia RB.indd 4                                                9/13/06 10:47:05 AM
+              Overview
+
+Whether masquerading among Stormwind's elite or brooding within her fiery lair deep in the
+
+Wyrmbog, Onyxia is a foe not to be trifled with. One of the few remaining elder dragons in Azeroth,
+the Behemoth of the Black Flight is a master tactician with elaborate machinations to return her
+kind to power. With cunning surpassed only by prowess, adventurers foolish enough to face her find
+themselves wishing for a painless death--but Onyxia is not in the business of granting wishes.
+
+In this game, one player will take on the role of Onyxia, and the other players will take on the role
+of a raiding party. The Onyxia player will play the Onyxia raid deck, and the raiding players will play
+their own decks from the World of Warcraft TCG card pool.
+
+Check out the complete World of Warcraft TCG rules on www.ude.com/wow.
+
+       What's in this Box?
+
+· 60-card Onyxia raid deck (2 copies each of 30 different cards)
+· 30-card event deck (30 different cards)
+· 10-card treasure pack
+· 3 two-sided oversize Onyxia hero cards (one for each stage)
+· 20 Whelp tokens
+
+       Object of the Game
+
+For the Onyxia player, the object of the game is simple: destroy all who dare to oppose you. A
+
+raiding player is destroyed if his or her hero takes fatal damage, or if that player has to draw a card
+and his or her deck is empty.
+
+When a raiding player's hero is destroyed, all of his or her cards are removed from the game. This
+includes abilities that are attached to other players' cards.
+
+For the raiding players, the object of the game is to work together to destroy Onyxia. The Onyxia
+player is destroyed if the Stage 3 Onyxia hero card takes fatal damage.
+
+If Onyxia is destroyed, it's a victory for all raiding players, even those who fell before the Dragon
+was defeated.
+
+                                                                                                                            1
+
+WOW Onyxia RB.indd 5  9/13/06 10:47:11 AM
+                 Setup
+
+  Each raiding player brings a standard 60-card (minimum) deck and hero. The raiding players'
+  heroes must all belong to the same faction, either Horde or Alliance.
+
+  Onyxia has a 60-card raid deck and a 30-card event deck. Shuffle each deck before the start of
+  each game.
+
+  Players should also bring a six-sided die for cards that require die rolls.
+
+  The Onyxia hero card with "Stage 1" on its
+  type line is the Onyxia player's starting hero.
+  Put this card into play at the start of the game.
+
+  Each player (including the Onyxia player)
+  draws a starting hand of seven cards.
+  Players may choose to mulligan as normal.
+
+  The Onyxia player draws a starting hand from the Onyxia raid deck, not the event deck. Unlike the
+  raiding players, the Onyxia player's maximum hand size is ten cards. The raiding players' maximum
+  hand size is seven cards.
+
+  The Onyxia player goes first, and then play proceeds clockwise. Just like in a traditional game, the
+  first player (Onyxia) skips drawing a card during the first draw step.
+
+               Gameplay
+
+  The game plays like a traditional multiplayer game of the WoW TCG. For the raiding team, a hero or
+  ally with protector can protect any friendly hero or ally.
+
+             Example: Warrax has the ability Defensive Stance, which gives him protector.
+             Onyxia attacks Boris Brightbeard, a friendly hero. Warrax can exhaust to protect
+             Boris, forcing Onyxia to fight him instead.
+
+  If a raiding player's hero is destroyed, all of his or her cards are removed from the game. This
+  includes abilities that are attached to other players' cards.
+
+  Like in a multiplayer game, Onyxia and the Whelps can attack any opposing hero or ally. The Onyxia
+  player doesn't have to attack the same hero or ally each turn. Players from the raiding team can
+  choose to attack Onyxia or any of the Whelps.
+
+  However, there are some important differences between a traditional multiplayer game and a raid scenario.
+
+2
+
+WOW Onyxia RB.indd 6  9/13/06 10:47:25 AM
+Three Stages
+
+The game takes place over three different stages. Many Onyxia abilities interact with the current
+stage, and some can be played only on certain stages. Cards that can be played only on a certain
+stage have "Stage X Only" in bold on the top of their text box.
+
+There's a different Onyxia hero card for each stage, and each one
+has its own powers and health.
+
+Each Onyxia hero card has a flip power that the Onyxia player can
+use once while that card is in play. To use this power, follow the
+instructions on the card and flip it face down.
+
+When Onyxia takes fatal damage on stage 1 or 2, immediately
+replace the Onyxia hero card in play with the one for the next
+stage. When Onyxia takes fatal damage on stage 3, the Dragon is
+destroyed, and the raiding players win the game.
+
+When a new Onyxia hero card replaces a previous one, the new card is treated just like the old one
+in most ways.
+
+· The new Onyxia hero card enters play in the same orientation (ready or exhausted) as the previous one.
+
+· The new Onyxia hero card retains all attachments that were on the previous one.
+          Example: The Stage 1 Onyxia hero card has a Curse of Agony attached to it.
+          When Stage 1 Onyxia takes fatal damage, it's replaced with the Stage 2 Onyxia,
+          and the Curse of Agony remains attached to it. If Curse of Agony has any agony
+          counters on it, those counters also remain.
+
+· The new Onyxia hero card retains all modifiers that were affecting the previous one.
+          Example: The Stage 2 Onyxia hero card is exhausted by Gouge, so it can't ready
+          during its controller's next ready step. During the same turn, the Stage 2 Onyxia
+          is destroyed, and the Stage 3 Onyxia enters play. The new Onyxia is still affected
+          by Gouge, so it won't be able to ready during the Onyxia player's next ready step.
+
+· Damage on one Onyxia hero card does not carry over to the next one. The new Onyxia hero card
+  enters play with no damage on it.
+          Example: Stage 1 Onyxia has 19 damage. One more damage will send the game to
+          stage 2. A Shaman hero deals 4 nature damage to Onyxia with a Lightning Bolt, but
+          the extra 3 damage is wasted, because Stage 2 Onyxia enters play with 0 damage.
+
+· The new Onyxia hero card enters play face up.
+
+                                                                                                                            3
+
+WOW Onyxia RB.indd 7  9/13/06 10:47:38 AM
+Stage-Based Draw
+
+During the Onyxia player's draw step, he or she draws cards equal to the current stage. The Onyxia
+player draws one card per draw step on stage 1, two cards on stage 2, and three cards on stage 3.
+
+The Onyxia player has a maximum hand size of ten cards, so sometimes (especially in the later
+stages) he or she will have to discard down to ten cards at the end of the turn.
+
+The raiding players have a maximum hand size of seven cards. If a raiding player has more than
+seven cards at the end of his or her turn, that player must discard down to seven cards.
+
+The Event Phase
+
+There are some important differences between how the Onyxia player and the raiding players play
+a raid scenario. First, the Onyxia raid deck does not have quests. (Onyxia cleared out her quest log
+long, long ago.) In addition, the Onyxia player isn't allowed to place a resource each turn. Instead,
+the Onyxia player has an event phase.
+
+Each raiding player's turn follows the phases and steps of a traditional game, as described by the
+diagram below:
+
+        4             9/13/06 10:47:41 AM
+WOW Onyxia RB.indd 8
+Onyxia's turn sequence is slightly different:
+
+WOW Onyxia RB.indd 9                                        5
+                                               9/13/06 10:47:44 AM
+During the event phase, the Onyxia player reveals the top card of the event deck and follows its
+instructions. Once the card has resolved, the Onyxia player adds it face down to his or her resource
+row. That card then becomes a resource and can be exhausted to play abilities and use powers.
+
+Generally, the Onyxia player gains one resource a turn, though some events can alter that.
+
+    Playing the Event Deck
+
+While most events help the Onyxia player, some of them benefit all players, and a few help just the
+raiding players.
+
+The game text on event cards is directed at the Onyxia player. For example, if an event reads, "Draw a
+card," the Onyxia player draws a card. When an event refers to "you," it is referring to the Onyxia player.
+
+Event cards use the chain. This means that once an event
+is revealed and all targets have been selected, each player
+(starting with the Onyxia player and going clockwise) has the
+opportunity to respond with cards and effects before the
+event resolves.
+
+When an event card resolves, the Onyxia player puts it
+face down and ready into his or her resource row. That
+card then becomes a resource and can be exhausted to
+play abilities and use powers.
+
+Some events have a duration that lasts several turns. You can
+put those cards face up in the Onyxia player's resource row as a reminder until
+their effects wear off. If you do this, the resource is still considered to be face down and can be
+exhausted to play cards and use powers.
+
+Event cards can only be in the event deck, in the event discard pile, in the Onyxia player's resource
+row, on the chain, or removed from the game. If an effect would put an event card anywhere else,
+ignore that effect.
+
+Cards from the event deck can only be played in Onyxia raid scenarios.
+
+        6              9/13/06 10:47:57 AM
+WOW Onyxia RB.indd 10
+Playing the Onyxia Raid Deck
+
+The Onyxia raid deck is designed to be played against three to five players. While some cards scale
+up depending on the size of the raiding party, in general, the more raiding players in a game, the
+easier it is to beat Onyxia. With five well-built decks, the raiding players should have a fair chance.
+With four raiding players, it'll be a real challenge. And with only three, it'll be an uphill battle.
+
+While the Onyxia raid deck was designed to take on three to five opponents, you can play with more
+or fewer players. However, playing against more than five opponents will be a tough challenge for
+the Onyxia player. On the other hand, opposing Onyxia with only one or two players will go relatively
+quickly--probably because Onyxia will devour them right away.
+
+Onyxia and the Whelps can attack any opposing hero or ally. The Onyxia player doesn't have to
+attack the same hero or ally each turn.
+
+Onyxia doesn't have a built-in ATK. However, each Onyxia hero card gives her an ATK bonus while
+she's attacking. Onyxia doesn't have weapons, but she has abilities that can further increase her
+ATK while attacking.
+
+Stage 2 Onyxia has long-range. This means that while she's attacking, defenders deal no combat
+damage to her.
+
+Cards from the Onyxia raid deck can only be played in Onyxia raid scenarios.
+
+               Whelps
+
+Several events and cards in the Onyxia raid deck put Whelp ally tokens into play. This box comes
+with 20 Whelp tokens. Each token represents a single Whelp.
+
+WOW Onyxia RB.indd 11               7
+                       9/13/06 10:48:09 AM
+Building Your Own Onyxia Raid Deck
+
+The Onyxia raid deck comes with two copies each of 30 different cards. You can customize your deck
+once you build up a collection of Onyxia cards. The rules are the same as for building a regular deck:
+
+      · 60 card minimum
+      · No more than 4 copies of any one card.
+      · Only cards with the Onyxia trait icon can go into
+
+             the Onyxia raid deck. Event cards go into a separate deck.
+
+If you customize your Onyxia raid deck, you still play with the same three Onyxia hero cards.
+You can't modify the event deck.
+
+       The Treasure Pack
+
+The treasure pack comes with ten cards: two epics, three rares, and five uncommons.
+Some of the treasure pack cards are especially good in raid scenarios. All of the treasure pack cards
+are playable in traditional games.
+You can save opening the treasure pack to reward raiding players who finally defeat Onyxia, or you
+can choose to open it right away. It's up to you.
+
+        8              9/13/06 10:48:21 AM
+WOW Onyxia RB.indd 12
+               Credits
+
+         Upper Deck Entertainment TCG Credits
+
+World of Warcraft TCG Engine Design: Mike Hummel, Brian Kibler, Danny Mandel
+Additional Engine Design: Eric Bess, Ben Brode, Shawn Carnes, Ben Cichoski,
+Jeff Donais, Dave Hewitt, Ken Ho, Cory Jones, Paul Ross, Kate Sullivan, Morgan Whitmont
+Onyxia's Lair Design Lead: Danny Mandel
+Onyxia's Lair Development Lead: Brian Kibler
+Onyxia's Lair Design and Development Team: Eric Bess, Ben Cichoski, Mike Hummel, Ken Ho,
+Morgan Whitmont
+Additional Design and Development: Ben Brode, Shawn Carnes, Jeff Donais,
+Dave Hewitt, Cory Jones
+Brand Management: Dave Hewitt (lead), Eric Schumann
+Graphic Design: Brian Bateman (lead), David Lomeli (Creative Manager), Michele Mejia,
+Scott Reyes
+Creative Content Manager: Stan!
+Flavor Text: Mike Hummel, Ben Cichoski, Brian Kibler, Danny Mandel, Regan Norris, Ben Brode,
+Shawn Carnes
+Editing: Cate Muscat
+Rulebook: Danny Mandel, Cate Muscat
+Art Direction: Mark Irwin, Jeremy Cranford
+Production: Louise Bateman, Rudy Diaz, Mike Eggleston, Kim Forral, Angel Sanchez,
+Justin Schmunk, Anita Spangler, Gordon Tucker, Wendy Wagner, Armando Villalobos
+Project Management: Sean Dillon
+Chairman and CEO, Upper Deck Company: Richard McWilliam
+President and COO, Upper Deck Company: Bob Andrews
+Director, Game Development Group: Jeff Donais
+Director, Brand Management Team: Cory Jones
+UDE Special Thanks: Dives of Wipe Club, Farmer Brode, Captain Volume, Tony "Idea Man" Hsu, Dark
+Talisman, Lost Anarchy, Shock, The Girl Scouts, Ragnrok the Heavy, Euri's Gerbils, the Orclings (Ruby
+Emma Reed-Elliott, Jubilee Nation Bojanowski, Augustus Erik Cichoski, Hailey Marie Hummel), Monkey
+
+            Blizzard Entertainment TCG Credits
+
+Lead Developer: Shawn Carnes
+Art Direction: Glenn Rane, Samwise Didier
+Producer: Ben Brode
+Blizzard Special Thanks: Chris Metzen, Gloria Soto, Joanna Cleland, Lisa Pearce, Brian Hsieh
+
+                                                                                                                           9
+
+WOW Onyxia RB.indd 13  9/13/06 10:48:34 AM
+

@@ -1,0 +1,713 @@
+World of WarcraftTM TCG Raid Rules
+
+Updated September 29, 2008
+
+R1. General
+
+R100. Raid fundamentals
+
+R100.1  Raid decks are played by a Boss player against a number of raiding players. Each raiding player
+        needs a deck and hero. If a raiding player has an Alliance hero, then no raiding player can have a
+        Horde hero, and vice versa. No other restrictions apply. For example, Traitor heroes can raid
+        with non-Traitors, and Demon heroes can raid with non-Demons.
+
+R100.2  A Boss player wins if no other players remain in the game. The raiding players win if the final
+        Boss is destroyed by fatal damage.
+
+R100.3  A Boss player's action phase is normal in all ways except that he or she can't place a resource. In
+        addition, a Boss player can't look at his or her face-down resources at any time.
+
+R100.4  A Boss player's end phase follows his or her action phase, and is normal in all ways except that a
+        Boss player's maximum hand size is ten cards. Each raiding player has a maximum hand size of
+        seven cards as usual. Each player must discard down to his or her maximum hand size during the
+        wrap-up step of his or her turn as usual.
+
+R101. Boss fundamentals
+
+R101.1  A Boss is any hero in a Boss player's party. Bosses have powers on both sides. Such powers
+        function only if they're on the side currently visible.
+
+R101.1a  Usually, only one side of a Boss has a type line and damage icon. Such a Boss enters play
+         with that side face up, and has that type line and damage icon even while on its other side.
+
+R101.1b  A modifier that flips a Boss turns it over regardless of which side is visible (but see
+         R101.3a).
+
+R101.2  If a Boss is destroyed, any allies or ongoing abilities controlled by the Boss player stay in play
+        unless otherwise specified in these rules.
+
+R101.3 Special Boss Rules
+
+R101.3a  Bosses can be destroyed only by fatal damage. Opposing modifiers can't turn a Boss over or
+         remove its powers (unless that Boss is the source of the modifier that does so).
+
+R101.3b Opposing modifiers can't add cards to or remove cards from a Boss player's resource row.
+
+R101.3c  A Boss player has a separate graveyard for each deck. Opposing modifiers can't remove
+         cards from any of these decks or graveyards. A Boss player doesn't lose the game if any of
+         these decks runs out of cards. If that happens, that deck's graveyard is shuffled into that deck
+         by the game (even if cards can't leave that graveyard) and the Boss player continues drawing
+         from it. This doesn't use the chain.
+
+R101.3d  Some Bosses have the immune keyword power. An immune Boss can't be attacked,
+         damaged, or targeted. In addition, Black Temple Bosses can't attack while they're immune.
+
+                           Page 1
+R101.4  Some Bosses are represented by multiple cards, and "swap" between those cards during a raid.
+        As one Boss card swaps with another card representing the same Boss:
+
+         The new card enters play face up and the old card is removed from the game.
+         The new card enters play ready unless otherwise specified.
+         The new card enters play undamaged. Any excess damage doesn't carry over.
+         Attachments attached to the old card stay attached to the new card.
+         Counters on the old card stay on the new card.
+         Modifiers affecting the old card continue to affect the new card within their durations.
+         None of this uses the chain.
+
+R2. Onyxia's LairTM
+
+R200. Starting the raid
+
+R200.1 The Boss player shuffles the Main deck and the Event deck.
+
+R200.2 The Boss player starts the game with Onyxia Stage 1 in play.
+
+R200.3  Each player puts the top seven cards of his or her deck into hand and may mulligan as usual. The
+        Boss player uses the Main deck.
+
+R200.4  The Boss player takes the first turn and skips his or her first draw step. Play proceeds clockwise
+        with all raiding players drawing a card during their first draw step.
+
+R201. Boss player's turn
+
+R201.1  The Boss player's start phase consists of a ready step and draw step. As the draw step starts, he
+        or she draws cards equal to the current Stage (R203.1). This doesn't use the chain.
+
+R201.2  The Event phase follows the Boss player's start phase. As it starts, the Boss player reveals the
+        top card of the Event deck and adds it to the chain. Event cards can't be interrupted by players.
+
+R201.2a  As the last part of resolving an event card, put it into the Boss player's resource row face
+         down and ready.
+
+R201.2b  Some event modifiers have a duration of "this turn" or "until your next turn." Such an event
+         may be left face up in the Boss player's resource row until its duration expires, as a
+         reminder. This doesn't change its functionality; it's still a face-down resource.
+
+R201.3 The Boss player's action phase follows his or her Event phase.
+
+R202. Boss destruction
+
+R202.1  If Onyxia Stage 1 or 2 takes fatal damage, swap (R101.4) her with the next stage Onyxia. The
+        new Onyxia enters play with the same readiness as the old Onyxia.
+
+R202.2 If Onyxia Stage 3 takes fatal damage, the Boss player loses.
+
+                          Page 2
+R203. Raid-specific concepts
+
+R203.1 Stage
+
+    R203.1a There are three different stages:
+
+               Stage 1 starts as the raid starts.
+               Stage 2 starts as Onyxia Stage 2 enters play following the destruction of Onyxia Stage 1.
+               Stage 3 starts as Onyxia Stage 3 enters play following the destruction of Onyxia Stage 2.
+
+R203.1b  Some ability cards have bold text that says "Stage X Only," where X is 1, 2, or 3. Such cards
+         can be played only during that stage.
+
+R203.2 Event
+
+R203.2a  The Boss player adds the top card of the Event deck to the chain as each Event phase
+         (R201.2) starts.
+
+R203.3 Whelp
+
+R203.3a  If text refers to a Whelp, it's referring to a Dragonkin ally token named Onyxian Whelp with
+         1 [fire] ATK / 1 health.
+
+R3. Molten CoreTM
+
+R300. Starting the raid
+
+R300.1 The Boss player shuffles the Main, Minion, and Ragnaros decks.
+
+R300.2  If the raid is to be played in the standard rather than the "full clear" mode, the Boss player
+        randomly chooses three rune cards to be the Rune deck and removes the rest from the game. The
+        chosen runes are not revealed to the raiding players. In a "full clear" raid, all rune cards become
+        the Rune deck.
+
+R300.3  The Boss player orders the Rune deck from lowest to highest Boss number, then sets it aside
+        until required (R301.5a).
+
+R300.4 The Boss player starts the game with Lucifron and two Flamewaker Protectors in play.
+
+R300.5  Each player puts the top seven cards of his or her deck into hand. The Boss player uses the Main
+        deck and can't mulligan. Raiding players may mulligan as usual.
+
+R300.6  The raiding player to the left of the Boss player takes the first turn, and then play proceeds
+        clockwise. All players draw a card during their first draw step.
+
+                         Page 3
+R301. Boss player's turn
+
+R301.1  The Boss player's start phase consists of a ready step and draw step. The Boss player readies all
+        cards (including runes) and ally tokens he or she controls during his or her ready step and draws
+        one card during his or her draw step. That card is drawn from the Main deck before Ragnaros
+        awakens (R303.1), and from the Ragnaros deck thereafter.
+
+R301.2 The New Boss phase (R301.5) follows the Boss player's start phase.
+
+R301.3  The Minion phase follows the New Boss phase. As it starts, the Boss player places the top card
+        of the Minion deck face down into his or her resource row without looking at it. This doesn't use
+        the chain. Next, a priority window opens. As it closes, the Minion phase ends.
+
+R301.4 The Boss player's action phase follows his or her Minion phase.
+
+R301.5 New Boss phase
+
+R301.5a  As a New Boss phase starts, if there is a Boss in play, that phase ends and the Boss player's
+         Minion phase starts immediately. If there is no Boss in play, the following happens in order:
+
+         The Boss player reveals the next rune in the rune deck, which identifies the next Boss on its
+            type line. If there are no more runes, the next Boss is Majordomo Executus.
+
+         The Boss player identifies the ally tokens associated with the next Boss as follows:
+
+         Order  Boss                      Ally Tokens                                          Rune
+            2   Magmadar                                                                       Kress
+            3   Gehennas                  2 Flamewaker                                         Mohn
+            4   Garr                      8 Firesworn                                          Blaz
+            5   Baron Geddon                                                                   Zeth
+            6   Shazzrah                  4 Flamewaker Priest                                  Mazj
+            7   Sulfuron Harbinger        2 Core Rager                                         Koro
+            8   Golemagg the Incinerator  4 Flamewaker Elite, 4 Flamewaker Healer              Theri
+            9   Majordomo Executus
+
+         A priority window opens, an effect is added to the chain, and then the Boss player gets
+            priority. That effect can't be interrupted by players. As it resolves, the next Boss, its rune (if
+            applicable), and its associated ally tokens all enter play at the same time. As that window
+            closes, the New Boss phase ends.
+
+                                          Page 4
+R302. Boss destruction
+
+R302.1 As a Boss is destroyed, the Boss player does the following in order, without using the chain:
+
+         Removes that Boss from the game.
+         Turns all face-up runes face down.
+         Removes all Minion cards in his or her resource row from the game face up.
+
+R302.2  Next, an effect is added to the chain, then the turn player gets priority. That effect can't be
+        interrupted by players. As it resolves, the Boss player puts those Minion cards into his or her ally
+        row.
+
+R302.3  If a Main deck card refers to "your hero" while no Boss is in play, it's referring to the last Boss
+        that left play.
+
+        Example: You are the Boss player and your hero is Golemagg. You play Flames of the
+        Incinerator on your turn. Before the start of your next turn, Golemagg is destroyed. Flames of
+        the Incinerator deals 4 damage at the start of your next turn because "your hero" is still
+        referring to Golemagg. After the next Boss enters play, Flames of the Incinerator deals 1
+        damage at the start of each of your turns.
+
+        Flames of the Incinerator, 2, Ability -- Molten Core
+        Ongoing: At the start of your turn, your hero deals 1 fire damage to attached character, or 4 damage if
+        your hero is Golemagg.
+
+R303. Raid-specific concepts
+
+R303.1 Awakening
+
+R303.1a  Majordomo Executus is the penultimate Boss. He can't be destroyed. At the end of each
+         turn, if the Boss player controls no allies while Executus is in play, he flips. When he does,
+         Ragnaros awakens, which means the Boss player does the following in order, without using
+         the chain:
+
+         Removes Majordomo Executus from the game.
+         Removes the Main deck and its graveyard from the game.
+         Removes his or her hand from the game.
+         Removes any allies in his or her party from the game.
+         Removes all Minion cards in his or her resource row from the game face up.
+
+R303.1b  Next, an effect is added to the chain, then the turn player gets priority. That effect can't be
+         interrupted by players. As it resolves, the Boss player does the following in order, without
+         using the chain:
+
+         Puts those Minion cards into his or her ally row.
+         Puts Ragnaros into play with his Submerged side face up.
+         Shuffles the Ragnaros deck, puts the top seven cards into hand, and can't mulligan. The Boss
+
+            player draws from the Ragnaros deck for the rest of the raid.
+
+                              Page 5
+R303.2 Minions and ally tokens
+
+R303.2a  As each Minion phase starts, the Boss player places the top card of the Minion deck face
+         down into his or her resource row without looking at it. Only Minion cards can enter the
+         Boss player's resource row. If a modifier tells the Boss player to put a card from his or her
+         deck into his or her resource row, that card is taken from the Minion deck.
+
+R303.2b  Minions and ally tokens put into play by the Boss player can't leave play unless they are
+         destroyed (either directly or by fatal damage).
+
+R303.3 Rune
+
+R303.3a  Rune is a new card type specific to Molten CoreTM. Like resources, runes can be exhausted
+         to pay resource costs whether face up or face down. However, runes are not resources.
+         Modifiers that count resources don't count runes, and vice versa.
+
+         Example: Volcanic Lair reads, "At the start of your turn, if you have five or more resources,
+         destroy target opposing hero." This counts only face-down Minion cards in the Boss
+         player's resource row; it doesn't count runes.
+
+R303.3b  Each rune is associated with the Boss specified on its type line, and enters play as that Boss
+         enters play. Runes enter play face up in the Boss player's rune row, next to his or her
+         resource row. Each rune has one or more powers that function while it stays face up.
+
+R303.3c  As part of destroying a Boss (R302), its rune is turned face down. A face-down rune stays in
+         the rune row and can still be exhausted to pay resource costs. Runes can't leave play.
+
+R304. Molten CoreTM FAQ
+
+What is The Bomb? Is it related to the Living Bomb ability?
+
+The Bomb is an element of the Baron Geddon encounter, generated by the powers of the Rune of Zeth. At
+the end of each of the Boss player's turns, he or she chooses an opposing hero to be The Bomb. Players may
+wish to write down which hero is The Bomb, or mark it with a distinctive counter. At the start of each of the
+Boss player's turns, Baron Geddon deals 5 fire damage to The Bomb and each ally in The Bomb's party. The
+Boss player then chooses a new (or the same) hero to be The Bomb at the end of his or her turn, and so on.
+
+Living Bomb is an ongoing ability that is particularly powerful during the Baron Geddon encounter, but it
+isn't related to the mechanics of The Bomb.
+
+                                Page 6
+Ancient Core Hound, Ally--Core Hound Minion, 3 [Melee] ATK / 3 Health
+When Ancient Core Hound enters play, roll a die. <p> 1-2: Exhaust all opposing allies. <p> 3-4: Ancient Core
+Hound deals 2 fire damage to each ally in a party of your choice. <p> 5-6: Put an opposing ally into its owner's
+hand.
+
+The Boss player rolls a die as the triggered effect resolves, then chooses a party (3-4) or opposing ally (5-6)
+as required. Ancient Core Hound can put an untargetable ally into its owner's hand.
+
+Azuresong Mageblade, 4, Weapon--Sword, Melee (1), 1 ATK, 3 Strike
+When you draw a card, put a verse counter on Azuresong Mageblade. <p> (1), Remove three verse counters >>>
+Draw a card.
+
+To use the power of a particular Azuresong Mageblade, you must remove three counters from that particular
+card. Using the second power to draw a card will trigger the first power.
+
+Benediction, 5, Priest, Two-Handed Weapon--Staff, Melee (1), 1 ATK, 4 Strike
+When your hero heals damage with an ability, draw a card. <p> Exhaust your hero >>> Put a card named
+Anathema from your graveyard into play.
+
+Benediction triggers multiple times if your hero heals damage from multiple characters with a single ability,
+but it triggers only once for each character, regardless of how much damage is healed. Anathema is a card
+from the Through the Dark Portal set. Having both in play will cause a uniqueness violation.
+
+Rune of Kress, Rune--Magmadar, Boss 2
+At the end of your turn, roll a die. <p> 1: Nothing happens. <p> 2-3: Magmadar deals 1 fire damage to each hero
+and ally in a party of your choice. <p> 4-5: Magmadar deals 3 fire damage to an opposing hero or ally. <p> 6: Each
+opponent puts an ally from his party into its owner's hand.
+
+The Boss player rolls a die as the triggered effect resolves, then chooses a party (2-3) or opposing character
+(4-5) as required. He or she can choose an untargetable character. If the die roll is 6, each opponent chooses
+an ally from his or her party.
+
+Shadowstrike, 3, Two-Handed Weapon--Polearm, Melee (1), 3 ATK, 3 Strike
+(1), Destroy Shadowstrike >>> If your hero has Enchanting, draw two cards.
+
+Your hero has Enchanting if it has the Enchanting profession on its type line.
+
+Shazzrah, Hero--Flamewaker, Boss 6, 13 Health
+[Front]: Shazzrah has +2 ATK while attacking and can attack only heroes. <p> (1) >>> Flip Shazzrah. Use only
+once per turn.
+[Back]: When Shazzrah flips to this side, drop him from at least three feet above play. He deals 5 arcane damage to
+each opposing hero and ally he lands on. <p> At the start of your turn, flip Shazzrah.
+
+Before Shazzrah's triggered effect resolves, each player is free to move his or her characters, but they must
+remain lying flat and wholly on the table within the boundaries of that player's "normal play area," which
+has the approximate dimensions of a playmat. Each opposing ally token must be temporarily proxied with a
+normal card. Characters can't be positioned so they overlap other characters. As Shazzrah drops, players
+can't interfere with him or any cards in play. Shazzrah lands on a character if it comes to rest touching that
+character or any object(s) touching or overlapping that character, including sleeves, counters, or other cards.
+And if you think of any other way to mess with him, that doesn't work either!
+
+                                                            Page 7
+R4. Magtheridon's LairTM
+
+R400. Starting the raid
+
+R400.1 The Boss player shuffles the Main deck.
+
+R400.2 The Boss player starts the game with Chained Magtheridon and five Channelers in play.
+
+R400.3 Each player puts the top seven cards of his or her deck into hand and may mulligan as usual.
+
+R400.4  The raiding player to the left of the Boss player takes the first turn, and then play proceeds
+        clockwise. All players draw a card during their first draw step.
+
+R401. Boss player's turn
+
+R401.1 The Boss player's start phase consists of a ready step and draw step.
+
+R401.1a  As the Boss player's ready step starts, he or she readies all of his or her cards in play.
+         Simultaneously, he or she also places a card from the Blood pile into his or her resource row
+         face down and ready. Simultaneously, if Magtheridon is Unleashed, the Boss player also
+         gains a Blood (R402.2). None of this uses the chain.
+
+R401.1b  As the Boss player's draw step starts, he or she draws a card, or two cards if Magtheridon is
+         Unleashed. None of this uses the chain.
+
+R401.2 The Boss player's action phase follows his or her start phase as usual.
+
+R402. Raid-specific concepts
+
+R402.1 Unleashing
+
+R402.1a  If a Channeler would leave play, remove it from the game instead. When the last Channeler
+         leaves the Boss player's party, or the Boss player places his or her fifth resource, flip
+         Magtheridon. This triggers an effect that can't be interrupted by players. As it resolves, the
+         Boss player does the following:
+
+         Gain a Blood (R402.2)
+         Put all five Cubes (R402.3) into play
+         Put Magtheridon's Lair (R402.4) into play with its Cooldown side face up
+         Swap (R101.4) Chained Magtheridon with Unleashed Magtheridon.
+
+                              Page 8
+R402.2 Blood
+
+R402.2a  As each of the Boss player's turns start, he or she places a Blood card into his or her
+         resource row face down and ready. These cards are normal resources for the rest of the
+         game; they are no longer Blood cards.
+
+R402.2b  After Magtheridon is Unleashed, the Boss player also gains a Blood at the same time. To
+         gain a Blood, take a card from the Blood pile and put it into play face up. Blood cards in
+         play are not resources. Raiding players can't interact with them in any way.
+
+R402.2c  Some cards allow the Boss player to destroy Blood cards to pay a cost. A Blood that has
+         been destroyed doesn't enter a graveyard; it's simply put back into the Blood pile.
+
+R402.2d  If the Boss player runs out of Blood cards, he or she can use any other means, such as
+         counters or dice, to represent the number of Blood in play and resources in his or her
+         resource row.
+
+R402.3 Cube
+
+R402.3a  Cube is a new card type specific to Magtheridon's LairTM. All five Cubes enter play as
+         Magtheridon is unleashed (R402.1) and stay in play for the rest of the raid. Raiding players
+         can't interact with Cubes except as follows:
+
+ During each raiding player's turn, that player may exhaust a character in his or her party to
+    attach a Cube to that character. A character can be exhausted this way regardless of how
+    long it has been in that player's party. The same player can exhaust multiple characters this
+    way, but no more than one Cube can be attached to the same character at the same time.
+
+ A character can exhaust to attach a Cube even if that Cube is already attached to another
+    character. If it does, that Cube detaches from the first as it attaches to the second.
+
+ Having a Cube attached doesn't stop a character from readying. If a character readies while
+    it has a Cube attached, that Cube detaches.
+
+R402.4 Lair
+
+R402.4a  Lair is a new card type specific to Magtheridon's LairTM. Magtheridon's Lair enters play
+         with its Cooldown side face up as Magtheridon is unleashed (R402.1) and stays in play for
+         the rest of the raid. Raiding players can't interact with it in any way.
+
+R402.4b At the end of each of the Boss player's turns, flip Magtheridon's Lair.
+
+R402.4c  While its Nova side is face up, at the start of the Boss player's turn, if any Cubes are
+         unattached, Magtheridon deals 10 fire damage to each opposing character, including those
+         with Cubes attached.
+
+R402.4d  When it flips to its Cooldown side, put 2 damage on each character with a Cube attached,
+         and then detach all Cubes.
+
+              Page 9
+R403. Magtheridon's LairTM FAQ
+
+Cleave Apart, 2, Instant Ability
+Destroy an ability, ready ally, and equipment controlled by target raiding player.
+
+You choose the three cards as this resolves. You can target a player who doesn't control all three.
+
+Eredar Wand of Obliteration, 4, Weapon--Wand, Wand (1), 1 [Shadow] ATK, 1 Strike
+When your hero deals shadow damage to an opponent's hero, you may destroy an ability, ally, or equipment you
+control. If you do, that opponent destroys an ability, ally, or equipment he controls.
+
+That opponent chooses the card he destroys. It need not be the same type of card you destroyed.
+
+Fel Ruination, 2, Ability
+Play only if seven or more Bloods are in play. <p> Raiding players destroy an ability, ally, or equipment they control
+for each Blood in play.
+
+If there are seven Bloods in play, the raiding players must destroy a total of seven cards they control, rather
+than seven cards each. Raiding players collectively choose the cards to be destroyed as this resolves. They
+can't choose cards that "can't be destroyed."
+
+Fiery Pits, 2, Ability
+Raiding players put 15 damage divided as they choose on any number of heroes and/or allies in their parties, putting
+no more than fatal damage on each character.
+
+"More than fatal damage" is damage in excess of a character's health. Raiding players must put a total of 15
+damage on characters in their parties, rather than 15 damage each.
+
+Glaive of the Pit, 7, Two-Handed Weapon--Polearm, Melee (1), 5 ATK, 1 Strike
+Opposing heroes have -5 health.
+
+If you play a second Glaive of the Pit, uniqueness destroys one before hero destruction is checked.
+
+Liar's Tongue Gloves, 4, Armor--Leather, Hands (1), 2 DEF
+(1), [Activate] >>> Name a card type and remove a card in your hand from the game face down. Target opponent
+guesses whether that card has that type, then reveals it. If he's right, put it into your graveyard. Otherwise, put it into
+your hand and draw two cards.
+
+The eight card types are ability, ally, armor, hero, item, location, quest, and weapon. Equipment isn't a card
+type.
+
+Superior Mana Oil, 1, Item
+Superior Mana Oil enters play attached to one of your weapons. <p> At the start of your turn, you may reveal the top
+card of your deck. If it's an ability card, put it into your hand. Otherwise, put it into your graveyard.
+
+This is the first non-ability attachment. You can play it even if you have no weapons. You choose one of
+your weapons as it resolves. If you can't, it enters your graveyard rather than play.
+
+Toss About, 2, Ability
+Play only if one or more Bloods are in play. <p> Each raiding player rolls a die. If one or more players roll odd,
+Magtheridon deals 1 melee damage to each of those players' heroes, and then all raiding players roll again.
+
+Raiding players roll repeatedly until all of them roll even at the same time. Once players start rolling, nobody
+gets priority until all players roll even, and so each player must keep rolling, even if his or her hero
+accumulates fatal damage.
+
+                                                           Page 10
+R5. Black TempleTM
+
+R500. Starting the raid
+
+R500.1  The Boss player shuffles the Main, Minion, Event, and Betrayer Event decks, and then sets aside
+        the Betrayer Event deck until required (R501.1b).
+
+R500.2 The Boss player starts the game with High Warlord Naj'entus (Boss 1) in play.
+
+R500.3  Each player puts the top seven cards of his or her deck into hand. The Boss player uses the Main
+        deck. All players, including the Boss player, may mulligan as usual.
+
+R500.4  The raiding player to the left of the Boss player takes the first turn, and then play proceeds
+        clockwise. All players draw a card during their first draw step.
+
+R501. Boss player's turn
+
+R501.1  The Boss player's start phase consists of a ready step, a draw step, and, while The Betrayer is in
+        play, a Betrayer Event step.
+
+R501.1a  The Boss player readies all of his cards as the ready step starts (including all Event and
+         Betrayer Event cards) and draws one card from the Main deck as the draw step starts.
+
+R501.1b  While The Betrayer is in play, the Betrayer Event step follows the Boss player's draw step.
+         As it starts, the Boss player adds the top card of the Betrayer Event deck to the chain. Next, a
+         priority window opens. As it closes, the Betrayer Event step ends. Players can't interrupt
+         Betrayer Event cards.
+
+         All Betrayer Events are ongoing, so each enters play face up as it resolves and stays in play
+            for the rest of the game. While a Betrayer Event is face up in play, it's not a resource, and
+            raiding players can't interact with it in any way.
+
+         If the Betrayer Event deck runs out of cards, the Boss player skips this step.
+
+R501.2  The Minion phase follows the Boss player's start phase. As it starts, the Boss player places the
+        top card of the Minion deck face down into his resource row without looking at it. This doesn't
+        use the chain. Next, a priority window opens. As it closes, the Minion phase ends.
+
+R501.3 The action phase follows the Boss player's Minion phase.
+
+                          Page 11
+R502. Boss destruction and events
+
+R502.1  As a Boss is destroyed, the Boss player does the following in order. None of this uses the chain
+        unless otherwise noted:
+
+R502.1a  Removes that Boss from the game. If a card refers to "your hero" while no Boss is in play,
+         it's referring to the last Boss that left play.
+
+R502.1b Destroys all face-up Events.
+
+R502.1c  Turns each face-down Event resource face up, one at a time, and adds it to the chain, and
+         then the turn player gets priority. Players can't interrupt Event cards.
+
+         Once an Event resolves, it's put into the Event graveyard, unless it's ongoing.
+
+         If it's ongoing, it re-enters play face up, and it is put into the Event graveyard as the next
+            Boss is destroyed. While an Event is face up in play, it's not a resource, and raiding players
+            can't interact with it in any way.
+
+         After each Event resolves, the Boss player turns over the next Event and adds it to the chain,
+            until none remain.
+
+R502.1d Removes all face-down Minion resources from the game face up.
+
+R502.2  Next, an effect is added to the chain, and then the turn player gets priority. Players can't interrupt
+        that effect. As it resolves, the Boss player puts those Minion cards into play face up as allies,
+        along with the next Boss.
+
+R502.2a  Each Boss has the words "Boss Hero" followed by a number (1 through 9) on its type line.
+         Bosses enter play in ascending order.
+
+R502.2b  The next Boss enters play with the number of Event cards specified on the right side of its
+         type line. As that Boss enters play, the Boss player puts that many cards from the top of the
+         Event deck face down into his resource row without looking at them.
+
+R502.2c  Some Bosses also enter play with ally tokens. Each token specifies its associated Boss on the
+         right side of its type line, followed by the number of tokens that enter play with that Boss.
+
+Order    Boss                    Ally Tokens                               Events         Threat
+   1     High Warlord Naj'entus                                               -              4
+   2     Supremus                6 Ashtongue Channelers                       1              5
+   3     Shade of Akama                                                       2              6
+   4     Teron Gorefiend         3 Soul Fragments                             2              7
+   5     Gurtogg Bloodboil       Gathios the Shatterer, High Nethermancer     3              8
+   6     Shrine of Lost Souls    Zerevor, Lady Malande, Veras Darkshadow      3              9
+   7     Mother Shahraz                                                       3             10
+
+   8     The Illidari Council                                                 4              -
+
+        9 The Betrayer                                                        5              -
+
+                                      Page 12
+R503. Boss-specific concepts
+
+R503.1 Teron Gorefiend (Boss 4)
+
+R503.1a The following "ghost rules" apply only while Teron Gorefiend is in play.
+
+R503.1b  All players and characters are non-ghosts by default. If a player becomes a ghost, all
+         characters in that player's party also become ghosts. The Boss player never becomes a ghost.
+
+R503.1c In general, non-ghosts can't interact with ghosts, and vice versa. For example:
+
+ Ghosts can't attack or damage non-ghosts, and non-ghosts can't attack or damage ghosts.
+
+ Shadowy Constructs, however, are ghosts that can attack and damage only non-ghosts. As
+    a result, if a Construct is attacking a non-ghost, the non-ghost can't damage the Construct
+    and, if a ghost is attacking a Construct, the Construct can't damage the ghost.
+
+ Only ghost protectors can protect against ghost attackers, and only non-ghost protectors can
+    protect against non-ghost attackers.
+
+ Ghosts can't be targeted by non-ghost players or affected by non-ghost modifiers, and non-
+    ghosts can't be targeted by ghost players or affected by ghost modifiers.
+
+         Example: Player A attaches Mark of the Wild to Player B's ally. Later, Player B and his ally
+         become ghosts, while Player A remains a non-ghost. Player B's ally is no longer affected by
+         Mark of the Wild's modifier (but it remains attached), and Player A can no longer target
+         that ally.
+
+         Mark of the Wild, 2, Druid, Instant Ability--Restoration
+         Attach to target ally. <p> Ongoing: Attached ally has +2 ATK / +2 health.
+
+R503.1d As part of Teron flipping or leaving play, all ghosts revert to being non-ghosts.
+
+R503.2 Reliquary of Souls (Boss 6)
+
+R503.2a  The Reliquary of Souls appears across the four sides of two different cards. It enters play
+         with the Shrine of Lost Souls face up until it flips to become the Essence of Suffering.
+
+R503.2b  If the Essence of Suffering would be destroyed, swap (R101.4) it with the Essence of Desire
+         instead. After it flips to become the Essence of Anger, this Boss can be destroyed.
+
+R503.2c Through each of these transitions (including Essence of Suffering to Essence of Desire)
+
+ Any attachments stay attached to the Boss.
+ If the Boss is ready/exhausted, it remains ready/exhausted.
+ Any modifiers affecting the Boss continue to do so within their durations.
+ No Event or Minion cards are flipped because no Boss has been destroyed.
+
+                                    Page 13
+R503.3 The Betrayer (Boss 9)
+
+R503.3a  As The Betrayer enters play, in addition to following the rules in R502.2, the Boss player
+         also discards his hand into the Main deck graveyard, then puts seven new cards from the
+         Main deck into hand. These seven cards can't be mulliganed.
+
+R503.3b  Since The Betrayer is the final Boss, the cards in his resource row are never turned face up.
+         They are used only to pay resource costs.
+
+R503.3c  While The Betrayer is in play, the Betrayer Event step (R501.1b) follows the Boss player's
+         draw step.
+
+R504. Raid-specific concepts
+
+R504.1 Minions
+
+R504.1a  If a Minion is destroyed, it's put into the Minion graveyard. If a Minion would otherwise
+         leave play during a Raid, it's destroyed instead.
+
+R504.1b  Minions have a resource cost in their top left corner because they can be included in regular
+         decks outside of this Raid. During a Raid game, the Boss player never pays a resource cost
+         to play a Minion. During both Raid and regular games, if a link or modifier looks for a
+         Minion card's cost, it uses that card's printed resource cost.
+
+R504.2 Threat Level
+
+R504.2a  Most Bosses have a threat level in their upper-right corner. During the wrap-up step of each
+         raiding player's turn, if he has more resources than the current Boss's threat level, that player
+         must destroy resources until he or she has resources equal to that threat level.
+
+R504.2b  Boss 8 (The Illidari Council) and Boss 9 (The Betrayer) have no threat level, allowing
+         raiding players to have any number of resources.
+
+                              Page 14
+R505. Black TempleTM FAQ
+
+Blessed Medallion of Karabor, 8, Item, Neck (1)
+Remove Blessed Medallion of Karabor from the game >>> Move to the right of another friendly player. Use only on
+your turn.
+
+Moving to the right of another player means that your position in turn order becomes immediately before that
+player's. You may physically move yourself and your cards to the immediate right of that player if this is
+agreeable to all players. Your turn continues as normal, and then that player takes the next turn. If there are
+only two players, nothing happens.
+
+Cursed Vision of Sargeras, 3, Armor--Leather, Head (1), 2 DEF
+[Activate] >>> If you completed a quest this turn, turn target resource face down.
+
+You can activate this card whether or not you've completed a quest this turn, because it checks only on
+resolution. You pass the check even if you completed a quest before Cursed Vision of Sargeras entered play.
+A quest has been completed as soon as its reward effect has been successfully added to the chain.
+
+Entry into the Black Temple, Quest
+Pay (5) to complete this quest. <p> Reward: Draw a card for each different class among allies in your party.
+
+This counts classes rather than allies. The ten classes are death knight, druid, hunter, mage, paladin, priest,
+rogue, shaman, warlock, and warrior.
+
+Fel Geyser, 2, Druid, Ability--Traitor
+Traitor Hero Required <p> Ongoing: Opposing quests have "As an additional cost to complete, turn another one of
+your quests face down."
+
+Trying to complete two quests at the same time so that each pays the other's additional cost doesn't work. If
+you control two Fel Geysers, opponents must turn two other quests face down, and so on.
+
+Illidan Stormrage, 11, Master Hero--Night Elf Demon Demonhunter Traitor, 5 [Melee] ATK, 35 Health
+Traitor Hero Required <p> At the start of your turn, you may put a Traitor ally card from your collection into play.
+
+Illidan starts the game in your deck and can be played from your hand. He enters a party with the same
+attachments, counters, damage, and ready/exhausted state as that party's previous hero, and anything
+affecting the previous hero (like a Gouge, for example) now affects Illidan. He enters play face up, and can't
+be flipped or turned face down. The previous hero is removed from the game and can't leave that RFG zone.
+
+Even though Illidan has no faction or class, you can still play faction- and class-stamped cards while he's in
+your party because deckbuilding rules don't apply during a game. However, a card like Blastershot Launcher
+that looks for an icon on your current hero loses its Hunter power while Illidan is in your party.
+
+The Skull of Gul'dan, 2, Item, Trinket (2)
+[Activate] >>> You pay (2) less the next time you pay a cost with (X) in it this turn.
+
+You pay (2) less the next time you play a card (like Aimed Shot), use a payment power (like "Chipper"
+Ironbane's), or complete a quest (like Preparing for War) with an actual (X) in its cost. Examples of cards
+that are not affected include Cleave, Dizdemona, and Massacre.
+
+                                                           Page 15
+

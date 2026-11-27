@@ -104,7 +104,7 @@ function splitHead(c) {
 
 // ---------------------------------------------------------------- Engine laden (Kartendaten bzw. alles)
 const CARD_FILES = ['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'cards8', 'cards9', 'cards10', 'cards11', 'cards12', 'cards13', 'cards14', 'cards15', 'cards16', 'cards17'];
-const FX_FILES = ['decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'ai', 'simcore', 'coach', 'tests'];
+const FX_FILES = ['decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'raid', 'raid_mc', 'ai', 'simcore', 'coach', 'tests'];
 function loadEngine(full, extraCards = [], extraFx = []) {
     globalThis.window = globalThis; globalThis.alert = () => {};
     globalThis.localStorage = { getItem: () => null, setItem: () => {} };

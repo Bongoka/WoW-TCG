@@ -7,7 +7,7 @@
 self.window = self;
 self.localStorage = self.localStorage || { getItem: () => null, setItem: () => {} };
 const SIMW_VERSION = self.location.search;                                                     // Versionsnummer der Seite (gegen veraltete Dateien im Cache)
-importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'cards8', 'cards9', 'cards10', 'cards11', 'cards12', 'cards13', 'cards14', 'cards15', 'cards16', 'cards17', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'ai', 'simcore'].map(f => f + '.js' + SIMW_VERSION));
+importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'cards8', 'cards9', 'cards10', 'cards11', 'cards12', 'cards13', 'cards14', 'cards15', 'cards16', 'cards17', 'cards18', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'raid', 'raid_mc', 'ai', 'simcore'].map(f => f + '.js' + SIMW_VERSION));
 self.onmessage = (e) => {
     const { a, b, lang } = e.data;
     try {

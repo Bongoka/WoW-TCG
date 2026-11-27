@@ -115,12 +115,12 @@ FX[3212] = { on: { questDone: (s, c, d, pid) => { if (d.pid === pid) trig(s, { i
             yesNo(s, a.pid, tr('Karaborian Talisman zerstören und die Quest offen drehen?'), 'Karaborian Talisman', '3212:go', a, true); },
         go: (s, a, v) => { if (!v) return; const t = findCharacter(s, a.uid); if (!t) return; destroy(s, t); const l0 = locate(s, a.uid); if (l0 && isInPlayZone(l0.zone)) return; const l = locate(s, a.q); if (l && l.zone === 'resource' && !l.res.faceUp) { l.res.faceUp = true; L(s, tr`${l.c.name} wird offen gedreht.`, '', a.pid); } } } };
 // Naaru Lightwarden's Band: "Friendly heroes have +5 [Health]."
-FX[3213] = { aura: { hp: (s, src, sp, c) => c.type === 'Hero' && ctrlBy(s, c, sp) ? 5 : 0 } };
+FX[3213] = { aura: { hp: (s, src, sp, c) => c.type === 'Hero' && friendOf(s, c, sp) ? 5 : 0 } };
 // Phoenix-fire Band: "(1), Destroy this item >>> Prevent all fire damage that would be dealt to target hero or ally this turn."
 FX[3214] = { powers: [{ key: 'phoenix', label: tr('Zerstören: Feuerschaden an Ziel verhindern'), cost: 1, selfCost: selfDestroyCost, slots: slotChar(tr('Ziel'), false),
     resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'noDtIn', dt: 'Fire', turn: s.turn }); } }] };
 // Ring of the Recalcitrant: "Friendly heroes have +1 ATK while attacking."
-FX[3215] = { aura: { atk: (s, src, sp, c, ctx) => c.type === 'Hero' && ctrlBy(s, c, sp) && ctx && ctx.attacking ? 1 : 0 } };
+FX[3215] = { aura: { atk: (s, src, sp, c, ctx) => c.type === 'Hero' && friendOf(s, c, sp) && ctx && ctx.attacking ? 1 : 0 } };
 // Super Mana Potion: "(4), Destroy this item >>> Draw four cards."
 FX[3216] = { powers: [{ key: 'smp', label: tr('Zerstören: Ziehe 4'), cost: 4, selfCost: selfDestroyCost, resolve: (s, it) => drawCards(s, me(s, it.pl), 4) }] };
 // Superior Mana Oil: "This item enters play attached to a Weapon you control. At the start of your turn, you may reveal the top card of your deck.
@@ -135,7 +135,7 @@ FX[3217] = { canPlay: (s, pid) => weaponsOf(s, pid).length > 0 || tr('Du brauchs
             L(s, tr`Superior Mana Oil deckt auf: ${c.name}`, '', a.pid); if (CARDS[id].type === 'Ability') { p.hand.push(c); } else p.graveyard.push(c); } } };
 // Crystalheart Pulse-Staff: "On your turn: (2), [Activate] >>> Remove a friendly ally from the game. If you do, its owner puts it into play at the end of your turn."
 FX[3218] = { powers: [actPow('pulse', tr('Eigenen Ally entfernen, am Zugende zurück'), { cost: 2, myTurn: true,
-    resolve: (s, it) => { const l = alliesOf(me(s, it.pl)); if (l.length) mustPick(s, it.pl, tr('Crystalheart Pulse-Staff: Welchen eigenen Ally entfernen?'), 'Crystalheart Pulse-Staff', l.map(c => c.uid), '3218:rm', { pid: it.pl }, u => { const c = findCharacter(s, u); return c && c.damage ? 3 : 1; }); } })],
+    resolve: (s, it) => { const l = friendAllies(s, it.pl); if (l.length) mustPick(s, it.pl, tr('Crystalheart Pulse-Staff: Welchen eigenen Ally entfernen?'), 'Crystalheart Pulse-Staff', l.map(c => c.uid), '3218:rm', { pid: it.pl }, u => { const c = findCharacter(s, u); return c && c.damage ? 3 : 1; }); } })],
     k: { rm: (s, a, u) => { const c = findCharacter(s, u); if (!c) return; const owner = c.owner || a.pid; if (removeFromGame(s, c) === false) return; if (c.isToken) return;
             addPE(s, a.pid, { k: 'pulse15', uid: c.uid, owner, until: 'game' }); } } };
 onEvt('endOfTurn', (s, d) => { for (const m of pes(s, d.pid, 'pulse15').filter(x => !x.used)) { m.used = true; pushTrig(s, d.pid, 3218, [{ op: 'call', k: 'E:pulse15', a: { uid: m.uid, owner: m.owner } }]); } });
@@ -172,7 +172,11 @@ FX[3301] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid && c.type 
 FX[3302] = { powers: [actPow('vision', tr('Ziel-Ressource verdeckt umdrehen (nach Quest)'), { slots: (s, pid) => [{ label: tr('Offene Ressource'), cands: faceUpResCands(s), harm: true, ai: u => locate(s, u).pid === pid ? -5 : 4 }],
     resolve: (s, it) => { if (pes(s, it.pl, 'questDone').length) turnResDown(s, T(it)[0]); } })] };
 // Blessed Medallion of Karabor: "On your turn: Remove this item from the game >>> Move to the right of another friendly player." (nur im Mehrspieler-Spiel möglich)
-FX[3303] = { powers: [{ key: 'karabor', label: tr('Zu einem anderen befreundeten Spieler wechseln'), myTurn: true, canUse: () => tr('Kein anderer befreundeter Spieler') }] };
+FX[3303] = { powers: [{ key: 'karabor', label: tr('Zu einem anderen befreundeten Spieler wechseln'), myTurn: true, selfCost: selfRemoveCost,
+    canUse: (s, pid) => friendPids(s, pid).length > 1 || tr('Kein anderer befreundeter Spieler'),
+    resolve: (s, it) => { const others = friendPids(s, it.pl).filter(i => i !== it.pl); if (!others.length || !s.pids) return;
+        ask(s, { pid: it.pl, prompt: tr('Blessed Medallion of Karabor: Rechts neben welchen Spieler?'), src: 'Blessed Medallion of Karabor', opts: others.map(i => ({ label: me(s, i).hero.name, v: i, ai: 1 })), k: '3303:go', a: { pid: it.pl } }); } }],
+    k: { go: (s, a, v) => { if (!s.pids || v === a.pid) return; const l = s.pids.filter(i => i !== a.pid); l.splice(l.indexOf(v), 0, a.pid); s.pids = l; L(s, tr`Blessed Medallion of Karabor: ${me(s, v).hero.name} ist als Nächstes am Zug.`, '', a.pid); } } };
 // Memento of Tyrande: "When a non-token ally is destroyed, its controller may put a 1 [Holy] / 1 [Health] Spirit ally token into play."
 FX[3304] = { on: { destroyed: (s, c, d, pid) => { const sn = d.snap; if (!sn || sn.isToken || !isAllyCard(CARDS[sn.id]) || !(sn.type === 'Ally' || sn.isTotem)) return; trig(s, { id: 3304, k: 'ask', a: { pid: sn.wasCtrl || sn.owner } }); } },
     k: { ask: (s, a) => yesNo(s, a.pid, tr('Memento of Tyrande: Spirit-Token (1/1 Heilig) ins Spiel bringen?'), 'Memento of Tyrande', '3304:go', a, true),
@@ -257,7 +261,7 @@ EK.gloves15 = (s, a) => { const h = me(s, a.pid).hero; [...h.weapons, ...h.armor
 FX[3417] = { aura: { assault: (s, src, sp, c) => isChar(c) && ctrlBy(s, c, sp) ? 2 : 0, kw: (s, src, sp, c, k) => k === 'conspicuous' && isChar(c) && ctrlBy(s, c, sp) } };
 // Scourgeborne Battlegear: "At the end of your turn, you may remove target ally in a graveyard from the game. If you do, put a 3 [Melee] / 3 [Health] Ghoul ally token into play.
 // <p> [Activate] >>> Your hero deals 3 shadow damage to target hero or ally. Ready a Ghoul you control."
-const gyAlliesAll15 = s => [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid);
+const gyAlliesAll15 = s => allPl(s).flatMap(p => p.graveyard).filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid);
 FX[3418] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid && gyAlliesAll15(s).length) trig(s, { id: 3418, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Scourgeborne Battlegear: Ally in einem Friedhof entfernen (Ghoul-Token)?'), 'Scourgeborne Battlegear', gyAlliesAll15(s), '3418:go', a, u => locate(s, u).pid === a.pid ? 1 : 3),
         go: (s, a, u) => { const l = u && gyCard(s, u); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.removed.push(l.c); L(s, tr`${l.c.name} wird aus dem Spiel entfernt.`, '', a.pid); ghoul(s, a.pid); },
@@ -277,7 +281,7 @@ FX[3420] = { aura: { mend: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? Arra
     kw: (s, src, sp, c, k) => k === 'protector' && c.uid === heroOf(s, sp).uid && !alliesOf(me(s, sp)).some(x => x.damage > 0) } };
 // Wall of Terror: "When this armor enters play, put each other ability, ally, and equipment into its owner's hand."
 FX[3421] = { enter: (s, c, pid) => trig(s, { id: 3421, k: 'go', a: { uid: c.uid } }),
-    k: { go: (s, a) => [s.p1, s.p2].forEach(p => [...(p.ongoing || []), ...p.allies, ...p.hero.weapons, ...p.hero.armors].forEach(x => { if (x.uid !== a.uid && findCharacter(s, x.uid)) leavePlay(s, x, 'hand', { destroyed: false }); })) } };
+    k: { go: (s, a) => allPl(s).forEach(p => [...(p.ongoing || []), ...p.allies, ...p.hero.weapons, ...p.hero.armors].forEach(x => { if (x.uid !== a.uid && findCharacter(s, x.uid)) leavePlay(s, x, 'hand', { destroyed: false }); })) } };
 // Bandit's Insignia: "On your turn: [Activate] >>> Target opponent puts a card from his hand into his resource row face down and exhausted."
 FX[3422] = { powers: [actPow('bandit', tr('Gegner legt eine Handkarte als Ressource'), { myTurn: true, canUse: (s, pid) => foe(s, pid).hand.length > 0 || tr('Gegner hat keine Handkarte'),
     resolve: (s, it) => { const o = foe(s, it.pl); if (!o.hand.length) return; ask(s, { pid: o.id, prompt: tr("Bandit's Insignia: Welche Handkarte legst du verdeckt und erschöpft in deine Ressourcenreihe?"), src: "Bandit's Insignia",
@@ -330,7 +334,7 @@ FX[3430] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr("Calamity's Grasp: W
 FX[3431] = { on: { strike: (s, c, d, pid) => { if (d.weapon === c.uid && s.activePlayer !== pid) trig(s, { id: 3431, k: 'go', a: { pid } }); } }, k: { go: (s, a) => { makeToken(s, 3659, a.pid); makeToken(s, 3659, a.pid); } } };
 // Damnation: "Opposing cards everywhere have 'Death Rattle: Your hero deals 1 shadow damage to itself.'" – Wächter wie bei Death Rattle (cardfx12)
 STATE_FIX.push(s => {
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         const e = p.dmn15 || (p.dmn15 = []); const g = p.graveyard;
         if (e.length === g.length && (!g.length || e[e.length - 1] === g[g.length - 1].uid)) continue;
         const old = new Set(e); p.dmn15 = g.map(c => c.uid);
@@ -384,13 +388,13 @@ FX[3440] = { aura: { watk: (s, src, sp, w) => w.uid === src.uid && (s.widow15 ||
 // ASSAULT ON ICECROWN CITADEL (Raid-Loot)
 // ============================================================================
 // Favor of Acherus: "Ongoing: Allies and weapons you control have Assault 1 for each Disease attached to opposing heroes."
-const diseasesOnOpp15 = (s, pid) => { const h = foe(s, pid).hero; return [s.p1, s.p2].flatMap(p => p.ongoing || []).filter(o => isDisease(o) && o.attachedTo === h.uid).length; };
+const diseasesOnOpp15 = (s, pid) => { const h = foe(s, pid).hero; return allPl(s).flatMap(p => p.ongoing || []).filter(o => isDisease(o) && o.attachedTo === h.uid).length; };
 FX[3501] = { aura: { assault: (s, src, sp, c) => isAllyLike(c) && ctrlBy(s, c, sp) ? diseasesOnOpp15(s, sp) : 0 } };
 STAT_MODS.push((s, c, st, ctx) => { if (st !== 'atk' || c.type !== 'Hero' || !ctx || !ctx.weapon || s.activePlayer !== ctrlOf(s, c)) return 0; const pid = ctrlOf(s, c);
     return (me(s, pid).ongoing || []).filter(o => o.id === 3501 && active(s, o)).length * diseasesOnOpp15(s, pid); });
 // Path of Life: "Put target ally from a graveyard into its owner's resource row face down and exhausted."
-FX[3502] = { slots: (s, pid) => [{ label: tr('Ally in einem Friedhof'), cands: [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid), harm: false }],
-    canPlay: s => [...s.p1.graveyard, ...s.p2.graveyard].some(c => isAllyCard(CARDS[c.id])) || tr('Kein Ally in einem Friedhof'),
+FX[3502] = { slots: (s, pid) => [{ label: tr('Ally in einem Friedhof'), cands: allPl(s).flatMap(p => p.graveyard).filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid), harm: false }],
+    canPlay: s => allPl(s).flatMap(p => p.graveyard).some(c => isAllyCard(CARDS[c.id])) || tr('Kein Ally in einem Friedhof'),
     resolve: (s, it) => { const l = gyCard(s, T(it)[0]); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c);
         const o = me(s, l.c.owner || l.pid); o.resources.push({ card: l.c, faceUp: false, exhausted: true }); L(s, tr`${l.c.name} kommt verdeckt und erschöpft in die Ressourcenreihe.`, '', o.id);
         evt(s, 'resEnters', { pid: o.id, faceUp: false, uid: l.c.uid, id: l.c.id }); } };
@@ -403,15 +407,15 @@ FX[3503] = { on: { allyEnters: nest15, entersPlay: nest15 },
 // Nexus Link: "Ongoing: When you or a friendly player plays a fire or [Fire] card, your hero may deal 1 fire damage to target hero.
 // <p> When you or a friendly player plays a frost or [Frost] card, your hero may deal 1 frost damage to target ally."
 const dtCard15 = (c, dt) => !!c && ((c.type === 'Ability' && c.school === dt) || c.atkType === dt || c.dmgType === dt || new RegExp(`\\b${dt.toLowerCase()} damage\\b`).test(c.text || ''));
-FX[3504] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid !== pid) return; if (dtCard15(d.card, 'Fire')) trig(s, { id: 3504, k: 'fire', a: { pid } }); if (dtCard15(d.card, 'Frost')) trig(s, { id: 3504, k: 'frost', a: { pid } }); } },
+FX[3504] = { on: { cardPlayed: (s, c, d, pid) => { if (!isFriendPid(s, d.pid, pid)) return; if (dtCard15(d.card, 'Fire')) trig(s, { id: 3504, k: 'fire', a: { pid } }); if (dtCard15(d.card, 'Frost')) trig(s, { id: 3504, k: 'frost', a: { pid } }); } },
     k: { fire: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Feuerschaden an Ziel-Held?'), 'Nexus Link', targetCands(s, a.pid, { hero: true }), '3504:dF', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
         frost: (s, a) => mayPick(s, a.pid, tr('Nexus Link: 1 Frostschaden an Ziel-Ally?'), 'Nexus Link', targetCands(s, a.pid, { ally: true }), '3504:dI', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -3 : 2),
         dF: (s, a, u) => { if (u) heroDmg(s, a.pid, u, 1, 'Fire', { ability: false }); }, dI: (s, a, u) => { if (u) heroDmg(s, a.pid, u, 1, 'Frost', { ability: false }); } } };
 // Grace of the Lightbringer: "Ongoing: If a friendly hero would deal holy ([Holy]) or melee ([Melee]) damage, it deals that much +1 instead."
-FX[3505] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.type === 'Hero' && ctrlBy(s, from, sp) && (o.dt === 'Holy' || o.dt === 'Melee') ? 1 : 0 } };
+FX[3505] = { aura: { dmgOut: (s, src, sp, from, t, o) => from && from.type === 'Hero' && friendOf(s, from, sp) && (o.dt === 'Holy' || o.dt === 'Melee') ? 1 : 0 } };
 // Mental Focus: "Attach to target friendly ally. <p> Ongoing: Friendly players pay (1) less to play cards, to a minimum of (1)."
 FX[3506] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
-    aura: { cost: (s, src, sp, pid) => pid === sp ? { min1: 1 } : 0 } };
+    aura: { cost: (s, src, sp, pid) => isFriendPid(s, pid, sp) ? { min1: 1 } : 0 } };
 // Assassin's Game: "Ongoing: Your hero has Assault 1 for each opposing exhausted hero, ally, and equipment."
 FX[3507] = { aura: { assault: (s, src, sp, c) => { if (c.uid !== heroOf(s, sp).uid) return 0; const o = foe(s, sp); return [o.hero, ...o.allies, ...o.hero.weapons, ...o.hero.armors].filter(x => x.exhausted).length; } } };
 // Windshear Totem: "Ongoing: When this card enters play, you may interrupt target ability. <p> At the start of your turn, this card deals 1 nature damage to target hero or ally."
@@ -430,8 +434,8 @@ FX[3509] = { resolve: (s, it) => pickMany(s, it.pl, tr('Fel Trade: Eigene Allies
             if (!opts.length) { shuffleInPlace(p); return; } ask(s, { pid: a.pid, prompt: tr('Fel Trade: Welcher Ally kommt ins Spiel?'), src: 'Fel Trade', opts, k: '3509:go', a }); },
         go: (s, a, id) => { const p = me(s, a.pid); const i = p.deck.indexOf(id); if (i >= 0) { p.deck.splice(i, 1); shuffleInPlace(p); putIntoPlay(s, makeCardInst(id, false, a.pid), a.pid); } } } };
 // Reinforced Steel: "Ongoing: Friendly armor have +1 [DEF] for each friendly weapon. <p> Friendly weapons have +1 ATK for each friendly armor."
-FX[3510] = { aura: { def: (s, src, sp, a) => a.type === 'Armor' && ctrlBy(s, a, sp) ? weaponsOf(s, sp).length : 0,
-    watk: (s, src, sp, w) => ctrlBy(s, w, sp) ? me(s, sp).hero.armors.filter(x => x.type === 'Armor').length : 0 } };
+FX[3510] = { aura: { def: (s, src, sp, a) => a.type === 'Armor' && friendOf(s, a, sp) ? friendPids(s, sp).reduce((n, i) => n + weaponsOf(s, i).length, 0) : 0,
+    watk: (s, src, sp, w) => friendOf(s, w, sp) ? friendPids(s, sp).reduce((n, i) => n + me(s, i).hero.armors.filter(x => x.type === 'Armor').length, 0) : 0 } };
 // Muradin Bronzebeard: "At the end of your turn, this ally deals 4 melee damage to each damaged opposing hero and ally."
 FX[3511] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3511, k: 'go', a: { pid, uid: c.uid } }); } },
     k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; opposingChars(s, a.pid).filter(x => x.damage > 0).forEach(x => dealDamage(s, { src: a.uid, tgt: x.uid, amt: 4, dt: 'Melee' })); } } };
@@ -501,7 +505,7 @@ FX[3527] = { enter: (s, c, pid) => { makeToken(s, 3657, pid); makeToken(s, 3657,
 // Residue Rendezvous: "Pay (5) to complete this quest. <p> Reward: Draw a card for each damaged hero and ally you control."
 FX[3528] = { reward: (s, pid) => { const p = me(s, pid); const n = [p.hero, ...alliesOf(p)].filter(c => c.damage > 0).length; if (n) drawCards(s, p, n); } };
 // Respite for a Tormented Soul: "Pay (2) to complete this quest. <p> Reward: Put target ally from a graveyard on top of its owner's deck."
-FX[3529] = { reward: (s, pid) => { const l = [...s.p1.graveyard, ...s.p2.graveyard].filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid); if (l.length) mustPick(s, pid, tr('Respite for a Tormented Soul: Ally aus einem Friedhof oben auf das Deck seines Besitzers'), 'Respite for a Tormented Soul', l, '3529:go', { pid }, u => locate(s, u).pid === pid ? (gyCard(s, u).c.cost || 0) : -1); },
+FX[3529] = { reward: (s, pid) => { const l = allPl(s).flatMap(p => p.graveyard).filter(c => isAllyCard(CARDS[c.id])).map(c => c.uid); if (l.length) mustPick(s, pid, tr('Respite for a Tormented Soul: Ally aus einem Friedhof oben auf das Deck seines Besitzers'), 'Respite for a Tormented Soul', l, '3529:go', { pid }, u => locate(s, u).pid === pid ? (gyCard(s, u).c.cost || 0) : -1); },
     k: { go: (s, a, u) => { const l = gyCard(s, u); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); const o = me(s, l.c.owner || l.pid); o.deck.push(deckId(l.c)); L(s, tr`${l.c.name} kommt oben auf das Deck von ${o.hero.name}.`, '', a.pid); } } };
 // Securing the Ramparts: "If you control an armor, item, and weapon: Pay (1) to complete this quest. <p> Reward: Draw two cards."
 FX[3530] = { questCond: (s, pid) => { const h = me(s, pid).hero; return h.armors.some(a => a.type === 'Armor') && h.armors.some(a => a.type === 'Item') && h.weapons.length ? null : tr('Du brauchst eine Rüstung, einen Gegenstand und eine Waffe'); }, reward: (s, pid) => drawCards(s, me(s, pid), 2) };
@@ -623,7 +627,7 @@ FX[3801] = { aura: { hp: (s, src, sp, c) => c.uid === heroOf(s, sp).uid ? 5 : 0 
 STAT_MODS.push((s, c, st) => { if (st !== 'hp' || c.type !== 'Hero' || !s.pe || !s.pe.length) return 0; const pid = ctrlOf(s, c); return pid && c.uid === heroOf(s, pid).uid ? 25 * pes(s, pid, 'bulwark16').length : 0; });
 // Tankatronic Goggles: "Engineering Hero Required <p> When this armor enters play, look at target player's hand. <p> Your hero has Protector.
 // Opposing allies lose and can't have Elusive, Stealth, and Untargetable."
-FX[3802] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr('Tankatronic Goggles: Wessen Hand ansehen?'), src: 'Tankatronic Goggles', opts: [{ label: tr('Gegner'), v: foe(s, pid).id, ai: 2 }, { label: tr('Du selbst'), v: pid, ai: 0 }], k: '3802:look', a: { pid } }),
+FX[3802] = { enter: (s, c, pid) => ask(s, { pid, prompt: tr('Tankatronic Goggles: Wessen Hand ansehen?'), src: 'Tankatronic Goggles', opts: [{ label: tr('Gegner'), v: foe(s, pid).id, plFoe: true, ai: 2 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: 0 }], k: '3802:look', a: { pid } }),
     k: { look: (s, a, who) => { const h = me(s, who).hand; if (!s.real || !(s.humans || []).includes(a.pid)) return;
         ask(s, { pid: a.pid, prompt: tr`Tankatronic Goggles – Hand von ${me(s, who).hero.name}: ${h.length ? h.map(c => c.name).join(', ') : tr('keine Karten')}`, src: 'Tankatronic Goggles', opts: [{ label: tr('OK'), v: 1, ai: 1 }], k: '3802:ok', a }); },
         ok: () => {} },
@@ -659,7 +663,7 @@ FX[3902] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, {
     k: { go: (s, a) => { const o = foe(s, a.pid); const n = o.resources.filter(r => r.faceUp).length; if (n > 0) heroDmg(s, a.pid, o.hero.uid, 2 * n, 'Nature', { ability: false }); } } };
 // Girdle of Ruination: "At the start of your turn, destroy the ability, ally, or equipment with the lowest cost. If two or more are tied, destroy all with that cost."
 FX[3903] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3903, k: 'go', a: { pid } }); } },
-    k: { go: (s, a) => { const all = [...nonHeroCards(s, s.p1), ...nonHeroCards(s, s.p2)]; if (!all.length) return;
+    k: { go: (s, a) => { const all = allPl(s).flatMap(p => nonHeroCards(s, p)); if (!all.length) return;
         const m = Math.min(...all.map(c => c.cost || 0)); all.filter(c => (c.cost || 0) === m).forEach(c => destroy(s, c)); } } };
 // Netherdrake Gloves: "[Activate], Destroy this armor >>> Put a 3 [Melee] / 3 [Health] Netherdrake ally token into play."
 FX[3904] = { powers: [actPow('ndrake', tr('Zerstören: 3/3 Netherdrake-Token'), { selfCost: selfDestroyCost, resolve: (s, it) => makeToken(s, 3971, it.pl) })] };
@@ -735,7 +739,7 @@ FX[3932] = { enter: (s, c, pid) => { if (me(s, pid).deck.length) yesNo(s, pid, t
         ask: (s, a) => { const l = allResCands(s); if (l.length) mayPick(s, a.pid, tr('Gloves of Immortal Dusk: Ziel-Ressource zerstören?'), 'Gloves of Immortal Dusk', l, '3932:kill', a, u => { const x = locate(s, u); return x && x.pid === a.pid ? -10 : 3; }); },
         kill: (s, a, u) => { if (u) destroyResource(s, u); } } };
 // Sunfire Handwraps: "This armor enters play with a +1 [DEF] counter for each friendly hero an[d] ally. <p> [Activate], Remove a +1 [DEF] counter >>> Draw a card."
-FX[3933] = { enter: (s, c, pid) => addCounter(s, c, 'def', 1 + alliesOf(me(s, pid)).length),
+FX[3933] = { enter: (s, c, pid) => addCounter(s, c, 'def', friendParty(s, pid).length),
     powers: [actPow('sunfire', tr('+1 [DEF]-Zähler entfernen: Ziehe 1'), { canUse: (s, pid, src) => cnt17(src, 'def') > 0 || tr('Keine +1 [DEF]-Zähler'),
         selfCost: (s, it, src) => takeCounters17(src, 'def', 1), resolve: (s, it) => drawCards(s, me(s, it.pl), 1) })] };
 
@@ -803,7 +807,7 @@ CARDS[3973] = { id: 3973, name: 'Pirate', type: 'Ally', cost: 0, atk: 1, hp: 1, 
 PRED.winterVeil = c => c.set === 28;   // "[Winter Veil] card": Karte mit dem Set-Symbol Feast of Winter Veil
 // Hardpacked Snowball: "Attach to target hero or ally and exhaust it. <p> Ongoing: Attached character can't attack or protect
 // and has '[Activate] >>> Attach this ability to target hero or ally and exhaust it.'"
-const snowballOn18 = (s, c) => (s.p1.ongoing || []).concat(s.p2.ongoing || []).filter(o => o.id === 3981 && o.attachedTo === c.uid);
+const snowballOn18 = (s, c) => allPl(s).flatMap(p => p.ongoing || []).filter(o => o.id === 3981 && o.attachedTo === c.uid);
 FX[3981] = { slots: slotChar(tr('Ziel (anhängen und erschöpfen)'), true), resolve: (s, it) => { const t = T(it)[0]; it.attachTo = t; const c = t && findCharacter(s, t); if (c) exhaust(s, c); },
     aura: { kw: (s, src, sp, c, k) => (k === 'cantAttack' || k === 'cantProtect') && src.attachedTo === c.uid,
         grant: (s, src, sp, c) => src.attachedTo === c.uid ? ['snowball18'] : [] } };
@@ -830,15 +834,19 @@ DRAW_REPLACE.push((s, p) => { if (s._greench18) return false; const o = getOppon
     s._greench18 = true; try { L(s, tr`The Abominable Greench: ${o.hero.name} zieht statt ${p.hero.name}.`, '', o.id); drawCards(s, o, 1); } finally { s._greench18 = false; } return true; });
 // Metzen the Reindeer: "Elusive <p> When this ally enters play, target opponent puts three 1/1 Pirate ally tokens into play.
 // <p> If no Pirates are in play: [Activate] >>> Ready target hero or ally."
-const piratesInPlay18 = s => [...alliesOf(s.p1), ...alliesOf(s.p2)].some(raceIs('Pirate'));
+const piratesInPlay18 = s => allPl(s).flatMap(p => alliesOf(p)).some(raceIs('Pirate'));
 FX[3986] = { enter: (s, c, pid) => { const o = foe(s, pid).id; for (let i = 0; i < 3; i++) makeToken(s, 3973, o); },
     powers: [actPow('metzen', tr('Ziel bereit machen'), { canUse: s => !piratesInPlay18(s) || tr('Es sind Piraten im Spiel'), slots: slotChar(tr('Ziel'), false, { filter: c => c.exhausted }),
         resolve: (s, it) => { const t = T1(s, it); if (t) readyCard(s, t); } })] };
 // Gingerbread Cookie: "Destroy this item >>> Each hero heals 7 damage from itself."
 FX[3987] = { powers: [{ key: 'cookie', label: tr('Zerstören: Jeder Held heilt 7'), cost: 0, selfCost: selfDestroyCost,
-    resolve: (s, it) => [s.p1, s.p2].forEach(p => heal(s, p.hero.uid, p.hero.uid, 7)) }] };
+    resolve: (s, it) => allPl(s).forEach(p => heal(s, p.hero.uid, p.hero.uid, 7)) }] };
 // Mistletoe: "You and another friendly player each exhaust your heroes >>> You and that player each draw a card." – 1 gegen 1 gibt es keinen befreundeten Spieler
-FX[3988] = { powers: [{ key: 'mistle', label: tr('Mit einem befreundeten Spieler: beide ziehen'), cost: 0, canUse: () => tr('Kein befreundeter Spieler (1 gegen 1)'), resolve: () => {} }] };
+FX[3988] = { powers: [{ key: 'mistle', label: tr('Mit einem befreundeten Spieler: beide ziehen'), cost: 0,
+    canUse: (s, pid) => (!heroOf(s, pid).exhausted && friendPids(s, pid).some(i => i !== pid && !heroOf(s, i).exhausted && !cantExhaust(s, heroOf(s, i)))) || tr('Kein anderer befreundeter Spieler mit bereitem Helden'),
+    payExtra: (s, it) => { const o = friendPids(s, it.pl).filter(i => i !== it.pl && !heroOf(s, i).exhausted); ask(s, { pid: it.pl, prompt: tr('Mistletoe: Mit welchem Spieler?'), src: 'Mistletoe', opts: o.map(i => ({ label: me(s, i).hero.name, v: i, ai: 1 })), k: '3988:pay', a: {} }); },
+    resolve: (s, it) => { drawCards(s, me(s, it.pl), 1); if (it.extra && it.extra.with) drawCards(s, me(s, it.extra.with), 1); } }],
+    k: { pay: (s, a, v) => { const it = s.chainPrep; exhaust(s, heroOf(s, it.pl)); exhaust(s, heroOf(s, v)); it.extra = { ...(it.extra || {}), with: v }; q(s, { op: 'call', k: 'E:finishPrep', a: {} }); } } };
 // The Reason for the Season: "On your turn: Pay (3) to complete this quest. <p> Reward: Draw a card. If it's December, draw another card." (Monat des echten Datums)
 FX[3989] = { questCond: (s, pid) => s.activePlayer === pid ? null : tr('Nur in deinem Zug'), reward: (s, pid) => drawCards(s, me(s, pid), new Date().getMonth() === 11 ? 2 : 1) };
 // Treats for Great-father Winter: "Reward: Draw a card. Then, you may discard a card named Gingerbread Cookie. If you do, search your deck for a [Winter Veil] card, reveal it, and put it into your hand."

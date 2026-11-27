@@ -6,9 +6,20 @@
 // Bewertung verändert den Zustand nicht: Dauereffekte und active() dabei nur einmal je Karte berechnen (readScope, engine.js)
 function evaluateState(s, pid) { return readScope(s, () => evaluateStateNow(s, pid)); }
 function evaluateStateNow(s, pid) {
-    if (s.gameOver) return s.winner === pid ? AI_WIN : (s.winner ? AI_LOSS : 0);
+    if (s.gameOver) return s.winner && teamOf(s, s.winner) === teamOf(s, pid) ? AI_WIN : (s.winner ? AI_LOSS : 0);
+    // Mehrspieler mit mehreren Gegnern (Raid-Boss): Mittel der Bewertungen gegen jeden einzelnen Gegner (s.focus lenkt getOpponent)
+    if (s.pids && !s._evalFoe) {
+        const f = foePids(s, pid);
+        if (f.length > 1) {
+            const old = s.focus; let sum = 0; s._evalFoe = true;
+            try { for (const i of f) { s.focus = { ...(old || {}), [pid]: i }; sum += evaluateStateNow(s, pid); } } finally { s.focus = old; s._evalFoe = false; }
+            return sum / f.length;
+        }
+    }
     const me = getPlayer(s, pid), opp = getOpponent(s, pid);
-    const myHp = hpOf(s, me.hero) - me.hero.damage, oppHp = hpOf(s, opp.hero) - opp.hero.damage;
+    // Raid: spätere Boss-Stufen zählen als Restleben (Stufe 1 auf 0 Leben ist nicht das Ende)
+    const reserve = p => typeof raidHpReserve === 'function' ? raidHpReserve(s, p) : 0;
+    const myHp = hpOf(s, me.hero) - me.hero.damage + reserve(me), oppHp = hpOf(s, opp.hero) - opp.hero.damage + reserve(opp);
     if (myHp <= 0 && !isIndestructible(s, me.hero)) return AI_LOSS;   // Spirit of Redemption (Set wrathgate): 0 Leben, aber nicht zerstörbar
     if (oppHp <= 0 && !isIndestructible(s, opp.hero)) return AI_WIN;
     // Sicher bevorstehende Zerstörung (A Final Sacrifice): eigener Held = verloren, Ally zählt schon nicht mehr
@@ -104,7 +115,7 @@ function evaluateStateNow(s, pid) {
 // (starke Verteidiger, Gegner, die gegen Erschöpfte mehr Schaden machen), entscheidet die Suche über den Angriff selbst.
 function aiColdTerm(s, pid, myHp, oppHp) {
     let v = 0;
-    for (const p of [s.p1, s.p2]) for (const o of p.ongoing || []) {
+    for (const p of allPl(s)) for (const o of p.ongoing || []) {
         if (o.id !== 10034 || !o.attachedTo) continue;
         const t = findCharacter(s, o.attachedTo); if (!t) continue;
         const tc = ctrlOf(s, t); if (s.activePlayer !== tc || t.lastAtk11 === s.turn) continue;
@@ -378,7 +389,7 @@ function attackPlans(s, pid) {
 function aiStateSig(s, skipUid, noPay) {
     const card = c => c.uid === skipUid ? '' : `${c.id}:${c.damage || 0}:${c.exhausted ? 1 : 0}:${(c.tm || []).length}:${JSON.stringify(c.counters || {})}:${c.attachedTo || ''}`;
     const side = p => [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].map(card).join(',') + `|h${p.hand.length}|d${p.deck.length}|r${p.resources.length}|f${p.resources.filter(r => r.faceUp).map(r => r.card.id + (r.exhausted && !noPay ? 'x' : '')).join('.')}|${p.hero.flipped ? 'F' : ''}`;
-    return side(s.p1) + '#' + side(s.p2) + '#' + (s.pe || []).filter(m => m.k !== 'playedCard').length + '#' + (s.gameOver ? 1 : 0) + '#' + (s.battle ? s.battle.att + '>' + s.battle.def : '');   // Kampf: "aus dem Kampf entfernen" ist eine Wirkung
+    return allPl(s).map(side).join('#') + '#' + (s.pe || []).filter(m => m.k !== 'playedCard').length + '#' + (s.gameOver ? 1 : 0) + '#' + (s.battle ? s.battle.att + '>' + s.battle.def : '');   // Kampf: "aus dem Kampf entfernen" ist eine Wirkung
 }
 function aiUseless(s, sim, act, pid) {
     if (!sim || !act) return false;
@@ -427,7 +438,7 @@ function searchBestAction(state, playerId, difficulty = 'normal') { return aiFor
 function searchBestActionCore(state, playerId, difficulty = 'normal') {
     let legal = getLegalActions(state, playerId);
     if (legal.length === 0) return null;
-    const oppId = playerId === 1 ? 2 : 1;
+    const oppPid = getOpponent(state, playerId).id;
     _aiDeadline = performance.now() + (AI_BUDGET[difficulty] || 1200);
     // Ressource zuerst und nach eigener Regel (ob überhaupt und welche Karte) – nicht über die Bewertung
     if (difficulty !== 'easy') {
@@ -482,10 +493,10 @@ function searchBestActionCore(state, playerId, difficulty = 'normal') {
         if (s.gameOver) score = evaluateState(s, playerId);
         else {
             // Gegnerzug: (a) ein ganzer gieriger Zug mit mehreren Aktionen, (b) die schlimmste Einzelaktion – das Schlechtere zählt
-            const turn = simulateOppTurn(cloneState(s), oppId);
+            const turn = simulateOppTurn(cloneState(s), oppPid);
             let worst = evaluateState(turn, playerId);
-            const threat = aiDistinct(s, getLegalActions(s, oppId)).filter(a => a.type === 'ATTACK' || a.type === 'PLAY_CARD').slice(0, threatN);
-            for (const oa of threat) { const os = simApply(s, oa, oppId); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
+            const threat = aiDistinct(s, getLegalActions(s, oppPid)).filter(a => a.type === 'ATTACK' || a.type === 'PLAY_CARD').slice(0, threatN);
+            for (const oa of threat) { const os = simApply(s, oa, oppPid); if (!os) continue; const v = evaluateState(os, playerId); if (v < worst) worst = v; }
             score = worst;
         }
         results.push({ action: it.firstAction, score, now: it.score, reason: it.firstAction ? it.firstAction.desc : tr('Zug beenden') });

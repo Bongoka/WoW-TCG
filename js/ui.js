@@ -29,12 +29,19 @@ applyUiZoom();                                                                  
 
 // ---------------------------------------------------------------- Hilfen
 function myPending(kind) { return G && G.pending && G.pending.pid === 1 && (!kind || G.pending.kind === kind) ? G.pending : null; }
-function canMain() { return !!G && !UI.busy && !G.gameOver && !G.spectate && canActMain(G, 1); }   // CPU gegen CPU: nur zuschauen
+function canMain() { return !!G && !UI.busy && !G.gameOver && !G.spectate && (canActMain(G, 1) || softWait()); }   // CPU gegen CPU: nur zuschauen
+// Raid-Hotseat (raidui.js): ein Mitspieler kann reagieren, der Zugspieler darf trotzdem weiterspielen (seine Aktion lässt den anderen passen)
+const softWait = () => typeof raidSoftWait === 'function' && raidSoftWait();
+const softState = () => softWait() ? raidSoftAhead() : G;
 function canInstant() { return !!G && !UI.busy && !G.gameOver && !G.spectate && !!myPending('priority'); }
 function isMine(uid) { const l = locate(G, uid); return !!l && l.pid === 1; }
+// Kamera: wessen Feld unten ('bot') bzw. oben ('top') gezeigt wird. 1 gegen 1: unten Spieler 1, oben Spieler 2.
+// Mehrspieler (Raid, raidui.js): VIEW.on – jede Seite zeigt einen Spieler ihres Teams, die Kamera fährt zum Spieler am Zug.
+const VIEW = { on: false, bot: 1, top: 2 };
+function viewP(side) { const def = side === 'top' ? G.p2 : G.p1; return VIEW.on && G.pids ? getPlayer(G, VIEW[side]) || def : def; }
 function choiceUids() {
     const d = myPending('choose'); if (!d) return new Set();
-    return new Set(d.opts.map(o => o.v).filter(v => typeof v === 'string' && locate(G, v)));
+    return new Set(d.opts.map(o => o.heroUid || o.v).filter(v => typeof v === 'string' && locate(G, v)));   // Spieler-Wahl: der Held des Spielers
 }
 function chooseV(v) { humanAct({ type: 'CHOOSE', v }); }
 // Erstes Ziel-Slot einer Handkarte (für Hervorhebung beim Ziehen)
@@ -49,12 +56,13 @@ function firstSlotCands(card) {
 function handPlayable(card) {
     if (card.type === 'Quest' || card.type === 'Location') return canMain() && !G.placedResource;   // nur als Ressource spielbar: leuchten, solange in diesem Zug noch keine gelegt ist
     if (!canMain() && !canInstant()) return false;
-    return !canPlayCard(G, 1, card);
+    return !canPlayCard(softState(), 1, card);
 }
 function usablePowers(c) {
     if (!G || UI.busy || G.gameOver || !isMine(c.uid)) return [];
     if (!canMain() && !canInstant()) return [];
-    return getPowers(G, c).filter(pw => !canUsePower(G, 1, c, pw));
+    const s = softState();
+    return getPowers(G, c).filter(pw => !canUsePower(s, 1, c, pw));
 }
 
 // ---------------------------------------------------------------- Friedhof
@@ -245,7 +253,7 @@ function animateResources(player, shown) {
 // (5) beide gleichmäßig enger. Die Lücke bleibt immer. Reicht die Höhe nicht (niedrige Bildschirme), weicht die Reihe
 // seitlich den Blöcken der unteren Leiste aus, die in ihre Höhe ragen. Erschöpfen ändert keine Abstände.
 const uiScale = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
-const rowTop = () => Math.round(22 * uiScale());                                           // Abstand der Karten zur Mittellinie
+const rowTop = () => Math.round((VIEW.on ? 32 : 22) * uiScale());              // Abstand der Karten zur Mittellinie (Raid: Platz für die Spieler-Tafeln)
 UI.slotX = new Map();                                                                     // letzte Position je Karte (gleitende Übergänge)
 const fieldW = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--field-w')) || 150;
 // Reine Berechnung: x-Positionen (links, in px ab Reihenanfang) in eigener Sicht – Allies von der Lücke nach links,
@@ -291,7 +299,7 @@ function stackSig(c, pid, attached) {
 // cards: Karten der Zone (Standard: Allies; Ausrüstung/Ongoing-Reihe: Waffen, Rüstung, Ongoing-Karten)
 function stackUnits(aSlots, p, cards = p.allies) {
     const attached = new Set();
-    for (const q of [G.p1, G.p2]) for (const c of [...q.hero.weapons, ...q.hero.armors, ...(q.ongoing || [])]) { const h = attachHost(c); if (h) attached.add(h.uid); }
+    for (const q of allPl(G)) for (const c of [...q.hero.weapons, ...q.hero.armors, ...(q.ongoing || [])]) { const h = attachHost(c); if (h) attached.add(h.uid); }
     const byUid = new Map(cards.map(c => [c.uid, c])), units = [], bySig = new Map();
     for (const s of aSlots) {
         const c = !s.dataset.gap && s.firstElementChild && byUid.get(s.firstElementChild.dataset.uid);
@@ -326,7 +334,7 @@ function layoutBoard(animate = true) {
         const aSlots = az ? [...az.children] : [], eSlots = ez ? [...ez.children] : [];
         // (2) Passen nicht alle nebeneinander, liegen gleiche Allies auf einem Platz.
         //     Gleiche Ausrüstung/Ongoing-Karten (z. B. 3× Nature of the Beast) liegen immer gestapelt, leicht senkrecht versetzt.
-        const pl = opp ? G.p2 : G.p1, hx = pl.hero;
+        const pl = viewP(opp ? 'top' : 'bot'), hx = pl.hero;
         const eUnits = stackUnits(eSlots, pl, [...hx.weapons, ...hx.armors, ...(pl.ongoing || [])]);
         const R2 = Math.max(l + w, r), gapW = aSlots.length && eUnits.length ? Math.max(24, w * 0.2) : 0;
         const natural = n => n ? n * (w + 16) - 16 : 0;
@@ -446,6 +454,7 @@ function applyHandUp() { const h = document.getElementById('bot-hand'); if (h) h
 // Situation: true = hoch, false = runter
 function handAutoUp(box) {
     if (!G || G.gameOver || G.spectate || !G.p1.hand.length) return false;
+    if (box.classList.contains('mate-hand')) return false;                                // Raid: Hand eines Mitspielers wird nur gezeigt
     if (UI.attacker) return false;                                                        // Angriff: Blick aufs Feld
     const ch = choiceUids();
     if (ch.size) return G.p1.hand.some(c => ch.has(c.uid));                               // Entscheidung: über Handkarten hoch, sonst Feld frei
@@ -494,43 +503,44 @@ function render() {
     }
     // Fortune Telling: umgedrehtes Deck – oberste Karte ist offen
     const deckTxt = p => p.deck.length + ((p.deckFaceUp || (typeof topVisible === 'function' && topVisible(G, p, 1))) && p.deck.length ? tr` · oben: ${CARDS[p.deck[p.deck.length - 1]].name}` : '');
-    document.getElementById("p1-deck-count").textContent = deckTxt(G.p1);
-    { const st = document.getElementById('p1-deck-stack'); if (st && !st.dataset.maul) { st.dataset.maul = '1'; st.addEventListener('click', () => { if (G && typeof gladMaulOk === 'function' && gladMaulOk(G, 1) && !G.placedResource) humanAct({ type: 'PLACE_RESOURCE', handIdx: -1, fromDeckTop: true, faceUp: false }); }); } }   // Gladiator's Maul: Klick auf das Deck
-    document.getElementById("p1-grave-count").textContent = G.p1.graveyard.length;
-    document.getElementById("p1-res-count").textContent = `${getReadyRes(G.p1)}/${G.p1.resources.length}`;
-    document.getElementById("p2-deck-count").textContent = deckTxt(G.p2);
-    document.getElementById("p2-grave-count").textContent = G.p2.graveyard.length;
-    document.getElementById("p2-res-count").textContent = `${getReadyRes(G.p2)}/${G.p2.resources.length}`;
-    document.getElementById("bot-deck-label").textContent = G.p1.className + ":";
-    document.getElementById("top-deck-label").textContent = G.p2.className + ":";
+    const bot = viewP('bot'), top = viewP('top');                                       // gezeigte Spieler (Kamera, Raid)
+    document.getElementById("p1-deck-count").textContent = deckTxt(bot);
+    { const st = document.getElementById('p1-deck-stack'); if (st && !st.dataset.maul) { st.dataset.maul = '1'; st.addEventListener('click', () => { if (G && viewP('bot').id === 1 && typeof gladMaulOk === 'function' && gladMaulOk(G, 1) && !G.placedResource) humanAct({ type: 'PLACE_RESOURCE', handIdx: -1, fromDeckTop: true, faceUp: false }); }); } }   // Gladiator's Maul: Klick auf das Deck
+    document.getElementById("p1-grave-count").textContent = bot.graveyard.length;
+    document.getElementById("p1-res-count").textContent = `${getReadyRes(bot)}/${bot.resources.length}`;
+    document.getElementById("p2-deck-count").textContent = deckTxt(top);
+    document.getElementById("p2-grave-count").textContent = top.graveyard.length;
+    document.getElementById("p2-res-count").textContent = `${getReadyRes(top)}/${top.resources.length}`;
+    document.getElementById("bot-deck-label").textContent = bot.className + ":";
+    document.getElementById("top-deck-label").textContent = top.className + ":";
 
-    renderDeckZone(G.p1, "p1");
-    renderDeckZone(G.p2, "p2");
-    renderHeroCard(G.p2, "top-hero-card-container");
-    renderResourceTray(G.p2, "top-resource-tray", false);
+    renderDeckZone(bot, "p1");
+    renderDeckZone(top, "p2");
+    renderHeroCard(top, "top-hero-card-container");
+    renderResourceTray(top, "top-resource-tray", false);
 
     // Gegner-Hand: Kartenrücken im Fächer
     const th = document.getElementById("top-hand");
     th.innerHTML = "";
-    const totalOpp = G.p2.hand.length, midOpp = (totalOpp - 1) / 2;
+    const totalOpp = top.hand.length, midOpp = (totalOpp - 1) / 2;
     for (let i = 0; i < totalOpp; i++) {
         const offset = i - midOpp;
         const wrapper = document.createElement("div");
         wrapper.className = "opp-hand-card-wrapper";
         wrapper.style.transform = `translateY(${Math.abs(offset) * 10}px) rotate(calc(${offset} * var(--opp-fan-ang, 5deg)))`;
         wrapper.style.zIndex = i;
-        if (G.gameOver || (typeof handRevealed === 'function' && handRevealed(G, 2))) {   // Mind Vision: Hand offen; Spielende: Gegnerhand aufdecken
-            const node = createCardDOM(G.p2.hand[i], false); node.classList.add('opp-hand-card-img'); wrapper.appendChild(node);
+        if (G.gameOver || (typeof handRevealed === 'function' && handRevealed(G, top.id))) {   // Mind Vision: Hand offen; Spielende: Gegnerhand aufdecken
+            const node = createCardDOM(top.hand[i], false); node.classList.add('opp-hand-card-img'); wrapper.appendChild(node);
         } else { const img = document.createElement("img"); img.src = "cards/Card Back.png"; img.className = "opp-hand-card-img"; wrapper.appendChild(img); }
         th.appendChild(wrapper);
     }
-    flyNewOppCards(G.p2, th);
+    flyNewOppCards(top, th);
 
-    renderBattlefield(G.p2, "top-allies", true);
-    renderBattlefield(G.p1, "bot-allies", false);
-    renderHeroCard(G.p1, "bot-hero-card-container");
-    renderResourceTray(G.p1, "bot-resource-tray", true);
-    renderPlayerHand(G.p1);
+    renderBattlefield(top, "top-allies", true);
+    renderBattlefield(bot, "bot-allies", false);
+    renderHeroCard(bot, "bot-hero-card-container");
+    renderResourceTray(bot, "bot-resource-tray", bot.id === 1);
+    renderPlayerHand(G.raid && VIEW.on ? bot : G.p1);                 // Raid: unten die Hand des gezeigten Mitspielers (eigenes Team, nur ansehen)
     updateHandAuto(document.getElementById('bot-hand'));
     layoutBoard();
     renderPendingPanel();
@@ -560,16 +570,17 @@ function renderOppThinking() {
 function renderTurnIndicator() {
     const mine = G.activePlayer === 1, over = G.gameOver;
     document.getElementById('bot-dock').classList.remove('turn-active');                 // eigener Held: kein Zug-Leuchten (Gelb heißt: Kraft/Angriff möglich)
-    document.getElementById('top-dock').classList.toggle('turn-active', !mine && !over);
+    document.getElementById('top-dock').classList.toggle('turn-active', G.activePlayer === viewP('top').id && !over);
     const ti = document.getElementById('turn-indicator');
     ti.style.display = over ? 'none' : '';
     ti.className = mine ? 'me' : 'cpu';
     ti.firstElementChild.textContent = G.spectate ? tr`ZUG VON SPIELER ${G.activePlayer}` : mine ? tr('DEIN ZUG') : G.online || G.hotseat ? tr('ZUG DES GEGNERS') : tr('ZUG DER CPU');
     const eb = document.getElementById('btn-end-turn');
-    eb.textContent = mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
-    eb.classList.toggle('cpu-turn', !mine);
-    eb.style.visibility = (mine && !G.spectate) || over ? '' : 'hidden';                                   // Gegnerzug steht schon links (turn-indicator)
-    const done = nothingLeftToDo();
+    const soft = softWait();                                                              // Raid-Hotseat: ein Mitspieler kann reagieren → „Weiter“
+    eb.textContent = soft ? tr('Weiter') : mine ? tr('Zug beenden') : tr('Gegnerischer Zug');
+    eb.classList.toggle('cpu-turn', !mine && !soft);
+    eb.style.visibility = (mine && !G.spectate) || over || soft ? '' : 'hidden';                           // Gegnerzug steht schon links (turn-indicator)
+    const done = !soft && nothingLeftToDo();                                              // kein Auto-Zugende, solange ein Mitspieler reagieren kann
     document.getElementById('big-end-turn').style.display = done && (!autoEndTurn() || G._noAutoEnd === G.turn) ? 'block' : 'none';
     scheduleAutoEnd(done);
     // Touch: angetippte eigene Karte zeigt ihre Knöpfe (Angriff, Kräfte) – auch nach dem Neuzeichnen
@@ -899,12 +910,12 @@ function bestCardOf(pid) {
 }
 function showGameOver() {
     const ov = document.getElementById('gameover'); if (!ov || !G) return;
-    const won = G.winner === 1, draw = !G.winner;
+    const won = G.raid ? G.winnerTeam === 'raid' : G.winner === 1, draw = !G.winner;                // Raid: alle Raider gewinnen oder verlieren gemeinsam (auch Hotseat)
     const title = document.getElementById('go-title');
-    title.textContent = draw ? tr('UNENTSCHIEDEN') : G.hotseat || G.spectate ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
-    title.className = draw ? '' : (won || G.hotseat || G.spectate ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
+    title.textContent = draw ? tr('UNENTSCHIEDEN') : !G.raid && (G.hotseat || G.spectate) ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
+    title.className = draw ? '' : (won || !G.raid && (G.hotseat || G.spectate) ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
     const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
-    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
+    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (won ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
     box.innerHTML = ''; cap.textContent = '';
     const best = draw ? null : bestCardOf(G.winner);
@@ -1315,7 +1326,25 @@ function markSabotageTarget(node, uid) {
     const att = UI.attacker && findCharacter(G, UI.attacker); if (!att || !canMain()) return;
     if (!sabotageTargets(G, att).some(d => d.uid === uid) || validateAction(G, { type: 'ATTACK', attackerUid: att.uid, defenderUid: uid, sabotage: true }, 1)) return;
     node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';
-    node.onclick = (e) => { e.stopPropagation(); UI.attacker = null; UI.preStrike = null; humanAct({ type: 'ATTACK', attackerUid: att.uid, defenderUid: uid, sabotage: true }); };
+    node.onclick = (e) => { e.stopPropagation(); doHumanSabotage(att.uid, uid); };
+}
+function canSabotageOn(attUid, uid) {
+    const att = findCharacter(G, attUid);
+    return !!att && sabotageTargets(G, att).some(d => d.uid === uid) && !validateAction(G, { type: 'ATTACK', attackerUid: attUid, defenderUid: uid, sabotage: true }, 1);
+}
+function doHumanSabotage(attUid, uid) { UI.attacker = null; UI.preStrike = null; humanAct({ type: 'ATTACK', attackerUid: attUid, defenderUid: uid, sabotage: true }); }
+// Held als Ziel eines Charakters mit "Sabotage: Player/Deck/Hand/Graveyard/Keywords" (der Held vertritt den Spieler):
+// normaler Angriff und Sabotage sind beide möglich → Auswahlfenster
+// Ebenso ein Ally/Held mit angehängter, sabotierbarer Fähigkeit (Sabotage: Ability/Attachment): Angriff auf ihn oder Sabotage der Fähigkeit
+function attackOrSabotage(attUid, uid, weaponUid = null) {
+    const att = findCharacter(G, attUid), def = findCharacter(G, uid); if (!att || !def) return;
+    const opts = [];
+    if (!validateAction(G, { type: 'ATTACK', attackerUid: attUid, defenderUid: uid }, 1)) opts.push({ label: tr`Angreifen: ${def.name}`, cls: 'success', action: () => doHumanAttack(attUid, uid, weaponUid) });
+    const sabs = weaponUid ? [] : [def, ...sabotageTargets(G, att).filter(c => c.attachedTo === uid)].filter(c => canSabotageOn(attUid, c.uid));
+    sabs.forEach(c => opts.push({ label: tr`Sabotieren: ${sabotageLabel(G, c, att)}`, cls: 'success', action: () => doHumanSabotage(attUid, c.uid) }));
+    if (!opts.length) { doHumanAttack(attUid, uid, weaponUid); return; }                 // zeigt den Grund
+    if (opts.length === 1) { opts[0].action(); return; }
+    openDecisionModal(att.name, tr('Angreifen oder sabotieren?'), [...opts, { label: tr('Abbrechen'), action: () => {} }]);
 }
 // Gemeinsame Interaktion für jede Karte im Spiel (Held, Ally, Ausrüstung, laufende Fähigkeit)
 // Protector (gedruckt, verliehen oder per Dauereffekt – hasProtector): Schild oben auf der Karte, dreht beim Erschöpfen mit
@@ -1358,7 +1387,11 @@ function decorateInPlay(node, c) {
         const att = findCharacter(G, UI.attacker);
         if (att && attackTargets(G, att).some(d => d.uid === uid) && !validateAction(G, { type: 'ATTACK', attackerUid: att.uid, defenderUid: uid }, 1)) {
             node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';
-            node.onclick = (e) => { e.stopPropagation(); doHumanAttack(att.uid, uid, UI.preStrike); };
+            node.onclick = (e) => { e.stopPropagation(); attackOrSabotage(att.uid, uid, UI.preStrike); };
+        }
+        else if (att && attackTargets(G, att).some(d => d.uid === uid) && sabotageTargets(G, att).some(c => c.attachedTo === uid && canSabotageOn(att.uid, c.uid))) {
+            node.classList.add('target-pulsing'); node.style.cursor = 'crosshair';      // nicht angreifbar (z. B. Winter's Grasp), aber angehängte Fähigkeit sabotierbar
+            node.onclick = (e) => { e.stopPropagation(); attackOrSabotage(att.uid, uid); };
         }
         else markSabotageTarget(node, uid);
     }
@@ -1460,7 +1493,7 @@ function attachHost(c) {
 const ATT_W = 0.62;
 function placeAttachments() {
     const groups = new Map();                                                             // Host-uid → { host, list: [[Karte, Controller]] }
-    for (const p of [G.p1, G.p2]) for (const c of [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])]) {
+    for (const p of allPl(G)) for (const c of [...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])]) {
         const h = attachHost(c); if (!h) continue;
         if (!groups.has(h.uid)) {
             const host = document.querySelector(`#arena .card-wrapper[data-uid="${CSS.escape(h.uid)}"]`); if (!host) continue;
@@ -1624,7 +1657,8 @@ function renderBattlefield(p, containerId, isOpponent) {
         slot.appendChild(node); equipZone.appendChild(slot);
     });
     row.appendChild(allyZone); if (equip.length) row.appendChild(equipZone);             // Positionen setzt layoutBoard
-    if (!isOpponent) {
+    row.ondragover = row.ondrop = null;                                                   // Raid: unten kann auch ein Mitspieler liegen
+    if (!isOpponent && p.id === 1) {
         row.ondragover = (e) => { if (UI.drag && UI.drag.kind === 'hand' && handPlayable(UI.drag.card) && UI.drag.card.type !== 'Quest') e.preventDefault(); };
         row.ondrop = (e) => {
             e.preventDefault();
@@ -1648,8 +1682,11 @@ function shownCost(p, card) {
     const now = alt && alt.free ? 0 : getPlayCost(G, p, card, 0);
     return now !== card.cost ? { costNow: now, costBase: card.cost } : null;
 }
+// Raid (VIEW): auch die Hand eines Mitspielers im eigenen Team – offen, aber ohne Bedienung (nur Spieler 1 spielt seine Karten)
 function renderPlayerHand(p) {
     const box = document.getElementById("bot-hand"); box.innerHTML = "";
+    const own = p.id === 1;
+    box.classList.toggle('mate-hand', !own);
     if (p.hand.length === 0) { UI.handSeen = new Set(); UI.handFly.clear(); return; }
     const total = p.hand.length, mid = (total - 1) / 2;
     const choices = choiceUids();
@@ -1674,8 +1711,9 @@ function renderPlayerHand(p) {
         const offset = pos - mid;
         slot.style.transform = handSlotTransform(offset); slot.dataset.ang = offset * (UI.fanAng || 6);
         nodes[idx] = node; angs[idx] = offset * (UI.fanAng || 6);
-        const sortable = !G.spectate && !G.gameOver;                                     // Reihenfolge per Ziehen ändern: immer (nur Anzeige)
-        if (choices.has(card.uid)) {
+        const sortable = own && !G.spectate && !G.gameOver;                              // Reihenfolge per Ziehen ändern: immer (nur Anzeige)
+        if (!own) { /* Mitspieler-Hand: nur ansehen (Zoom über die Vorschau) */ }
+        else if (choices.has(card.uid)) {
             // Entscheidung über Handkarten (z. B. Abwerfen)
             node.classList.add('choice-target'); node.style.cursor = 'pointer';
             if ((myPending('choose') || {}).multi && (UI.multiSel || []).includes(card.uid)) node.classList.add('multi-picked');
@@ -1706,7 +1744,7 @@ const handSlotTransform = offset => `translateY(${Math.abs(offset) * 8}px) rotat
 // p.hand und alle Aktionen (handIdx) bleiben unberührt, auch online. Neue Karten kommen hinten dazu.
 function handDisplayOrder(p) {
     const all = p.hand.map((c, i) => i);
-    if (!UI.handOrder || G.spectate) return all;
+    if (!UI.handOrder || G.spectate || p.id !== 1) return all;
     const pos = new Map(UI.handOrder.map((u, i) => [u, i]));
     const order = all.filter(i => pos.has(p.hand[i].uid)).sort((a, b) => pos.get(p.hand[a].uid) - pos.get(p.hand[b].uid)).concat(all.filter(i => !pos.has(p.hand[i].uid)));
     UI.handOrder = order.map(i => p.hand[i].uid);
@@ -2143,7 +2181,7 @@ async function hsMullToHand(ov, slots) {
 function dropAllowedOn(uid) {
     const d = UI.drag; if (!d) return false;
     if (d.kind === 'hand') return handPlayable(d.card) && d.card.type !== 'Quest' && firstSlotCands(d.card).includes(uid);
-    if (d.kind === 'attack') { const att = findCharacter(G, d.uid); return !!att && !validateAction(G, { type: 'ATTACK', attackerUid: d.uid, defenderUid: uid }, 1); }
+    if (d.kind === 'attack') { const att = findCharacter(G, d.uid); return !!att && (!validateAction(G, { type: 'ATTACK', attackerUid: d.uid, defenderUid: uid }, 1) || (!d.weapon && canSabotageOn(d.uid, uid))); }
     if (d.kind === 'protect') return !!G.battle && (uid === G.battle.att || uid === G.battle.def);
     return false;
 }
@@ -2151,7 +2189,7 @@ function dropOn(uid) {
     const d = UI.drag; UI.drag = null; clearDragHighlights();
     if (!d) return;
     if (d.kind === 'hand') humanAct({ type: 'PLAY_CARD', handIdx: d.idx, firstTarget: uid });
-    else if (d.kind === 'attack') doHumanAttack(d.uid, uid, d.weapon || null);
+    else if (d.kind === 'attack') { if (d.weapon) doHumanAttack(d.uid, uid, d.weapon); else attackOrSabotage(d.uid, uid); }
     else if (d.kind === 'protect') chooseV(d.uid);
 }
 function markDropTargets() {
@@ -2311,16 +2349,16 @@ function renderPendingPanel() {
     const title = document.getElementById("pp-title"), prompt = document.getElementById("pp-prompt"), opts = document.getElementById("pp-opts"), ch = document.getElementById("pp-chain");
     ch.innerHTML = tr`<div class="pp-chain-head">Kette (oben löst zuerst aus):</div>` + chain.slice().reverse().map(it => `<div class="pp-chain-item ${it.pl === 1 ? 'mine' : 'opp'}">${G.spectate ? tr`Spieler ${it.pl}` : it.pl === 1 ? tr('Du') : G.online || G.hotseat ? tr('Gegner') : 'CPU'}: ${esc(chainDesc(G, it))}${it.targets && it.targets.flat().length ? ' → ' + esc(it.targets.flat().map(u => nameOf(G, u)).join(', ')) : ''}</div>`).join('');
     opts.innerHTML = '';
-    title.textContent = tr('Kette'); prompt.textContent = G.hotseat || G.online ? '' : tr('Die CPU reagiert …');
+    title.textContent = tr('Kette'); prompt.textContent = softWait() ? tr`${getPlayer(G, G.pending.pid).hero.name} kann reagieren – tippe auf die leuchtende Tafel, spiel einfach weiter oder tippe auf „Weiter“.` : G.hotseat || G.online ? '' : tr('Die CPU reagiert …');
 }
 // Optionen, die Karten auf dem Feld oder der eigenen Hand sind (die wählt man dort)
-const boardOpt = o => { const l = typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };
+const boardOpt = o => { const l = o.heroUid ? locate(G, o.heroUid) : typeof o.v === 'string' ? locate(G, o.v) : null; return !!l && (isInPlayZone(l.zone) || (l.zone === 'hand' && l.pid === 1)); };
 function boardChoice(d) {
     if (!d || d.kind !== 'choose') return false;   // Mehrfachauswahl: liegen alle Karten auf dem Feld/der Hand, dort markieren, sonst im Fenster
     let cards = 0;
     for (const o of d.opts) {
         if (o.card !== undefined) return false;
-        const l = typeof o.v === 'string' ? locate(G, o.v) : null;
+        const l = o.heroUid ? locate(G, o.heroUid) : typeof o.v === 'string' ? locate(G, o.v) : null;
         if (!l) continue;
         if (!boardOpt(o)) return false;
         cards++;
@@ -2333,7 +2371,8 @@ function boardPick(uid) {
     if (d && d.multi) { multiToggle(d, uid); render(); return; }
     if (d && d.limit) { limitPick(uid); return; }
     if (d && d.destroy) { UI.destroyPick = uid; render(); return; }
-    chooseV(uid);
+    const po = d && d.opts.find(o => o.heroUid === uid);                                  // Spieler-Wahl über seinen Helden
+    chooseV(po ? po.v : uid);
 }
 // Einzigartigkeit (Unique, Legs (1), Pet (1), Totem, Form, Zweihänder + Off-Hand …): ein Klick genügt (CR 414.2/414.3).
 // Darf nur eine bleiben, ist die angeklickte Karte die, die bleibt – die übrigen werden nacheinander zerstört

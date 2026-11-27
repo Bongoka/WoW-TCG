@@ -5,7 +5,7 @@
 // ============================================================================
 self.window = self;
 const AIW_VERSION = self.location.search;                                                      // Versionsnummer der Seite (gegen veraltete Dateien im Cache)
-importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'cards8', 'cards9', 'cards10', 'cards11', 'cards12', 'cards13', 'cards14', 'cards15', 'cards16', 'cards17', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'ai', 'roguelike_data'].map(f => f + '.js' + AIW_VERSION));
+importScripts(...['i18n_en', 'i18n', 'utils', 'cards', 'cards2', 'cards3', 'cards4', 'cards5', 'cards6', 'cards7', 'cards8', 'cards9', 'cards10', 'cards11', 'cards12', 'cards13', 'cards14', 'cards15', 'cards16', 'cards17', 'cards18', 'decks', 'state', 'engine', 'cardfx', 'cardfx2', 'cardfx3', 'cardfx4', 'cardfx5', 'cardfx6', 'cardfx7', 'cardfx8', 'cardfx9', 'cardfx10', 'cardfx11', 'cardfx12', 'cardfx13', 'cardfx14', 'cardfx15', 'cardfx16', 'cardfx17', 'raid', 'raid_mc', 'ai', 'roguelike_data'].map(f => f + '.js' + AIW_VERSION));
 // Roguelike-Kampf: synthetische Karten (Aufwertungen RLUP_…, Abbilder RLTOK_…) gibt es nur zur Laufzeit –
 // hier aus den Kennungen im Zustand neu erzeugen und die Artefakt-Hooks einschalten, damit die Vorausschau stimmt.
 function rlPrepare(state) {

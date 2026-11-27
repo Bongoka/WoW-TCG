@@ -368,7 +368,7 @@ FX[14063] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: attachTo16, aura
 // Blessing of the Kindred: "Ongoing: As this ability enters play, name a class. <p> Friendly allies of that class have +1 / +1."
 FX[14064] = { entered: (s, c, pid) => ask(s, { pid, prompt: tr('Blessing of the Kindred: Klasse nennen'), src: 'Blessing of the Kindred', opts: CLASSES14.map(k => ({ label: tr(k), v: k, ai: alliesOf(me(s, pid)).filter(a => isClassAlly(a, k)).length + 0.1 * me(s, pid).hand.filter(a => isClassCardData(a, k)).length })), k: '14064:set', a: { uid: c.uid } }),
     k: { set: (s, a, v) => { const c = findCharacter(s, a.uid); if (c) { c.kin16 = v; L(s, tr`Blessing of the Kindred: ${tr(v)}`, '', ctrlOf(s, c)); } } },
-    aura: { atk: (s, src, sp, c) => !!src.kin16 && ctrlOf(s, c) === sp && isClassAlly(c, src.kin16) ? 1 : 0, hp: (s, src, sp, c) => !!src.kin16 && ctrlOf(s, c) === sp && isClassAlly(c, src.kin16) ? 1 : 0 } };
+    aura: { atk: (s, src, sp, c) => !!src.kin16 && friendOf(s, c, sp) && isClassAlly(c, src.kin16) ? 1 : 0, hp: (s, src, sp, c) => !!src.kin16 && friendOf(s, c, sp) && isClassAlly(c, src.kin16) ? 1 : 0 } };
 // Blessing of Virtue: "Attach to target ally. Ongoing: Attached ally has +2 / +2, and damage that it would deal is unpreventable. <p> Stash: Damage that allies you control would deal is unpreventable this turn."
 FX[14065] = fxMix({ slots: slotAlly(tr('Ziel-Ally'), false), resolve: attachTo16, aura: { ...attachAura(2, 2), unprev: (s, src, sp, from) => !!from && !!src.attachedTo && from.uid === src.attachedTo } },
     stash16(tr('Schaden deiner Allies ist in diesem Zug unverhinderbar'), (s, a) => addPE(s, a.pid, { k: 'virtue16' })));
@@ -376,7 +376,7 @@ DMG_PRE.push((s, o) => { if (o.unprev || !s.pe || !s.pe.length) return; const c 
 // Censure: "Put target opposing attacking ally into its owner's hand."
 FX[14066] = { slots: (s, pid) => [{ label: tr('Gegnerischer angreifender Ally'), cands: targetCands(s, pid, { ally: true, side: 'enemy', filter: c => isAttackerNow(s, c) }), harm: true }], resolve: (s, it) => { const t = T1(s, it); if (t) bounce(s, t); } };
 // Divine Cleansing: "Destroy any number of abilities attached to friendly cards."
-const attachedToFriendly16 = (s, pid) => [s.p1, s.p2].flatMap(p => p.ongoing).filter(o => { const h = o.attachedTo && findCharacter(s, o.attachedTo); return !!h && ctrlOf(s, h) === pid; }).map(o => o.uid);
+const attachedToFriendly16 = (s, pid) => allPl(s).flatMap(p => p.ongoing).filter(o => { const h = o.attachedTo && findCharacter(s, o.attachedTo); return !!h && friendOf(s, h, pid); }).map(o => o.uid);
 FX[14067] = { resolve: (s, it) => q(s, { op: 'trig', id: 14067, k: 'ask', a: { pid: it.pl } }),
     k: { ask: (s, a) => { const l = attachedToFriendly16(s, a.pid); if (l.length) askMany(s, a.pid, tr('Divine Cleansing: angehängte Fähigkeit zerstören'), 'Divine Cleansing', l, '14067:one', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -2 : 3); },
         one: (s, a, v) => { const c = v && v !== '__done' && findCharacter(s, v); if (!c) return; destroy(s, c); q(s, { op: 'trig', id: 14067, k: 'ask', a }); } } };
@@ -384,7 +384,7 @@ FX[14067] = { resolve: (s, it) => q(s, { op: 'trig', id: 14067, k: 'ask', a: { p
 FX[14069] = { slots: (s, pid) => [{ label: tr('Karte, mit der / durch die in diesem Zug Schaden zugefügt wurde'), cands: targetCands(s, pid, { ally: true, ability: true, equipment: true, filter: c => w16(s).used.includes(c.uid) }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t && w16(s).used.includes(t.uid)) destroy(s, t); } };
 // Sacred Shield: "Interrupt target ability that is targeting a friendly card."
-FX[14070] = { slots: interruptSlot16(tr('Fähigkeit, die eine befreundete Karte anvisiert'), (s, pid, c) => { const i = s.chain.find(x => x.card === c); return !!i && (i.targets || []).flat().some(u => { const t = findCharacter(s, u); return t && ctrlOf(s, t) === pid; }); }),
+FX[14070] = { slots: interruptSlot16(tr('Fähigkeit, die eine befreundete Karte anvisiert'), (s, pid, c) => { const i = s.chain.find(x => x.card === c); return !!i && (i.targets || []).flat().some(u => { const t = findCharacter(s, u); return t && friendOf(s, t, pid); }); }),
     resolve: (s, it) => { const u = T(it)[0]; if (u) interruptUid(s, u); } };
 // Seal of Wrath: "Ongoing: When your hero deals combat damage with a weapon, it may also deal 2 unpreventable holy damage to target hero or ally."
 FX[14071] = { on: { damaged: (s, c, d, pid) => { if (d.combat && d.amt > 0 && d.weapon && d.src === heroOf(s, pid).uid) trig(s, { id: 14071, k: 'go', a: { pid } }); } },
@@ -417,7 +417,7 @@ FX[14079] = { slots: slotAlly(tr('Ziel-Ally'), false), resolve: attachTo16, aura
 FX[14080] = fxMix({ modes: playerModes(-3, 3), resolve: (s, it) => { const l = alliesOf(me(s, it.mode)).filter(c => ctrlOf(s, c) === it.mode); if (!l.length) return;
         ask(s, { pid: it.mode, prompt: tr('Psychic Wail: Welchen eigenen Ally nimmst du auf die Hand?'), src: 'Psychic Wail', opts: l.map(c => ({ label: c.name, v: c.uid, ai: (c.cost || 0) - cardValue(s, c) })), k: '14080:do', a: {} }); },
     k: { do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) bounce(s, c); } } },
-    stash16(tr('Ziel-Ressource erschöpfen'), (s, a) => mustPick(s, a.pid, tr('Psychic Wail: Ressource erschöpfen'), 'Psychic Wail', [...s.p1.resources, ...s.p2.resources].filter(r => !r.exhausted).map(r => r.card.uid), '14080:exh', a, u => locate(s, u).pid === a.pid ? -2 : 2)));
+    stash16(tr('Ziel-Ressource erschöpfen'), (s, a) => mustPick(s, a.pid, tr('Psychic Wail: Ressource erschöpfen'), 'Psychic Wail', allPl(s).flatMap(p => p.resources).filter(r => !r.exhausted).map(r => r.card.uid), '14080:exh', a, u => locate(s, u).pid === a.pid ? -2 : 2)));
 FX[14080].k.exh = (s, a, v) => { const l = v && locate(s, v); if (l && l.zone === 'resource') { l.res.exhausted = true; L(s, tr`Psychic Wail: Ressource wird erschöpft.`, '', a.pid); } };
 // Seeping Shadows: "Attach to target hero. Ongoing: At the start of your turn, your hero deals 2 shadow damage to attached hero. Its controller puts a card from the top of his deck into his graveyard for each damage dealt this way."
 FX[14081] = fxMix({ slots: tgtHero16(tr('Ziel-Held')), resolve: attachTo16 }, attachTick16(14081, 2, 'Shadow', true),
@@ -452,8 +452,8 @@ FX[14087] = { slots: poisonSlot16, resolve: attachTo16,
 CARDS[14090].attach = false;   // Host ist eine Ressource (kein Charakter): Anhängen in "entered" (wie Plunder, cardfx12.js)
 FX[14090] = { slots: (s, pid) => [{ label: tr('Ziel-Ressource'), cands: allResCands(s), harm: true, ai: u => locate(s, u).pid === pid ? -5 : 2 }], resolve: (s, it) => { it.inc16 = T(it)[0]; },
     entered: (s, c, pid, it) => { const l = it && it.inc16 && locate(s, it.inc16); if (l && l.zone === 'resource') c.attachedTo = it.inc16; else q(s, { op: 'call', k: 'E:destroyUid13', a: { uid: c.uid } }); } };
-READY_BLOCK.push((s, c) => !!c && [s.p1, s.p2].some(p => p.ongoing.some(o => o.id === 14090 && o.attachedTo === c.uid)));
-onEvt('resDestroyed', (s) => { for (const p of [s.p1, s.p2]) for (const o of [...p.ongoing]) if (o.id === 14090 && o.attachedTo && !locate(s, o.attachedTo)) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' }); });
+READY_BLOCK.push((s, c) => !!c && allPl(s).some(p => p.ongoing.some(o => o.id === 14090 && o.attachedTo === c.uid)));
+onEvt('resDestroyed', (s) => { for (const p of allPl(s)) for (const o of [...p.ongoing]) if (o.id === 14090 && o.attachedTo && !locate(s, o.attachedTo)) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' }); });
 // Seal Fate: "As an additional cost to play this ability, put the top five cards of your deck into your graveyard. <p> Your hero deals melee damage to target hero or ally equal to the number of [Rogue] abilities put into your graveyard this way."
 const rogueAbility16 = c => !!c && c.type === 'Ability' && (c.allowedClasses || []).includes('Rogue');
 FX[14091] = { slots: slotChar(tr('Ziel'), true),
@@ -474,7 +474,7 @@ FX[14092] = { addCost: (s, it) => { it.extra.ss16 = 0; q(s, { op: 'call', k: '14
 // SCHAMANE (93–102)
 // ============================================================================
 // Ancestral Purge: "Destroy target ability that's not attached to a friendly card. If you do, your hero deals 1 nature damage to each opposing hero and ally."
-FX[14093] = { slots: (s, pid) => [{ label: tr('Fähigkeit (nicht an einer befreundeten Karte)'), cands: targetCands(s, pid, { ability: true, filter: c => { const h = c.attachedTo && findCharacter(s, c.attachedTo); return !(h && ctrlOf(s, h) === pid); } }), harm: true }],
+FX[14093] = { slots: (s, pid) => [{ label: tr('Fähigkeit (nicht an einer befreundeten Karte)'), cands: targetCands(s, pid, { ability: true, filter: c => { const h = c.attachedTo && findCharacter(s, c.attachedTo); return !(h && friendOf(s, h, pid)); } }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t && destroy(s, t)) opposingChars(s, it.pl).forEach(c => heroDmg(s, it.pl, c.uid, 1, 'Nature')); } };
 // Breath of the Elements: "Ready each ally you control."
 FX[14094] = { resolve: (s, it) => alliesOf(me(s, it.pl)).filter(c => ctrlOf(s, c) === it.pl).forEach(c => readyCard(s, c)) };
@@ -492,7 +492,7 @@ FX[14097] = { resolve: (s, it) => { const p = me(s, it.pl), top = topN16(p, 3); 
 // Nature Resistance Totem: "When this card enters play, it deals 2 nature damage to target hero or ally. <p> Other friendly heroes and allies have Nature Resistance."
 FX[14099] = { enterTrig: (s, c, pid) => trig(s, { id: 14099, k: 'go', a: { pid, uid: c.uid } }),
     k: { go: (s, a) => mustPick(s, a.pid, tr('Nature Resistance Totem: 2 Naturschaden'), 'Nature Resistance Totem', targetCands(s, a.pid, { char: true }), '14099:do', a), do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: 2, dt: 'Nature' }); } },
-    aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid !== src.uid && isChar(t) && ctrlOf(s, t) === sp && o.dt === 'Nature' && !resistLost(s, t) ? amt : 0 } };
+    aura: { prevent: (s, src, sp, t, from, o, amt) => t.uid !== src.uid && isChar(t) && friendOf(s, t, sp) && o.dt === 'Nature' && !resistLost(s, t) ? amt : 0 } };
 // Rolling Thunder: "Your hero deals 3 nature damage to target hero or ally, plus an additional 3 for each equipment in that character's party."
 FX[14100] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T1(s, it); if (t) heroDmg(s, it.pl, t.uid, 3 + 3 * equipInParty16(s, t).length, 'Nature'); } };
 // Spiritual Return: "Put target [Fire], [Frost], or [Nature] ally from your graveyard into play if its cost is less than or equal to the number of resources you control. That ally enters play with damage equal to its [Health] -1."
@@ -517,9 +517,9 @@ FX[14103] = fxMix({ canPlay: (s, pid) => alliesOf(me(s, pid)).some(c => ctrlOf(s
 FX[14103].k.mix = (s, a, v) => { const l = v && gyCard(s, v); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); p.deck.push(deckId(l.c)); shuffleInPlace(p); L(s, tr`${l.c.name} wird ins Deck gemischt.`, '', a.pid); };
 // Demonic Soulstone: "Attach to target ally you control. Ongoing: When attached ally is destroyed, put it from its owner's graveyard into his hand."
 FX[14104] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: attachTo16, k: { back: (s, a) => { if (gyCard(s, a.uid)) fromGyToHand(s, a.uid); } } };
-DESTROY_PRE.push((s, c) => { if (!isAllyLike(c)) return; for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.id === 14104 && o.attachedTo === c.uid && active(s, o)) pushTrig(s, p.id, 14104, [{ op: 'trig', id: 14104, k: 'back', a: { uid: c.uid } }]); });
+DESTROY_PRE.push((s, c) => { if (!isAllyLike(c)) return; for (const p of allPl(s)) for (const o of p.ongoing) if (o.id === 14104 && o.attachedTo === c.uid && active(s, o)) pushTrig(s, p.id, 14104, [{ op: 'trig', id: 14104, k: 'back', a: { uid: c.uid } }]); });
 // Fel Blaze: "Your hero deals 2 fire damage to each nonDemon hero and ally."
-FX[14106] = { resolve: (s, it) => [s.p1, s.p2].forEach(p => partyOf(p).filter(c => !isDemon8(s, c)).forEach(c => heroDmg(s, it.pl, c.uid, 2, 'Fire'))) };
+FX[14106] = { resolve: (s, it) => allPl(s).forEach(p => partyOf(p).filter(c => !isDemon8(s, c)).forEach(c => heroDmg(s, it.pl, c.uid, 2, 'Fire'))) };
 // Jhuunash: "Protector <p> This ally has +1 / +1 for each resource you control."
 FX[14107] = { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? me(s, sp).resources.length : 0, hp: (s, src, sp, c) => c.uid === src.uid ? me(s, sp).resources.length : 0 } };
 // Muddle: "Ongoing: When this ability enters play, you may put target opposing ability into its owner's hand. <p> Opponents pay (1) more to play abilities."
@@ -554,7 +554,7 @@ FX[14117] = { slots: slotChar(tr('Eigener Held oder Ally'), false, { side: 'frie
 // Juggernaut: "Exhaust all opposing heroes and allies. Your hero has Assault 3 this turn."
 FX[14118] = { resolve: (s, it) => { opposingChars(s, it.pl).forEach(c => exhaust(s, c)); addTM(heroOf(s, it.pl), { k: 'assault', v: 3, turn: s.turn }); } };
 // Onslaught: "Destroy all equipment."
-FX[14119] = { resolve: (s, it) => [s.p1, s.p2].forEach(p => [...p.hero.weapons, ...p.hero.armors].forEach(c => destroy(s, c))) };
+FX[14119] = { resolve: (s, it) => allPl(s).forEach(p => [...p.hero.weapons, ...p.hero.armors].forEach(c => destroy(s, c))) };
 // Raging Shout: "Ongoing: Allies you control have Assault 1. <p> Stash: Your hero has Assault 1 this turn."
 FX[14120] = fxMix({ aura: { assault: (s, src, sp, c) => isAllyLike(c) && ctrlOf(s, c) === sp ? 1 : 0 } }, stash16(tr('Held erhält Assault 1'), (s, a) => addTM(heroOf(s, a.pid), { k: 'assault', v: 1, turn: s.turn })));
 // Stance Mastery: "Ongoing: [Activate] >>> Your hero has +1 ATK this combat."
@@ -729,7 +729,7 @@ FX[14196] = fxMix(TIM16, { powers: [actPow('trax', tr('1 Feuerschaden'), { slots
 FX[14200] = fxMix(onEnter(14200, 'go'), { k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; alliesOf(me(s, a.pid)).filter(c => ctrlOf(s, c) === a.pid && c.atkType === 'Nature' && c.damage > 0).forEach(c => heal(s, a.uid, c.uid, 'all')); } } });
 // Emerald-Dragonkin: "When a resource you control is turned face down, …"
 // Emerald Acidspewer: "… you may have target player shuffle his graveyard into his deck."
-FX[14203] = fxMix(resDown16(14203, 'go'), { k: { go: (s, a) => ask(s, { pid: a.pid, prompt: tr('Emerald Acidspewer: Wer mischt seinen Friedhof ins Deck?'), src: 'Emerald Acidspewer', opts: [{ label: tr('Du selbst'), v: a.pid, ai: me(s, a.pid).deck.length < 10 ? 2 : -1 }, { label: tr('Gegner'), v: oppPid(s, a.pid), ai: 0 }, { label: tr('Niemand'), v: 0, ai: 1 }], k: 'E:gyShuffle16', a, auto: false }) } });
+FX[14203] = fxMix(resDown16(14203, 'go'), { k: { go: (s, a) => ask(s, { pid: a.pid, prompt: tr('Emerald Acidspewer: Wer mischt seinen Friedhof ins Deck?'), src: 'Emerald Acidspewer', opts: [{ label: tr('Du selbst'), v: a.pid, plSelf: true, ai: me(s, a.pid).deck.length < 10 ? 2 : -1 }, { label: tr('Gegner'), v: oppPid(s, a.pid), plFoe: true, ai: 0 }, { label: tr('Niemand'), v: 0, ai: 1 }], k: 'E:gyShuffle16', a, auto: false }) } });
 EK.gyShuffle16 = (s, a, v) => { if (!v) return; const p = me(s, v); if (gyLocked(s, v) && v !== a.pid) return; if (!p.graveyard.length) { shuffleInPlace(p); return; } p.deck.push(...p.graveyard.map(c => deckId(c))); L(s, tr`${p.hero.name} mischt ${p.graveyard.length} Karte(n) aus dem Friedhof ins Deck.`, '', a.pid); p.graveyard = []; shuffleInPlace(p); };
 // Emerald Captain: "… this ally deals 1 nature damage to target hero."
 FX[14204] = fxMix(resDown16(14204, 'go'), { k: { go: (s, a) => mustPick(s, a.pid, tr('Emerald Captain: 1 Naturschaden an Ziel-Held'), 'Emerald Captain', targetCands(s, a.pid, { hero: true }), '14204:do', a), do: (s, a, v) => allyDmg16(s, a, v, 1, 'Nature') } });
@@ -773,7 +773,7 @@ FX[14219] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid && d.faceUp
 // Landro's Lil' XT: "When this ally enters play, you may destroy target item. <p> At the start of your turn, this ally deals 1 nature damage to each hero and ally."
 FX[14220] = fxMix(mayEnter16(14220, tr("Landro's Lil' XT: Ziel-Item zerstören?"), (s, a) => targetCands(s, a.pid, { equipment: true, filter: c => c.type === 'Item' }), 'do'),
     { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 14220, k: 'tick', a: { pid, uid: c.uid } }); } },
-      k: { do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c); }, tick: (s, a) => { if (findCharacter(s, a.uid)) [s.p1, s.p2].forEach(p => partyOf(p).forEach(c => dealDamage(s, { src: a.uid, tgt: c.uid, amt: 1, dt: 'Nature' }))); } } });
+      k: { do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c); }, tick: (s, a) => { if (findCharacter(s, a.uid)) allPl(s).forEach(p => partyOf(p).forEach(c => dealDamage(s, { src: a.uid, tgt: c.uid, amt: 1, dt: 'Nature' }))); } } });
 
 // ============================================================================
 // AUSRÜSTUNG (221–250)
@@ -820,7 +820,7 @@ FX[14231] = { on: { died: (s, c, d, pid) => { if (d.snap.wasCtrl !== pid && isAl
         endOfTurn: (s, c, d, pid) => { if (d.pid === pid && ((c.counters || {}).fuel || 0) > 0) trig(s, { id: 14231, k: 'ask', a: { pid, uid: c.uid } }); } },
     k: { fuel: (s, a) => { const c = findCharacter(s, a.uid); if (c) addCounter(s, c, 'fuel', 1); },
         ask: (s, a) => { const c = findCharacter(s, a.uid); if (c) yesNo(s, a.pid, tr`Grim Campfire: jedem eigenen Charakter ${(c.counters || {}).fuel || 0} heilen?`, 'Grim Campfire', '14231:do', a, true); },
-        do: (s, a, v) => { const c = findCharacter(s, a.uid), n = c ? (c.counters || {}).fuel || 0 : 0; if (v && n > 0) partyOf(me(s, a.pid)).filter(x => ctrlOf(s, x) === a.pid && x.damage > 0).forEach(x => heroHeal(s, a.pid, x.uid, n)); } } };
+        do: (s, a, v) => { const c = findCharacter(s, a.uid), n = c ? (c.counters || {}).fuel || 0 : 0; if (v && n > 0) friendParty(s, a.pid).filter(x => x.damage > 0).forEach(x => heroHeal(s, a.pid, x.uid, n)); } } };
 // Swift Hand of Justice: "(2), Put this equipment into its owner's hand >>> Target ally has Ferocity this turn."
 FX[14232] = fxMix({ powers: [toHandPow16('swift', tr('Auf die Hand: Ziel-Ally erhält Ferocity'), 2, { slots: slotAlly(tr('Ziel-Ally'), false), resolve: (s, it) => { const t = T1(s, it); if (t) addTM(t, { k: 'ferocity', turn: s.turn }); } })] }, heirloom16(14232));
 // Abomination Knuckles: "When this equipment enters play, you may destroy target armor or item."
@@ -915,7 +915,7 @@ FX[14263] = { reward: (s, pid) => drawCards(s, me(s, pid), me(s, pid).resources.
 // The Mighty U'cha: "On your turn: Pay (2) to complete this quest. <p> Reward: Put a 1/1 Gorilla ally token named U'cha into play."
 FX[14264] = { questCond: myTurnQ12, reward: (s, pid) => makeToken(s, 14508, pid) };
 // The Torch of Retribution: "Reward: Target player shuffles his graveyard into his deck. Draw a card."
-FX[14266] = { reward: (s, pid) => { ask(s, { pid, prompt: tr('The Torch of Retribution: Wer mischt seinen Friedhof ins Deck?'), src: 'The Torch of Retribution', opts: [{ label: tr('Du selbst'), v: pid, ai: me(s, pid).deck.length < 15 ? 2 : 0 }, { label: tr('Gegner'), v: oppPid(s, pid), ai: 1 }], k: 'E:gyShuffle16', a: { pid } }); q(s, { op: 'trig', id: 14266, k: 'draw', a: { pid } }); },
+FX[14266] = { reward: (s, pid) => { ask(s, { pid, prompt: tr('The Torch of Retribution: Wer mischt seinen Friedhof ins Deck?'), src: 'The Torch of Retribution', opts: [{ label: tr('Du selbst'), v: pid, plSelf: true, ai: me(s, pid).deck.length < 15 ? 2 : 0 }, { label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 1 }], k: 'E:gyShuffle16', a: { pid } }); q(s, { op: 'trig', id: 14266, k: 'draw', a: { pid } }); },
     k: { draw: (s, a) => drawCards(s, me(s, a.pid), 1) } };
 // What's Haunting Witch Hill?: "Pay (2) and an additional (1) for each opposing face-up resource to complete this quest. <p> Reward: Draw a card."
 FX[14267] = { questSelfLess: (s, pid) => -foe(s, pid).resources.filter(r => r.faceUp).length, reward: (s, pid) => drawCards(s, me(s, pid), 1) };

@@ -4804,6 +4804,7 @@ cards/* scans small/
 
 # Werkzeuge (ImageMagick portable, Umwandlung PNG → WebP: bin/conv.sh), siehe CLAUDE.md
 /bin/imagemagick/
+/bin/realesrgan/
 # Kartenbilder des Addons (TGA, 143 MB), aus cards/azeroth small erzeugt
 /addon/WoWTCG/Art/
 
@@ -4836,6 +4837,26 @@ Tokens small/*
 !Tokens small/Ringo.webp
 !Tokens/Skeleton.webp
 !Tokens small/Skeleton.webp
+!Tokens/Onyxian Whelp.webp
+!Tokens small/Onyxian Whelp.webp
+!Tokens/Firesworn.webp
+!Tokens small/Firesworn.webp
+!Tokens/Flamewaker.webp
+!Tokens small/Flamewaker.webp
+!Tokens/Flamewaker Elite.webp
+!Tokens small/Flamewaker Elite.webp
+!Tokens/Flamewaker Healer.webp
+!Tokens small/Flamewaker Healer.webp
+!Tokens/Flamewaker Protector.webp
+!Tokens small/Flamewaker Protector.webp
+!Tokens/Son of Flame.webp
+!Tokens small/Son of Flame.webp
+!Tokens/Flamewaker Priest.webp
+!Tokens small/Flamewaker Priest.webp
+!Tokens/Core Rager.webp
+!Tokens small/Core Rager.webp
+!Tokens/Lava Spawn.webp
+!Tokens small/Lava Spawn.webp
 !Tokens/Fel Reaver.webp
 !Tokens small/Fel Reaver.webp
 !Tokens/Snake.webp

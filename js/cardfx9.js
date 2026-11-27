@@ -70,8 +70,8 @@ onEvt('cardPlayed', (s, d) => { if (d.card.type === 'Ability' && d.card.school !
 const onResEnter = (id, k) => ({ on: { resEnters: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id, k, a: { pid, uid: c.uid } }); } } });
 // Ressource offen/verdeckt umdrehen
 function turnResDown(s, uid) { const l = locate(s, uid); if (!l || l.zone !== 'resource' || !l.res.faceUp) return; l.res.faceUp = false; evt(s, 'resTurnedDown', { pid: l.pid, uid }); L(s, tr`${l.c.name} wird verdeckt umgedreht.`, '', l.pid); }
-const allResCands = s => [...s.p1.resources, ...s.p2.resources].map(r => r.card.uid);
-const faceUpResCands = s => [...s.p1.resources, ...s.p2.resources].filter(r => r.faceUp).map(r => r.card.uid);
+const allResCands = s => allPl(s).flatMap(p => p.resources).map(r => r.card.uid);
+const faceUpResCands = s => allPl(s).flatMap(p => p.resources).filter(r => r.faceUp).map(r => r.card.uid);
 // Abilities, Allies und Equipment im Spiel (ohne Helden)
 const nonHeroCards = (s, p) => [...alliesOf(p), ...p.hero.weapons, ...p.hero.armors, ...(p.ongoing || [])].filter((c, i, a) => a.indexOf(c) === i);
 const cardsInPlayOf = (s, p) => [p.hero, ...nonHeroCards(s, p)];
@@ -102,10 +102,10 @@ FX[7001] = { powers: [flipPow(tr('Ziel-Ally fügt sich Heiligschaden in Höhe se
     resolve: (s, it) => { const t = T1(s, it); if (t) dealDamage(s, { src: t.uid, tgt: t.uid, amt: atkOf(s, t), dt: 'Holy' }); } })] };
 FX[7002] = { powers: [flipPow(tr('Gegnerische Allies -1 [Health] in diesem Zug'), 4, { myTurn: true, resolve: (s, it) => addPE(s, it.pl, { k: 'benj9' }) })] };
 STAT_MODS.push((s, c, st) => { if (st !== 'hp' || !isAllyLike(c) || !s.pe || !s.pe.length) return 0; const cp = ctrlOf(s, c); return -pes(s, null, 'benj9').filter(m => m.pid !== cp).length; });
-FX[7003] = { powers: [flipPow(tr('Ziel-Spieler wirft ab, falls er in diesem Zug schon abgeworfen hat'), 1, { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: discardedThisTurn(s, oppPid(s, pid)) ? 4 : -1 }, { label: tr('Du selbst'), v: pid, ai: -5 }],
+FX[7003] = { powers: [flipPow(tr('Ziel-Spieler wirft ab, falls er in diesem Zug schon abgeworfen hat'), 1, { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: discardedThisTurn(s, oppPid(s, pid)) ? 4 : -1 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -5 }],
     resolve: (s, it) => { if (discardedThisTurn(s, it.mode)) q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Martiana the Mindwrench' } }); } })] };
 FX[7004] = { powers: [flipPow(tr('Bear Form und Form (1) in diesem Zug'), 1, { resolve: (s, it) => addPE(s, it.pl, { k: 'heroForm', form: 'bear' }) })] };
-FX[7005] = { powers: [flipPow(tr('Hand ansehen und eine Karte daraus entfernen'), 4, { myTurn: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }, { label: tr('Du selbst'), v: pid, ai: -5 }],
+FX[7005] = { powers: [flipPow(tr('Hand ansehen und eine Karte daraus entfernen'), 4, { myTurn: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 3 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -5 }],
     resolve: (s, it) => { const p = me(s, it.mode); if (!p.hand.length) return; showHand(s, it.pl, it.mode, 'Pidge Filthfinder');
         ask(s, { pid: it.pl, prompt: tr('Pidge: Welche Karte wird aus dem Spiel entfernt?'), src: 'Pidge Filthfinder', opts: p.hand.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: it.mode === it.pl ? -(c.cost || 0) : (c.cost || 0) + 1 })), k: '7005:do', a: { pid: it.mode } }); } })],
     k: { do: (s, a, v) => handToRemoved(s, a.pid, v) } };
@@ -128,14 +128,14 @@ FX[7012] = { powers: [flipPow(tr('Gegnerischen Ally mit den höchsten Kosten zer
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const mx = Math.max(...alliesOf(me(s, ctrlOf(s, t))).map(a => a.cost || 0)); if ((t.cost || 0) >= mx) destroy(s, t); } })] };
 FX[7013] = { powers: [flipPow(tr('Cat Form und Form (1) in diesem Zug'), 2, { resolve: (s, it) => addPE(s, it.pl, { k: 'heroForm', form: 'cat' }) })] };
 FX[7014] = { powers: [flipPow(tr('Fähigkeit zerstören, die nicht an einem befreundeten Charakter hängt'), 3, {
-    slots: (s, pid) => [{ label: tr('Ziel-Fähigkeit'), cands: targetCands(s, pid, { ability: true, filter: c => { const h = c.attachedTo && findCharacter(s, c.attachedTo); return !(h && isChar(h) && ctrlOf(s, h) === pid); } }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }],
+    slots: (s, pid) => [{ label: tr('Ziel-Fähigkeit'), cands: targetCands(s, pid, { ability: true, filter: c => { const h = c.attachedTo && findCharacter(s, c.attachedTo); return !(h && isChar(h) && friendOf(s, h, pid)); } }), harm: true, ai: u => ctrlOf(s, findCharacter(s, u)) === pid ? -10 : 5 }],
     resolve: (s, it) => { const t = T1(s, it); if (t) destroy(s, t); } })] };
 FX[7015] = { powers: [flipPow(tr('Nächster Kampfschaden trifft zusätzlich ein zweites Ziel'), 3, { resolve: (s, it) => addPE(s, it.pl, { k: 'sinthya9', uid: heroOf(s, it.pl).uid }) })],
     k: { second: (s, a) => mustPick(s, a.pid, tr`Sinthya: ${a.n} Nahkampfschaden an ein zweites Ziel`, 'Sinthya Flabberghast', targetCands(s, a.pid, { char: true }).filter(u => u !== a.first), '7015:hit', a),
         hit: (s, a, v) => { if (v) dealDamage(s, { src: a.uid, tgt: v, amt: a.n, dt: 'Melee' }); } } };
 onEvt('dmg', (s, d) => { if (!d.combat || d.amt <= 0) return; const m = (s.pe || []).find(x => x.k === 'sinthya9' && x.turn === s.turn && !x.used && x.uid === d.src); if (!m) return; m.used = true;
     pushTrig(s, m.pid, 7015, [{ op: 'trig', id: 7015, k: 'second', a: { pid: m.pid, uid: m.uid, n: d.amt, first: d.tgt } }]); });
-FX[7016] = { powers: [flipPow(tr('Ziel-Spieler zerstört einen eigenen Ally'), 3, { myTurn: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }, { label: tr('Du selbst'), v: pid, ai: -5 }],
+FX[7016] = { powers: [flipPow(tr('Ziel-Spieler zerstört einen eigenen Ally'), 3, { myTurn: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 3 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -5 }],
     resolve: (s, it) => playerDestroys(s, it.mode, 'ally', 'Spiritualist Sunshroud') })] };
 FX[7017] = { powers: [flipPow(tr('X eigene Allies zerstören: X Schattenschaden'), 3, { myTurn: true, slots: slotChar(tr('Ziel'), true),
     xRange: (s, pid) => ({ min: 0, max: alliesOf(me(s, pid)).length }), xValues: (s, pid) => [1, 2, 3].filter(x => x <= alliesOf(me(s, pid)).length),
@@ -197,7 +197,7 @@ FX[7033] = { slots: (s, pid) => [{ label: tr('Ziel-Ally oder -Waffe'), cands: ta
     aura: { atk: (s, src, sp, c) => c.uid === src.attachedTo ? -3 : 0, watk: (s, src, sp, w) => w.uid === src.attachedTo ? -3 : 0 } };
 FX[7034] = {};
 FX[7035] = { powers: [{ key: 'roll', label: tr('Zerstören: Heile 1 je Ressource'), cost: 1, selfCost: selfDestroyCost, resolve: (s, it) => { const h = heroOf(s, it.pl); heroHeal(s, it.pl, h.uid, me(s, it.pl).resources.length); } },
-    { key: 'give', label: tr('Ziel-Spieler erhält die Kontrolle über diese Fähigkeit'), cost: 1, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: -2 }, { label: tr('Du selbst'), v: pid, ai: -3 }],
+    { key: 'give', label: tr('Ziel-Spieler erhält die Kontrolle über diese Fähigkeit'), cost: 1, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: -2 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -3 }],
         resolve: (s, it) => { const c = findCharacter(s, it.src); if (c && it.mode !== ctrlOf(s, c)) moveOngoing(s, c, it.mode); } }] };
 FX[7036] = { slots: slotAlly(tr('Ziel-Ally'), true), resolve: (s, it) => { const t = T1(s, it); if (t) heroDmg(s, it.pl, t.uid, t.exhausted ? 2 : 6, 'Frost'); } };
 FX[7037] = { slots: (s, pid) => [{ label: tr('Karte auf der Kette'), cands: chainCards(s, () => true), harm: true, ai: u => { const i = s.chain.find(x => x.card && x.card.uid === u); return i && i.pl !== pid ? 5 : -10; } }],
@@ -218,7 +218,7 @@ FX[7041] = { resolve: (s, it) => { const p = me(s, it.pl), list = []; [...allies
         if (list.length) addPE(s, it.pl, { k: 'tempDiss9', uids: list, back: s.turn + 1, untilTurn: s.turn + 1 }); } };
 onEvt('endOfTurn', (s, d) => { for (const m of (s.pe || []).filter(x => x.k === 'tempDiss9' && x.back === s.turn && !x.done)) { m.done = true;
     pushTrig(s, m.pid, 7041, [{ op: 'call', k: '7041:back', a: { pid: m.pid, uids: m.uids } }]); } });
-FX[7041].k = { back: (s, a) => a.uids.forEach(u => { for (const p of [s.p1, s.p2]) { const i = (p.removed || []).findIndex(c => c.uid === u); if (i < 0) continue; const c = p.removed.splice(i, 1)[0]; resetInst(c); putIntoPlay(s, c, a.pid); L(s, tr`${c.name} kommt zurück ins Spiel.`, '', a.pid); } }) };
+FX[7041].k = { back: (s, a) => a.uids.forEach(u => { for (const p of allPl(s)) { const i = (p.removed || []).findIndex(c => c.uid === u); if (i < 0) continue; const c = p.removed.splice(i, 1)[0]; resetInst(c); putIntoPlay(s, c, a.pid); L(s, tr`${c.name} kommt zurück ins Spiel.`, '', a.pid); } }) };
 FX[7042] = { powers: [{ key: 'transfigure', label: tr('Ziel-Waffe: ATK = [Strike] in diesem Zug'), act: true, slots: (s, pid) => [{ label: tr('Ziel-Waffe'), cands: targetCands(s, pid, { weapon: true }), harm: false }],
     resolve: (s, it) => { const w = T1(s, it); if (w) addTM(w, { k: 'watkSet', v: w.strike || 0, turn: s.turn }); } }] };
 // Aura of Accuracy: Karten und Kräfte mit Zielen (1) weniger, mindestens (1)
@@ -237,7 +237,7 @@ FX[7045] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = 
     k: { seal: (s, a) => mayPick(s, a.pid, tr('Crusader Strike: Judgement oder Seal aus dem Friedhof ins Spiel?'), 'Crusader Strike', gyCands(s, a.pid, judgementOrSeal), '7045:put', a, u => 2),
         put: (s, a, v) => { if (v) fromGyToPlay(s, v, a.pid); } } };
 FX[7046] = { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { const t = T(it)[0]; if (t) heroHeal(s, it.pl, t, 8); drawCards(s, me(s, it.pl), 1); } };
-FX[7047] = { resolve: (s, it) => [...s.p1.allies, ...s.p2.allies].filter(isAllyLike).forEach(c => dealDamage(s, { src: c.uid, tgt: c.uid, amt: atkOf(s, c), dt: 'Holy' })) };
+FX[7047] = { resolve: (s, it) => allPl(s).flatMap(p => p.allies).filter(isAllyLike).forEach(c => dealDamage(s, { src: c.uid, tgt: c.uid, amt: atkOf(s, c), dt: 'Holy' })) };
 onEvt('dmg', (s, d) => { if (d.amt <= 0) return; const m = (s.dmg9 = s.dmg9 || {}); for (const u of [d.weapon, d.abilityUid, ...(d.weapons || [])]) if (u) m[u] = s.turn; });
 FX[7048] = { slots: (s, pid) => [{ label: tr('Fähigkeit oder Ausrüstung'), cands: targetCands(s, pid, { ability: true, equipment: true }), harm: true, ai: u => (s.dmg9 || {})[u] === s.turn && ctrlOf(s, findCharacter(s, u)) !== pid ? 5 : -5 }],
     resolve: (s, it) => { const t = T1(s, it); if (t && (s.dmg9 || {})[t.uid] === s.turn) destroy(s, t); } };
@@ -264,11 +264,11 @@ FX[7052] = { resolve: (s, it) => { const mine = inPlayCount9(s, me(s, it.pl)); c
             ask(s, { pid: a.pid, prompt: tr`Equalize: Zerstöre eine eigene Karte im Spiel (noch ${a.n})`, src: 'Equalize', opts: cards.map(c => { const l = locate(s, c.uid); return { label: l.zone === 'resource' ? (l.res.faceUp ? c.name : tr('Verdeckte Ressource')) : c.name, v: c.uid, ai: l.zone === 'resource' ? -2 : -cardValue(s, c) }; }), k: '7052:do', a }); },
         do: (s, a, v) => { const l = locate(s, v); if (l && l.zone === 'resource') destroyResource(s, v); else { const c = findCharacter(s, v); if (c) destroy(s, c); } q(s, { op: 'call', k: '7052:pick', a: { ...a, n: a.n - 1 } }); } } };
 FX[7053] = { modes: playerModes(-3, 3), resolve: (s, it) => { const n = alliesOf(me(s, it.pl)).filter(a => a.atkType === 'Shadow').length; if (n > 0) q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n, src: 'Exasperate' } }); } };
-FX[7054] = { powers: [{ key: 'misery', label: tr('Ziel-Spieler legt die obersten X Karten in den Friedhof'), cost: 'X', act: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -3 }],
+FX[7054] = { powers: [{ key: 'misery', label: tr('Ziel-Spieler legt die obersten X Karten in den Friedhof'), cost: 'X', act: true, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 2 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -3 }],
     resolve: (s, it) => millN(s, it.mode, it.x || 0) }] };
 function millN(s, pid, n) { const p = me(s, pid); let k = 0; for (let i = 0; i < n && p.deck.length; i++) { p.graveyard.push(makeCardInst(p.deck.pop(), false, p.deckOwner || pid)); k++; } if (k) L(s, tr`${p.hero.name} legt ${k} Karte(n) vom Deck in den Friedhof.`, '', pid); }
 // KI: nicht, wenn der Gegner einem damit Babagahnoosh (Set icecrown) geben kann und das zu viele Karten kostet
-FX[7055] = { aiSkip: (s, pid, c, o) => typeof babaTooCostly === 'function' && getOpponent(s, pid).hand.some(a => a.id === 13165 && (a.cost || 0) <= (o.x || 0)) && babaTooCostly(s, pid, c), xRange: () => ({ min: 0, max: 20 }), modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }],
+FX[7055] = { aiSkip: (s, pid, c, o) => typeof babaTooCostly === 'function' && getOpponent(s, pid).hand.some(a => a.id === 13165 && (a.cost || 0) <= (o.x || 0)) && babaTooCostly(s, pid, c), xRange: () => ({ min: 0, max: 20 }), modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 3 }],
     resolve: (s, it) => { const o = me(s, oppPid(s, it.pl)); showHand(s, it.pl, o.id, 'Precognition'); const l = o.hand.filter(c => c.type === 'Ally' && (c.cost || 0) <= (it.x || 0)); if (!l.length) return;
         ask(s, { pid: o.id, prompt: tr`Precognition: Welcher Ally (Kosten ≤ ${it.x || 0}) geht ins Spiel des Gegners?`, src: 'Precognition', opts: l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: -(c.cost || 0) })), k: '7055:do', a: { pid: it.pl, from: o.id } }); },
     k: { do: (s, a, v) => { const p = me(s, a.from), c = p.hand.find(x => x.uid === v); if (!c) return; p.hand.splice(p.hand.indexOf(c), 1); evt(s, 'handLeft', { pid: p.id, uid: c.uid }); putIntoPlay(s, c, a.pid); } } };
@@ -292,7 +292,7 @@ FX[7062] = { resolve: (s, it) => { const h = heroOf(s, it.pl); readyCard(s, h); 
 FX[7063] = { slots: (s, pid) => [{ label: tr('Charakter, dem dein Held Kampfschaden zugefügt hat'), cands: targetCands(s, pid, { char: true, filter: c => (s.cd9 || {})[pid + ':' + c.uid] === s.turn }), harm: true }],
     resolve: (s, it) => { it.attachTo = T(it)[0]; }, on: dotOnStart(3, 'Nature') };
 onEvt('dmg', (s, d) => { if (!d.combat || d.amt <= 0) return; const src = findCharacter(s, d.src); if (src && src.type === 'Hero') (s.cd9 = s.cd9 || {})[ctrlOf(s, src) + ':' + d.tgt] = s.turn; });
-FX[7064] = { resolve: (s, it) => { const all = [s.p1, s.p2].flatMap(p => nonHeroCards(s, p)); if (!all.length) return;
+FX[7064] = { resolve: (s, it) => { const all = allPl(s).flatMap(p => nonHeroCards(s, p)); if (!all.length) return;
         const mn = Math.min(...all.map(c => c.cost || 0)); all.filter(c => (c.cost || 0) === mn).forEach(c => destroy(s, c)); } };
 FX[7065] = { slots: (s, pid) => [{ label: tr('Erschöpftes Ziel'), cands: targetCands(s, pid, { char: true, exhausted: true }), harm: true }], resolve: (s, it) => { const t = T1(s, it); if (t && isExhausted(s, t)) heroDmg(s, it.pl, t.uid, 3, 'Melee'); } };
 FX[7066] = { xRange: (s, pid) => ({ min: 0, max: Math.min(5, combosInGy(s, pid).length) }), addCost: (s, it) => removeCombos(s, it), selfCost: (s, pid, card, x) => -(x || 0), resolve: (s, it) => drawCards(s, me(s, it.pl), 3) };
@@ -360,7 +360,7 @@ FX[7096] = { resolve: (s, it) => q(s, { op: 'call', k: '7096:look', a: { pid: it
     k: { look: (s, a) => { const p = me(s, a.pid), n = Math.min(2, p.deck.length); if (!n) return; const ids = p.deck.slice(-n).reverse(); if (n === 1) { p.hand.push(makeCardInst(p.deck.pop(), false, p.id)); return; }
             ask(s, { pid: a.pid, prompt: tr('Eagle Sight: Welche Karte auf die Hand? (die andere unter das Deck)'), src: 'Eagle Sight', opts: ids.map((id, i) => ({ label: CARDS[id].name, v: i, card: id, ai: CARDS[id].cost || 0 })), k: '7096:do', a: { ...a, ids } }); },
         do: (s, a, v) => { const p = me(s, a.pid); p.deck.splice(p.deck.length - 2, 2); const take = a.ids[v], rest = a.ids[1 - v]; p.hand.push(makeCardInst(take, false, p.id)); p.deck.unshift(rest); L(s, tr`${p.hero.name} nimmt eine Karte auf die Hand und legt eine unter das Deck.`, '', a.pid); } } };
-FX[7097] = { resolve: (s, it) => [s.p1, s.p2].forEach(p => [p.hero, ...alliesOf(p)].forEach(c => heroDmg(s, it.pl, c.uid, 3, 'Fire'))) };
+FX[7097] = { resolve: (s, it) => allPl(s).forEach(p => [p.hero, ...alliesOf(p)].forEach(c => heroDmg(s, it.pl, c.uid, 3, 'Fire'))) };
 FX[7098] = { slots: (s, pid) => [{ label: tr('Ziel für 2 Feuer (optional)'), cands: targetCands(s, pid, { char: true }), min: 0, max: 1, harm: true }, { label: tr('Zweites Ziel für 1 Frost (optional)'), cands: targetCands(s, pid, { char: true }), min: 0, max: 1, harm: true }],
     distinct: true, resolve: (s, it) => { const a = T(it, 0)[0], b = T(it, 1)[0]; if (a) heroDmg(s, it.pl, a, 2, 'Fire'); if (b) heroDmg(s, it.pl, b, 1, 'Frost', { after: { k: 'E:frozen', a: { uid: b } } }); } };
 FX[7099] = { slots: (s, pid) => [{ label: tr('Fähigkeit, Ally, Ausrüstung oder Ressource'), cands: [...targetCands(s, pid, { ability: true, ally: true, equipment: true }), ...allResCands(s)], harm: true, ai: u => { const l = locate(s, u); return l && l.pid !== pid ? 4 : -10; } }],
@@ -374,7 +374,7 @@ FX[7103] = { slots: slotChar(tr('Ziel'), false), resolve: (s, it) => { it.attach
 // Revival Stone hängt am Ally und verlässt mit ihm das Spiel: die Auslösung wird vor dem Verlassen gemerkt (DESTROY_PRE)
 FX[7104] = { slots: slotAlly(tr('Eigener Ally'), false, { side: 'friendly' }), resolve: (s, it) => { it.attachTo = T(it)[0]; },
     k: { back: (s, a) => { if (!gyCard(s, a.uid)) return; fromGyToPlay(s, a.uid, a.pid); const x = findCharacter(s, a.uid); if (x) x.damage = Math.max(0, hpOf(s, x) - 1); } } };
-DESTROY_PRE.push((s, c) => { if (!isAllyLike(c)) return; for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.id === 7104 && o.attachedTo === c.uid && active(s, o)) pushTrig(s, p.id, 7104, [{ op: 'trig', id: 7104, k: 'back', a: { pid: p.id, uid: c.uid } }]); });
+DESTROY_PRE.push((s, c) => { if (!isAllyLike(c)) return; for (const p of allPl(s)) for (const o of p.ongoing) if (o.id === 7104 && o.attachedTo === c.uid && active(s, o)) pushTrig(s, p.id, 7104, [{ op: 'trig', id: 7104, k: 'back', a: { pid: p.id, uid: c.uid } }]); });
 FX[7105] = { slots: (s, pid) => [{ label: tr('Fähigkeit mit einem Ziel'), cands: (s.chain || []).filter(i => i.kind === 'card' && i.card.type === 'Ability' && (i.targets || []).flat().length === 1).map(i => i.card.uid), harm: true }],
     resolve: (s, it) => { const u = T(it)[0]; const x = (s.chain || []).find(i => i.card && i.card.uid === u); if (x) q(s, { op: 'call', k: '7105:new', a: { pid: it.pl, item: x.id } }); },
     k: { new: (s, a) => { const x = (s.chain || []).find(i => i.id === a.item); if (!x) return; const f = FX[x.card.id] || {}; const sl = f.slots ? targetSlots(s, x.pl, f, x.card, x) : []; if (!sl.length) return;
@@ -439,7 +439,7 @@ FX[7115] = fxMix(onEnter(7115, 'take'), { k: { take: (s, a) => { if (!findCharac
     do: (s, a, v) => { const t = v && findCharacter(s, v), c = findCharacter(s, a.uid); if (!t || !c || ctrlOf(s, c) !== a.pid) return; const from = ctrlOf(s, t); changeControl(s, t, a.pid); bindCtrl(s, c, a.pid, 'brel9', { uid: t.uid, from }); } } });
 // Kontrolle zurück, sobald Brelnor nicht mehr unter dieser Kontrolle ist
 STATE_FIX.push(s => { let ch = false;
-    for (const p of [s.p1, s.p2]) for (const t of [...p.allies]) { const m = t.brelBy9; if (!m) continue; const b = findCharacter(s, m.src);
+    for (const p of allPl(s)) for (const t of [...p.allies]) { const m = t.brelBy9; if (!m) continue; const b = findCharacter(s, m.src);
         if (!b || ctrlOf(s, b) !== m.ctrl || !isInPlayZone((locate(s, b.uid) || {}).zone) || !(b.brel9 && b.brel9.v.uid === t.uid)) { delete t.brelBy9; if (ctrlOf(s, t) === m.ctrl && m.from !== m.ctrl) { changeControl(s, t, m.from); ch = true; } } }
     return ch; });
 FX[7115].k.do = (s, a, v) => { const t = v && findCharacter(s, v), c = findCharacter(s, a.uid); if (!t || !c || ctrlOf(s, c) !== a.pid) return; const from = ctrlOf(s, t); changeControl(s, t, a.pid);
@@ -455,7 +455,7 @@ const raceOf9 = c => ALLIANCE_RACES.find(r => raceIs(r)(c)) || null;
 FX[7118] = fxMix(diplomacy(c => facIs(c, 'Alliance')), { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? new Set(alliesOf(me(s, sp)).map(raceOf9).filter(Boolean)).size : 0,
     hp: (s, src, sp, c) => c.uid === src.uid ? new Set(alliesOf(me(s, sp)).map(raceOf9).filter(Boolean)).size : 0 } });
 FX[7119] = KW9.shadowmeld;
-FX[7120] = fxMix(diplomacy(raceIs('Dwarf')), { powers: [actPow('soortan', tr('Ziel-Spieler legt die obersten zwei Karten in den Friedhof'), { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -2 }], resolve: (s, it) => millN(s, it.mode, 2) })] });
+FX[7120] = fxMix(diplomacy(raceIs('Dwarf')), { powers: [actPow('soortan', tr('Ziel-Spieler legt die obersten zwei Karten in den Friedhof'), { modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 2 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -2 }], resolve: (s, it) => millN(s, it.mode, 2) })] });
 FX[7121] = fxMix(onEnter(7121, 'ask'), { k: { ask: (s, a) => mayPick(s, a.pid, tr('Durgrin Ironedge: Ziel-Ausrüstung erschöpfen?'), 'Durgrin Ironedge', targetCands(s, a.pid, { equipment: true }), '7121:do', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -5 : 3),
     do: (s, a, v) => { const e = v && findCharacter(s, v), c = findCharacter(s, a.uid); if (!e) return; exhaust(s, e); if (c && ctrlOf(s, c) === a.pid) bindCtrl(s, c, a.pid, 'durg9', e.uid); } },
     aura: { noReady: (s, src, sp, c) => boundTo(s, src, sp, 'durg9') === c.uid } });
@@ -465,7 +465,7 @@ FX[7124] = fxMix(diplomacy(raceIs('Night Elf')), { powers: [actPow('samantha', t
     resolve: (s, it) => { const t = T1(s, it); if (t) { readyCard(s, t); addTM(t, { k: 'cantAttack', turn: s.turn }); } } })] });
 FX[7125] = resist('Arcane');
 FX[7126] = KW9.shadowmeld;
-FX[7127] = fxMix(locBuff, { powers: [actPow('gryth', tr('Ziel-Location bereit machen'), { slots: (s) => [{ label: tr('Ziel-Location'), cands: [...locsOf(s.p1), ...locsOf(s.p2)].map(r => r.card.uid), harm: false }],
+FX[7127] = fxMix(locBuff, { powers: [actPow('gryth', tr('Ziel-Location bereit machen'), { slots: (s) => [{ label: tr('Ziel-Location'), cands: allPl(s).flatMap(p => locsOf(p)).map(r => r.card.uid), harm: false }],
     resolve: (s, it) => { const l = locate(s, T(it)[0]); if (l && l.zone === 'resource') l.res.exhausted = false; } })] });
 FX[7128] = fxMix(onEnter(7128, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid, tr('The Hammerhand Brothers: Gegnerischer Ally kann nicht angreifen'), 'The Hammerhand Brothers', targetCands(s, a.pid, { ally: true, side: 'enemy' }), '7128:do', a),
     do: (s, a, v) => { const c = findCharacter(s, a.uid); if (c && v && ctrlOf(s, c) === a.pid) bindCtrl(s, c, a.pid, 'ham9', v); } },
@@ -495,7 +495,7 @@ FX[7141] = fxMix(onEnter(7141, 'tok'), { k: { tok: (s, a) => makeToken(s, 9801, 
 FX[7141].k.pay = (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c, { cause: 'cost' }); finishPrep(s); };
 FX[7142] = { aura: { watk: (s, src, sp, w) => ctrlOf(s, w) === sp ? 3 : -3 } };
 FX[7143] = selfKwIf('longRange', (s, src) => !(src.damage > 0));
-FX[7144] = { powers: [actPow('bixy', tr('Ziel-Spieler wirft ab, du ziehst'), { canUse: undamaged, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 3 }, { label: tr('Du selbst'), v: pid, ai: 0 }],
+FX[7144] = { powers: [actPow('bixy', tr('Ziel-Spieler wirft ab, du ziehst'), { canUse: undamaged, modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 3 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: 0 }],
     resolve: (s, it) => { q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Tinker Bixy Blue' } }); q(s, { op: 'call', k: 'E:draw', a: { pid: it.pl, n: 1 } }); } })] };
 FX[7145] = { powers: [actPow('burnfizzle', tr('3 Feuer an jeden Gegner'), { canUse: undamaged, resolve: (s, it) => { if (!findCharacter(s, it.src)) return; opposingChars(s, it.pl).forEach(c => dealDamage(s, { src: it.src, tgt: c.uid, amt: 3, dt: 'Fire' })); } })] };
 FX[7146] = selfKwIf('protector', (s, src) => !(src.damage > 0));
@@ -518,7 +518,7 @@ FX[7154] = fxMix(KW9.shadowmeld, { aura: { prevent: (s, src, sp, t, from, o, amt
 FX[7155] = { on: { defends: (s, c, d, pid) => { const a = findCharacter(s, d.att); if (d.def === c.uid && a && isAllyLike(a)) trig(s, { id: 7155, k: 'hit', a: { pid, uid: c.uid } }); } },
     k: { hit: (s, a) => { if (!s.battle) return; const att = findCharacter(s, s.battle.att); if (att && isAllyLike(att) && !untargetableBy(s, att, a.pid) && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: att.uid, amt: 3, dt: 'Holy', unprev: true }); } } };
 const isDruid9 = c => c.type === 'Hero' ? c.class === 'Druid' : (c.allyClass === 'Druid' || (c.allyTypes || []).includes('Druid'));
-FX[7156] = { aura: { atk: (s, src, sp, c) => c.uid !== src.uid && isChar(c) && ctrlOf(s, c) === sp && isDruid9(c) ? 1 : 0, hp: (s, src, sp, c) => c.uid !== src.uid && isChar(c) && ctrlOf(s, c) === sp && isDruid9(c) ? 1 : 0 } };
+FX[7156] = { aura: { atk: (s, src, sp, c) => c.uid !== src.uid && isChar(c) && friendOf(s, c, sp) && isDruid9(c) ? 1 : 0, hp: (s, src, sp, c) => c.uid !== src.uid && isChar(c) && friendOf(s, c, sp) && isDruid9(c) ? 1 : 0 } };
 FX[7157] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 7157, k: 'go', a: { pid } }); } }, k: { go: (s, a) => peasants(s, a.pid, 'ferocity') } };
 FX[7158] = {};
 FX[7159] = { aura: { hp: (s, src, sp, c) => c.uid !== src.uid && isAllyLike(c) && ctrlOf(s, c) === sp && raceIs('Tauren')(c) ? 10 : 0 } };
@@ -541,7 +541,7 @@ FX[7169] = { powers: [{ key: 'kimble', label: tr('Karte abwerfen: Fähigkeit ode
 FX[7170] = warStomp(7170);
 FX[7171] = fxMix(warStomp(7171), onEnter(7171, 'all'), { k: { all: (s, a) => opposingChars(s, a.pid).forEach(c => exhaust(s, c)) } });
 FX[7172] = { powers: [{ key: 'coor', label: tr('Karte abwerfen: 1 Feuer an jeden Ally'), cost: 1, canUse: handN, payExtra: discardCost(7172),
-    resolve: (s, it) => { if (!findCharacter(s, it.src)) return; [...s.p1.allies, ...s.p2.allies].filter(isAllyLike).forEach(c => dealDamage(s, { src: it.src, tgt: c.uid, amt: 1, dt: 'Fire' })); } }] };
+    resolve: (s, it) => { if (!findCharacter(s, it.src)) return; allPl(s).flatMap(p => p.allies).filter(isAllyLike).forEach(c => dealDamage(s, { src: it.src, tgt: c.uid, amt: 1, dt: 'Fire' })); } }] };
 FX[7173] = KW9.berserking;
 FX[7174] = fxMix(KW9.berserking, { powers: [{ key: 'jilti', label: tr('Long-Range in diesem Zug'), cost: 1, resolve: (s, it) => { const c = findCharacter(s, it.src); if (c) addTM(c, { k: 'longRange', turn: s.turn }); } }] });
 FX[7175] = fxMix(resist('Shadow'), onEnter(7175, 'ask'), { k: { ask: (s, a) => mayPick(s, a.pid, tr('Johnny Rotten: 3 Nahkampfschaden an erschöpftes Ziel?'), 'Johnny Rotten', targetCands(s, a.pid, { char: true, exhausted: true }), '7175:do', a),
@@ -561,7 +561,7 @@ PRED.location = c => c.type === 'Location';
 PRED.arena = c => !!c.arena;
 FX[7182] = fxMix(locBuff, onEnter(7182, 'look'), { k: { look: (s, a) => revealTop(s, a.pid, 4, 'Michael Garrett, Bat Handler', { pred: 'location' }) } });
 FX[7183] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 7183, k: 'go', a: { pid, uid: c.uid } }); } },
-    k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; [s.p1, s.p2].forEach(p => [p.hero, ...alliesOf(p)].forEach(c => { if (c.uid !== a.uid) dealDamage(s, { src: a.uid, tgt: c.uid, amt: 1, dt: 'Fire' }); })); } } };
+    k: { go: (s, a) => { if (!findCharacter(s, a.uid)) return; allPl(s).forEach(p => [p.hero, ...alliesOf(p)].forEach(c => { if (c.uid !== a.uid) dealDamage(s, { src: a.uid, tgt: c.uid, amt: 1, dt: 'Fire' }); })); } } };
 FX[7184] = { aura: { atkBlock: (s, src, sp, att, d) => att.uid === src.uid && !isExhausted(s, d) } };
 FX[7185] = fxMix(onEnter(7185, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid, tr('Munkin Blackfist: Ziel-Ausrüstung zerstören'), 'Munkin Blackfist', targetCands(s, a.pid, { equipment: true }), '7185:do', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? -10 : 3),
     do: (s, a, v) => { const t = v && findCharacter(s, v); if (!t) return; const eq = p => p.hero.weapons.length + p.hero.armors.length; if (eq(me(s, ctrlOf(s, t))) > eq(me(s, a.pid))) destroy(s, t); } } });
@@ -587,7 +587,7 @@ FX[7195] = fxMix(onEnter(7195, 'ask'), { k: { ask: (s, a) => mayPick(s, a.pid, t
     do: (s, a, v) => { if (v) turnResDown(s, v); } } });
 FX[7196] = warStomp(7196);
 FX[7197] = { powers: [{ key: 'emek', label: tr('Karte abwerfen: Ziel-Spieler wirft ab'), cost: 3, myTurn: true, canUse: handN, payExtra: discardCost(7197),
-    modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), ai: 2 }, { label: tr('Du selbst'), v: pid, ai: -5 }], resolve: (s, it) => q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Tormentor Emek' } }) }] };
+    modes: (s, pid) => [{ label: tr('Gegner'), v: oppPid(s, pid), plFoe: true, ai: 2 }, { label: tr('Du selbst'), v: pid, plSelf: true, ai: -5 }], resolve: (s, it) => q(s, { op: 'call', k: 'E:discard', a: { pid: it.mode, n: 1, src: 'Tormentor Emek' } }) }] };
 FX[7198] = KW9.berserking;
 FX[7199] = KW9.berserking;
 FX[7200] = KW9.conspicuous;
@@ -598,9 +598,9 @@ FX[7202] = { powers: [actPow('vixton', tr('Oberste drei aufdecken: Arena-Karte a
 // ============================================================================
 // AUSRÜSTUNG (203–238)
 // ============================================================================
-const namesInPlay = s => { const m = {}; for (const p of [s.p1, s.p2]) { [...cardsInPlayOf(s, p), ...p.resources.filter(r => r.faceUp).map(r => r.card)].forEach(c => { m[c.name] = (m[c.name] || 0) + 1; }); } return m; };
+const namesInPlay = s => { const m = {}; for (const p of allPl(s)) { [...cardsInPlayOf(s, p), ...p.resources.filter(r => r.faceUp).map(r => r.card)].forEach(c => { m[c.name] = (m[c.name] || 0) + 1; }); } return m; };
 FX[7203] = { on: { endOfTurn: (s, c, d, pid) => trig(s, { id: 7203, k: 'go', a: {} }) },
-    k: { go: (s) => { const m = namesInPlay(s); [s.p1, s.p2].flatMap(p => nonHeroCards(s, p)).filter(c => m[c.name] > 1).forEach(c => destroy(s, c)); } } };
+    k: { go: (s) => { const m = namesInPlay(s); allPl(s).flatMap(p => nonHeroCards(s, p)).filter(c => m[c.name] > 1).forEach(c => destroy(s, c)); } } };
 FX[7204] = fxMix(onEnter(7204, 'ask'), { k: { ask: (s, a) => mustPick(s, a.pid, tr('Blue Suede Shoes: eigene Karte wird Untargetable'), 'Blue Suede Shoes', cardsInPlayOf(s, me(s, a.pid)).map(c => c.uid), '7204:do', a, u => cardValue(s, findCharacter(s, u))),
     do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) addTM(c, { k: 'untargetable', turn: s.turn }); } } });
 FX[7205] = { on: { dmg: (s, c, d, pid) => { if (d.tgt === heroOf(s, pid).uid && d.amt > 0) trig(s, { id: 7205, k: 'ex', a: { uid: c.uid } }); } }, k: { ex: (s, a) => exhaust(s, findCharacter(s, a.uid)) } };
@@ -683,7 +683,7 @@ FX[7238] = { powers: [{ key: 'glacial', label: tr('Zerstören: 1 Frost an [Allia
 PRED.allianceCard = c => facIs(c, 'Alliance') || (c.allowedFactions || []).includes('Alliance');
 PRED.hordeCard = c => facIs(c, 'Horde') || (c.allowedFactions || []).includes('Horde');
 FX[7239] = { reward: (s, pid) => revealTop(s, pid, 3, 'Establishing New Outposts', { pred: 'allianceCard', byQuest: true }) };
-const counterCards = s => [...inPlay(s).map(e => e.c), ...[s.p1, s.p2].flatMap(p => p.resources.map(r => r.card))].filter(c => c.counters && Object.values(c.counters).some(v => v > 0));
+const counterCards = s => [...inPlay(s).map(e => e.c), ...allPl(s).flatMap(p => p.resources.map(r => r.card))].filter(c => c.counters && Object.values(c.counters).some(v => v > 0));
 FX[7240] = { reward: (s, pid) => { drawCards(s, me(s, pid), 1); q(s, { op: 'call', k: '7240:pick', a: { pid } }); },
     k: { pick: (s, a) => mayPick(s, a.pid, tr('In Defense of Halaa: Zähler auf einer Karte verdoppeln?'), 'In Defense of Halaa', counterCards(s).map(c => c.uid), '7240:kind', a, u => locate(s, u).pid === a.pid ? 2 : -2),
         kind: (s, a, v) => { const c = v && findCharacter(s, v); if (!c) return; const ks = Object.keys(c.counters).filter(k => c.counters[k] > 0); if (ks.length === 1) return FX[7240].k.add(s, { uid: v }, ks[0]);
@@ -711,7 +711,7 @@ FX[7245] = { reward: (s, pid) => q(s, { op: 'call', k: '7245:pick', a: { pid, or
         done: (s, a) => { const atk = u => { const c = u && findCharacter(s, u); return c ? atkOf(s, c) : -1; }; const mine = atk(a.chosen[a.pid]); if (mine < 0) return;
             if (Object.keys(a.chosen).every(k => atk(a.chosen[k]) <= mine)) drawCards(s, me(s, a.pid), 2); } } };
 FX[7246] = { questSelfLess: (s, pid) => alliesOf(me(s, pid)).filter(a => a.atkType === 'Nature').length, reward: (s, pid) => drawCards(s, me(s, pid), 1) };
-FX[7247] = { reward: (s, pid) => { const m = {}; [...s.p1.allies, ...s.p2.allies].filter(isAllyLike).forEach(c => { m[c.name] = (m[c.name] || 0) + 1; }); drawCards(s, me(s, pid), Object.values(m).some(n => n >= 2) ? 2 : 1); } };
+FX[7247] = { reward: (s, pid) => { const m = {}; allPl(s).flatMap(p => p.allies).filter(isAllyLike).forEach(c => { m[c.name] = (m[c.name] || 0) + 1; }); drawCards(s, me(s, pid), Object.values(m).some(n => n >= 2) ? 2 : 1); } };
 FX[7248] = { questCond: (s, pid) => controlsLocation(s, pid) ? null : tr('Du brauchst eine Location'), reward: (s, pid) => drawCards(s, me(s, pid), 1) };
 const outlandish = c => isChar(c) && (raceIs('Blood Elf')(c) || raceIs('Draenei')(c) || hasType(c, 'Demon') || /\bDemon\b/.test(c.race || ''));
 FX[7249] = { reward: (s, pid) => drawCards(s, me(s, pid), partyOf(foe(s, pid)).some(outlandish) ? 2 : 1) };
@@ -788,10 +788,10 @@ FX[7210] = { powers: [actPow('gown', tr('Eigener Ally wird Kopie eines zweiten e
 function copyAlly9(s, a, b) { if (!a.copy9) a.copy9 = { orig: Object.fromEntries(COPY_FIELDS9.map(k => [k, a[k]])), turn: s.turn }; else a.copy9.turn = s.turn;
     const d = CARDS[b.id]; for (const k of COPY_FIELDS9) { if (k === 'b') a.b = { atk: d.atk || 0, hp: d.hp || 0, def: d.def || 0, strike: d.strike || 0 }; else a[k] = k === 'id' ? b.id : d[k] !== undefined ? d[k] : b[k]; }
     L(s, tr`Masquerade Gown: ${a.copy9.orig.name} wird zu einer Kopie von ${b.name}.`, '', ctrlOf(s, a)); }
-STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) for (const c of p.allies) if (c.copy9 && c.copy9.turn !== s.turn) { const o = c.copy9.orig; delete c.copy9; for (const k of COPY_FIELDS9) c[k] = o[k]; } return false; });
+STATE_FIX.push(s => { for (const p of allPl(s)) for (const c of p.allies) if (c.copy9 && c.copy9.turn !== s.turn) { const o = c.copy9.orig; delete c.copy9; for (const k of COPY_FIELDS9) c[k] = o[k]; } return false; });
 // Arcanite Dragonling: "(1) >>> This item is also an ally with 2 [Melee] / 2 [Health] and Protector this turn." – zugleich in Party und Ausrüstung (engine.js allyItem9)
 FX[7216] = { powers: [{ key: 'dragon', label: tr('In diesem Zug auch ein Ally 2/2 mit Protector'), cost: 1, canUse: (s, pid, src) => !src.allyItem9 || tr('Ist schon ein Ally'),
     resolve: (s, it) => { const c = findCharacter(s, it.src); if (!c || c.allyItem9) return; const p = me(s, ctrlOf(s, c));
         c.allyItem9 = s.turn; c.dragonOrig9 = { b: c.b, atkType: c.atkType, kw: c.kw }; c.b = { ...(c.b || {}), atk: 2, hp: 2 }; c.atk = 2; c.hp = 2; c.atkType = 'Melee'; c.kw = { ...(c.kw || {}), protector: true }; if (c.joinedTurn === undefined) c.joinedTurn = s.turn; c.damage = 0;   // kein neues "Betreten": seit dem Ausspielen unter Kontrolle (CR 601.2a)
         p.allies.push(c); L(s, tr`${c.name} ist in diesem Zug auch ein Ally.`, '', p.id); evt(s, 'allyEnters', { uid: c.uid, pid: p.id }); } }] };
-STATE_FIX.push(s => { for (const p of [s.p1, s.p2]) for (const c of [...p.allies]) if (c.allyItem9 && c.allyItem9 !== s.turn) { p.allies.splice(p.allies.indexOf(c), 1); const o = c.dragonOrig9 || {}; c.b = o.b; c.atkType = o.atkType; c.kw = o.kw; c.damage = 0; delete c.allyItem9; delete c.dragonOrig9; } return false; });
+STATE_FIX.push(s => { for (const p of allPl(s)) for (const c of [...p.allies]) if (c.allyItem9 && c.allyItem9 !== s.turn) { p.allies.splice(p.allies.indexOf(c), 1); const o = c.dragonOrig9 || {}; c.b = o.b; c.atkType = o.atkType; c.kw = o.kw; c.damage = 0; delete c.allyItem9; delete c.dragonOrig9; } return false; });

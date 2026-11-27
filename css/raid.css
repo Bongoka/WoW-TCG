@@ -1,0 +1,242 @@
+/* Raid: Einrichtung (Hauptmenü „Raid“: Raid-Kacheln, 5 Plätze mit Deck-Box und Spieler/CPU/frei) und Leiste der Mitspieler auf dem Spielfeld (js/raidui.js) */
+.raid-setup { position: fixed; inset: 0; z-index: 99500; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .66); backdrop-filter: blur(4px);
+    opacity: 0; transition: opacity .25s; }                                              /* über dem Hauptmenü (99000), unter der Deck-Auswahl (100040) */
+.raid-setup.in { opacity: 1; }
+.raid-setup[hidden] { display: none; }
+.raid-box { position: relative; width: min(1000px, calc(100vw - 32px)); max-height: calc(100vh - 24px); overflow-y: auto; box-sizing: border-box; padding: 22px 26px 18px;
+    border: 1px solid #8a6a2c; border-radius: 10px; color: #f3e6c8;
+    background: linear-gradient(rgba(16, 7, 4, .86), rgba(12, 6, 3, .95)), var(--raid-bg, none) center 30% / cover; box-shadow: 0 0 40px rgba(255, 90, 20, .3), inset 0 0 0 1px rgba(255, 207, 107, .06);
+    transform: translateY(10px) scale(.985); transition: transform .3s cubic-bezier(.2, .8, .3, 1); }
+.raid-setup.in .raid-box { transform: none; }
+.raid-box h2 { margin: 0 0 12px; font-family: Georgia, serif; color: #ffcf6b; letter-spacing: .04em; text-align: center; font-size: 26px; }
+.raid-intro, .raid-hint { font-size: 14px; line-height: 1.45; opacity: .9; margin: 12px 0; text-align: center; }
+.raid-hint { font-size: 12px; opacity: .6; margin: 4px 0 0; }
+.raid-btns { display: flex; justify-content: center; gap: 12px; margin-top: 14px; }
+.raid-btns button { padding: 9px 22px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+.raid-btns .raid-go { padding: 11px 38px; font-size: 18px; font-weight: bold; }
+.raid-btns button[disabled] { opacity: .45; cursor: default; }
+
+/* Raid-Kacheln: Artwork des Bosses, gewählter Raid leuchtet */
+.rsu-raids { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.rsu-raid { position: relative; height: 104px; padding: 0; overflow: hidden; border: 1px solid rgba(138, 106, 44, .6); border-radius: 8px; background: #000; cursor: pointer; text-align: left;
+    display: flex; flex-direction: column; justify-content: flex-end; color: #f3e6c8; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.rsu-raid > i { position: absolute; inset: 0; background: center 28% / cover no-repeat; filter: brightness(.45) saturate(.75); transform: scale(1.04); transition: filter .3s, transform .6s; }
+.rsu-raid > i::after { content: ''; position: absolute; inset: 0; background: linear-gradient(transparent 35%, rgba(0, 0, 0, .8)); }
+.rsu-raid > b, .rsu-raid > small { position: relative; padding: 0 14px; text-shadow: 0 1px 4px #000, 0 0 10px #000; }
+.rsu-raid > b { font: bold 19px Georgia, serif; color: #ffe2a0; }
+.rsu-raid > small { font-size: 12px; opacity: .8; padding-bottom: 10px; }
+.rsu-raid:hover { transform: translateY(-2px); border-color: #c9a84c; }
+.rsu-raid:hover > i { filter: brightness(.65) saturate(.9); transform: scale(1.08); }
+.rsu-raid.on { border-color: #ffcf6b; box-shadow: 0 0 0 1px #ffcf6b, 0 0 22px rgba(255, 140, 40, .55); }
+.rsu-raid.on > i { filter: brightness(.85) saturate(1.05); }
+.rsu-raid.on::before { content: '✔'; position: absolute; top: 8px; right: 10px; z-index: 1; width: 22px; height: 22px; border-radius: 50%; background: #ffcf6b; color: #2a1a06; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgba(255, 207, 107, .7); }
+
+/* Plätze: Deck-Box, Name, Steuerung */
+.rsu-seats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rsu-seat { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 10px 6px 12px; border: 1px solid rgba(138, 106, 44, .35); border-radius: 8px;
+    background: rgba(0, 0, 0, .38); text-align: center; transition: opacity .2s, border-color .2s, background .2s; }
+.rsu-seats.anim .rsu-seat { animation: rsuIn .35s calc(var(--k) * 50ms) both cubic-bezier(.2, .8, .3, 1); }
+@keyframes rsuIn { from { opacity: 0; transform: translateY(8px); } }
+.rsu-seat.c-human { border-color: rgba(255, 207, 107, .7); background: linear-gradient(rgba(255, 190, 80, .1), rgba(0, 0, 0, .38)); }
+.rsu-seat.c-off { opacity: .55; border-style: dashed; }
+.rsu-seat.c-off:hover { opacity: .8; }
+.rsu-num { font: bold 14px Georgia, serif; color: #ffcf6b; }
+.rsu-seat.c-off .rsu-num { color: #b9a27a; }
+.rsu-name { font-size: 13px; color: #f3e6c8; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rsu-hero { font-size: 11px; color: #b9a27a; max-width: 100%; min-height: 1.3em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rsu-empty { font-size: 40px !important; opacity: .5; border-style: dotted !important; }
+.rsu-ctl { margin-top: 4px; }
+.rsu-ctl button { padding: 4px 8px; }
+.rsu-mode { margin: 12px 0 0; text-align: center; font-size: 13.5px; color: #e8dcc0; min-height: 1.3em; }
+.rsu-mode.err { color: #ff8a7a; font-weight: bold; }
+
+@media (max-width: 760px) { .rsu-seats { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); } }
+@media (max-height: 560px) {
+    .raid-box { padding: 12px 16px; }
+    .raid-box h2 { font-size: 20px; margin-bottom: 8px; }
+    .rsu-raid { height: 70px; }
+    .raid-intro { font-size: 12.5px; margin: 8px 0; }
+    .rsu-seat .dbox.big { --w: 64px; --h: 88px; --d: 24px; }
+    .rsu-seat .mp-deckbox .dbox-special { width: 64px; height: 88px; margin: 15px 12px 4px 0; font-size: 32px; }
+    .raid-hint { display: none; }
+}
+
+.rp-runeback { width: var(--field-w); aspect-ratio: 5 / 7; background: center / cover no-repeat; border-radius: 3px; }
+
+/* ===== Raid-Spielfeld (js/raidui.js): Spieler-Tafeln auf der Mittellinie, Kamerafahrt, Parallax ===== */
+@property --rs-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+#raid-strip { --pw: calc(var(--field-w) * .7); --ph: calc(var(--field-w) * .3); --rad: calc(var(--ph) * .2);
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+#raid-strip > * { pointer-events: auto; }
+.rs-team { display: flex; gap: 6px; padding: 4px; border-radius: calc(var(--rad) + 4px); background: rgba(8, 6, 5, .45); box-shadow: inset 0 0 0 1px rgba(255, 214, 140, .08); backdrop-filter: blur(3px); }
+.rs-vs { font: italic 900 calc(var(--ph) * .3) / 1 Georgia, serif; color: #e9c97a; letter-spacing: .04em; text-shadow: 0 1px 0 #000, 0 0 10px rgba(0, 0, 0, .9); }
+.rs-runes { display: flex; gap: 3px; --field-w: 26px; }
+.rs-runes[hidden] { display: none; }
+.rs-runes .card-wrapper { margin: 0 !important; }
+.rs-runes .rp-ex { opacity: .55; }
+
+/* Tafel: getöntes Glas in Klassenfarbe mit Klassen-Wappen, Mini-Karten, schmaler Lebensbalken mit Zahl */
+.rs-pl { position: relative; width: var(--pw); height: var(--ph); border-radius: var(--rad); cursor: pointer;
+    transition: transform .25s cubic-bezier(.2, .8, .2, 1), filter .25s, opacity .25s; filter: saturate(.75) brightness(.74); opacity: .9; }
+.rs-pl:hover { filter: saturate(.85) brightness(.9); opacity: 1; }
+.rs-in { position: absolute; inset: 0; border-radius: inherit; overflow: hidden;
+    background: radial-gradient(130% 150% at 0% 0%, color-mix(in srgb, var(--cc) 62%, transparent), transparent 72%),
+        linear-gradient(180deg, color-mix(in srgb, var(--cc) 34%, #15110d), color-mix(in srgb, var(--cc) 10%, #0c0a08));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc) 45%, rgba(255, 255, 255, .08)), inset 0 1px 0 rgba(255, 255, 255, .14), 0 3px 10px rgba(0, 0, 0, .65); }
+.rs-in::before { content: ''; position: absolute; left: 50%; top: 42%; width: calc(var(--ph) * .95); height: calc(var(--ph) * .95); transform: translate(-50%, -50%);
+    background: var(--icon) center / contain no-repeat; opacity: .28; filter: drop-shadow(0 0 4px rgba(0, 0, 0, .6)); }
+.rs-field { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--ph) * .14); }
+.rs-left, .rs-right { position: absolute; inset: 0; }
+.rs-mc { position: absolute; top: 12%; width: calc(var(--ph) * .36); height: calc(var(--ph) * .5); border-radius: 2px; box-sizing: border-box;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .7), inset 0 0 0 1px rgba(255, 255, 255, .12); transition: transform .2s, opacity .2s; }
+.rs-mc.ally { background: linear-gradient(160deg, #3a332b, #0f0d0b 70%); border: 1px solid rgba(214, 178, 96, .75); }
+.rs-mc.abil { background: linear-gradient(160deg, #c48ae8, #6a2f98 70%); border: 1px solid rgba(236, 206, 255, .7); }
+.rs-mc.equip { background: linear-gradient(160deg, #d9dee3, #6b737c 70%); border: 1px solid rgba(245, 247, 250, .75); }
+.rs-mc.ex { opacity: .5; transform: rotate(12deg) scale(.92); }
+.rs-hp { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--ph) * .14); min-height: 5px; border-radius: 0 0 var(--rad) var(--rad); background: rgba(0, 0, 0, .75);
+    box-shadow: inset 0 1px 0 rgba(0, 0, 0, .9), inset 0 2px 3px rgba(0, 0, 0, .6); overflow: hidden; }
+.rs-hp-fill, .rs-hp-trail { position: absolute; left: 0; top: 0; bottom: 0; }
+.rs-hp-trail { background: rgba(255, 240, 220, .75); transition: width .6s ease-out; }
+.rs-hp-fill { background: linear-gradient(180deg, color-mix(in srgb, var(--hpc) 55%, #fff), var(--hpc) 50%, color-mix(in srgb, var(--hpc) 70%, #000));
+    transition: width .35s cubic-bezier(.3, .7, .3, 1), background .4s; box-shadow: 0 0 6px color-mix(in srgb, var(--hpc) 70%, transparent); }
+.rs-num { position: absolute; left: 50%; bottom: calc(var(--ph) * .07); transform: translate(-50%, 0); min-width: calc(var(--ph) * .62); padding: 0 6px; box-sizing: border-box;
+    border-radius: 99px; background: #0d0b09; color: #fff; text-align: center; font: 800 calc(var(--ph) * .34) / 1.15 Georgia, serif; z-index: 3;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--hpc) 80%, transparent), 0 1px 4px rgba(0, 0, 0, .8); transition: box-shadow .4s; }
+.rs-flash { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; }
+
+/* Gezeigtes Feld: angehoben, voll beleuchtet, heller Rand und ein Lichtsteg zum Feld hin; die anderen Tafeln bleiben gedämpft */
+.rs-pl.viewed { filter: none; opacity: 1; transform: translateY(var(--lift, 0)) scale(1.1); z-index: 2; }
+.rs-pl.viewed.bot { --lift: -1px; } .rs-pl.viewed.top { --lift: 1px; }
+.rs-pl.viewed .rs-in { box-shadow: inset 0 0 0 1.5px rgba(255, 246, 225, .95), inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 14px color-mix(in srgb, var(--cc) 55%, transparent), 0 4px 14px rgba(0, 0, 0, .7); }
+.rs-pl.viewed::after { content: ''; position: absolute; left: 18%; right: 18%; height: 3px; border-radius: 99px; background: #fff6e1;
+    box-shadow: 0 0 8px 2px rgba(255, 238, 200, .85), 0 0 18px 4px color-mix(in srgb, var(--cc) 60%, transparent); }
+.rs-pl.viewed.bot::after { top: calc(100% + 5px); } .rs-pl.viewed.top::after { bottom: calc(100% + 5px); }
+/* Am Zug: ein goldener Ring läuft um die Tafel */
+.rs-ring { position: absolute; inset: -2px; border-radius: calc(var(--rad) + 2px); padding: 2px; opacity: 0; pointer-events: none; transition: opacity .3s;
+    background: conic-gradient(from var(--rs-a), #b8892e 0deg, #e0b54f 180deg, #ffe7a0 300deg, #fffbe8 335deg, #b8892e 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    filter: drop-shadow(0 0 4px rgba(255, 210, 100, .8)); }
+.rs-pl.active .rs-ring { opacity: 1; animation: rsSpin 2.4s linear infinite; }
+.rs-pl.active { filter: none; opacity: 1; }
+@keyframes rsSpin { to { --rs-a: 360deg; } }
+.rs-pl.out { filter: grayscale(1) brightness(.45); }
+.rs-pl.out .rs-hp { opacity: .3; }
+/* Ziel einer Entscheidung liegt bei diesem Spieler (nicht gezeigt): grünes Atmen */
+.rs-pl.pick { filter: none; opacity: 1; }
+.rs-pl.pick .rs-in { animation: rsPick 1.1s ease-in-out infinite; }
+@keyframes rsPick { 50% { box-shadow: inset 0 0 0 1.5px #6ee7a0, 0 0 14px 2px rgba(74, 222, 128, .75); } }
+/* Wenig Leben: Balken und Zahl pulsieren rot, kritisch schneller und stärker */
+.rs-pl.low .rs-hp { animation: rsLow 1.4s ease-in-out infinite; }
+.rs-pl.low .rs-num { animation: rsLowNum 1.4s ease-in-out infinite; }
+.rs-pl.crit .rs-hp, .rs-pl.crit .rs-num { animation-duration: .7s; }
+.rs-pl.crit .rs-in { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, .7), inset 0 0 12px rgba(239, 68, 68, .35), 0 3px 10px rgba(0, 0, 0, .65); }
+@keyframes rsLow { 50% { box-shadow: inset 0 1px 2px rgba(0, 0, 0, .8), 0 0 8px 2px rgba(239, 68, 68, .9); } }
+@keyframes rsLowNum { 50% { box-shadow: 0 0 0 1px #ef4444, 0 0 10px 2px rgba(239, 68, 68, .85); color: #ffd4d4; } }
+/* Schaden: Tafel ruckt, roter Blitz, Zahl steigt auf; Heilung: grünes Aufleuchten mit aufsteigender Zahl */
+.rs-pl.hit .rs-in { animation: rsShake .38s cubic-bezier(.36, .07, .19, .97); }
+.rs-pl.hit .rs-flash { animation: rsFlash .6s ease-out; background: radial-gradient(ellipse at 50% 80%, rgba(255, 60, 40, .75), rgba(255, 30, 20, .2) 70%); }
+.rs-pl.heal .rs-flash { animation: rsFlash .9s ease-out; background: radial-gradient(ellipse at 50% 80%, rgba(110, 255, 150, .6), rgba(60, 220, 110, .12) 70%); }
+.rs-pl.heal .rs-hp-fill { animation: rsHealBar .9s ease-out; }
+@keyframes rsShake { 15% { translate: -3px 0; } 30% { translate: 3px 0; } 45% { translate: -2px 0; } 60% { translate: 2px 0; } 80% { translate: -1px 0; } }
+@keyframes rsFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes rsHealBar { 30% { filter: brightness(1.8); box-shadow: 0 0 10px 2px rgba(110, 255, 150, .9); } }
+.rs-float { position: absolute; left: 50%; top: 20%; z-index: 5; pointer-events: none; font: 900 calc(var(--ph) * .34) / 1 Georgia, serif;
+    text-shadow: 0 1px 0 #000, 0 0 6px rgba(0, 0, 0, .9); animation: rsFloat 1.25s cubic-bezier(.2, .7, .3, 1) forwards; }
+.rs-float.hit { color: #ff6b5a; } .rs-float.heal { color: #7dffa6; }
+.rs-pl.top .rs-float { top: auto; bottom: 20%; }
+@keyframes rsFloat { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.7); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+    70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -22px) scale(1); } }
+/* Kamerafahrt: die Seite gleitet links hinaus und von rechts herein (Zeit/Kurve setzt raidCamMove); unten fährt die Hand des Spielers mit */
+body.raid-on .player-row, body.raid-on #top-allies, body.raid-on #bot-allies { transition: translate var(--cam-t, .4s) var(--cam-ease, ease); }
+body.raid-on #bot-hand { transition: transform .3s cubic-bezier(.2, .8, .2, 1), translate var(--cam-t, .4s) var(--cam-ease, ease); }
+body.cam-out-bot .bottom-row, body.cam-out-bot #bot-allies, body.cam-out-top .top-row, body.cam-out-top #top-allies { translate: -115vw 0; }
+body.cam-in-bot .bottom-row, body.cam-in-bot #bot-allies, body.cam-in-top .top-row, body.cam-in-top #top-allies { translate: 115vw 0; }
+/* Hand eines Mitspielers (nur ansehen): ausgefahren, aber etwas tiefer als die eigene */
+#bot-hand.mate-hand:not(.hand-up) { transform: translate(calc(-50% + var(--hand-shift, 0px)), 24%); }
+body.cam-out-bot #bot-hand { translate: -115vw 0; }
+body.cam-in-bot #bot-hand { translate: 115vw 0; }
+/* Klick auf eine Tafel: kurzes Überblenden statt Fahrt */
+body.raid-on .bottom-row > *, body.raid-on .top-row > *, body.raid-on #top-allies > *, body.raid-on #bot-allies > * { transition: opacity .17s, filter .17s; }
+body.cam-cut-bot .bottom-row > *, body.cam-cut-bot #bot-allies > *, body.cam-cut-top .top-row > *, body.cam-cut-top #top-allies > * { opacity: 0; filter: blur(6px); }
+/* Parallax: das Hintergrundbild ein zweites Mal je Seite (Streifen aus überlappenden Kacheln), weicher Übergang zur Mittellinie */
+#match-bg .mbg-near { position: absolute; left: 0; right: 0; overflow: hidden; }
+#match-bg .mbg-near.bot { top: var(--mid, 50%); bottom: 0; -webkit-mask-image: linear-gradient(transparent, #000 90px); mask-image: linear-gradient(transparent, #000 90px); }
+#match-bg .mbg-near.top { top: 0; height: var(--mid, 50%); -webkit-mask-image: linear-gradient(#000 calc(100% - 90px), transparent); mask-image: linear-gradient(#000 calc(100% - 90px), transparent); }
+#match-bg .mbg-strip { position: absolute; left: 0; height: 100vh; width: 500vw; will-change: transform; scale: 1.45; transform-origin: 0 var(--mid, 50vh); }
+#match-bg .mbg-near.bot .mbg-strip { top: calc(-1 * var(--mid, 50vh)); }
+#match-bg .mbg-near.top .mbg-strip { top: 0; }
+#match-bg .mbg-tile { position: absolute; top: 0; width: 100vw; height: 100%; background: center / cover no-repeat; filter: blur(1px) saturate(.5) brightness(.5);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 20vw); mask-image: linear-gradient(90deg, transparent, #000 20vw); }
+#match-bg .mbg-tile:first-child { -webkit-mask-image: none; mask-image: none; }
+
+/* Zuletzt aufgedecktes Event offen in der Ressourcenreihe des Bosses (nur Anzeige) */
+.raid-last-event { filter: drop-shadow(0 0 8px rgba(255, 120, 40, .55)); }
+
+/* ===== Inszenierung des Boss-Zugs (js/raidui.js) ===== */
+/* Artwork als Kulisse: im Hintergrundbild hinter dem Spielfeld, weich auslaufende Ränder, hellt das Bild auf (screen),
+   kommt aus leichter Unschärfe, zoomt langsam und blendet weich aus. Die Vignette von #match-bg liegt darüber. */
+#match-bg .raid-artbg { position: absolute; left: 50%; top: 34%; width: min(92vh, 74vw); aspect-ratio: 5 / 4; translate: -50% -50%; pointer-events: none;
+    mix-blend-mode: screen; opacity: 0; transition: opacity 1.3s cubic-bezier(.3, .1, .3, 1); }
+#match-bg .raid-artbg.strong { top: 42%; width: min(110vh, 86vw); }
+#match-bg .raid-artbg.on { opacity: .62; }
+#match-bg .raid-artbg.strong.on { opacity: .8; }
+#match-bg .raid-artbg.gone { opacity: 0; transition: opacity 1.5s ease-in; }
+#match-bg .rab-img { position: absolute; inset: 0; background: center / cover no-repeat;
+    -webkit-mask-image: radial-gradient(closest-side, #000 38%, rgba(0, 0, 0, .55) 62%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 38%, rgba(0, 0, 0, .55) 62%, transparent 100%);
+    filter: blur(7px) saturate(1.15) brightness(.9); transform: scale(1.14) translateY(2%); }
+#match-bg .raid-artbg.on .rab-img { filter: blur(.4px) saturate(1.15) brightness(.9); transform: scale(1.02) translateY(0);
+    transition: filter 1.4s ease-out, transform 7s cubic-bezier(.15, .4, .25, 1); }
+#match-bg .raid-artbg.gone .rab-img { filter: blur(5px) saturate(1) brightness(.8); transform: scale(.98) translateY(-1%); transition: filter 1.5s ease-in, transform 1.5s ease-in; }
+/* warmer Schein hinter dem Bild, damit es aus der Szene „aufglüht“ */
+#match-bg .rab-glow { position: absolute; inset: -12%; background: radial-gradient(closest-side, rgba(255, 110, 40, .32), rgba(255, 70, 20, .1) 55%, transparent 80%);
+    opacity: 0; transition: opacity 1.8s ease-out; }
+#match-bg .raid-artbg.on .rab-glow { opacity: 1; animation: rabGlow 3.2s ease-in-out infinite; }
+@keyframes rabGlow { 50% { transform: scale(1.04); filter: brightness(1.2); } }
+
+/* Stufen-Titel: nur Schrift mit Zierlinie, schärft sich aus der Unschärfe */
+.raid-title { position: fixed; left: 50%; top: 34%; z-index: 9600; translate: -50% -50%; pointer-events: none; text-align: center; white-space: nowrap;
+    opacity: 0; filter: blur(10px); transform: scale(1.08); transition: opacity .6s ease-out, filter .8s ease-out, transform 2.4s cubic-bezier(.15, .6, .25, 1); }
+.raid-title.in { opacity: 1; filter: blur(0); transform: scale(1); }
+.raid-title.out { opacity: 0; filter: blur(6px); transform: scale(.97); transition: opacity .9s ease-in, filter .9s ease-in, transform .9s ease-in; }
+.raid-title small { display: block; font: 700 14px Georgia, serif; letter-spacing: .42em; text-transform: uppercase; color: rgba(255, 214, 150, .85);
+    text-shadow: 0 0 10px rgba(0, 0, 0, .9); margin-bottom: 4px; }
+.raid-title b { display: block; font: 700 clamp(38px, 6.4vh, 64px) / 1.05 Georgia, serif; letter-spacing: .04em;
+    background: linear-gradient(180deg, #fff3cf 10%, #f3c766 52%, #b5702a 92%); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .9)) drop-shadow(0 0 22px rgba(255, 120, 40, .55)); }
+.raid-title i { display: block; height: 1px; margin: 10px auto 0; width: 0; background: linear-gradient(90deg, transparent, #f3c766, transparent);
+    box-shadow: 0 0 8px rgba(255, 180, 80, .8); transition: width 1.2s .2s cubic-bezier(.2, .8, .2, 1); }
+.raid-title.in i { width: 120%; margin-left: -10%; }
+
+/* Event des Bosses: die Karte lesbar in der Mitte, dahinter abgedunkelt; dreht sich aus der Tiefe herein, Zeitbalken darunter */
+.raid-ev-splash { position: fixed; inset: 0; z-index: 9700; pointer-events: none; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse 55% 60% at 50% 46%, rgba(8, 3, 1, .72), rgba(8, 3, 1, .35) 60%, transparent 85%); opacity: 0; transition: opacity .45s ease-out; }
+.raid-ev-splash.in { opacity: 1; }
+.raid-ev-splash.out { opacity: 0; transition: opacity .55s ease-in; }
+.raid-ev-splash .rs-ev { pointer-events: auto; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px; perspective: 1100px; }
+.raid-ev-splash .rs-ev small { display: flex; align-items: center; gap: 12px; font: 700 13px Georgia, serif; letter-spacing: .38em; text-transform: uppercase; color: #ffd98a;
+    text-shadow: 0 0 10px rgba(0, 0, 0, .9); opacity: 0; transform: translateY(6px); transition: opacity .5s .25s, transform .5s .25s; }
+.raid-ev-splash .rs-ev small::before, .raid-ev-splash .rs-ev small::after { content: ''; width: 46px; height: 1px; background: linear-gradient(90deg, transparent, #e7b35c); }
+.raid-ev-splash .rs-ev small::after { transform: scaleX(-1); }
+.raid-ev-splash.in .rs-ev small { opacity: 1; transform: none; }
+.raid-ev-splash .rs-ev-card { width: min(300px, 40vh); transform: rotateY(-28deg) rotateX(8deg) scale(.78) translateY(24px); opacity: 0; filter: blur(4px);
+    transition: transform .75s cubic-bezier(.16, .9, .3, 1.08), opacity .4s ease-out, filter .5s ease-out;
+    box-shadow: 0 0 0 1px rgba(255, 200, 120, .25), 0 0 34px rgba(255, 110, 30, .45), 0 16px 40px rgba(0, 0, 0, .85); border-radius: 4.5%; }
+.raid-ev-splash.in .rs-ev-card { transform: none; opacity: 1; filter: none; animation: rsEvFloat 4s 0.8s ease-in-out infinite; }
+.raid-ev-splash.out .rs-ev-card { transform: translateY(-14px) scale(.94); opacity: 0; transition: transform .55s ease-in, opacity .45s ease-in; animation: none; }
+@keyframes rsEvFloat { 50% { transform: translateY(-4px); } }
+.raid-ev-splash .rs-ev-timer { width: min(300px, 40vh); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; position: relative; }
+.raid-ev-splash .rs-ev-timer::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #b5702a, #ffd98a); transform-origin: left; }
+.raid-ev-splash.in .rs-ev-timer::after { animation: rsEvTimer var(--t) linear forwards; }
+@keyframes rsEvTimer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Raid-Hotseat: ein anderer Spieler kann reagieren – seine Tafel leuchtet in Signalfarbe und pocht wie ein Herz (Klick = zu ihm wechseln) */
+.rs-pl.react { --sig: #3ee8ff; filter: none; opacity: 1; z-index: 3; animation: rsHeart 1.2s ease-in-out infinite; }
+.rs-pl.react .rs-in { animation: rsHeartGlow 1.2s ease-in-out infinite; }
+.rs-pl.react::before { content: ''; position: absolute; inset: -4px; border-radius: calc(var(--rad) + 4px); border: 2px solid var(--sig); pointer-events: none;
+    box-shadow: 0 0 12px var(--sig), inset 0 0 8px color-mix(in srgb, var(--sig) 60%, transparent); animation: rsHeartRing 1.2s ease-out infinite; }
+@keyframes rsHeart { 0%, 40%, 100% { scale: 1; } 12% { scale: 1.09; } 26% { scale: 1.04; } }
+@keyframes rsHeartGlow { 0%, 40%, 100% { box-shadow: inset 0 0 0 1.5px var(--sig), 0 0 10px color-mix(in srgb, var(--sig) 50%, transparent); }
+    12% { box-shadow: inset 0 0 0 2px #fff, 0 0 26px 4px var(--sig); } 26% { box-shadow: inset 0 0 0 1.5px var(--sig), 0 0 18px 2px var(--sig); } }
+@keyframes rsHeartRing { 0% { opacity: .95; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.18); } }

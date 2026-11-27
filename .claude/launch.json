@@ -28,6 +28,34 @@
         "8767"
       ],
       "port": 8767
+    },
+    {
+      "name": "game3",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".claude/serve.ps1",
+        "-Port",
+        "8769"
+      ],
+      "port": 8769
+    },
+    {
+      "name": "game4",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".claude/serve.ps1",
+        "-Port",
+        "8773"
+      ],
+      "port": 8773
     }
   ]
 }

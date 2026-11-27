@@ -77,12 +77,38 @@ function cloneState(s) {
     c.real = false; c.humans = []; c.look = true;   // Vorausschau: in Kopien antwortet niemand in Prioritätsfenstern
     // Einzige Mehrfach-Referenz: Imp Mistress Noali (Set 6) – verdeckte Ressource und Imp-Ally sind dasselbe Objekt. Die
     // Tiefenkopie macht daraus zwei; ohne Neuverknüpfung entfernte der Zustandsabgleich die Imps in jeder Vorausschau
-    for (const p of [c.p1, c.p2]) for (const a of p.allies) if (a.allyRes6) { const r = p.resources.find(x => x.card.uid === a.uid); if (r) r.card = a; }
+    for (const p of allPl(c)) for (const a of p.allies) if (a.allyRes6) { const r = p.resources.find(x => x.card.uid === a.uid); if (r) r.card = a; }
     return c;
 }
 
-function getPlayer(s, id) { return id === 1 ? s.p1 : s.p2; }
-function getOpponent(s, id) { return id === 1 ? s.p2 : s.p1; }
+// ---------------------------------------------------------------- Mehrspieler (Raid, später 2 gegen 2)
+// 1 gegen 1: nur p1/p2, s.pids fehlt. Mehrspieler: s.pids = Spieler in Zugreihenfolge (im Uhrzeigersinn, CR 102),
+// s.team = { pid: Team }, Spieler p1 … pN. Ausgeschiedene Spieler (p.out) bleiben im Zustand, haben aber keine Karten mehr.
+function getPlayer(s, id) { return id === 1 ? s.p1 : id === 2 ? s.p2 : s['p' + id]; }
+function allPl(s) { return s.pids ? s.pids.map(i => s['p' + i]) : [s.p1, s.p2]; }
+function livePids(s) { return s.pids ? s.pids.filter(i => !s['p' + i].out) : [1, 2]; }
+function teamOf(s, pid) { return s.team ? s.team[pid] : pid; }
+function isFoePid(s, a, b) { return teamOf(s, a) !== teamOf(s, b); }
+// Gegner (CR-Glossar "Opposing"): alle noch spielenden Spieler eines anderen Teams
+function foePids(s, pid) { return s.pids ? livePids(s).filter(i => isFoePid(s, pid, i)) : [pid === 1 ? 2 : 1]; }
+// Befreundete Spieler (CR-Glossar "Friendly": du und im Mehrspieler die Spieler deines Teams)
+function friendPids(s, pid) { return s.pids ? livePids(s).filter(i => !isFoePid(s, pid, i)) : [pid]; }
+// Der eine Gegner: 1 gegen 1 der andere Spieler, im Raid für jeden Raider der Boss. Hat ein Spieler mehrere Gegner
+// (der Boss), gilt der Gegner im Blick (s.focus[pid], z. B. bei der KI-Bewertung), sonst der Zugspieler bzw. der erste
+function getOpponent(s, id) {
+    if (!s.pids) return id === 1 ? s.p2 : s.p1;
+    const f = foePids(s, id);
+    if (f.length === 1) return s['p' + f[0]];
+    const want = s.focus && s.focus[id];
+    const pick = f.includes(want) ? want : f.includes(s.activePlayer) ? s.activePlayer : (f[0] || (id === 1 ? 2 : 1));
+    return s['p' + pick];
+}
+function oppId(s, pid) { return getOpponent(s, pid).id; }
+// Nächster Spieler im Uhrzeigersinn (ausgeschiedene übersprungen)
+function nextPid(s, pid) { if (!s.pids) return pid === 1 ? 2 : 1; const l = livePids(s); const i = s.pids.indexOf(pid); for (let k = 1; k <= s.pids.length; k++) { const n = s.pids[(i + k) % s.pids.length]; if (l.includes(n)) return n; } return pid; }
+// Alle (noch spielenden) Spieler in Zugreihenfolge, beginnend bei first (CR 101.3: "starting with the turn player")
+function turnOrderFrom(s, first) { if (!s.pids) return [first, first === 1 ? 2 : 1]; const l = livePids(s), i = s.pids.indexOf(first), out = []; for (let k = 0; k < s.pids.length; k++) { const n = s.pids[(i + k) % s.pids.length]; if (l.includes(n)) out.push(n); } return out; }
+function turnOrder(s) { return turnOrderFrom(s, s.activePlayer); }
 // getReadyRes / payRes stehen in engine.js
 function hasPowers(char) { return !char.powersRemoved; }
 function isHordeCard(c) { return !!c && (c.faction === 'Horde' || (Array.isArray(c.allowedFactions) && c.allowedFactions.includes('Horde'))); }

@@ -3,7 +3,7 @@ let _cfgImgPath = "AZEROTH-{id}-EA.png";
 // (Hand/Spielfeld/Deck Builder, 358 px), "<set> scans" / "<set> scans small" (fotografierte Originalkarten, 745/372 px,
 // ohne Extended Art). Dateien überall: "<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp" (cardImgBase), z. B.
 // "AZEROTH-100 Lobotomize (EA).webp", Heldenrückseite "AZEROTH-1 Boris Brightbeard (Back).webp".
-const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia treasure', 'ONYXIA'], 5: ['molten core treasure', 'MOLTEN CORE'], 6: ['legion', 'LEGION'], 7: ['betrayer', 'BETRAYER'], 8: ['illidan', 'ILLIDAN'], 9: ['drums', 'DRUMS'], 10: ['gladiator', 'GLADIATORS'], 11: ['honor', 'HONOR'], 12: ['scourgewar', 'SCOURGEWAR'], 13: ['wrathgate', 'WRATHGATE'], 14: ['icecrown', 'ICECROWN'], 15: ['grand melee', 'GRAND MELEE'], 16: ['magtheridon treasure', 'MAGTHERIDON'], 17: ['black temple treasure', 'BLACK TEMPLE'], 18: ['naxxramas treasure', 'NAXXRAMAS'], 19: ['citadel treasure', 'CITADEL'], 20: ['death knight starter', 'KNIGHT'], 21: ['drums crafted', 'DRUMS CRAFTED'], 22: ['bc crafted', 'BC CRAFTED'], 23: ['gladiator crafted', 'GLADIATORS CRAFTED'], 24: ['honor crafted', 'HONOR CRAFTED'], 25: ['scourgewar crafted', 'SCOURGEWAR CRAFTED'], 26: ['wrathgate crafted', 'WRATHGATE CRAFTED'], 27: ['icecrown crafted', 'ICECROWN CRAFTED'], 28: ['winter veil', 'WINTER VEIL'], 29: ['darkmoon faire', 'DARKMOON FAIRE'], 30: ['worldbreaker', 'WORLDBREAKER'], 31: ['class', 'CLASS'], 33: ['black temple raid', 'BLACK TEMPLE RAID'], 34: ['drums starter', 'DRUMS STARTER'], 35: ['worldbreaker crafted', 'WORLDBREAKER CRAFTED'], 36: ['badge', 'BADGE'], 37: ['icecrown badge', 'ICECROWN BADGE'], 38: ['scourgewar badge', 'SCOURGEWAR BADGE'], 39: ['wrathgate badge', 'WRATHGATE BADGE'], 40: ['worldbreaker badge', 'WORLDBREAKER BADGE'], 41: ['bc promo', 'BC PROMO'], 42: ['cat promo', 'CAT PROMO'], 43: ['wotlk promo', 'WOTLK PROMO'], 44: ['holiday', 'HOLIDAY'], 45: ['blizzcon', 'BLIZZCON'] };
+const SET_IMG = { 1: ['azeroth', 'AZEROTH'], 2: ['dark portal', 'DARK PORTAL'], 3: ['outland', 'OUTLAND'], 4: ['onyxia treasure', 'ONYXIA'], 5: ['molten core treasure', 'MOLTEN CORE'], 6: ['legion', 'LEGION'], 7: ['betrayer', 'BETRAYER'], 8: ['illidan', 'ILLIDAN'], 9: ['drums', 'DRUMS'], 10: ['gladiator', 'GLADIATORS'], 11: ['honor', 'HONOR'], 12: ['scourgewar', 'SCOURGEWAR'], 13: ['wrathgate', 'WRATHGATE'], 14: ['icecrown', 'ICECROWN'], 15: ['grand melee', 'GRAND MELEE'], 16: ['magtheridon treasure', 'MAGTHERIDON'], 17: ['black temple treasure', 'BLACK TEMPLE'], 18: ['naxxramas treasure', 'NAXXRAMAS'], 19: ['citadel treasure', 'CITADEL'], 20: ['death knight starter', 'KNIGHT'], 21: ['drums crafted', 'DRUMS CRAFTED'], 22: ['bc crafted', 'BC CRAFTED'], 23: ['gladiator crafted', 'GLADIATORS CRAFTED'], 24: ['honor crafted', 'HONOR CRAFTED'], 25: ['scourgewar crafted', 'SCOURGEWAR CRAFTED'], 26: ['wrathgate crafted', 'WRATHGATE CRAFTED'], 27: ['icecrown crafted', 'ICECROWN CRAFTED'], 28: ['winter veil', 'WINTER VEIL'], 29: ['darkmoon faire', 'DARKMOON FAIRE'], 30: ['worldbreaker', 'WORLDBREAKER'], 31: ['class', 'CLASS'], 33: ['black temple raid', 'BLACK TEMPLE RAID'], 34: ['drums starter', 'DRUMS STARTER'], 35: ['worldbreaker crafted', 'WORLDBREAKER CRAFTED'], 36: ['badge', 'BADGE'], 37: ['icecrown badge', 'ICECROWN BADGE'], 38: ['scourgewar badge', 'SCOURGEWAR BADGE'], 39: ['wrathgate badge', 'WRATHGATE BADGE'], 40: ['worldbreaker badge', 'WORLDBREAKER BADGE'], 41: ['bc promo', 'BC PROMO'], 42: ['cat promo', 'CAT PROMO'], 43: ['wotlk promo', 'WOTLK PROMO'], 44: ['holiday', 'HOLIDAY'], 45: ['blizzcon', 'BLIZZCON'], 46: ['onyxia raid', 'ONYXIA RAID'], 47: ['onyxia event', 'ONYXIA EVENT'], 48: ['molten core raid', 'MOLTEN CORE RAID'] };
 const SET_IMG_PREFIX = { 2: 'DARKPORTAL', 3: 'OUTLAND', 4: 'ONYXIA', 5: 'MOLTENCORE' };   // alte Ablage cards/<PRÄFIX>-<Nr>.png (Rückfall)
 // Einstellung Kartenbilder: 'edited' Normal, 'scans' Original-Scans, 'hq' Normal + High Resolution (Zoom aus "<set> big").
 // Nötig ist nur der Ordner "<set>" – alle anderen sind optional, fehlende Bilder fallen auf die vorhandenen zurück.
@@ -69,7 +69,7 @@ function updateImgStyleOptions() {
 }
 // Token-Bilder: "Tokens small/<Name>.webp" (Hand/Spielfeld), "Tokens/<Name>.webp" (große Vorschau).
 // Auf GitHub liegen nur diese Tokens (Whitelist am Ende von .gitignore) – neue Einträge dort ergänzen.
-const TOKEN_IMG = { 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
+const TOKEN_IMG = { 17201: 'Onyxian Whelp', 17401: 'Firesworn', 17402: 'Flamewaker', 17403: 'Flamewaker Elite', 17404: 'Flamewaker Healer', 17405: 'Flamewaker Protector', 17406: 'Son of Flame', 17407: 'Flamewaker Priest', 17408: 'Core Rager', 17409: 'Lava Spawn', 9001: 'Mechanical Yeti', 9002: 'Tooga', 9004: 'Peasant', 9005: 'Dwarf', 9101: 'Mechanical Dragonling', 9103: 'Misha',
     9104: 'Earth Elemental', 9106: 'Draenei Survivor', 9201: 'Treant', 9202: 'Fire Elemental', 9203: 'Boar', 9204: 'Ringo', 9401: 'Skeleton',
     9501: 'Fel Reaver', 9601: 'Snake', 9602: 'Bear', 9603: 'Naga',
     3652: 'Flame of Azzinoth 1', 3653: 'Flame of Azzinoth 2', 3655: 'Snake', 3656: 'Dwarf', 3657: 'Undead - Champion Deck', 9801: 'Felhunter Demon', 9802: 'Peasant',
@@ -308,27 +308,49 @@ function initGame(seedPlayerDeck = null, seedOppDeck = null, ctl = null) {
 
 // ---------------------------------------------------------------- Hotseat: Zwischenbildschirm und Brett-Flip
 // Platz (1/2 im Hauptmenü) des Spielers, der im Zustand pid ist
-function seatOf(pid) { return G && G.hotseat ? (pid === 1 ? G.hotseat.seat : 3 - G.hotseat.seat) : pid; }
-// Wer muss jetzt handeln? Offene Entscheidung, sonst (Ruhe) der Zugspieler
-function hotseatActor(s) { return s.gameOver ? 0 : s.pending ? s.pending.pid : isIdle(s) ? s.activePlayer : 0; }
-// Nach jeder Aktion: muss der andere Spieler ran, kommt der Zwischenbildschirm (erst nach den Animationen)
+// Raid (G.raidSeat): Platz 1–5 der Raid-Einrichtung je Spieler-ID
+function seatOf(pid) { return G && G.raidSeat ? G.raidSeat[pid] || pid : G && G.hotseat ? (pid === 1 ? G.hotseat.seat : 3 - G.hotseat.seat) : pid; }
+// Wer muss jetzt handeln? Offene Entscheidung, sonst (Ruhe) der Zugspieler.
+// Raid: eine freiwillige Reaktion (Prioritätsfenster) holt nie das Gerät – es gehört dem menschlichen Zugspieler bzw. bleibt im Zug
+// eines CPU-Spielers (Boss) bei dem, der es gerade hat. Andere Mitspieler zeigen ihr Fenster als pochende Tafel (raidSoftWait, raidui.js).
+function hotseatActor(s) {
+    if (s.gameOver) return 0;
+    if (s.pending) {
+        if (s.raid && s.pending.kind === 'priority') return isHuman(s, s.activePlayer) ? s.activePlayer : isHuman(s, 1) ? 1 : s.pending.pid;
+        return s.pending.pid;
+    }
+    return isIdle(s) ? s.activePlayer : 0;
+}
+// Nach jeder Aktion: muss ein anderer Mensch ran, kommt der Zwischenbildschirm (erst nach den Animationen).
+// Raid-Hotseat: mehrere menschliche Raider – wer handelt, wird Spieler 1 (pidSwap 1 ⇄ seine ID)
 const HOTSEAT = { el: null, open: false, timer: 0 };
 function hotseatCheck() {
     if (!G || !G.hotseat || !G.hotseat.go || G.gameOver || HOTSEAT.open || HOTSEAT.timer) return;
-    if (hotseatActor(G) !== 2) return;
+    const who = hotseatActor(G);
+    if (!who || who === 1 || !isHuman(G, who)) return;
+    if (typeof raidSoftWait === 'function' && raidSoftWait()) return;                    // Raid: Tafel pocht statt Zwischenbildschirm (raidui.js)
     const g0 = G, t0 = Date.now();
     const wait = () => {
         HOTSEAT.timer = 0;
-        if (G !== g0 || !G.hotseat || G.gameOver || hotseatActor(G) !== 2) return;
+        if (G !== g0 || !G.hotseat || G.gameOver || hotseatActor(G) !== who) return;
         if (UI.busy || UI.flipWait || Date.now() - t0 < 350) { HOTSEAT.timer = setTimeout(wait, 120); return; }
-        const turn = !G.pending && G.activePlayer === 2;
+        const turn = G.activePlayer === who && (!G.pending || G.pending.kind === 'priority');
         const sub = turn ? tr('ist am Zug') : G.pending.kind === 'priority' ? tr('kann reagieren') : tr('muss entscheiden');
-        hotseatHandoff(sub, () => { if (G.activePlayer === 1 && !G.pending) showTurnBanner(tr('Dein Zug!')); });
+        hotseatHandoff(sub, () => { if (G.activePlayer === 1 && (!G.pending || G.pending.pid !== 1)) showTurnBanner(tr('Dein Zug!')); }, who);
     };
     HOTSEAT.timer = setTimeout(wait, 120);
 }
-// Schwarzer Bildschirm „Spieler X“ – Tipp: Brett drehen (Spieler 2 ⇄ 1), dann ausblenden
-function hotseatHandoff(sub, after) {
+// Alle Menschen im selben Team (Koop-Raid): sie dürfen ihre Hände sehen – kein Zwischenbildschirm, die Kamera wechselt direkt.
+// Sitzen Gegner am selben Gerät (1 gegen 1, später 2 gegen 2), bleibt der Zwischenbildschirm.
+function hotseatCoop(s = G) { return !!(s && s.team && s.humans && new Set(s.humans.map(p => s.team[p])).size <= 1); }
+// Schwarzer Bildschirm „Spieler X“ – Tipp: Brett drehen (Spieler to ⇄ 1, im 1 gegen 1 immer 2), dann ausblenden
+function hotseatHandoff(sub, after, to = 2) {
+    if (hotseatCoop()) {                                                                    // Koop: Kamera zum Spieler, dann tauschen (er sitzt nun unten)
+        const g0 = G; HOTSEAT.open = true;
+        const go = () => { HOTSEAT.open = false; if (G !== g0 || G.gameOver) return; hotseatSwap(to); after && after(); };
+        if (typeof raidCamMove === 'function' && VIEW.on && VIEW.bot !== to) { raidCamMove('bot', to, 'cut'); setTimeout(go, 320); } else go();
+        return;
+    }
     let el = HOTSEAT.el;
     if (!el) {
         el = HOTSEAT.el = document.createElement('div'); el.id = 'hotseat';
@@ -336,9 +358,9 @@ function hotseatHandoff(sub, after) {
         el.querySelector('.hs-menu').onclick = e => { e.stopPropagation(); if (typeof openMainMenu === 'function') openMainMenu(); };
         document.body.appendChild(el);
     }
-    const next = 3 - G.hotseat.seat;
+    const next = seatOf(to);
     el.querySelector('.hs-who').textContent = tr`Spieler ${next}`;
-    el.querySelector('.hs-hero').textContent = G.p2.hero.name;
+    el.querySelector('.hs-hero').textContent = getPlayer(G, to).hero.name;
     el.querySelector('.hs-sub').textContent = sub;
     HOTSEAT.open = true; el.classList.remove('out'); el.style.display = 'flex';
     if (window.cardPreview) window.cardPreview.hide();
@@ -346,7 +368,7 @@ function hotseatHandoff(sub, after) {
     el.onclick = () => {
         if (G !== g0) { hotseatHide(); return; }
         el.onclick = null;
-        hotseatSwap();
+        hotseatSwap(to);
         if (typeof sfx !== 'undefined') sfx.play('flip');
         el.classList.add('out');
         setTimeout(() => { if (el.classList.contains('out')) { el.style.display = 'none'; HOTSEAT.open = false; } after && after(); }, 380);
@@ -354,10 +376,11 @@ function hotseatHandoff(sub, after) {
 }
 function hotseatHide() { clearTimeout(HOTSEAT.timer); HOTSEAT.timer = 0; HOTSEAT.open = false; if (HOTSEAT.el) HOTSEAT.el.style.display = 'none'; }
 // Zustand spiegeln: der nächste Spieler wird Spieler 1 (unten). G bleibt dasselbe Objekt (driveCpu, Endbildschirm merken es sich)
-function hotseatSwap() {
-    const seat = 3 - G.hotseat.seat;
-    const s = netMirror({ ...G, _undo: null, fxq: [] });
-    s.real = true; s.humans = [1, 2]; s.hotseat = { ...G.hotseat, seat };
+function hotseatSwap(to = 2) {
+    const sw = v => v === 1 ? to : v === to ? 1 : v;
+    const s = pidSwap({ ...G, _undo: null, fxq: [] }, 1, to);
+    s.real = true; s.humans = G.humans.map(sw); s.hotseat = { ...G.hotseat, seat: s.raidSeat ? s.raidSeat[1] : 3 - G.hotseat.seat };
+    if (s.raid && typeof VIEW !== 'undefined' && VIEW.on) { VIEW.bot = 1; VIEW.top = sw(VIEW.top); if (typeof CAM !== 'undefined') CAM.active = s.activePlayer; }   // Raid: Kamera auf den neuen Spieler 1
     for (const k of Object.keys(G)) delete G[k];
     Object.assign(G, s);
     UNDO.stack = [];                                                                        // Rückgängig nur innerhalb der eigenen Sicht
@@ -365,7 +388,7 @@ function hotseatSwap() {
     UI.handSeen = new Set(G.p1.hand.map(c => c.uid)); UI.oppSeen = new Set(G.p2.hand.map(c => c.uid));
     UI.resPrev = {};
     // Log-Farben aus Sicht des neuen Spielers
-    document.querySelectorAll('#log-area .log-entry').forEach(r => { const me = r.classList.contains('log-me'), op = r.classList.contains('log-opp'); r.classList.toggle('log-me', op); r.classList.toggle('log-opp', me); });
+    if (to === 2) document.querySelectorAll('#log-area .log-entry').forEach(r => { const me = r.classList.contains('log-me'), op = r.classList.contains('log-opp'); r.classList.toggle('log-me', op); r.classList.toggle('log-opp', me); });
     render();
 }
 
@@ -387,6 +410,13 @@ function humanAct(action) {
             uiConfirm(title, lines.join(' '), yes, () => humanAct({ ...action, limitOk: true }));
             return false;
         }
+    }
+    // Raid-Hotseat: ein Mitspieler könnte reagieren – der Zugspieler spielt weiter, also passt der Mitspieler (raidSoftWait, raidui.js).
+    // Handkarte über ihre uid wiederfinden: die Auflösung der Kette kann die Hand verändert haben
+    if (typeof raidSoftWait === 'function' && raidSoftWait() && action.type !== 'PASS' && action.type !== 'CHOOSE') {
+        const uid = action.handIdx >= 0 && !action.gyUid ? (G.p1.hand[action.handIdx] || {}).uid : null;
+        raidSoftPass();
+        if (uid) { const i = G.p1.hand.findIndex(c => c.uid === uid); if (i < 0) { UI.reset(); render(); playEventAnimations(); return false; } action = { ...action, handIdx: i }; }
     }
     if (action.limitOk) { action = { ...action }; delete action.limitOk; }
     // Online: der Gast schickt seine Aktion an den Host, der Host rechnet erst, wenn beide den Mulligan hinter sich haben
@@ -410,6 +440,8 @@ function humanAct(action) {
 }
 function endTurn() {
     if (!G || G.gameOver || UI.busy || G.spectate) return;
+    // Raid-Hotseat: im Reaktionsfenster eines Mitspielers heißt der Knopf „Weiter“ – der Mitspieler passt, das Spiel läuft weiter
+    if (typeof raidSoftWait === 'function' && raidSoftWait()) { raidSoftPass(); UI.reset(); render(); playEventAnimations(); setTimeout(driveCpu, 30); return; }
     if (!canActMain(G, 1)) { const m = tr("Du kannst den Zug gerade nicht beenden (offene Entscheidung oder Kette)."); addLog(m, "log-hit"); showToast(m); return; }
     const err = validateAction(G, { type: 'END_TURN' }, 1);
     if (err) { addLog(err, "log-hit"); showToast(err); return; }
@@ -467,7 +499,7 @@ async function driveCpu() {
             const pid = G.activePlayer;                               // CPU gegen CPU: beide Seiten, sonst nur Spieler 2
             if (isHuman(G, pid)) break;
             if (turnOf !== G.turn) { turnOf = G.turn; steps = 0; announced = false; }
-            if (!announced) { announced = true; CPU_SKIP.on = false; showTurnBanner(G.spectate ? tr`Spieler ${pid} ist am Zug!` : tr("CPU ist am Zug!")); UI.busy = true; render(); await cpuSleep(700); if (pid === 2) cpuSay('turn', 0.35); }
+            if (!announced) { announced = true; CPU_SKIP.on = false; showTurnBanner(G.raid ? tr`${getPlayer(G, pid).hero.name} ist am Zug!` : G.spectate ? tr`Spieler ${pid} ist am Zug!` : tr("CPU ist am Zug!")); UI.busy = true; render(); await cpuSleep(700); if (pid === 2) cpuSay('turn', 0.35); }
             updateCpuStatus(true, tr("CPU analysiert..."));
             await cpuSleep(250);
             // Ab und zu eine Denkpause mit Sprechblase
@@ -722,7 +754,7 @@ function bootGame() {
         _cfgImgPath = imgPathInput.value.trim() || "AZEROTH-{id}-EA.png";
         imgPathInput.onchange = (e) => { _cfgImgPath = e.target.value.trim() || "AZEROTH-{id}-EA.png"; render(); };
     }
-    document.getElementById("go-again").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; initGame(..._lastDecks); };
+    document.getElementById("go-again").onclick = () => { if (G && G.online) { netBackToRoom(); return; } document.getElementById("log-area").innerHTML = ""; if (G && G.raid && typeof initRaid === 'function') { initRaid(G.raid.id, RAID_UI.seats.map(x => ({ ...x }))); return; } initGame(..._lastDecks); };   // Raid: gleicher Raid, gleiche Plätze
     // Neues Spiel: Auswahl im Hauptmenü (Decks, Spieler/CPU)
     document.getElementById("go-new").onclick = () => { if (G && G.online) { netBackToRoom(); return; } hideGameOver(); if (typeof openPlaySetup === 'function') { openMainMenu(); openPlaySetup(); } else { document.getElementById("log-area").innerHTML = ""; initGame(); } };
     document.getElementById("go-close").onclick = hideGameOver;

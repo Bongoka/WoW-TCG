@@ -25,7 +25,7 @@ function isHuman(s, pid) { return !!(s.humans && s.humans.includes(pid)); }
 function L(s, msg, cls, pid) { if (isReal(s) && typeof addLog === 'function') addLog(logStrip(s, msg, !pid), cls || "", pid || s._logPid || s.activePlayer); }
 // Kartentexte (ohne eigene pid) beginnen oft mit dem Heldennamen ("Thrall deckt auf: …"): Name weg, Rest groß
 function logStrip(s, msg, lead) {
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         msg = msg.split(`[${p.hero.name}] `).join('');
         const pre = msg.match(/^\W*/u)[0], body = msg.slice(pre.length);
         if (lead && (body.startsWith(p.hero.name + ' ') || body.startsWith(p.hero.name + ': '))) {
@@ -64,7 +64,7 @@ function isAllyLike(c) { return !!c && (c.type === 'Ally' || c.isTotem || !!c.al
 // Alle Karten im Spiel mit Controller
 function inPlay(s) {
     const out = [];
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         out.push({ c: p.hero, pid: p.id, zone: 'hero' });
         p.allies.forEach(c => out.push({ c, pid: p.id, zone: 'party' }));
         p.hero.weapons.forEach(c => out.push({ c, pid: p.id, zone: 'equip' }));
@@ -76,7 +76,7 @@ function inPlay(s) {
 function locate(s, uid) {
     if (!uid) return null;
     // Zuerst die Spielzonen beider Spieler (häufigster Fall, z. B. ctrlOf in hpOf/atkOf), dann Hand, Friedhof, Ressourcen
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         if (p.hero.uid === uid) return { c: p.hero, pid: p.id, zone: 'hero' };
         // Imp Mistress Noali (Set 6): verdeckte Ressourcen sind zugleich Imp-Allies in der Party – res trotzdem mitgeben
         // (Ziele "Ressource erschöpfen/bereit machen" lasen sonst locate(...).res und stürzten ab)
@@ -85,7 +85,7 @@ function locate(s, uid) {
         c = p.hero.armors.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'equip' };
         c = (p.ongoing || []).find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'ongoing' };
     }
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         let c = p.hand.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'hand' };
         c = p.graveyard.find(x => x.uid === uid); if (c) return { c, pid: p.id, zone: 'graveyard' };
         const r = p.resources.find(x => x.card && x.card.uid === uid); if (r) return { c: r.card, pid: p.id, zone: 'resource', res: r };
@@ -106,31 +106,32 @@ function anyCtrl(s, id) { return inPlay(s).filter(e => e.c.id === id && active(s
 // counters.silenced), "loses and can't have powers this turn" (TM noPowers)
 function polymorphed(s, c) {
     if (!c) return false;
-    for (const p of [s.p1, s.p2]) for (const o of p.ongoing) {
+    for (const p of allPl(s)) for (const o of p.ongoing) {
         if (o.id === 58 && o.attachedTo === c.uid) return true;
         const cd = CARDS[o.id]; if (cd && cd.silence && (o.attachedTo === c.uid || (o.counters && o.counters.silenced && o.counters.silenced.includes(c.uid)))) return true;
     }
     return false;
 }
-function regaliaFoe(s, c) { if (!s.p1.hero.armors.length && !s.p2.hero.armors.length) return false; const pid = ctrlOf(s, c); return [s.p1, s.p2].some(p => p.id !== pid && p.hero.armors.some(a => a.id === 7209 && !metalmorphed(s, a) && !attachedTo(s, a.uid, 7040).length)); }   // Gladiator's Regalia (Set drums): "Opposing allies lose and can't have powers."
+function regaliaFoe(s, c) { if (!allPl(s).some(p => p.hero.armors.length)) return false; const pid = ctrlOf(s, c); return allPl(s).some(p => p.id !== pid && p.hero.armors.some(a => a.id === 7209 && !metalmorphed(s, a) && !attachedTo(s, a.uid, 7040).length)); }   // Gladiator's Regalia (Set drums): "Opposing allies lose and can't have powers."
 // Weitere "lose and can't have powers"-Quellen: (s, c) => true (dürfen active() nicht aufrufen)
 const NO_POWERS = [];
 function active(s, c) {
     if (READ_SCOPE && c && READ_SCOPE.s === s) { const m = READ_SCOPE.act; let v = m.get(c); if (v === undefined) { v = activeNow(s, c); m.set(c, v); } return v; }   // readScope: je Karte nur einmal
     return activeNow(s, c);
 }
-function activeNow(s, c) { if (!c) return true; if (NO_POWERS.length && NO_POWERS.some(f => f(s, c))) return false; if (isAllyLike(c) && regaliaFoe(s, c)) return false; if (s.p1.ongoing.length + s.p2.ongoing.length && attachedTo(s, c.uid, 7040).length) return false; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }   // Spell Suppression (Set drums): angehängte Karte verliert ihre Kräfte
+function activeNow(s, c) { if (!c) return true; if (NO_POWERS.length && NO_POWERS.some(f => f(s, c))) return false; if (isAllyLike(c) && regaliaFoe(s, c)) return false; if (allPl(s).some(p => p.ongoing.length) && attachedTo(s, c.uid, 7040).length) return false; if (c.reputation && c.reputation !== 'Aldor' && repLocked(s)) return false; if (c.tm && c.tm.length && hasTM(s, c, 'noPowers')) return false; if (metalmorphed(s, c)) return false; return !(isAllyLike(c) && polymorphed(s, c)); }   // Spell Suppression (Set drums): angehängte Karte verliert ihre Kräfte
 // Metalmorph (Set 7): "Attached equipment loses and can't have powers and can't exhaust"
 function metalmorphed(s, c) { return (c.type === 'Weapon' || c.type === 'Armor' || c.type === 'Item') && attachedTo(s, c.uid, 5064).length > 0; }
 const CANT_EXHAUST = [];   // (s, c) => true ohne Karte im Spiel (Kungen the Thunderer, Ice Nova – Set wrathgate)
 function cantExhaust(s, c) { return metalmorphed(s, c) || hasTM(s, c, 'cantExhaust') || (CANT_EXHAUST.length && CANT_EXHAUST.some(f => f(s, c))) || !!auraAny(s, 'cantExhaust', c); }   // Freeze (Set scourgewar): "can't attack or exhaust"
 function attachedTo(s, uid, id) {
     const out = [];
-    for (const p of [s.p1, s.p2]) for (const o of p.ongoing) if (o.attachedTo === uid && (id === undefined || o.id === id)) out.push(o);
+    for (const p of allPl(s)) for (const o of p.ongoing) if (o.attachedTo === uid && (id === undefined || o.id === id)) out.push(o);
     return out;
 }
 // Ressourcen pro Zug (CR 412.1): eine, Natural Genesis (Set 6) erlaubt jedem Spieler je eine zusätzliche
-function resAllowance(s) { return 1 + [s.p1, s.p2].reduce((n, p) => n + unattachedOngoing(p, 4026).length, 0) + auraSum(s, 'resAllow', s.activePlayer) + ((s.rl && typeof RL !== 'undefined' && RL.extraResourceAllowance) ? (RL.extraResourceAllowance(s) || 0) : 0); }   // Call of the Grove (Set scourgewar); RL: Leylinien-Ader
+const RES_BLOCK = [];   // (s, pid) => true: Spieler darf keine Ressource legen
+function resAllowance(s) { return 1 + allPl(s).reduce((n, p) => n + unattachedOngoing(p, 4026).length, 0) + auraSum(s, 'resAllow', s.activePlayer) + ((s.rl && typeof RL !== 'undefined' && RL.extraResourceAllowance) ? (RL.extraResourceAllowance(s) || 0) : 0); }   // Call of the Grove (Set scourgewar); RL: Leylinien-Ader
 function unattachedOngoing(p, id) { return (p.ongoing || []).filter(o => !o.attachedTo && o.id === id); }
 // Set drums: Helden-Form "this turn" (Oakenclaw, Maleo: PE heroForm) und Master Instinct (Karte hat diesen Zug Cat statt Bear Form: o.catTurn)
 function heroFormOn(s, pid, form) { return pes(s, pid, 'heroForm').some(m => m.form === form && !m.ended); }
@@ -161,7 +162,7 @@ function auraSrcs(s) {
 function auraSrcsNow(s) {
     if (!AURA_IDS) AURA_IDS = new Set(Object.keys(FX).filter(id => FX[id] && FX[id].aura).map(Number));
     const out = [];
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         if (AURA_IDS.has(p.hero.id) && (!p.hero.flipped || FX[p.hero.id].backAura)) out.push({ c: p.hero, pid: p.id });
         for (const c of p.allies) if (AURA_IDS.has(c.id) && active(s, c)) out.push({ c, pid: p.id });
         for (const c of p.allies) if (c.hes11 && AURA_IDS.has(c.hes11.id) && active(s, c) && hesrianaOk(s, c)) out.push({ c, pid: p.id, fx: c.hes11.id });   // Hesriana
@@ -173,7 +174,7 @@ function auraSrcsNow(s) {
     return out;
 }
 function auraSum(s, hook, ...args) { let v = 0; const tw = twinOn(s); for (const e of auraSrcs(s)) { const f = FX[e.fx || e.c.id].aura[hook]; if (f) { const x = f(s, e.c, e.pid, ...args) || 0; v += tw && e.c.id !== 7234 ? 2 * x : x; } } return v; }
-function twinOn(s) { return s.p1.hero.weapons.some(w => w.id === 7234) || s.p2.hero.weapons.some(w => w.id === 7234); }   // The Staff of Twin Worlds (Set drums): "Other cards in play have their printed text a second time."
+function twinOn(s) { return allPl(s).some(p => p.hero.weapons.some(w => w.id === 7234)); }   // The Staff of Twin Worlds (Set drums): "Other cards in play have their printed text a second time."
 function auraAny(s, hook, ...args) { for (const e of auraSrcs(s)) { const f = FX[e.fx || e.c.id].aura[hook]; if (f) { const r = f(s, e.c, e.pid, ...args); if (r) return r; } } return false; }
 // Keyword (gedruckt, "this turn" oder durch Dauereffekt): protector, elusive, ferocity, stealth, untargetable,
 // spellshield, longRange, cantAttack, cantProtect, indestructible, unprevCombat
@@ -221,14 +222,14 @@ function faceDownRes(p) { return p.resources.filter(r => !r.faceUp).length; }
 // Verdeckte Ressourcen sind leer (CR 412.1b), zählen also nicht als Location.
 function locsOf(p) { return p.resources.filter(r => r.faceUp && r.card && r.card.type === 'Location'); }
 const LOC_ANY = [];   // (s, Spieler) => true: darf beliebig viele offene Locations haben (Magnificent Flying Carpet)
-function locEntries(s) { const out = []; for (const p of [s.p1, s.p2]) for (const r of locsOf(p)) out.push({ c: r.card, pid: p.id, zone: 'resource', res: r }); return out; }
+function locEntries(s) { const out = []; for (const p of allPl(s)) for (const r of locsOf(p)) out.push({ c: r.card, pid: p.id, zone: 'resource', res: r }); return out; }
 function controlsLocation(s, pid) { return locsOf(getPlayer(s, pid)).length > 0; }
 // Zähler hinzufügen; Locations mit Kapazität: höchstens so viele (CR 306.3)
 // Würfeln (Würfel mit 6 Seiten): Ergebnis in a.roll an die Fortsetzung k. Eye of Magtheridon (Raid-Loot): "If 1 would be rolled on a die,
 // you may change it to any value on that die instead." – want: { pid: Wunschwert der KI } (sonst bleibt die 1)
 function rollD6(s, label, k, a, want = {}) {
     const r = 1 + Math.floor(Math.random() * 6);
-    const eye = r === 1 ? [s.p1, s.p2].find(p => p.hero.armors.some(e => e.id === 3210)) : null;
+    const eye = r === 1 ? allPl(s).find(p => p.hero.armors.some(e => e.id === 3210)) : null;
     if (eye) {
         const w = want[eye.id] || 1;
         ask(s, { pid: eye.id, prompt: tr`${label}: Eine 1 wurde gewürfelt – Eye of Magtheridon: Wert ändern?`, src: 'Eye of Magtheridon',
@@ -408,7 +409,7 @@ function hasElusive(s, c) {
     if (!active(s, c)) return hasTM(s, c, 'elusive') || (!!auraAny(s, 'kw', c, 'elusive') || kwGain(s, c, 'elusive'));
     if (printedKw(c, 'elusive')) return true;
     if (hasTM(s, c, 'elusive')) return true;                                              // Sneak
-    if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 151 && !o.attachedTo)) return true; // From the Shadows
+    if (allPl(s).flatMap(p => p.ongoing).some(o => o.id === 151 && !o.attachedTo)) return true; // From the Shadows
     if (c.id === 280 && facIs(p, 'Alliance')) return true;                            // Hippogryph
     return (!!auraAny(s, 'kw', c, 'elusive') || kwGain(s, c, 'elusive'));
 }
@@ -419,7 +420,7 @@ function hasFerocity(s, c) {
     if (!active(s, c)) return hasTM(s, c, 'ferocity') || (!!auraAny(s, 'kw', c, 'ferocity') || kwGain(s, c, 'ferocity'));
     if (printedKw(c, 'ferocity')) return true;
     if (hasTM(s, c, 'ferocity')) return true;                                             // Into the Fray / Leeroy
-    if ((s.p1.ongoing.concat(s.p2.ongoing)).some(o => o.id === 154 && !o.attachedTo)) return true; // Lust for Battle
+    if (allPl(s).flatMap(p => p.ongoing).some(o => o.id === 154 && !o.attachedTo)) return true; // Lust for Battle
     if (c.race === 'Orc' && alliesOf(p).some(a => a.id === 268 && active(s, a))) return true; // Goretooth
     if (c.id === 280 && facIs(p, 'Horde')) return true;                               // Hippogryph
     return (!!auraAny(s, 'kw', c, 'ferocity') || kwGain(s, c, 'ferocity'));
@@ -444,7 +445,7 @@ function untargetableBy(s, c, byPid) {
     const pid = ctrlOf(s, c); if (!pid) return false;
     const l = locate(s, c.uid); if (!l || !isInPlayZone(l.zone)) return false;
     if (kwHas(s, c, 'untargetable')) return true;                                         // Untargetable (alle Spieler)
-    if (pid === byPid) return false;
+    if (pid === byPid || (s.pids && byPid && !isFoePid(s, pid, byPid))) return false;     // die folgenden gelten nur gegen Gegner (Mitspieler im Raid nicht)
     if (hasTM(s, c, 'spellshield')) return true;                                          // Divine Shield / Veil of Night
     if (c.type === 'Weapon' && countCtrl(s, pid, 300) > 0) return true;                   // Stronghold Gauntlets
     if (kwHas(s, c, 'spellshield')) return true;
@@ -512,9 +513,11 @@ function addValue(s, uid, kind, n, val = n, victimPid = null) {
     const v = (s.vals || (s.vals = {}))[uid] || (s.vals[uid] = { uid, id: c.id, name: c.name, pid, dmg: 0, heal: 0, kills: 0, v: 0 });
     v[kind] += n; v.v += val;
 }
+const HEAL_BLOCK = [];   // (s, Ziel) => true: kann nicht geheilt werden
 function heal(s, healerUid, tgtUid, amt) {
     const t = findCharacter(s, tgtUid); if (!t || !isChar(t) || !isInPlayZone((locate(s, tgtUid) || {}).zone)) return 0;
     if (hasTM(s, t, 'noHeal')) return 0;                                                  // Mortal Strike
+    if (HEAL_BLOCK.length && HEAL_BLOCK.some(f => f(s, t))) return 0;                     // Raid: Rune of Mohn
     if (pes(s, ctrlOf(s, t), 'noHeal').length) return 0;                                  // Brutality Blade: "Opposing heroes and allies can't be healed this turn"
     if (auraAny(s, 'noHeal', t)) return 0;                                                 // Wound Poison (Set 6): "Attached character can't be healed"
     const healer = healerUid ? findCharacter(s, healerUid) : null;
@@ -534,6 +537,8 @@ function heal(s, healerUid, tgtUid, amt) {
 function putDamage(s, c, n) { if (c && n > 0) { const d = c.damage || 0; c.damage = Math.min(d + n, Math.max(d, hpOf(s, c))); } }
 function drawCard(s, p, isSim) { return drawCards(s, p, 1); }
 const DRAW_REPLACE = [];   // (s, p) => true: dieses Ziehen wird ersetzt (die Funktion erledigt Log und Zähler)
+const NO_DECKOUT = [];   // (s, p) => true: leeres Deck führt nicht zur Niederlage (Raid-Boss, R101.3c)
+const DECK_REFILL = [];   // (s, p) => true: leeres Deck wurde wieder aufgefüllt (kein "decked")
 function drawCards(s, p, n) {
     let got = 0;
     if (p.allies.some(a => a.id === 4245 && active(s, a))) n *= 2;                           // Voren'thal the Seer (Set 6): "If you would draw a card, draw two instead."
@@ -549,7 +554,8 @@ function drawCards(s, p, n) {
             q(s, { op: 'fkDraw', pid: p.id }); got++; continue;
         }
         // Ziehen aus leerem Deck: der Spieler ist "decked" und verliert bei der nächsten Vorprüfung (CR 410.6b, 102.1a)
-        if (p.deck.length === 0) { p.decked = true; return got; }
+        if (p.deck.length === 0 && DECK_REFILL.some(f => f(s, p))) { i--; continue; }      // Raid-Boss: Friedhof wird ins Deck gemischt (Raid Rules R101.3c)
+        if (p.deck.length === 0) { if (!NO_DECKOUT.some(f => f(s, p))) p.decked = true; return got; }
         const c = makeCardInst(p.deck.pop(), false, p.deckOwner || p.id);
         p.hand.push(c); got++; p.drawn = { turn: s.turn, n: ((p.drawn || {}).turn === s.turn ? p.drawn.n : 0) + 1 };
         s._hidden = true;
@@ -560,19 +566,42 @@ function drawCards(s, p, n) {
 }
 function lose(s, pid, why) {
     if (s.gameOver) return;
-    s.gameOver = true; s.winner = pid === 1 ? 2 : 1;
+    if (s.pids) { eliminate(s, pid, why); return; }
+    s.gameOver = true; s.winner = oppId(s, pid);
     const p = getPlayer(s, pid);
     L(s, tr`☠ ${why || ''} ${p.hero.name} verliert!`, "log-hit", p.id);
+}
+// Mehrspieler: ein Spieler scheidet aus (Raid-Regelheft: "all of his or her cards are removed from the game. This includes
+// abilities that are attached to other players' cards."). Bleibt nur ein Team übrig, gewinnt es (s.teamLead = Spieler-ID
+// für die Anzeige, z. B. gewinnen die Raider auch dann, wenn der Mensch schon gefallen ist).
+const ELIM_HOOK = [];   // (s, pid) => true: Ausscheiden selbst geregelt (Raid: Boss-Stufe wechselt statt zu verlieren)
+function eliminate(s, pid, why) {
+    const p = getPlayer(s, pid); if (!p || p.out || s.gameOver) return;
+    if (ELIM_HOOK.some(f => f(s, pid))) return;
+    L(s, tr`☠ ${why || ''} ${p.hero.name} scheidet aus!`, "log-hit", pid);
+    for (const q of allPl(s)) for (const o of [...q.ongoing]) if (o.owner === pid || ctrlOf(s, o) === pid) { q.ongoing.splice(q.ongoing.indexOf(o), 1); }
+    for (const q of allPl(s)) for (const c of [...q.allies]) if (c.owner === pid && q.id !== pid) q.allies.splice(q.allies.indexOf(c), 1);
+    p.removed.push(...p.allies, ...p.hero.weapons, ...p.hero.armors, ...p.hand, ...p.graveyard, ...p.deck, ...p.resources.map(r => r.card).filter(Boolean));
+    p.allies = []; p.hero.weapons = []; p.hero.armors = []; p.hand = []; p.graveyard = []; p.deck = []; p.resources = []; p.ongoing = [];
+    p.out = true;
+    if (s.chain) s.chain = s.chain.filter(it => it.pl !== pid);
+    s.waitTrig = (s.waitTrig || []).filter(w => w.pid !== pid);
+    const teams = [...new Set(livePids(s).map(i => teamOf(s, i)))];
+    if (teams.length <= 1) { s.gameOver = true; s.winner = teams.length ? ((s.teamLead || {})[teams[0]] || livePids(s)[0]) : null; s.winnerTeam = teams[0] || null; }
+    else if (s.activePlayer === pid && !s.gameOver) { s.queue = []; s.win = null; s.battle = null; s.pending = null; s.queue.push({ op: 'turn', step: 'endPhase' }); }   // Zugspieler fällt: sein Zug endet
 }
 function shuffleInPlace(p) { p.deck = shuffleDeck(p.deck); }
 
 // Karte verlässt das Spiel (dest: graveyard | hand | removed | deck | deckTop | deckBottom)
 // Vor dem Zerstören (die Karte ist noch im Spiel): Revival Stone (Set drums)
 const DESTROY_PRE = [];
+const LEAVE_BLOCK = [];   // (s, Karte, dest, info) => true: Karte bleibt im Spiel
+const GY_ROUTE = [];      // (s, Karte) => Array: eigener Friedhof statt des Friedhofs des Besitzers (Raid: Minion-Friedhof)
 function leavePlay(s, c, dest = 'graveyard', info = {}) {
     const l = locate(s, c.uid); if (!l || !isInPlayZone(l.zone)) return false;
     if (info.cause !== 'damage' && info.cause !== 'limit' && kwHas(s, c, 'forsaken') && !((c.damage || 0) >= hpOf(s, c))) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Will of the Forsaken).`, '', l.pid); return false; }
     if (info.cause !== 'limit' && hasTM(s, c, 'invincible')) { L(s, tr`${c.name} kann das Spiel nicht verlassen (Invincible).`, '', l.pid); return false; }   // Invincible (CR Glossar)
+    if (LEAVE_BLOCK.some(f => f(s, c, dest, info))) return false;                         // Raid: Minions/Ally-Tokens des Bosses verlassen das Spiel nur durch Zerstörung
     if (info.destroyed) for (const f of DESTROY_PRE) f(s, c);
     const p = getPlayer(s, l.pid);
     const hpEff = isReal(s) && l.zone === 'party' ? hpOf(s, c) : null;                   // nur Anzeige: Stärke der Tod-Animation (deathAnim, ui.js)
@@ -589,7 +618,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
         corruption: attachedTo(s, c.uid, 120).length, damage: c.damage || 0, isPet: !!c.isPet, totem: c.totem || null, faction: c.faction, allyTypes: c.allyTypes || null, dest,
         rlUp: c.rlUp, upgradeEffect: c.upgradeEffect, exhausted: !!c.exhausted, isTotem: !!c.isTotem };   // Roguelike: Aufwertung, Zustand beim Verlassen
     // An diese Karte angehängte Fähigkeiten gehen auf den Friedhof ihres Besitzers
-    for (const pp of [s.p1, s.p2]) for (const o of [...pp.ongoing]) if (o.attachedTo === c.uid) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' });
+    for (const pp of allPl(s)) for (const o of [...pp.ongoing]) if (o.attachedTo === c.uid) leavePlay(s, o, 'graveyard', { cause: 'hostLeft' });
     fxEvent(s, { t: 'leave', uid: c.uid, dest: c.isToken ? 'token' : dest, owner: owner.id,
         card: { id: c.id, uid: c.uid, name: c.name, type: c.type, cost: c.cost, text: c.text, atk: c.atk, hp: c.hp, damage: c.damage || 0, hpEff, isTotem: c.isTotem } });
     resetInst(c); c.isTotem = false;
@@ -599,7 +628,7 @@ function leavePlay(s, c, dest = 'graveyard', info = {}) {
     else if (dest === 'deckTop') owner.deck.push(deckId(c));
     else if (dest === 'deckBottom') owner.deck.unshift(deckId(c));
     else if (dest === 'resource') { owner.resources.push({ card: c, faceUp: false, exhausted: !!info.exhausted }); evt(s, 'resEnters', { pid: owner.id, faceUp: false, uid: c.uid, id: c.id }); }   // Hibernate (Set drums)
-    else owner.graveyard.push(c);
+    else (GY_ROUTE.map(f => f(s, c)).find(Boolean) || owner.graveyard).push(c);
     // Auslöser
     const f = FX[snapshot.id];
     if (f && f.leave) f.leave(s, snapshot, dest, info);
@@ -636,7 +665,8 @@ function destroy(s, c, info = {}) {
 }
 function removeFromGame(s, c) { if (cantLeavePlay(s, c) || auraAny(s, 'noRemove', c)) return false;   // Netherbane (Set drums)
     return leavePlay(s, c, 'removed', { destroyed: false }); }
-function isIndestructible(s, c) { return hasTM(s, c, 'indestructible') || !!auraAny(s, 'kw', c, 'indestructible'); }
+const INDESTR = [];   // (s, Karte) => true: kann nicht zerstört werden (Raid: Majordomo Executus hat keine Lebenspunkte)
+function isIndestructible(s, c) { return hasTM(s, c, 'indestructible') || !!auraAny(s, 'kw', c, 'indestructible') || (INDESTR.length > 0 && INDESTR.some(f => f(s, c))); }
 // Will of the Forsaken / Invincible-artige Effekte (FX.aura.kw 'cantLeave')
 function cantLeavePlay(s, c) { return hasTM(s, c, 'invincible') || !!auraAny(s, 'kw', c, 'cantLeave'); }   // Invincible (CR Glossar): "can't leave play, be targeted, or be dealt damage"
 function bounce(s, c) { L(s, tr`↩ ${c.name}`, '', pidOf(s, c)); return leavePlay(s, c, 'hand', { destroyed: false }); }
@@ -724,7 +754,7 @@ function asTrigger(s, c, pid, fn) {
 // auf die Kette und löst damit zuletzt auf. Gleiche Effekte (gleiche Quelle, gleiche Schritte) brauchen keine Wahl.
 function addWaitingTriggers(s) {
     const ap = s.activePlayer;
-    for (const pid of [ap, ap === 1 ? 2 : 1]) {
+    for (const pid of turnOrderFrom(s, ap)) {
         const mine = s.waitTrig.filter(t => t.pid === pid);
         // Gefragt wird nur ein Mensch und nur, wenn die Reihenfolge das Ergebnis ändern kann (sonst unnötiger Halt)
         if (mine.length > 1 && isHuman(s, pid) && new Set(mine.map(t => t.srcName + JSON.stringify(t.steps))).size > 1
@@ -758,7 +788,7 @@ function choiceMatters(s, opts, apply) {
 function choiceSig(c) {
     const ids = a => a.map(x => x.id).sort().join(',');
     const chars = a => a.map(x => x.id + ':' + (x.damage || 0) + ':' + !!x.exhausted + ':' + atkOf(c, x, {}) + '/' + hpOf(c, x)).sort().join(',');
-    return JSON.stringify([c.gameOver, c.winner, c.activePlayer, c.chain.length, ...[c.p1, c.p2].map(p => [chars([p.hero]), ids(p.hand), chars(p.allies), ids(p.graveyard), p.deck.length,
+    return JSON.stringify([c.gameOver, c.winner, c.activePlayer, c.chain.length, ...allPl(c).map(p => [chars([p.hero]), ids(p.hand), chars(p.allies), ids(p.graveyard), p.deck.length,
         p.resources.map(r => !!r.exhausted + ':' + r.faceUp).sort().join(','), ids(p.ongoing || []), p.hero.weapons.map(w => w.id + ':' + !!w.exhausted + ':' + weaponAtk(c, w, {})).join(','), ids(p.hero.armors) + p.hero.armors.map(x => !!x.exhausted).join('')])]);
 }
 function chainTrigger(s, t) {
@@ -790,7 +820,7 @@ function execStep(s, st) {
     switch (st.op) {
         case 'ask': {
             const d = st.dec;
-            d.opts = (d.opts || []).filter(Boolean);
+            d.opts = expandPlayerOpts(s, d.pid, (d.opts || []).filter(Boolean));
             if (!d.opts.length) { if (d.none !== undefined) callK(s, d.k, d.a, d.none); break; }
             if (d.opts.length === 1 && d.auto !== false && !d.keep) { callK(s, d.k, d.a, d.opts[0].v); break; }
             if (isHuman(s, d.pid)) {
@@ -845,7 +875,7 @@ function isIdle(s) { return !s.gameOver && !s.pending && !s.queue.length && !s.w
 const STATE_FIX = [];
 function stateBased(s) {
     let changed = false;
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         // Gift of Nature (Set 7): "Allies you control can't be destroyed by fatal damage" (zerstört am Zugende, siehe FX[5040])
         const gon = unattachedOngoing(p, 5040).length > 0;
         const dead = gon ? [] : readScope(s, () => p.allies.filter(a => (a.damage || 0) >= hpOf(s, a) && !isIndestructible(s, a) && !(FX[a.id] && FX[a.id].noFatal && active(s, a))));   // Zorus (Set illidan)
@@ -856,21 +886,22 @@ function stateBased(s) {
     // Reincarnation (Set 6): "If your hero would be destroyed, remove this ability from the game and remove all but 14 damage from your hero instead."
     // Beide Prüfungen in einem Nur-Lese-Durchgang; nach einer Reincarnation (Zustand geändert) neu prüfen
     const heroCheck = () => readScope(s, () => {
-        const fatal = [s.p1, s.p2].filter(p => !p.decked && p.hero.damage >= hpOf(s, p.hero) && !isIndestructible(s, p.hero));
-        return { fatal, dead: [s.p1, s.p2].filter(p => p.decked || (fatal.includes(p) && !alliesOf(p).some(a => a.id === 263 && active(s, a)))) };
+        const fatal = allPl(s).filter(p => !p.out && !p.decked && p.hero.damage >= hpOf(s, p.hero) && !isIndestructible(s, p.hero));
+        return { fatal, dead: allPl(s).filter(p => !p.out && (p.decked || (fatal.includes(p) && !alliesOf(p).some(a => a.id === 263 && active(s, a))))) };
     });
     let hc = heroCheck(), reinc = false;
     for (const p of hc.fatal) { const r = unattachedOngoing(p, 4097)[0]; if (r && removeFromGame(s, r) !== false) { p.hero.damage = Math.min(p.hero.damage, 14); L(s, tr`Reincarnation: ${p.hero.name} überlebt mit 14 Schaden.`, '', p.id); reinc = true; } }
     if (reinc) hc = heroCheck();
     const heroDead = hc.dead;
+    if (s.pids && heroDead.length) { for (const p of heroDead) eliminate(s, p.id, p.decked ? 'DECKOUT' : tr`${p.hero.name} ist gefallen.`); return true; }
     if (heroDead.length === 2) { s.gameOver = true; s.winner = null; L(s, tr('Unentschieden!')); return true; }
     if (heroDead.length === 1) { const p = heroDead[0]; lose(s, p.id, p.decked ? 'DECKOUT' : tr`${p.hero.name} ist gefallen.`); return true; }
     for (const f of STATE_FIX) if (f(s)) { flushBatch(s); return true; }                   // Set drums: "while … remains under your control" (Brelnor)
     // CR 410.6f: Zähler auf verdeckten Ressourcen entfernen (betrifft hier nur Locations mit capture counters)
-    for (const p of [s.p1, s.p2]) for (const r of p.resources) if (!r.faceUp && r.card && r.card.type === 'Location' && r.card.counters && Object.keys(r.card.counters).length) r.card.counters = {};
+    for (const p of allPl(s)) for (const r of p.resources) if (!r.faceUp && r.card && r.card.type === 'Location' && r.card.counters && Object.keys(r.card.counters).length) r.card.counters = {};
     // "You can control any number of locations" (Magnificent Flying Carpet): LOC_ANY
     // CR 410.6g: mehr als eine offene Location – eine behalten, die übrigen verdeckt umdrehen
-    for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {
+    for (const p of turnOrder(s).map(i => getPlayer(s, i))) {
         const ls = locsOf(p);
         if (ls.length > 1 && !LOC_ANY.some(f => f(s, p))) {
             ask(s, { pid: p.id, prompt: tr('Du darfst nur eine offene Location haben: Welche bleibt offen?'), src: 'Location',
@@ -879,7 +910,7 @@ function stateBased(s) {
         }
     }
     // Unique + Tag-Limits (Pet(1), Totem-Tags, Ausrüstungsplätze)
-    for (const p of [getPlayer(s, s.activePlayer), getOpponent(s, s.activePlayer)]) {   // Zugspieler repariert zuerst (CR 414.2)
+    for (const p of turnOrder(s).map(i => getPlayer(s, i))) {   // Zugspieler repariert zuerst (CR 414.2)
         const v = findLimitViolation(s, p);
         if (v) {
             // limit: Regeltext + wie viele bleiben dürfen – die Oberfläche fragt „Welche Karte willst du behalten?“ (CR 414.3b: "You choose which one to keep")
@@ -945,7 +976,7 @@ function limitRule(v) {
 function stopAllOf(s, pid) { return s.stopAllP && s.stopAllP[pid] !== undefined ? !!s.stopAllP[pid] : !!s.stopAll; }
 function linkWindow(s, pid, ow) {
     const w = { prio: pid, passes: 0, reason: ow ? ow.reason : undefined, after: ow ? ow.after : undefined };
-    if (isHuman(s, pid) && !stopAllOf(s, pid)) { w.prio = pid === 1 ? 2 : 1; w.passes = 1; }   // "Jedes Fenster": Priorität behalten (CR 410.1)
+    if (isHuman(s, pid) && !stopAllOf(s, pid)) { w.prio = nextPid(s, pid); w.passes = 1; }   // "Jedes Fenster": Priorität behalten (CR 410.1)
     return w;
 }
 function openWindow(s, first, reason) {
@@ -955,7 +986,7 @@ function openWindow(s, first, reason) {
 function closeWindow(s) { const w = s.win; s.win = null; if (w && w.after && w.after.length) s.queue.unshift(...w.after); }
 function priorityStep(s) {
     const w = s.win;
-    if (w.passes >= 2) {
+    if (w.passes >= livePids(s).length) {
         if (s.chain.length) {
             s.queue.push({ op: 'resolveTop' });
             // Nach der Auflösung bekommt der Zugspieler wieder Priorität; das Fenster schließt erst nach
@@ -1005,8 +1036,9 @@ function respondMoment(s, pid) {
     // Auch auf einen gegnerischen Angriffsvorschlag: "can't attack" oder Ausschalten des Angreifers bricht ihn ab (CR 601.3)
     if (top) return top.pl !== pid && top.kind !== 'resource' ? 'react' : null;   // auf eine Ressource reagiert man nicht sinnvoll
     if (s.battle) return s.battle.step === 'damage' ? 'react' : null;
-    if (s.win && s.win.reason === 'end' && s.activePlayer !== pid) return 'end';
-    if (s.win && (s.win.reason === 'draw' || s.win.reason === 'ready') && s.activePlayer !== pid && !aiOld(pid, 'start')) return 'start';
+    // Zugbeginn/-ende nur im Zug eines Gegners (Mehrspieler/Raid: nicht bei Mitspielern – ihr Zug ist kein Anlass, und das eigene Bereitmachen folgt nicht direkt)
+    if (s.win && s.win.reason === 'end' && isFoePid(s, pid, s.activePlayer)) return 'end';
+    if (s.win && (s.win.reason === 'draw' || s.win.reason === 'ready') && isFoePid(s, pid, s.activePlayer) && !aiOld(pid, 'start')) return 'start';
     return null;
 }
 // Sinnvolle Antworten für pid, beste zuerst: [{a, gain}]. Der Mensch wird nur gefragt, wenn es eine gibt; die KI
@@ -1104,7 +1136,7 @@ function respondHaltAt(s, pid) {
 // stattdessen: Ändert die Antwort, was der Gegner in seiner Aktionsphase tun kann (legale Aktionen)? Sonst bringt sie jetzt
 // nichts, was sie am Zugende nicht auch brächte. Je Karte/Kraft/Quest die ersten zwei Varianten, die das tun (Simulation: eine).
 function respondOppSig(s, pid, act) {
-    const c = cloneState(s), opp = pid === 1 ? 2 : 1;
+    const c = cloneState(s), opp = oppId(s, pid);
     try { if (act) doAction(c, act, pid); else passPriority(c); process(c); autoResolve(c); } catch (e) { return null; }
     if (c.gameOver || !isIdle(c) || c.activePlayer !== opp) return null;
     // gleiche Karten auf der Hand ergeben dieselbe Aktion: Handgröße und Deck zählen mit (Brain Freeze: "Players can't draw cards")
@@ -1210,7 +1242,7 @@ function respondReplay(c, opp, r) {
 }
 function respondPlayout(c, pid, onHalt, rec, plan) {
     c.noHold = true;
-    const opp = pid === 1 ? 2 : 1, rnd = Math.random, prev = _respondHalt;
+    const opp = oppId(c, pid), rnd = Math.random, prev = _respondHalt;
     if (typeof seededRandom === "function") Math.random = seededRandom((c.turn || 0) * 7919 + pid);   // gleicher Zufall in allen Varianten
     let guard = 0, steps = 0;
     try {
@@ -1314,7 +1346,7 @@ function respondDecline(s, pend) {
     if (s.declinedTurn !== s.turn) { s.declined = {}; s.declinedTurn = s.turn; }
     s.declined[pend.ctx] = [...new Set([...(s.declined[pend.ctx] || []), ...pend.good])];
 }
-function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = w.prio === 1 ? 2 : 1; }
+function passPriority(s) { const w = s.win; if (!w) return; w.passes++; w.prio = nextPid(s, w.prio); }
 function priorityPrompt(s, pid) {
     if (s.chain.length) { const t = s.chain[s.chain.length - 1]; return tr`Auf der Kette: ${chainDesc(s, t)}. Reagieren?`; }
     if (s.battle) return tr`Kampf: ${nameOf(s, s.battle.att)} greift ${nameOf(s, s.battle.def)} an. Reagieren?`;
@@ -1369,6 +1401,11 @@ function getPlayCost(s, p, card, x = 0, targets = null) {
 // Karten, die "wie Ressourcen" zum Bezahlen erschöpft werden können: Resourcefulness (Set drums), Gromble the Apt (Set honor),
 // Gale Winds, Hemet Nesingwary (Set icecrown). Bezahlt wird zuerst mit Ressourcen, dann mit diesen Karten.
 function extraPayers(p) {
+    const runes = (p.runes || []).filter(r => !r.exhausted);                              // Raid (Molten Core): Runen bezahlen wie Ressourcen, sind aber keine (R303.3a)
+    if (runes.length) return [...extraPayersBase(p), ...runes];
+    return extraPayersBase(p);
+}
+function extraPayersBase(p) {
     const ong = id => (p.ongoing || []).some(o => o.id === id && !o.attachedTo), al = id => p.allies.some(a => a.id === id);
     const r7030 = ong(7030), r10100 = al(10100), r13167 = al(13167), r13026 = (p.ongoing || []).some(o => o.id === 13026);
     if (!r7030 && !r10100 && !r13167 && !r13026) return [];
@@ -1458,8 +1495,34 @@ function canActMain(s, pid) { return isIdle(s) && s.activePlayer === pid; }
 function canActInstant(s, pid) { return canActMain(s, pid) || hasPriority(s, pid) || (s.phase === 'end' && s.win && s.win.prio === pid); }
 
 // Ziel-Slots einer Karte/Kraft: [{label, cands:[uid], min, max}]
+// Mehrspieler: "friendly" schließt die Spieler des eigenen Teams ein (CR-Glossar "Friendly"), "you control"/"your" nicht.
+// targetCands mit side 'friendly' meint das Team, wenn der Text der Quelle (gespielte Karte, Kraft, Auslöser) "friendly" sagt.
+let SLOT_SRC = null;
+function friendlyIsTeam(s) {
+    if (!s.pids) return false;
+    const ids = [SLOT_SRC && SLOT_SRC.id, s.resolvingCard && s.resolvingCard.id, s.trigSrcId];
+    return ids.some(id => id !== undefined && id !== null && CARDS[id] && /\bfriendly\b/i.test(CARDS[id].text || ''));
+}
+// Spieler als Ziel/Wahl ("target player", "target opponent"): Optionen mit plFoe (Gegner) bzw. plSelf (du selbst).
+// Mehrspieler: "Gegner" wird zu je einer Option pro Gegner, bei "target player" (beide vorhanden) kommen die Mitspieler dazu.
+// Jede Spieler-Option trägt pl (Spieler) und heroUid – die Oberfläche lässt den Helden des Spielers anklicken.
+const PLAYER_OPT_FILTER = [];   // (s, pid) => true: Spieler fällt als Wahl weg (Blessing of Salvation: Untargetable)
+function expandPlayerOpts(s, pid, opts) {
+    if (!Array.isArray(opts) || !opts.some(o => o && (o.plFoe || o.plSelf))) return opts;
+    const any = opts.some(o => o && o.plFoe) && opts.some(o => o && o.plSelf), out = [];
+    const mk = (o, i, label) => ({ ...o, label, v: i, pl: i, heroUid: getPlayer(s, i).hero.uid });
+    for (const o of opts) {
+        if (!o || !(o.plFoe || o.plSelf)) { out.push(o); continue; }
+        if (o.plFoe) { const f = foePids(s, pid); for (const i of f) out.push(mk(o, i, s.pids && f.length > 1 ? `${o.label}: ${getPlayer(s, i).hero.name}` : o.label)); continue; }
+        out.push(mk(o, o.v, o.label));
+        if (any && s.pids) for (const i of friendPids(s, pid)) if (i !== o.v) out.push(mk(o, i, getPlayer(s, i).hero.name));
+    }
+    return out.filter(o => !o || o.pl === undefined || !PLAYER_OPT_FILTER.some(f => f(s, o.pl)));
+}
+function modeOpts(s, pid, f, card, ctx) { return expandPlayerOpts(s, pid, f.modes(s, pid, card, ctx)); }
 function targetSlots(s, pid, f, card, ctx) {
-    const sl = f && f.slots ? f.slots(s, pid, card, ctx || {}) : [];
+    const prevSrc = SLOT_SRC; SLOT_SRC = card || null;
+    let sl; try { sl = f && f.slots ? f.slots(s, pid, card, ctx || {}) : []; } finally { SLOT_SRC = prevSrc; }
     // KI: Heil-Ziele (Text "heals", Ziel ohne harm und ohne eigene Bewertung) nach geheiltem Schaden ordnen – sonst wählte sie
     // den wertvollsten eigenen Charakter, auch unverletzt (Soothing Wave, Piana, Tribemother Torra, Boris Brightbeard)
     const txt = (card && CARDS[card.id] && CARDS[card.id].text) || '';
@@ -1472,7 +1535,7 @@ function targetSlots(s, pid, f, card, ctx) {
 function targetsPossible(s, pid, f, card, x, mode) {
     if (!f || !f.slots) return true;
     const ok = (xx, mm) => targetSlots(s, pid, f, card, { x: xx, mode: mm }).every(sl => { const mn = sl.min === undefined ? 1 : sl.min; return mn <= 0 || sl.cands.length >= mn; });
-    const modes = mode !== undefined && mode !== null ? [mode] : f.modes ? f.modes(s, pid, card, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
+    const modes = mode !== undefined && mode !== null ? [mode] : f.modes ? modeOpts(s, pid, f, card, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
     // X noch nicht gewählt: Ziel-Slots behandeln ein offenes X als "beliebig" (FX.xValues nutzt nur die KI)
     return modes.some(mm => ok(x, mm));
 }
@@ -1529,7 +1592,7 @@ function applyAction(s, action, isSim = false, actorId = null) {
 // 'skip'  = sonst (kein neuer Schritt)
 function undoVerdict(before, s, action, pid = 1) {
     const sig = pl => pl.deck.join(',');
-    if (sig(before.p1) !== sig(s.p1) || sig(before.p2) !== sig(s.p2) || s._hidden || s._oppDecided || s.gameOver || action.type === 'END_TURN') return 'clear';
+    if (allPl(s).some(p => sig(getPlayer(before, p.id)) !== sig(p)) || s._hidden || s._oppDecided || s.gameOver || action.type === 'END_TURN') return 'clear';
     if (s.activePlayer !== pid || s.phase !== 'main') return 'skip';
     return isIdle(s) || (s.pending && s.pending.pid === pid) ? 'push' : 'skip';
 }
@@ -1557,6 +1620,7 @@ function validateAction(s, a, pid) {
         case 'PLACE_RESOURCE': {
             if (!canActMain(s, pid)) return tr('Ressourcen nur in deiner Aktionsphase');
             if (s.placedResource || (s.resPlaced || 0) >= resAllowance(s)) return tr('Du hast in diesem Zug schon eine Ressource gelegt');
+            if (RES_BLOCK.some(f => f(s, pid))) return tr('Du darfst keine Ressourcen legen');   // Raid-Boss (Raid Rules R100.3)
             if (a.fromDeckTop) return gladMaulOk(s, pid) && !a.faceUp ? null : tr('Die oberste Deckkarte kannst du nicht als Ressource legen');   // Gladiator's Maul (Set honor)
             const c = p.hand[a.handIdx]; if (!c) return tr('Karte nicht auf der Hand');
             if (a.faceUp && c.type !== 'Quest' && c.type !== 'Location') return tr('Nur Quests und Locations werden offen gelegt');   // CR 412.1b
@@ -1642,7 +1706,7 @@ function doAction(s, a, pid) {
     switch (a.type) {
         // Der Zugspieler passt in seiner Aktionsphase (CR 502.2): der Gegner bekommt noch Priorität. Passt auch er,
         // beginnt die End-Phase; fügt er einen Link hinzu, ist der Zugspieler danach wieder in seiner Aktionsphase.
-        case 'END_TURN': s.win = { prio: pid === 1 ? 2 : 1, passes: 1, reason: 'action', after: [{ op: 'turn', step: 'endPhase' }] }; return;
+        case 'END_TURN': s.win = { prio: nextPid(s, pid), passes: 1, reason: 'action', after: [{ op: 'turn', step: 'endPhase' }] }; return;
         case 'PLACE_RESOURCE': {
             const c = a.fromDeckTop ? makeCardInst(p.deck.pop(), false, p.deckOwner || p.id) : p.hand.splice(a.handIdx, 1)[0];
             s.resPlaced = (s.resPlaced || 0) + 1; s.placedResource = s.resPlaced >= resAllowance(s);   // Natural Genesis: weitere Ressource erlaubt
@@ -1719,7 +1783,7 @@ EK.prepItem = (s) => {
     }
     // 2) Modus (Choose one)
     if (f.modes && (it.mode === undefined || it.mode === null)) {
-        const opts = f.modes(s, p.id, card, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai }));
+        const opts = modeOpts(s, p.id, f, card, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai, pl: m.pl, heroUid: m.heroUid }));
         if (!opts.length) return abortPrep(s, tr('Kein Modus möglich'));
         ask(s, { pid: p.id, prompt: tr`${card.name}: Wähle`, src: card.name, opts, k: 'E:prepSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
         return;
@@ -1770,7 +1834,7 @@ function takeFirstTarget(it, cands) {
     it._slot.picked.push(u); return true;
 }
 // Lolly the Unsuspecting (Set drums): "All targets are chosen at random." – so viele Ziele wie nötig (mindestens eins), zufällig
-function lollyOn(s) { return [s.p1, s.p2].some(p => p.allies.some(a => a.id === 7134 && active(s, a))); }
+function lollyOn(s) { return allPl(s).some(p => p.allies.some(a => a.id === 7134 && active(s, a))); }
 function lollyPick(st, cands) { const left = cands.filter(u => !st.picked.includes(u)); if (!left.length || st.picked.length >= Math.max(1, st.mn)) return '__done'; return left[Math.floor(Math.random() * left.length)]; }
 // Ziel-Slots mit Budget (Faces from the Past: "if their combined cost is less than or equal to …"):
 // sl.budget = Obergrenze, sl.weight(u) = Gewicht eines Ziels; nur Ziele wählbar, die noch hineinpassen
@@ -1846,12 +1910,13 @@ function finishPrep(s) {
 }
 EK.finishPrep = (s) => finishPrep(s);
 
+const NO_INTERRUPT = [];   // (s, Kettenglied) => true: kann nicht unterbrochen werden
 function resolveTop(s) {
     const it = s.chain.pop(); if (!it) return;
     s.resolvingPl = it.pl;                                                                 // wer die gerade auflösende Wirkung kontrolliert (Nerves of Steel, Set drums)
     s._logPid = it.pl;                                                                     // Wirkungen gehören dem Controller des Links
     const p = getPlayer(s, it.pl);
-    s.resolvingCard = null;
+    s.resolvingCard = null; s.trigSrcId = null;
     s.lastCard = it.kind === 'card' ? it.card.uid : null;   // für die Wert-Statistik (Siegbildschirm)
     if (it.kind === 'resource') {
         // "This quest enters play exhausted" (Lazy Peons) – Set 2/3
@@ -1861,8 +1926,8 @@ function resolveTop(s) {
         return;
     }
     if (it.kind === 'trigger') {
-        s.trigSrc = it.src || null;
-        if (it.interrupted) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
+        s.trigSrc = it.src || null; s.trigSrcId = it.srcId;
+        if (it.interrupted && !NO_INTERRUPT.some(f => f(s, it))) { L(s, tr`✖ ${chainDesc(s, it)} wurde unterbrochen.`, "log-hit"); return; }
         it.steps.forEach(st => q(s, st));
         return;
     }
@@ -1879,6 +1944,7 @@ function resolveTop(s) {
     let interrupted = !!it.interrupted && !(it.kind === 'card' && ['Ability', 'Ally', 'Weapon', 'Armor', 'Item'].includes(it.card.type) && (unattachedOngoing(p, 4019).length || (it.kind === 'card' && it.card.type === 'Ability' && !!auraAny(s, 'noInterruptAbility', p.id))));
     // Karte mit "This ability can't be interrupted" (Nether Fissure, FX.noInterrupt) – das Flag wurde bisher nie gelesen
     if (interrupted && it.kind === 'card' && fx(it.card).noInterrupt) interrupted = false;
+    if (interrupted && NO_INTERRUPT.some(f => f(s, it))) interrupted = false;              // Raid: Home Lair Advantage ("your cards can't be interrupted")
     if (!interrupted && it.targets && it.targets.length) {
         const f = it.kind === 'card' ? fx(it.card) : powerDef(it);
         const card = it.kind === 'card' ? it.card : (findCharacter(s, it.src) || { uid: it.src, id: it.srcId, name: it.srcName });
@@ -1899,8 +1965,10 @@ function resolveTop(s) {
     else { const src = findCharacter(s, it.src) || { uid: it.src, id: it.srcId, name: it.srcName, gone: true }; const pw = powerDef(it); if (pw && pw.resolve) pw.resolve(s, it, src); }
 }
 const GY_REDIRECT = [];   // (s, it) => 'hand' | null (A Taste of Divinity)
+const CHAIN_LEAVE = [];   // (s, it, dest) => true: Karte selbst abgelegt (Raid: Events gehen in die Ressourcenreihe, R201.2a)
 function leaveChain(s, it, dest) {
     if (it.copy) return;                                                                   // Kopie (Lightning Overload, Set drums) hört auf zu existieren
+    for (const f of CHAIN_LEAVE) if (f(s, it, dest)) return;
     for (const f of GY_REDIRECT) { const d = f(s, it); if (d === 'hand') { const o = getPlayer(s, it.card.owner || it.pl); resetInst(it.card); o.hand.push(it.card); L(s, tr`${it.card.name} geht auf die Hand zurück.`, '', o.id); return; } }
     const owner = getPlayer(s, it.card.owner || it.pl);
     resetInst(it.card);
@@ -1977,7 +2045,7 @@ const HERO_GRANTS = [];
 const RES_GRANTS = [];   // (s, Ressourcenkarte, locate) => [FX_GRANT-Schlüssel]
 // Ressourcen mit Kräften (außer offenen Locations): für die Aktionsliste
 function resPowerEntries(s, pid) { const p = getPlayer(s, pid); const out = []; for (const r of p.resources) { if (r.faceUp && r.card.type === 'Location') continue; const l = { zone: 'resource', res: r, pid }; if ((r.faceUp && r.card.type === 'Quest' && FX[r.card.id] && FX[r.card.id].resPowers) || RES_GRANTS.some(g => (g(s, r.card, l) || []).length)) out.push({ c: r.card, pid }); } return out; }
-function hesrianaOk(s, c) { return !!c.hes11 && [s.p1, s.p2].some(p => (p.removed || []).some(x => x.uid === c.hes11.uid)); }
+function hesrianaOk(s, c) { return !!c.hes11 && allPl(s).some(p => (p.removed || []).some(x => x.uid === c.hes11.uid)); }
 function getPowers(s, src) {
     if (!src) return [];
     const l = locate(s, src.uid); if (!l) return [];
@@ -2006,7 +2074,7 @@ function getPowers(s, src) {
         if (src.hes11 && active(s, src) && hesrianaOk(s, src)) { const fh = FX[src.hes11.id]; if (fh && fh.powers) fh.powers.forEach(pw => { if (!pw.fromHand && !pw.fromRemoved && !pw.fromGy && !pw.flip) out.push({ ...pw, key: 'hes_' + pw.key, borrowed: { id: src.hes11.id, key: pw.key } }); }); }
         // Koringar the Heavy: "This turn, this ally has all the payment powers of all other allies."
         if (src.id === 1219 && active(s, src) && hasTM(s, src, 'koringar')) {
-            for (const a of [...s.p1.allies, ...s.p2.allies]) {
+            for (const a of allPl(s).flatMap(p => p.allies)) {
                 if (a === src || !active(s, a)) continue;
                 const fa = FX[a.id]; if (!fa || !fa.powers) continue;
                 fa.powers.forEach(pw => { if (!out.some(x => x.key === 'kor_' + a.id + '_' + pw.key)) out.push({ ...pw, key: 'kor_' + a.id + '_' + pw.key, borrowed: { id: a.id, key: pw.key } }); });
@@ -2082,7 +2150,7 @@ EK.prepItemPower = (s) => {
         return;
     }
     if (pw.modes && (it.mode === undefined || it.mode === null)) {
-        const opts = pw.modes(s, p.id, src, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai }));
+        const opts = modeOpts(s, p.id, pw, src, it).map((m, i) => ({ label: m.label, v: m.v !== undefined ? m.v : i, ai: m.ai, pl: m.pl, heroUid: m.heroUid }));
         ask(s, { pid: p.id, prompt: tr`${src.name}: Wähle`, src: src.name, opts, k: 'E:prepPowerSet', cancel: true, a: { key: 'mode' }, keep: opts.length > 1 });
         return;
     }
@@ -2151,8 +2219,9 @@ const FX_GRANT = {
 const EXH_ALSO = [];
 function isExhausted(s, c) { return !!c && (!!c.exhausted || EXH_ALSO.some(f => f(s, c))); }
 function targetCands(s, pid, spec) {
-    const me = getPlayer(s, pid), op = getOpponent(s, pid);
-    const sides = spec.side === 'friendly' ? [me] : spec.side === 'enemy' ? [op] : [me, op];
+    const me = getPlayer(s, pid);
+    // Mehrspieler: "opposing" = alle Spieler anderer Teams; "friendly" bleibt der eigene Spieler ("you control", die häufige Form)
+    const sides = spec.side === 'friendly' ? (friendlyIsTeam(s) ? friendPids(s, pid).map(i => getPlayer(s, i)) : [me]) : spec.side === 'enemy' ? foePids(s, pid).map(i => getPlayer(s, i)) : [me, ...livePids(s).filter(i => i !== pid).map(i => getPlayer(s, i))];
     let out = [];
     for (const p of sides) {
         if (spec.hero || spec.char) out.push(p.hero);
@@ -2260,6 +2329,7 @@ function dmgStep(s, o) {
         if (src && attachedTo(s, src.uid, 63).length) all();                              // Blessing of Protection (verursacht von)
         if (attachedTo(s, t.uid, 63).length) all();                                       // Blessing of Protection (an)
         if (hasTM(s, t, 'preventAll')) all();                                             // Bestial Wrath / Snapjaw / Divine Shield
+        if (DMG_PREVENT_ALL.length && DMG_PREVENT_ALL.some(f => f(s, t, tp.id, src, o))) all();   // Spieler-Effekte ohne Karte (Raid: Take Cover)
         if (o.blessed) all();                                                             // Blessed Life (Set 7)
         if (t.type === 'Hero' && o.combat && hasTM(s, t, 'kayleitha') && hasStealth(s, t)) all();
         if (t.type === 'Hero' && hasTM(s, t, 'arktos') && s.battle && s.battle.def === t.uid && (tp.ongoing || []).some(x => CARDS[x.id].bearForm && !x.attachedTo)) all();   // Arktos (Set 6)
@@ -2272,6 +2342,7 @@ function dmgStep(s, o) {
 // "Prevent the next N"-Schilde. Welcher zuerst verbraucht wird, wählt der Besitzer des Ziels (CR 717.4b) – gefragt
 // wird der Mensch nur, wenn es einen Unterschied macht: verschiedene Schilde (z. B. Holy Shield wirft zurück) und
 // der Schaden verbraucht nicht alle.
+const DMG_PREVENT_ALL = [];   // (s, Ziel, Ziel-Spieler, Quelle, o) => true: allen Schaden verhindern
 function dmgShields(s, c) {
     const t = findCharacter(s, c.tgt), tp = getPlayer(s, c.tp), src = c.src ? findCharacter(s, c.src) : null, o = c.o;
     if (t && !c.unprev) {
@@ -2464,12 +2535,13 @@ EK.mayPayDraw = (s, a) => {
 };
 EK.mayPayDrawDo = (s, a, v) => { if (v && payRes(getPlayer(s, a.pid), a.cost)) drawCards(s, getPlayer(s, a.pid), 1); };
 // Abwerfen: Spieler wählt selbst
+const DISCARD_BLOCK = [];   // (s, pid) => true: Spieler kann keine Karten abwerfen
 EK.discard = (s, a) => {
     const p = getPlayer(s, a.pid);
     for (let i = 0; i < a.n; i++) q(s, { op: 'call', k: 'E:discardOne', a: { pid: a.pid, src: a.src } });
 };
 EK.discardOne = (s, a) => {
-    const p = getPlayer(s, a.pid); if (!p.hand.length || auraAny(s, 'noDiscard', a.pid)) return;   // Magistrix Fyalenn (Set 6)
+    const p = getPlayer(s, a.pid); if (!p.hand.length || auraAny(s, 'noDiscard', a.pid) || DISCARD_BLOCK.some(f => f(s, a.pid))) return;   // Magistrix Fyalenn (Set 6); Raid: Ragnaros (untergetaucht)
     // Scepter of the Unholy (Set 6): eine Abwurf-Wirkung des Scepter-Controllers trifft eine zufällige Karte
     const by = a.by || s._logPid; if (a.src !== 'Handlimit' && by && by !== a.pid && auraAny(s, 'randomDiscard', by)) { EK.discardDo(s, {}, p.hand[Math.floor(Math.random() * p.hand.length)].uid); return; }
     ask(s, { pid: p.id, prompt: tr`${a.src ? a.src + ': ' : ''}Wirf eine Karte ab`, src: a.src || 'Abwerfen', opts: p.hand.map(c => ({ label: c.name, v: c.uid, ai: -cardHandValue(s, p, c) })), k: 'E:discardDo', a: {} });
@@ -2492,7 +2564,7 @@ EK.destroyResDo = (s, a, uid) => destroyResource(s, uid);
 // "Each player destroys a resource/an ally he controls" (CR 802.1): erst wählt der Zugspieler, dann der nächste;
 // danach wird alles gleichzeitig zerstört
 function eachPlayerDestroys(s, kind, src) {
-    q(s, { op: 'call', k: 'E:eachPick', a: { kind, src, order: [s.activePlayer, s.activePlayer === 1 ? 2 : 1], picks: [] } });
+    q(s, { op: 'call', k: 'E:eachPick', a: { kind, src, order: turnOrder(s), picks: [] } });
 }
 EK.eachPick = (s, a) => {
     const pid = a.order[a.picks.length];
@@ -2531,10 +2603,13 @@ EK.bottomPick = (s, a) => {
 // Die gewählte Karte kommt unter das Deck, die nächste darunter
 EK.bottomSet = (s, a, i) => { const ids = a.ids.slice(); const id = ids.splice(i, 1)[0]; getPlayer(s, a.pid).deck.unshift(id); q(s, { op: 'call', k: 'E:bottomPick', a: { ...a, ids } }); };
 EK.drawN = (s, a) => drawCards(s, getPlayer(s, a.pid), a.n);
+const RES_PROTECT = [];   // (s, pid) => true: Ressourcenreihe dieses Spielers ist vor gegnerischen Effekten geschützt (Raid Rules R101.3b)
+const RES_GY = [];        // (s, card) => true: zerstörte Ressource selbst abgelegt (Raid: Event-Friedhof)
 function destroyResource(s, cardUid) {
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         const i = p.resources.findIndex(r => r.card.uid === cardUid);
-        if (i >= 0) { const r = p.resources.splice(i, 1)[0]; const owner = getPlayer(s, r.card.owner || p.id); resetInst(r.card); owner.graveyard.push(r.card); evt(s, 'resDestroyed', { uid: r.card.uid, pid: p.id });   /* Ossandran (Set 6) */ L(s, tr`🔥 Ressource zerstört (${r.faceUp ? r.card.name : tr('verdeckt')})`, 'log-hit', p.id); evt(s, 'resDestroyed', { pid: p.id }); return true; }
+        if (i >= 0 && RES_PROTECT.some(f => f(s, p.id))) return false;
+        if (i >= 0) { const r = p.resources.splice(i, 1)[0]; const owner = getPlayer(s, r.card.owner || p.id); resetInst(r.card); if (!RES_GY.some(f => f(s, r.card))) owner.graveyard.push(r.card); evt(s, 'resDestroyed', { uid: r.card.uid, pid: p.id });   /* Ossandran (Set 6) */ L(s, tr`🔥 Ressource zerstört (${r.faceUp ? r.card.name : tr('verdeckt')})`, 'log-hit', p.id); evt(s, 'resDestroyed', { pid: p.id }); return true; }
     }
     return false;
 }
@@ -2563,7 +2638,7 @@ EV.destroyed = (s, d) => {
     (snap.tm || []).filter(m => m.k === 'shadowBolt' && m.turn === s.turn).forEach(() => trig(s, { k: 'discard', a: { pid: snap.wasCtrl, n: 1, src: 'Shadow Bolt' } }));
     // Circle of Life
     if (isAllyCard(CARDS[snap.id])) {
-        const n = (s.p1.ongoing.concat(s.p2.ongoing)).filter(o => o.id === 19 && !o.attachedTo).length;
+        const n = allPl(s).flatMap(p => p.ongoing).filter(o => o.id === 19 && !o.attachedTo).length;
         for (let i = 0; i < n; i++) trig(s, { k: 'circleOfLife', a: { pid: snap.wasCtrl, name: snap.name } });
     }
 };
@@ -2721,8 +2796,7 @@ function canAttackNow(s, c, p) {
         if (!active(s, c)) return false;                                                  // Polymorph
         if (c.cantAttack) return false;                                                   // Guardian Steelhorn
         if (attachedTo(s, c.uid, 162).length) return false;                               // Interest You in a Pint?
-        const o = getOpponent(s, pid);
-        if (alliesOf(o).some(a => a.id === 195 && active(s, a))) return false;           // Lady Jaina
+        if (foePids(s, pid).some(i => alliesOf(getPlayer(s, i)).some(a => a.id === 195 && active(s, a)))) return false;           // Lady Jaina
         if (pes(s, null, 'alliesCantAttack').some(m => m.all || m.pid !== pid)) return false; // Battle "Preparations", Chen Stormstout
         const settled = c.joinedTurn !== undefined && c.joinedTurn < turnStartOf(s, pid);
         if (!settled && !hasFerocity(s, c)) return false;
@@ -2730,14 +2804,15 @@ function canAttackNow(s, c, p) {
     if (pes(s, null, 'cantAttackAll').some(m => m.pid !== pid)) return false;             // Frost Trap: "opposing heroes and allies can't attack this turn"
     return attackTargets(s, c).length > 0 || sabotageTargets(s, c).length > 0;
 }
+const ATTACK_FILTER = [];   // (s, Angreifer, Liste) => Liste
 function attackTargets(s, att) {
-    const pid = ctrlOf(s, att); const o = getOpponent(s, pid);
-    let list = partyOf(o).filter(d => (!hasElusive(s, d) || (FX[att.id] && FX[att.id].attackElusive && active(s, att)) || pes(s, pid, 'huntElusive11').length > 0) && !hasTM(s, d, 'cantBeAttacked'));
+    const pid = ctrlOf(s, att);
+    let list = foePids(s, pid).flatMap(i => partyOf(getPlayer(s, i))).filter(d => (!hasElusive(s, d) || (FX[att.id] && FX[att.id].attackElusive && active(s, att)) || pes(s, pid, 'huntElusive11').length > 0) && !hasTM(s, d, 'cantBeAttacked'));
     // Gamon: "Any hero or ally can attack this ally. (Including characters you control.)"
     getPlayer(s, pid).allies.forEach(d => { if (d.id === 1209 && active(s, d) && d !== att && !hasElusive(s, d)) list.push(d); });
-    if (isAllyLike(att)) getPlayer(s, pid).hero.armors.forEach(d => { if (d.id === 10166) list.push(d); });   // Piñata (Set honor): "Friendly allies can attack this item as though it were an opposing ally."
+    if (isAllyLike(att)) friendPids(s, pid).forEach(i => getPlayer(s, i).hero.armors.forEach(d => { if (d.id === 10166) list.push(d); }));   // Piñata (Set honor): "Friendly allies can attack this item as though it were an opposing ally."
     // Dashel Stonefist (Set illidan): "This ally can attack friendly heroes and allies (including other characters you control)."
-    if (FX[att.id] && FX[att.id].attackFriendly && active(s, att)) partyOf(getPlayer(s, pid)).forEach(d => { if (d !== att && !list.includes(d) && !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked')) list.push(d); });
+    if (FX[att.id] && FX[att.id].attackFriendly && active(s, att)) friendPids(s, pid).flatMap(i => partyOf(getPlayer(s, i))).forEach(d => { if (d !== att && !list.includes(d) && !hasElusive(s, d) && !hasTM(s, d, 'cantBeAttacked')) list.push(d); });
     // Set 2/3: einzelne Angriffssperren (Wing Clip, Mind Soothe, Grace of Air ohne Bezahlung ist erlaubt → atkTax)
     list = list.filter(d => !(tms(s, att, 'cantAttackUid').some(m => m.uid === d.uid)) && !auraAny(s, 'atkBlock', att, d) && !(d.limitTags && d.limitTags.Mount));   // CR 302.3: Mounts können nicht angegriffen werden
     { const ao = tms(s, att, 'attackOnlyUid')[0] || ATTACK_ONLY.map(f => f(s, att)).filter(Boolean).map(uid => ({ uid }))[0]; if (ao) { const x = list.filter(d => d.uid === ao.uid); if (x.length) list = x; } }   // Karta Foultongue (Set gladiator)
@@ -2758,21 +2833,32 @@ function attackTargets(s, att) {
     if (sar.length) list = sar;
     // Curse of Frenzy (Set 7): "can attack only allies if able"
     if (auraAny(s, 'attackOnlyAllies', att)) { const x = list.filter(d => d.type !== 'Hero'); if (x.length) list = x; }
+    for (const f of ATTACK_FILTER) list = f(s, att, list);                               // Raid: "can attack only heroes", Bosse außer Spiel
     return list;
 }
 // Sabotage (CR 601.2b, Glossar "Sabotage"): Ally mit "Sabotage: [thing]" darf auch ein nicht befreundetes [thing] angreifen
 // Verdeckte Ressourcen bleiben verdeckt
-function sabotageLabel(s, c) { if (c.type === 'Hero' && s.battle && s.battle.sabotage) { const k = sabotageKind(s, findCharacter(s, s.battle.att) || {}); if (k === 'Player') return tr`Spieler ${c.name}`; if (k === 'Graveyard') return tr`Friedhof von ${c.name}`; if (k === 'Hand') return tr`Hand von ${c.name}`; if (k === 'Deck') return tr`Deck von ${c.name}`; if (k === 'Keywords') return tr`Schlüsselwörter von ${c.name}`; } const l = locate(s, c.uid); return l && l.zone === 'resource' && !l.res.faceUp ? tr('verdeckte Ressource') : c.name; }
+// att: sabotierender Charakter (sonst der aus dem laufenden Sabotage-Kampf)
+function sabotageLabel(s, c, att) {
+    if (c.type === 'Hero') { const a = att || (s.battle && s.battle.sabotage && findCharacter(s, s.battle.att)); const k = a ? sabotageKind(s, a) : null;
+        if (k === 'Player') return tr`Spieler ${c.name}`; if (k === 'Graveyard') return tr`Friedhof von ${c.name}`; if (k === 'Hand') return tr`Hand von ${c.name}`; if (k === 'Deck') return tr`Deck von ${c.name}`; if (k === 'Keywords') return tr`Schlüsselwörter von ${c.name}`; }
+    const l = locate(s, c.uid); return l && l.zone === 'resource' && !l.res.faceUp ? tr('verdeckte Ressource') : c.name; }
+// Sabotierter Spieler eines "sabotages"-Ereignisses: Controller des gewählten Ziels (Mehrspieler: der Held steht für seinen Spieler)
+function sabotagedPid(s, d) { const t = findCharacter(s, d.tgt); return (t && ctrlOf(s, t)) || foePids(s, d.apid)[0]; }
 // (Set 6: Ability, Attachment, Resource, Quest, Weapon, Armor, Equipment). Ergebnis: Karten (Ressourcen: deren Karte).
 // Sabotage-Art eines Charakters: aufgedruckt (FX.sabotage) oder verliehen (SABOTAGE_GRANT, Seer's Signet)
 const SABOTAGE_GRANT = [];
 function sabotageKind(s, att) { const f = FX[att.id]; if (f && f.sabotage && active(s, att)) return f.sabotage; for (const g of SABOTAGE_GRANT) { const k = g(s, att); if (k) return k; } return null; }
 function sabotageTargets(s, att) {
     const kind = sabotageKind(s, att); if (!kind) return [];
-    const o = getOpponent(s, ctrlOf(s, att)); const h = o.hero;
+    // CR 601.2b: nicht befreundet, nicht Elusive; Mehrspieler: Ziele aller gegnerischen Spieler
+    return foePids(s, ctrlOf(s, att)).flatMap(i => sabotageTargetsOf(getPlayer(s, i), kind)).filter(d => !hasElusive(s, d));
+}
+function sabotageTargetsOf(o, kind) {
+    const h = o.hero;
     switch (kind) {
         case 'Player': return [h];                                                         // Set illidan: der Spieler (vertreten durch seinen Helden)
-        case 'Graveyard': case 'Hand': case 'Deck': case 'Keywords': return [h];               // früher ⚠: Friedhof, Hand, Deck, Schlüsselwörter (vertreten durch den Helden)
+        case 'Graveyard': case 'Hand': case 'Deck': case 'Keywords': return [h];               // Friedhof, Hand, Deck, Schlüsselwörter des Spielers (vertreten durch seinen Helden)
         case 'AbilityOrEquipment': return [...(o.ongoing || []), ...h.weapons, ...h.armors];   // Seer's Signet
         case 'Ability': return [...(o.ongoing || [])];
         case 'Attachment': return (o.ongoing || []).filter(c => c.attachedTo);
@@ -2908,7 +2994,7 @@ function protectorsFor(s) {
     if (alliesOf(getPlayer(s, b.apid)).some(a => a.id === 187 && active(s, a))) return [];// Hannah the Unstoppable
     if (auraAny(s, 'noProtect', att)) return [];                                           // Set 2/3
     if (pes(s, b.apid, 'noProtectOpp').length) return [];                                 // Retainer Kai (Set illidan): "opposing heroes and allies can't protect this turn"
-    return partyOf(dp).filter(c => {
+    return (s.pids ? foePids(s, b.apid).flatMap(i => partyOf(getPlayer(s, i))) : partyOf(dp)).filter(c => {
         if (c.exhausted) return false;
         if (stealthAtt && !(FX[c.id] && FX[c.id].protectStealth && active(s, c))) return false;
         if (c.uid === def.uid && !(c.id === 2148 && active(s, c) && hasProtector(s, c))) return false; // Ubel Sternbrow: "can protect himself"
@@ -2929,9 +3015,12 @@ function askProtect(s) {
     if ((findCharacter(s, b.def) || {}).type === 'Item') { b.step = 'defend'; return; }   // Piñata: kein Schutz
     if (!prots.length) { b.step = 'defend'; return; }
     const att = findCharacter(s, b.att), def = findCharacter(s, b.def);
-    const opts = prots.map(c => ({ label: tr`${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
+    // Mehrspieler: die Spieler nacheinander (Zugreihenfolge, CR 101.3), jeder nur mit eigenen Charakteren
+    const askers = s.pids ? turnOrder(s).filter(i => prots.some(c => ctrlOf(s, c) === i)) : [b.dpid];
+    const who = askers[b.protAsk || 0]; if (who === undefined) { b.step = 'defend'; return; }
+    const opts = prots.filter(c => !s.pids || ctrlOf(s, c) === who).map(c => ({ label: tr`${c.name} schützt`, v: c.uid, ai: aiProtectValue(s, c, att, def) }));
     opts.push({ label: tr('Durchlassen'), v: '__none', ai: 0 });
-    ask(s, { pid: b.dpid, prompt: tr`${att.name} greift ${def.name} an. Mit einem Protector blocken?`, src: 'Protector', opts, k: 'E:protectDo', a: {}, keep: true, protect: true });
+    ask(s, { pid: who, prompt: tr`${att.name} greift ${def.name} an. Mit einem Protector blocken?`, src: 'Protector', opts, k: 'E:protectDo', a: {}, keep: true, protect: true });
     flushBatch(s);
 }
 EK.protectDo = (s, a, v) => {
@@ -2940,12 +3029,13 @@ EK.protectDo = (s, a, v) => {
         const pr = findCharacter(s, v);
         if (pr && !pr.exhausted) {
             exhaust(s, pr);
-            b.def = pr.uid; b.protectedBy = pr.uid; b.protecting = pr.uid; b.sabotage = false;   // CR 602.2c: Beschützen beendet die Sabotage
-            L(s, tr`🛡 ${pr.name} schützt`, "log-combat", b.dpid);
+            b.def = pr.uid; b.protectedBy = pr.uid; b.protecting = pr.uid; b.sabotage = false;
+            if (s.pids) b.dpid = ctrlOf(s, pr);                                                   // Mehrspieler: ein Mitspieler schützt – er ist nun der verteidigende Spieler   // CR 602.2c: Beschützen beendet die Sabotage
+            L(s, tr`🛡 ${pr.name} schützt`, "log-combat", ctrlOf(s, pr));
             s.lastProtect = { uid: pr.uid, att: b.att, t: Date.now() };
-            evt(s, 'protects', { uid: pr.uid, pid: b.dpid });
+            evt(s, 'protects', { uid: pr.uid, pid: ctrlOf(s, pr) });
         }
-    }
+    } else if (s.pids) { b.protAsk = (b.protAsk || 0) + 1; askProtect(s); return; }   // nächster Spieler am Protect Point
     b.step = 'defend';
 };
 const STRIKE_ALT = [];   // (s, pid, Waffe) => Karte, die statt der Strike-Kosten erschöpft wird, oder null
@@ -3037,8 +3127,8 @@ function combatDamage(s) {
     if (!longR && def.type !== 'Hero' && dw) dDmg += weaponAtk(s, dw, { defending: true });
     if (!longR && def.type === 'Hero' && dw2) dDmg += weaponAtk(s, dw2, { defending: true });
     if (!longR) dwM.forEach(w => { dDmg += weaponAtk(s, w, { defending: true }); });
-    const aType = att.type === 'Hero' ? (aw ? wdt(aw) : (att.masterHero && att.atkType) || 'Melee') : (aw ? wdt(aw) : allyDt(s, att));   // Master Hero (CR 301.4): eigene Schadensart ohne Waffe
-    const dType = def.type === 'Hero' ? (dw ? wdt(dw) : (def.masterHero && def.atkType) || 'Melee') : (dw ? wdt(dw) : allyDt(s, def));
+    const aType = att.type === 'Hero' ? (aw ? wdt(aw) : ((att.masterHero || att.boss) && att.atkType) || 'Melee') : (aw ? wdt(aw) : allyDt(s, att));   // Master Hero (CR 301.4): eigene Schadensart ohne Waffe
+    const dType = def.type === 'Hero' ? (dw ? wdt(dw) : ((def.masterHero || def.boss) && def.atkType) || 'Melee') : (dw ? wdt(dw) : allyDt(s, def));
     
     b.step = 'done';
     const aWs = [aw, aw2, ...awM].filter(Boolean).map(w => w.uid), dWs = [dw, dw2, ...dwM].filter(Boolean).map(w => w.uid);
@@ -3059,9 +3149,13 @@ function removeAttackers(s, alliesOnly) {
 // Wrap-up-Schritt (CR 503.2a): "Modifiers that last until end of turn expire" – ohne Kette, nach dem Abwerfen aufs Handlimit
 const WRAPUP = [];   // (s) => void
 EK.wrapExpire = (s) => { for (const f of WRAPUP) f(s); };
-function ashtongueOn(s) { return [s.p1, s.p2].some(p => p.hero.weapons.some(w => w.id === 6229)); }
+function ashtongueOn(s) { return allPl(s).some(p => p.hero.weapons.some(w => w.id === 6229)); }
+const TURN_STEP_FX = {};   // zusätzliche Zugschritte (Raid: Event-Phase des Bosses, R201.2) – name => (s, p)
+const AFTER_DRAW = [];     // (s, p) => Name des Schritts nach dem Draw-Step statt 'main'
+const DRAW_STEP_N = [];    // (s, p, n) => Anzahl Karten im Draw-Step (Raid: Boss zieht so viele wie die Stufe, R201.1)
 function turnStep(s, step) {
     const p = getPlayer(s, s.activePlayer);
+    if (TURN_STEP_FX[step]) return TURN_STEP_FX[step](s, p);
     if (step === 'endPhase') {
         s.phase = 'end';
         
@@ -3088,27 +3182,26 @@ function turnStep(s, step) {
     if (step === 'start') {
         s.lastTurnOf = s.lastTurnOf || {};
         s.firstTurnOf = s.firstTurnOf || {}; if (s.firstTurnOf[s.activePlayer] === undefined) s.firstTurnOf[s.activePlayer] = s.turn;   // erster Zug des Startspielers
-        let next = s.activePlayer === 1 ? 2 : 1;
+        let next = nextPid(s, s.activePlayer);
         if (s.extraTurn && s.extraTurn.pid === s.activePlayer) { next = s.activePlayer; s.extraTurn = null; L(s, tr('⏳ Chromie: Zusätzlicher Zug!'), 'log-turn'); }
         // "Skip your next turn" (Lay on Hands, Gone Fishin') – Set 2/3
         s.skip = s.skip || {};
         let guardSkip = 0;
-        while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, tr`⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = next === 1 ? 2 : 1; }
+        while (s.skip[next] > 0 && guardSkip++ < 4) { s.skip[next]--; L(s, tr`⏭ ${getPlayer(s, next).hero.name} setzt einen Zug aus.`, 'log-turn'); s.turn++; s.lastTurnOf[next] = s.turn; next = nextPid(s, next); }
         s.activePlayer = next; s.turn++; s.placedResource = false; s.resPlaced = 0; s.phase = 'start';
         s.lastTurnOf[next] = s.turn;
         if (s.firstTurnOf[next] === undefined) s.firstTurnOf[next] = s.turn;                // Preparation: "On your first turn"
         s.pe = (s.pe || []).filter(m => m.until === 'game' || m.turn >= s.turn - 1 || (m.untilTurn && m.untilTurn >= s.turn));
         // Alte "this turn"-Modifikatoren aufräumen (nur Speicher – tms() wertet ohnehin nur den aktuellen Zug)
-        for (const pl of [s.p1, s.p2]) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);
+        for (const pl of allPl(s)) for (const c of [pl.hero, ...pl.allies, ...pl.hero.weapons, ...pl.hero.armors, ...pl.ongoing]) if (c.tm && c.tm.length) c.tm = c.tm.filter(m => m.turn === undefined || m.turn >= s.turn - 1);
         const np = getPlayer(s, next);
         L(s, '', 'log-sep', next);                                                     // neuer Zug: nur eine Trennlinie
         s.queue.push({ op: 'turn', step: 'ready' });
         return;
     }
     if (step === 'ready') {
-        const o = getOpponent(s, p.id);
-        const earthbind = totemsOf(o).some(t => t.id === 107);                            // Earthbind Totem
-        const cards = [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...p.ongoing];   // CR 411: alle eigenen Karten im Spiel
+        const earthbind = foePids(s, p.id).some(i => totemsOf(getPlayer(s, i)).some(t => t.id === 107));                            // Earthbind Totem
+        const cards = [p.hero, ...p.allies, ...p.hero.weapons, ...p.hero.armors, ...p.ongoing, ...(p.runes || [])];   // CR 411: alle eigenen Karten im Spiel (Raid: auch Runen, R301.1)
         const helwens = [];
         for (const c of cards) {
             // "can't ready during your next ready step" gilt genau für diesen Schritt – auch wenn die Karte
@@ -3128,7 +3221,7 @@ function turnStep(s, step) {
           const cap = auraAny(s, 'resReadyCap', p.id) ? 3 : Infinity; let n = 0; const pr = r => r.faceUp && r.card.type === 'Location' ? 0 : !r.faceUp ? 1 : 2;
           [...p.resources].sort((a, b) => pr(a) - pr(b)).forEach(r => { if (!r.exhausted || n >= cap) return; if (auraAny(s, 'noReady', r.card) || READY_BLOCK.some(f => f(s, r.card))) return; r.exhausted = false; n++; }); }   // Immobilize (Set drums): auch Ressourcen
         helwens.forEach(u => q(s, { op: 'call', k: 'E:helwenReady', a: { uid: u } }));
-        q(s, { op: 'call', k: 'E:inspire', a: { pid: o.id, done: [] } });                // Inspire (CR 501.1b): der andere Spieler readyt gleichzeitig
+        for (const i of turnOrder(s).slice(1)) q(s, { op: 'call', k: 'E:inspire', a: { pid: i, done: [] } });   // jeder andere Spieler (CR-Glossar Inspire)                // Inspire (CR 501.1b): der andere Spieler readyt gleichzeitig
         flushBatch(s);
         s.queue.push({ op: 'turn', step: 'startTrig' });
         return;
@@ -3146,10 +3239,10 @@ function turnStep(s, step) {
     }
     if (step === 'draw') {
         s.phase = 'draw';
-        if (!(s.turn === 1) && !SKIP_DRAW_STEP.some(f => f(s, p.id))) drawCards(s, p, 1);   // Icy Veins (Set honor): Draw-Step überspringen
+        if (!(s.turn === 1 && !s.firstDrawOk) && !SKIP_DRAW_STEP.some(f => f(s, p.id))) drawCards(s, p, DRAW_STEP_N.reduce((n, f) => f(s, p, n), 1));   // Icy Veins (Set honor): Draw-Step überspringen
         flushBatch(s);
         s.queue.push({ op: 'window', first: s.activePlayer, reason: 'draw' });      // Fenster im Draw-Step
-        s.queue.push({ op: 'turn', step: 'main' });
+        s.queue.push({ op: 'turn', step: AFTER_DRAW.map(f => f(s, p)).find(Boolean) || 'main' });
         return;
     }
     if (step === 'main') { s.phase = 'main'; return; }
@@ -3186,7 +3279,7 @@ function checkStateDeaths(s) { process(s); }
 
 // Anzeige-Werte aktualisieren (Renderer liest atk/hp/def direkt)
 function refreshDisplay(s) {
-    for (const p of [s.p1, s.p2]) {
+    for (const p of allPl(s)) {
         p.hero.atk = atkOf(s, p.hero, {}); p.hero.hp = hpOf(s, p.hero); p.hero.tempAtkBonus = 0;
         p.hero.protector = hasProtector(s, p.hero); p.hero.stealth = hasStealth(s, p.hero); p.hero.elusive = hasElusive(s, p.hero);
         p.allies.forEach(a => { if (!a.b) return; a.atk = atkOf(s, a, {}); a.hp = hpOf(s, a); a.tempAtkBonus = 0; a.protector = hasProtector(s, a); a.elusive = hasElusive(s, a); a.ferocity = hasFerocity(s, a); });
@@ -3213,11 +3306,11 @@ function getPriorityActions(s, pid) {
 // Karten in Friedhöfen, die pid gerade spielen dürfte (Dramla, Readiness, Greed Before Need)
 function gyPlayables(s, pid) {
     const out = [], seen = new Set();
-    for (const o of [s.p1, s.p2]) for (const c of o.graveyard) {
+    for (const o of allPl(s)) for (const c of o.graveyard) {
         if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || seen.has(c.id)) continue;
         if (canPlayFromGy(s, pid, c, o.id)) { seen.add(c.id); out.push(c); }
     }
-    for (const o of [s.p1, s.p2]) for (const c of (o.removed || [])) { if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || c.isToken || seen.has(c.uid)) continue; if (canPlayFromRemoved(s, pid, c, o.id)) { seen.add(c.uid); out.push(c); } }
+    for (const o of allPl(s)) for (const c of (o.removed || [])) { if (c.type === 'Quest' || c.type === 'Location' || c.type === 'Hero' || c.isToken || seen.has(c.uid)) continue; if (canPlayFromRemoved(s, pid, c, o.id)) { seen.add(c.uid); out.push(c); } }
     return out;
 }
 // KI: Karten, die einer Karte ihre Kräfte nehmen, nie auf eigene Karten spielen. Die Bewertung sieht verlorene Kräfte nicht
@@ -3249,7 +3342,7 @@ function playVariants(s, pid, c, idx, instantOnly, gyUid) {
     // Nur X mit Pflichtzielen (Mind Control: Ally mit Kosten X), sonst fiele das passende X oft aus der Stichprobe
     if (xs[0] !== undefined && f.slots) { const ok = xs.filter(x => targetsPossible(s, pid, f, c, x)); xs.splice(0, xs.length, ...ok); if (!xs.length) return out; }
     for (const x of xs.length > 4 ? [xs[0], xs[Math.floor(xs.length / 2)], xs[xs.length - 1]] : xs) {
-        const modes = f.modes ? f.modes(s, pid, c, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
+        const modes = f.modes ? modeOpts(s, pid, f, c, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
         for (const mode of modes) {
             const slots = targetSlots(s, pid, f, c, { x, mode });
             const combos = targetCombos(s, pid, slots, f.distinct);
@@ -3324,7 +3417,7 @@ function powerVariants(s, pid, instantOnly) {
                 if (pw.xValues) return [...new Set(pw.xValues(s, pid, e.c))].filter(x => x !== undefined && x >= xr.min && x <= lim);   // X nach möglichen Zielen
                 const a = []; for (let x = Math.max(1, xr.min); x <= lim; x++) a.push(x); return a.length > 3 ? [a[0], a[a.length - 1]] : a; })() : [undefined];
             for (const x of xs) {
-                const modes = pw.modes ? pw.modes(s, pid, e.c, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
+                const modes = pw.modes ? modeOpts(s, pid, pw, e.c, { x }).map((m, i) => (m.v !== undefined ? m.v : i)) : [undefined];
                 for (const mode of modes) {
                     const slots = targetSlots(s, pid, pw, e.c, { x, mode });
                     const combos = targetCombos(s, pid, slots, pw.distinct);
@@ -3346,7 +3439,7 @@ function getLegalActions(s, pid) {
     if (!canActMain(s, pid)) return [];
     const p = getPlayer(s, pid), o = getOpponent(s, pid);
     const acts = [];
-    if (!s.placedResource) {
+    if (!s.placedResource && !RES_BLOCK.some(f => f(s, pid))) {
         const seen = new Set();
         if (gladMaulOk(s, pid) && !auraAny(s, 'noFaceDownRes', pid)) acts.push({ type: 'PLACE_RESOURCE', handIdx: -1, fromDeckTop: true, faceUp: false, actorId: pid, desc: tr('Oberste Deckkarte verdeckt als Ressource') });
         p.hand.forEach((c, i) => {
@@ -3370,7 +3463,7 @@ function pushAttackActions(s, pid, acts) {
     for (const c of (forced.length ? forced : partyOf(p))) {
         if (!canAttackNow(s, c, p)) continue;
         attackTargets(s, c).forEach(d => { if (winterCost(s, c, d) <= getReadyRes(p)) acts.push({ type: 'ATTACK', attackerUid: c.uid, defenderUid: d.uid, actorId: pid, desc: `${c.name} → ${d.name}` }); });
-        sabotageTargets(s, c).forEach(d => acts.push({ type: 'ATTACK', attackerUid: c.uid, defenderUid: d.uid, sabotage: true, actorId: pid, desc: tr`${c.name} sabotiert ${sabotageLabel(s, d)}` }));
+        sabotageTargets(s, c).forEach(d => acts.push({ type: 'ATTACK', attackerUid: c.uid, defenderUid: d.uid, sabotage: true, actorId: pid, desc: tr`${c.name} sabotiert ${sabotageLabel(s, d, c)}` }));
     }
     return acts;
 }
@@ -3471,7 +3564,7 @@ function aiPick(s, d) {
 function humanPriorityOptions() { return G && G.pending && G.pending.kind === 'priority' ? getPriorityActions(G, G.pending.pid) : []; }
 
 // ---------------------------------------------------------------- Spielstart / Mulligan (CR 101.2: einmal)
-function dealOpeningHands(s) { for (const p of [s.p1, s.p2]) drawCards(s, p, 7); s._batch = []; }
+function dealOpeningHands(s) { for (const p of allPl(s)) drawCards(s, p, 7); s._batch = []; }
 function doMulligan(s, pid) {
     const p = getPlayer(s, pid);
     if (p.mulliganed) return false;
@@ -3527,8 +3620,10 @@ const INSPIRE_KINDS = {
 // Set illidan: Inspire auf Karten eines Namens ("name:<Name>", Anchorite Kilandra) und "Inspire: All …" (alle auf einmal)
 const INSPIRE_EXTRA = [];
 const INSPIRE_ALL = {
-    AllProtector: (s, p) => [p.hero, ...p.allies].filter(c => c.exhausted && hasProtector(s, c)).map(c => c.uid),
-    AllActivate: (s, p) => [p.hero, ...p.allies].filter(c => c.exhausted && hasActivatePower(s, c)).map(c => c.uid),
+    // Vindicator Aluumen / Falaan: "All friendly …" – der Kartentext geht der Inspire-Regel ("you control") vor (CR 103.1),
+    // im Mehrspieler also auch die Charaktere der Mitspieler (in 1 gegen 1 unverändert)
+    AllProtector: (s, p) => friendParty(s, p.id).filter(c => c.exhausted && hasProtector(s, c)).map(c => c.uid),
+    AllActivate: (s, p) => friendParty(s, p.id).filter(c => c.exhausted && hasActivatePower(s, c)).map(c => c.uid),
 };
 function inspireCands(s, p, k) {
     if (INSPIRE_KINDS[k]) return INSPIRE_KINDS[k](p);

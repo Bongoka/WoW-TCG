@@ -2,7 +2,7 @@
 // "this turn"-Schadensänderungen (engine.js: Spieler-Effekt dmgMod)
 const DMG_MODS = {
     // Commander Michael Goodchilde: eigener verteidigender Ally macht +2 Kampfschaden
-    michaelDef: (s, m, src, t, o, amt, sp) => o.combat && src && src.type === 'Ally' && sp === m.pid && s.battle && s.battle.def === src.uid ? amt + 2 : amt,
+    michaelDef: (s, m, src, t, o, amt, sp) => o.combat && src && src.type === 'Ally' && isFriendPid(s, sp, m.pid) && s.battle && s.battle.def === src.uid ? amt + 2 : amt,
     // Crusader Michael Goodchilde: gegnerischer verteidigender Ally erhält +2 Kampfschaden
     michaelOpp: (s, m, src, t, o, amt, sp, tpid) => o.combat && t.type === 'Ally' && tpid !== m.pid && s.battle && s.battle.def === t.uid ? amt + 2 : amt,
     // Lelora the Dawnslayer: Kampfschaden an oder von dem Ziel-Ally verdoppelt
@@ -38,21 +38,21 @@ FX[5009] = { powers: [flipPow(tr('Eigener Ally mit Anhang: Elusive und Untargeta
 FX[5010] = { powers: [flipPow(tr('Gegnerische verteidigende Allies erhalten +2 Kampfschaden'), 2, { resolve: (s, it) => addPE(s, it.pl, { k: 'dmgMod', mod: 'michaelOpp' }) })] };
 FX[5011] = { powers: [flipPow(tr('2 Nahkampf an unbeschädigtes Ziel'), 2, { myTurn: true, slots: slotChar(tr('Unbeschädigtes Ziel'), true, { filter: c => !(c.damage > 0) }),
     resolve: (s, it) => { const t = T1(s, it); if (t && !(t.damage > 0)) heroDmg(s, it.pl, t.uid, 2, 'Melee', { ability: false }); } })] };
-FX[5012] = { powers: [flipPow(tr('Totem zerstören: Held und Waffen bereit'), 2, { canUse: (s, pid) => totemsOf(me(s, pid)).length > 0 || tr('Kein Totem'),
-    payExtra: payPick(5012, tr('Ixamos: Welches Totem zerstören?'), (s, pid) => totemsOf(me(s, pid)).map(t => t.uid)),
+FX[5012] = { powers: [flipPow(tr('Totem zerstören: Held und Waffen bereit'), 2, { canUse: (s, pid) => friendPids(s, pid).flatMap(i => totemsOf(me(s, i))).length > 0 || tr('Kein Totem'),
+    payExtra: payPick(5012, tr('Ixamos: Welches Totem zerstören?'), (s, pid) => friendPids(s, pid).flatMap(i => totemsOf(me(s, i))).map(t => t.uid)),
     resolve: (s, it) => { const p = me(s, it.pl); readyCard(s, p.hero); p.hero.weapons.forEach(w => readyCard(s, w)); } })], k: { pay: payDo((s, c) => destroy(s, c)) } };
-FX[5013] = { powers: [flipPow(tr('Eigenen Ally zerstören: Ziel −X Leben'), 2, { myTurn: true, slots: slotChar(tr('Ziel'), true), canUse: (s, pid) => alliesOf(me(s, pid)).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
-    payExtra: payPick(5013, tr('Marlowe: Welchen eigenen Ally zerstören?'), (s, pid) => alliesOf(me(s, pid)).filter(a => a.type === 'Ally').map(a => a.uid)),
+FX[5013] = { powers: [flipPow(tr('Eigenen Ally zerstören: Ziel −X Leben'), 2, { myTurn: true, slots: slotChar(tr('Ziel'), true), canUse: (s, pid) => friendAllies(s, pid).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
+    payExtra: payPick(5013, tr('Marlowe: Welchen eigenen Ally zerstören?'), (s, pid) => friendAllies(s, pid).filter(a => a.type === 'Ally').map(a => a.uid)),
     resolve: (s, it) => { const t = T1(s, it); if (t && it.extra.x) addTM(t, { k: 'hp', v: -it.extra.x, turn: s.turn }); } })], k: { pay: payDo((s, c, it) => { it.extra.x = hpOf(s, c); destroy(s, c); }) } };
 FX[5014] = { powers: [flipPow(tr('1 Natur an Held je Quest seines Controllers'), 2, { slots: (s, pid) => [{ label: tr('Ziel-Held'), cands: targetCands(s, pid, { hero: true }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (!t) return; const n = faceUpQuestCount(me(s, ctrlOf(s, t))); if (n) heroDmg(s, it.pl, t.uid, n, 'Nature', { ability: false }); } })] };
 FX[5015] = { powers: [flipPow(tr('Diesen Zug: Gegner zieht → 1 Arkan an seinen Charakter'), 2, { resolve: (s, it) => addPE(s, it.pl, { k: 'oboraMad' }) })] };
-onEvt('drew', (s, d) => { const o = d.pid === 1 ? 2 : 1; if (pes(s, o, 'oboraMad').length) pushTrig(s, o, 5015, [{ op: 'trig', id: 5015, k: 'ask', a: { pid: o, opp: d.pid } }]); });
+onEvt('drew', (s, d) => { const o = oppId(s, d.pid); if (pes(s, o, 'oboraMad').length) pushTrig(s, o, 5015, [{ op: 'trig', id: 5015, k: 'ask', a: { pid: o, opp: d.pid } }]); });
 FX[5015].k = { ask: (s, a) => mustPick(s, a.pid, tr('Obora the Mad: 1 Arkanschaden an Ziel des Gegners'), 'Obora the Mad', targetCands(s, a.pid, { char: true, side: 'enemy' }), '5015:do', a),
     do: (s, a, v) => { if (v) heroDmg(s, a.pid, v, 1, 'Arcane', { ability: false }); } };
 FX[5016] = { powers: [flipPow(tr('Ziel-Spieler zerstört eine eigene Ausrüstung'), 3, { modes: playerModes(-4, 3), resolve: (s, it) => playerDestroys(s, it.mode, 'equipment', 'Ressa the Leper Queen') })] };
-FX[5017] = { powers: [flipPow(tr('Eigenen Ally zerstören: Fernkampf = sein ATK'), 2, { slots: slotAlly(tr('Ziel-Ally'), true), canUse: (s, pid) => alliesOf(me(s, pid)).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
-    payExtra: payPick(5017, tr('Nally: Welchen eigenen Ally zerstören?'), (s, pid) => alliesOf(me(s, pid)).filter(a => a.type === 'Ally').map(a => a.uid)),
+FX[5017] = { powers: [flipPow(tr('Eigenen Ally zerstören: Fernkampf = sein ATK'), 2, { slots: slotAlly(tr('Ziel-Ally'), true), canUse: (s, pid) => friendAllies(s, pid).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
+    payExtra: payPick(5017, tr('Nally: Welchen eigenen Ally zerstören?'), (s, pid) => friendAllies(s, pid).filter(a => a.type === 'Ally').map(a => a.uid)),
     resolve: (s, it) => { const t = T(it)[0]; if (t && it.extra.x) heroDmg(s, it.pl, t, it.extra.x, 'Ranged', { ability: false }); } })], k: { pay: payDo((s, c, it) => { it.extra.x = atkOf(s, c); destroy(s, c); }) } };
 FX[5018] = { powers: [flipPow(tr('Kontrolle über Ally mit Anhang'), 4, { myTurn: true, needsAttach: true, slots: (s, pid) => [{ label: tr('Ally mit Anhang'), cands: targetCands(s, pid, { ally: true, side: 'enemy', filter: c => attachedTo(s, c.uid).length > 0 }), harm: true }],
     resolve: (s, it) => { const t = T1(s, it); if (t && attachedTo(s, t.uid).length) changeControl(s, t, it.pl); } })] };
@@ -93,9 +93,9 @@ const idleAllies = (s, p) => alliesOf(p).filter(a => a.type === 'Ally' && a.atta
 FX[5035] = { powers: [flipPow(tr('Zugende: untätige Allies des Zugspielers zerstören'), 3, { resolve: (s, it) => addPE(s, it.pl, { k: 'vorna' }) })] };
 onEvt('endOfTurn', (s, d) => { [1, 2].forEach(pid => { if (pes(s, pid, 'vorna').length) pushTrig(s, pid, 5035, [{ op: 'trig', id: 5035, k: 'go', a: { pid: d.pid } }]); }); });
 FX[5035].k = { go: (s, a) => idleAllies(s, me(s, a.pid)).forEach(x => destroy(s, x)) };
-FX[5036] = { powers: [flipPow(tr('Eigenen Ally zerstören: Form aus dem Friedhof auf die Hand'), 2, { canUse: (s, pid) => alliesOf(me(s, pid)).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
+FX[5036] = { powers: [flipPow(tr('Eigenen Ally zerstören: Form aus dem Friedhof auf die Hand'), 2, { canUse: (s, pid) => friendAllies(s, pid).some(a => a.type === 'Ally') || tr('Kein eigener Ally'),
     slots: (s, pid) => [{ label: tr('Form in deinem Friedhof'), cands: gyCands(s, pid, c => !!(c.limitTags && c.limitTags.Form)), harm: false }],
-    payExtra: payPick(5036, tr('Stormclaw: Welchen eigenen Ally zerstören?'), (s, pid) => alliesOf(me(s, pid)).filter(a => a.type === 'Ally').map(a => a.uid)),
+    payExtra: payPick(5036, tr('Stormclaw: Welchen eigenen Ally zerstören?'), (s, pid) => friendAllies(s, pid).filter(a => a.type === 'Ally').map(a => a.uid)),
     resolve: (s, it) => { const u = T(it)[0]; if (u) fromGyToHand(s, u); } })], k: { pay: payDo((s, c) => destroy(s, c)) } };
 
 // ============================================================================
@@ -116,7 +116,7 @@ FX[5043] = { slots: (s, pid) => [{ label: tr('Fähigkeit oder Ausrüstung'), can
 FX[5044] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability' && d.card.school === 'Feral' && ownForms(s, pid).length) trig(s, { id: 5044, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Savage Fury: 2 Nahkampfschaden an Ziel-Ally?'), 'Savage Fury', targetCands(s, a.pid, { ally: true }), '5044:do', a), do: (s, a, v) => { if (v) heroDmg(s, a.pid, v, 2, 'Melee'); } } };
 FX[5045] = { on: { questDone: (s, c, d, pid) => { if (d.pid !== pid) trig(s, { id: 5045, k: 'hit', a: { pid, opp: d.pid } }); } }, k: { hit: (s, a) => heroDmg(s, a.pid, heroOf(s, a.opp).uid, 3, 'Nature') } };
-FX[5046] = { resolve: (s, it) => partyOf(me(s, it.pl)).forEach(c => heal(s, heroOf(s, it.pl).uid, c.uid, 2 * (it.x || 0))) };
+FX[5046] = { resolve: (s, it) => friendParty(s, it.pl).forEach(c => heal(s, heroOf(s, it.pl).uid, c.uid, 2 * (it.x || 0))) };
 CARDS[5046].xCost = true;
 FX[5047] = { enter: (s, c, pid) => trig(s, { id: 5047, k: 'ask', a: { pid, uid: c.uid } }),
     k: { ask: (s, a) => mayPick(s, a.pid, tr('Bogspike: 1 Nahkampfschaden an Ziel-Ally?'), 'Bogspike', targetCands(s, a.pid, { ally: true }), '5047:do', a), do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: 1, dt: 'Melee' }); } } };
@@ -169,7 +169,7 @@ FX[5075] = { on: { dmg: (s, c, d, pid) => { if (d.combat && d.src === heroOf(s, 
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Seal of Redemption: Ally aus deinem Friedhof auf die Hand'), 'Seal of Redemption', gyCands(s, a.pid, c => isAllyCard(c)), '5075:do', a, u => (findCharacter(s, u) || {}).cost || 0), do: (s, a, v) => { if (v) fromGyToHand(s, v); } },
     powers: [{ key: 'redemption', label: tr('Zerstören: Ally aus deinem Friedhof auf die Hand'), cost: 1, selfCost: selfDestroyThen, canUse: (s, pid) => me(s, pid).graveyard.some(c => isAllyCard(c)) || tr('Kein Ally im Friedhof'),
         resolve: (s, it) => mustPick(s, it.pl, tr('Seal of Redemption: Ally aus deinem Friedhof auf die Hand'), 'Seal of Redemption', gyCands(s, it.pl, c => isAllyCard(c)), '5075:do', { pid: it.pl }, u => (findCharacter(s, u) || {}).cost || 0) }] };
-FX[5076] = { resolve: (s) => [s.p1, s.p2].forEach(p => alliesOf(p).filter(a => a.attackedTurn === s.turn).forEach(a => destroy(s, a))) };
+FX[5076] = { resolve: (s) => allPl(s).forEach(p => alliesOf(p).filter(a => a.attackedTurn === s.turn).forEach(a => destroy(s, a))) };
 FX[5077] = { slots: slotChar(tr('Ziel'), true), resolve: (s, it) => { const t = T(it)[0]; if (t) heroDmg(s, it.pl, t, heroOf(s, it.pl).damage > 0 ? 2 : 6, 'Holy', { unprev: true }); } };
 FX[5078] = { modes: playerModes(-6, 4), resolve: (s, it) => { const p = me(s, it.mode); discardHand(s, p); } };
 FX[5079] = { on: { healed: (s, c, d, pid) => { if (d.tpid && d.tpid !== pid && d.amt > 0) trig(s, { id: 5079, k: 'hit', a: { pid, uid: d.tgt, n: d.amt * 2 } }); } }, k: { hit: (s, a) => { if (findCharacter(s, a.uid)) heroDmg(s, a.pid, a.uid, a.n, 'Shadow'); } } };
@@ -267,7 +267,7 @@ FX[5113] = { on: { damaged: (s, c, d, pid) => { const t = findCharacter(s, d.tgt
     k: { ask: (s, a) => { if (!findCharacter(s, a.uid) || !findCharacter(s, a.to)) return; const ownSrc = ctrlOf(s, findCharacter(s, a.to)) === a.pid;
         ask(s, { pid: a.pid, prompt: tr`Gobloz: 1 Feuerschaden an ${nameOf(s, a.to)}?`, src: 'Gobloz', opts: [{ label: tr('Ja'), v: 1, ai: ownSrc ? 0 : 1 }, { label: tr('Nein'), v: 0, ai: ownSrc ? 1 : 0 }], k: '5113:do', a, auto: false }); },
         do: (s, a, v) => { if (v && findCharacter(s, a.uid) && findCharacter(s, a.to)) dealDamage(s, { src: a.uid, tgt: a.to, amt: 1, dt: 'Fire' }); } } };
-FX[5114] = { resolve: (s, it) => mustPick(s, it.pl, tr('Ripped through the Portal: Entfernten Ally ins Spiel bringen'), 'Ripped through the Portal', [...s.p1.removed, ...s.p2.removed].filter(c => isAllyCard(c) && c.type === 'Ally').map(c => c.uid), '5114:do', { pid: it.pl }, u => (findCharacter(s, u) || {}).cost || 0),
+FX[5114] = { resolve: (s, it) => mustPick(s, it.pl, tr('Ripped through the Portal: Entfernten Ally ins Spiel bringen'), 'Ripped through the Portal', allPl(s).flatMap(p => p.removed).filter(c => isAllyCard(c) && c.type === 'Ally').map(c => c.uid), '5114:do', { pid: it.pl }, u => (findCharacter(s, u) || {}).cost || 0),
     k: { do: (s, a, v) => { const l = locate(s, v); if (!l || l.zone !== 'removed') return; const p = me(s, l.pid); p.removed.splice(p.removed.indexOf(l.c), 1); resetInst(l.c); putIntoPlay(s, l.c, a.pid); } } };
 FX[5115] = { canPlay: (s, pid) => alliesOf(me(s, pid)).length >= 2 || tr('Du brauchst zwei oder mehr Allies'), entered: (s, c) => { c.counters = { ...(c.counters || {}), spirit: 4 }; },
     powers: [{ key: 'souls', label: tr('Geist-Marke entfernen: Heile 3'), act: true, canUse: (s, pid, src) => ((src.counters || {}).spirit || 0) > 0 || tr('Keine Marke'), slots: slotChar(tr('Ziel'), false),
@@ -331,7 +331,7 @@ FX[5149] = orderkeeper(c => c.type === 'Ally');
 FX[5150] = { powers: [{ key: 'q_el', label: tr('Elusive diesen Zug'), cost: 1, resolve: (s, it, src) => { if (!src.gone) addTM(src, { k: 'elusive', turn: s.turn }); } },
     { key: 'q_un', label: tr('Untargetable diesen Zug'), cost: 1, resolve: (s, it, src) => { if (!src.gone) addTM(src, { k: 'untargetable', turn: s.turn }); } }] };
 FX[5151] = { on: { endOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 5151, k: 'ask', a: { pid } }); } },
-    k: { ask: (s, a) => mayPick(s, a.pid, tr('Rames: Angehängte Fähigkeit an eigenem Charakter zerstören?'), 'Rames the Purifier', [s.p1, s.p2].flatMap(p => p.ongoing).filter(o => o.attachedTo && ctrlOf(s, findCharacter(s, o.attachedTo)) === a.pid).map(o => o.uid), '5151:do', a, () => 1),
+    k: { ask: (s, a) => mayPick(s, a.pid, tr('Rames: Angehängte Fähigkeit an eigenem Charakter zerstören?'), 'Rames the Purifier', allPl(s).flatMap(p => p.ongoing).filter(o => o.attachedTo && ctrlOf(s, findCharacter(s, o.attachedTo)) === a.pid).map(o => o.uid), '5151:do', a, () => 1),
         do: (s, a, v) => { const c = v && findCharacter(s, v); if (c) destroy(s, c); } } };
 FX[5152] = { on: { readied: (s, c, d, pid) => { const t = findCharacter(s, d.uid); if (t && (t.type === 'Hero' || t.type === 'Ally') && ctrlOf(s, t) !== pid) trig(s, { id: 5152, k: 'shot', a: { uid: c.uid, to: d.uid } }); } },
     k: { shot: (s, a) => { if (findCharacter(s, a.uid) && findCharacter(s, a.to)) dealDamage(s, { src: a.uid, tgt: a.to, amt: 4, dt: 'Ranged' }); } } };
@@ -346,7 +346,7 @@ FX[5157] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { i
 FX[5159] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 5159, k: 'ready', a: { uid: c.uid } }); } }, k: { ready: (s, a) => readyCard(s, findCharacter(s, a.uid)) } };
 FX[5160] = smythe(5160, (s, pid) => targetCands(s, pid, { equipment: true }), tr('David Smythe: Ally aus deinem Friedhof entfernen, um Ausrüstung zu zerstören?'));
 FX[5161] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5161, k: 'go', a: { pid } }); } },
-    k: { go: (s, a) => pickMany(s, a.pid, tr('Delrach: Allies mit Anhang zerstören (beliebig viele)'), 'Delrach the Vile', [s.p1, s.p2].flatMap(p => alliesOf(p)).filter(x => attachedTo(s, x.uid).length).map(x => x.uid), '5161:do', {}),
+    k: { go: (s, a) => pickMany(s, a.pid, tr('Delrach: Allies mit Anhang zerstören (beliebig viele)'), 'Delrach the Vile', allPl(s).flatMap(p => alliesOf(p)).filter(x => attachedTo(s, x.uid).length).map(x => x.uid), '5161:do', {}),
         do: (s, a, list) => (list || []).forEach(u => { const c = findCharacter(s, u); if (c) destroy(s, c); }) } };
 FX[5162] = { enter: (s, c, pid) => trig(s, { id: 5162, k: 'go', a: { pid, uid: c.uid } }), k: { go: (s, a) => divideDamage(s, a.pid, null, a.uid, 3, 'Nature', { char: true }, 'Gok Stormhammer') } };
 FX[5163] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid && d.faceUp) trig(s, { id: 5163, k: 'ask', a: { pid, uid: c.uid } }); } },
@@ -376,7 +376,7 @@ FX[5175] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid && enterComb
 const kindType7 = c => !c ? null : isEquip(c) ? 'Equipment' : c.isTotem ? 'Ability' : c.type;
 FX[5128] = { aura: { kw: (s, src, sp, c, k) => { if (k !== 'spellshield' || src.attachedTo || ctrlOf(s, c) !== sp) return false; const p = me(s, sp); if (!p.deck.length) return false; return kindType7(CARDS[p.deck[p.deck.length - 1]]) === kindType7(c); } } };
 // Oberste Deckkarte sichtbar? (Raith, Tian, Personal Weather Maker) – viewer: Spieler, der schaut
-function topVisible(s, p, viewer) { const o = p.id === 1 ? s.p2 : s.p1;
+function topVisible(s, p, viewer) { const o = getOpponent(s, p.id);
     if (o.allies.some(a => a.id === 4231 && active(s, a))) return true;
     if ((p.ongoing || []).some(c => c.id === 5128 && !c.attachedTo && active(s, c))) return true;
     return viewer === p.id && p.allies.some(a => a.id === 4232 && active(s, a)); }
@@ -395,12 +395,12 @@ onEvt('dmg', (s, d) => { const a = d.src && findCharacter(s, d.src); if (a && a.
 FX[5179] = { on: { allyEnters: (s, c, d, pid) => { const x = findCharacter(s, d.uid); if (d.pid === pid && d.uid !== c.uid && x && x.atkType === 'Arcane') trig(s, { k: 'draw', a: { pid, n: 1 } }); } } };
 FX[5180] = { aura: { kw: (s, src, sp, c, k) => k === 'ferocity' && isDemonS7(s, c) } };
 FX[5181] = { enter: (s, c, pid) => trig(s, { id: 5181, k: 'ask', a: { pid } }),
-    k: { ask: (s, a) => ask(s, { pid: a.pid, prompt: tr('Tatulla: Welcher Spieler zerstört eine eigene Fähigkeit oder Ausrüstung?'), src: 'Tatulla the Reclaimer', opts: [{ label: tr('Gegner'), v: foe(s, a.pid).id, ai: 1 }, { label: tr('Du selbst'), v: a.pid, ai: -1 }], k: '5181:do', a, auto: false }),
+    k: { ask: (s, a) => ask(s, { pid: a.pid, prompt: tr('Tatulla: Welcher Spieler zerstört eine eigene Fähigkeit oder Ausrüstung?'), src: 'Tatulla the Reclaimer', opts: [{ label: tr('Gegner'), v: foe(s, a.pid).id, plFoe: true, ai: 1 }, { label: tr('Du selbst'), v: a.pid, plSelf: true, ai: -1 }], k: '5181:do', a, auto: false }),
         do: (s, a, v) => { const p = me(s, v); const list = [...(p.ongoing || []), ...p.hero.weapons, ...p.hero.armors]; if (list.length) ask(s, { pid: v, prompt: tr('Tatulla: Zerstöre eine eigene Fähigkeit oder Ausrüstung'), src: 'Tatulla the Reclaimer', opts: list.map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), k: 'E:optDestroy', a: {} }); } } };
 FX[5182] = { on: { attacks: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5182, k: 'ask', a: { pid } }); } },
     k: { ask: (s, a) => mustPick(s, a.pid, tr('Ulrac: Dämon aus deinem Friedhof auf die Hand'), 'Ulrac Bloodshadow', gyCands(s, a.pid, c => isAllyCard(c) && isDemonS7(s, c)), '5182:do', a, u => (findCharacter(s, u) || {}).cost || 0), do: (s, a, v) => { if (v) fromGyToHand(s, v); } } };
 FX[5183] = { aura: { atk: (s, src, sp, c) => { if (c.uid !== src.uid || !s.battle || s.battle.att !== c.uid) return 0; const d = findCharacter(s, s.battle.def); return d && d.type === 'Ally' && !d.exhausted ? 2 : 0; } } };
-FX[5184] = { powers: [{ key: 'fareena', label: tr('Anhang an diesen Ally hängen'), cost: 0, once: 'turn', slots: (s, pid) => [{ label: tr('Ziel-Anhang'), cands: [s.p1, s.p2].flatMap(p => p.ongoing).filter(o => o.attachedTo && !untargetableBy(s, o, pid)).map(o => o.uid), harm: false }],
+FX[5184] = { powers: [{ key: 'fareena', label: tr('Anhang an diesen Ally hängen'), cost: 0, once: 'turn', slots: (s, pid) => [{ label: tr('Ziel-Anhang'), cands: allPl(s).flatMap(p => p.ongoing).filter(o => o.attachedTo && !untargetableBy(s, o, pid)).map(o => o.uid), harm: false }],
     resolve: (s, it, src) => { const t = T1(s, it); if (t && t.attachedTo && !src.gone) t.attachedTo = src.uid; } }] };
 FX[5185] = { aura: { atk: (s, src, sp, c) => c.type === 'Ally' && ctrlOf(s, c) === sp && !c.exhausted ? 3 : 0, hp: (s, src, sp, c) => c.type === 'Ally' && ctrlOf(s, c) === sp && !c.exhausted ? 3 : 0 } };
 FX[5186] = { inspire: 'AnyOne' };
@@ -427,11 +427,11 @@ FX[5200] = { backToHand: true, enter: (s, c, pid) => trig(s, { id: 5200, k: 'loo
             ask(s, { pid: a.pid, prompt: tr`Magistrix Dianas: ${CARDS[id].name}`, src: 'Magistrix Dianas', show: [id], opts: [{ label: tr('Ziehen (Dianas geht auf die Hand)'), v: 1, ai: 1 }, { label: tr('Unter das Deck'), v: 0, ai: 0 }], k: '5200:do', a, auto: false }); },
         do: (s, a, v) => { const p = me(s, a.pid); if (!p.deck.length) return; if (!v) { p.deck.unshift(p.deck.pop()); return; } drawCards(s, p, 1); const c = findCharacter(s, a.uid); if (c && isInPlayZone((locate(s, a.uid) || {}).zone)) leavePlay(s, c, 'hand', { destroyed: false }); } } };
 FX[5202] = { leave: onDestroyed(5202),
-    k: { died: (s, a) => ask(s, { pid: a.pid, prompt: tr('Retainer Athan: Welcher Spieler wirft seine Hand ab und zieht neu?'), src: 'Retainer Athan', opts: [{ label: tr('Gegner'), v: foe(s, a.pid).id, ai: 1 }, { label: tr('Du selbst'), v: a.pid, ai: 0 }], k: '5202:do', a, auto: false }),
+    k: { died: (s, a) => ask(s, { pid: a.pid, prompt: tr('Retainer Athan: Welcher Spieler wirft seine Hand ab und zieht neu?'), src: 'Retainer Athan', opts: [{ label: tr('Gegner'), v: foe(s, a.pid).id, plFoe: true, ai: 1 }, { label: tr('Du selbst'), v: a.pid, plSelf: true, ai: 0 }], k: '5202:do', a, auto: false }),
         do: (s, a, v) => { const p = me(s, v); if (auraAny(s, 'noDiscard', v)) return; const n = discardHand(s, p); if (n) drawCards(s, p, n); } } };
 FX[5203] = { sabotage: 'Equipment', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5203, k: 'take', a: { pid, uid: d.tgt } }); } },
     k: { take: (s, a) => { const t = findCharacter(s, a.uid), l = locate(s, a.uid); if (!t || !l || l.zone !== 'equip') return; const from = me(s, l.pid).hero, to = me(s, a.pid).hero; const arr = t.type === 'Weapon' ? 'weapons' : 'armors'; from[arr].splice(from[arr].indexOf(t), 1); to[arr].push(t); L(s, tr`Retainer Cara übernimmt ${t.name}.`, '', a.pid); } } };
-FX[5206] = { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? -[s.p1, s.p2].flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0, hp: (s, src, sp, c) => c.uid === src.uid ? -[s.p1, s.p2].flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0 } };
+FX[5206] = { aura: { atk: (s, src, sp, c) => c.uid === src.uid ? -allPl(s).flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0, hp: (s, src, sp, c) => c.uid === src.uid ? -allPl(s).flatMap(p => partyOf(p)).filter(x => hasProtector(s, x)).length : 0 } };
 FX[5208] = { leave: onDestroyed(5208), k: { died: (s, a) => { const p = me(s, a.pid); if (!p.deck.length) return; const id = p.deck[p.deck.length - 1]; L(s, tr`Coilfang Myrmidon deckt auf: ${CARDS[id].name}`); if (CARDS[id].name === 'Coilfang Myrmidon') drawCards(s, p, 1); } } };
 FX[5210] = { on: { endOfTurn: (s, c, d, pid) => trig(s, { id: 5210, k: 'roll', a: { pid } }) }, k: { roll: (s, a) => rollD6(s, 'Lady Vashj', '5210:apply', a, { [a.pid]: 6 }), apply: (s, a) => { const n = a.roll; L(s, tr`Lady Vashj: Wurf ${n}`); for (let i = 0; i < n; i++) makeToken(s, 9603, a.pid); } } };
 // Millhouse Manastorm: drei Monolog-Marken; greift nicht an, solange er welche hat; jeder Satz nur einmal pro Spiel
@@ -462,7 +462,7 @@ FX[5224] = { powers: [{ key: 'shattered', label: tr('Beschädigten Ally zerstör
 FX[5225] = { powers: [{ key: 'crown', label: tr('Fähigkeit aus dem Friedhof als Ressource'), act: true, canUse: (s, pid) => me(s, pid).hand.length >= 7 || tr('Braucht 7 oder mehr Handkarten'),
     slots: (s, pid) => [{ label: tr('Fähigkeit in deinem Friedhof'), cands: gyCands(s, pid, c => c.type === 'Ability'), harm: false }],
     resolve: (s, it) => { const l = gyCard(s, T(it)[0]); if (!l || gyLocked(s, l.pid)) return; const p = me(s, l.pid); p.graveyard.splice(p.graveyard.indexOf(l.c), 1); resetInst(l.c); me(s, it.pl).resources.push({ card: l.c, faceUp: false, exhausted: true }); } }] };
-onEvt('discarded', (s, d) => { [s.p1, s.p2].forEach(p => { if (p.id !== d.pid && p.hero.armors.some(a => a.id === 5226)) pushTrig(s, p.id, 5226, [{ op: 'trig', id: 5226, k: 'go', a: { pid: p.id, opp: d.pid } }]); }); });
+onEvt('discarded', (s, d) => { allPl(s).forEach(p => { if (p.id !== d.pid && p.hero.armors.some(a => a.id === 5226)) pushTrig(s, p.id, 5226, [{ op: 'trig', id: 5226, k: 'go', a: { pid: p.id, opp: d.pid } }]); }); });
 FX[5226] = { k: { go: (s, a) => partyOf(me(s, a.opp)).forEach(c => heroDmg(s, a.pid, c.uid, 1, 'Shadow', { ability: false })) } };
 FX[5227] = { on: { dmg: (s, c, d, pid) => { const t = findCharacter(s, d.tgt); if (d.src === heroOf(s, pid).uid && t && t.type === 'Ally' && t.exhausted) trig(s, { id: 5227, k: 'kill', a: { uid: t.uid } }); } },
     k: { kill: (s, a) => { const c = findCharacter(s, a.uid); if (c && isInPlayZone((locate(s, a.uid) || {}).zone)) destroy(s, c); } } };
@@ -541,7 +541,7 @@ CARD_ISSUES[5209] = 'Einen Onyxia-Raid zu starten ist in diesem Spiel nicht mög
 // Dämon: gedruckter Typ oder Apocanon (5107) im Spiel – "Allies in all zones are also Demons".
 // Helden: Typzeile der offiziellen Kartenliste (OCR, z. B. "Hero—Pit Lord Demon, 25 Health"), sonst race
 const heroIsDemon = c => /\bDemon\b/.test(c.race || '') || /^(?:Master )?Hero—[^,]*\bDemon\b/.test(((typeof OCR !== 'undefined' && OCR[c.id]) || [])[0] || '');
-function isDemonS7(s, c) { return !!c && ((c.allyTypes || []).includes('Demon') || ((c.type === 'Hero' || c.type === 'Master Hero') && heroIsDemon(c)) || attachedTo(s, c.uid, 6116).length > 0 || (c.type === 'Ally' && [s.p1, s.p2].some(p => p.allies.some(a => a.id === 5107 && active(s, a))))); }
+function isDemonS7(s, c) { return !!c && ((c.allyTypes || []).includes('Demon') || ((c.type === 'Hero' || c.type === 'Master Hero') && heroIsDemon(c)) || attachedTo(s, c.uid, 6116).length > 0 || (c.type === 'Ally' && allPl(s).some(p => p.allies.some(a => a.id === 5107 && active(s, a))))); }
 // Ersatzeffekte beim Schaden (aus dmgStep): Umleiten auf Plague / auf einen Dämon, Blessed Life
 function s7DmgReplace(s, o, tl) {
     const t = tl.c, tp = me(s, tl.pid);
@@ -649,7 +649,7 @@ FX[5107] = {};
 // Rückkehr entfernter Karten beim Verlassen (Banish to the Nether, Sampron the Banisher)
 function returnRemoved(s, uids) {
     for (const u of uids || []) {
-        for (const p of [s.p1, s.p2]) {
+        for (const p of allPl(s)) {
             const i = (p.removed || []).findIndex(c => c.uid === u); if (i < 0) continue;
             const c = p.removed.splice(i, 1)[0]; resetInst(c); c.joinedTurn = s.turn;
             if (c.type === 'Ally' || c.totem) putIntoPlay(s, c, p.id);
@@ -733,12 +733,12 @@ FX[5238] = { powers: [{ key: 'q', label: tr('Obere 10 Deckkarten entfernen: näc
 // Preparing for War: "Pay (X) to complete this quest. Reward: Shuffle X target cards from any number of graveyards into their owners' decks."
 FX[5259] = { questNoPay: true,
     questExtra: (s, pid) => { const n = getReadyRes(me(s, pid)), opts = [];
-        for (let x = 0; x <= n; x++) opts.push({ label: `X = ${x}`, v: x, ai: Math.min(x, [s.p1, s.p2].reduce((k, p) => k + p.graveyard.length, 0)) - x * 0.4 });
+        for (let x = 0; x <= n; x++) opts.push({ label: `X = ${x}`, v: x, ai: Math.min(x, allPl(s).reduce((k, p) => k + p.graveyard.length, 0)) - x * 0.4 });
         ask(s, { pid, prompt: tr('Preparing for War: Wähle X'), src: 'Preparing for War', opts, k: '5259:pay', a: { pid } }); },
     reward: (s, pid) => { const m = pes(s, pid, 'pfwX').pop(); const x = m ? m.v : 0; if (x > 0) q(s, { op: 'call', k: '5259:pick', a: { pid, left: x, list: [] } }); },
     k: { pay: (s, a, v) => { if (!payRes(me(s, a.pid), v)) return; addPE(s, a.pid, { k: 'pfwX', v }); EK.questPay(s, {}); },
         pick: (s, a) => {
-            const c = [...s.p1.graveyard, ...s.p2.graveyard].map(x => x.uid).filter(u => !a.list.includes(u));
+            const c = allPl(s).flatMap(p => p.graveyard).map(x => x.uid).filter(u => !a.list.includes(u));
             if (!a.left || !c.length) { q(s, { op: 'call', k: '5259:go', a }); return; }
             mustPick(s, a.pid, tr`Preparing for War: Karte ins Deck mischen (noch ${a.left})`, 'Preparing for War', c, '5259:add', a, u => { const l = gyCard(s, u); return l && l.pid === a.pid ? 1 + (l.c.cost || 0) * 0.1 : -1; });
         },
@@ -758,25 +758,25 @@ FX[5198] = { sabotage: 'Quest', on: { sabotages: (s, c, d, pid) => { if (d.att =
             L(s, tr`📜 ${l.c.name} erfüllt (Arcanist Dayvana)`, 'log-heal', a.pid); evt(s, 'questDone', { pid: a.pid, uid: a.q, id: l.c.id });
             s.chain.push({ kind: 'reward', id: newUid('rw_'), pl: a.pid, src: a.q, srcId: l.c.id, srcName: l.c.name, label: tr('Belohnung') }); } } };
 // Magistrix Larynna: "When this ally sabotages a graveyard, she deals 1 fire damage to target hero or ally for each card in it."
-FX[5201] = { sabotage: 'Graveyard', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5201, k: 'go', a: { pid, uid: c.uid, n: foe(s, pid).graveyard.length } }); } },
+FX[5201] = { sabotage: 'Graveyard', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5201, k: 'go', a: { pid, uid: c.uid, n: me(s, sabotagedPid(s, d)).graveyard.length } }); } },
     k: { go: (s, a) => { if (a.n > 0) mustPick(s, a.pid, tr`Magistrix Larynna: ${a.n} Feuerschaden`, 'Magistrix Larynna', targetCands(s, a.pid, { char: true }), '5201:do', a); },
         do: (s, a, v) => { if (v && findCharacter(s, a.uid)) dealDamage(s, { src: a.uid, tgt: v, amt: a.n, dt: 'Fire' }); } } };
 // Retainer Eteron: "When this ally sabotages an opponent's hand, look at it and choose up to two cards. That opponent puts those cards into his resource row face down and exhausted."
-FX[5204] = { sabotage: 'Hand', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5204, k: 'go', a: { pid, opp: oppPid(s, pid) } }); } },
+FX[5204] = { sabotage: 'Hand', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5204, k: 'go', a: { pid, opp: sabotagedPid(s, d) } }); } },
     k: { go: (s, a) => { const o = me(s, a.opp); showHand(s, a.pid, a.opp, 'Retainer Eteron'); if (!o.hand.length) return; q(s, { op: 'trig', id: 5204, k: 'pick', a: { ...a, left: 2, list: [] } }); },
         pick: (s, a) => { const o = me(s, a.opp); const l = o.hand.filter(c => !a.list.includes(c.uid)); if (a.left <= 0 || !l.length) { q(s, { op: 'trig', id: 5204, k: 'put', a }); return; }
             ask(s, { pid: a.pid, prompt: tr`Retainer Eteron: Karte wählen (noch ${a.left})`, src: 'Retainer Eteron', opts: [...l.map(c => ({ label: c.name, v: c.uid, card: c.id, ai: c.cost || 0 })), { label: tr('Fertig'), v: 0, ai: -1 }], k: '5204:add', a, auto: false }); },
         add: (s, a, v) => { if (!v) { q(s, { op: 'trig', id: 5204, k: 'put', a }); return; } q(s, { op: 'trig', id: 5204, k: 'pick', a: { ...a, left: a.left - 1, list: [...a.list, v] } }); },
         put: (s, a) => { const o = me(s, a.opp); a.list.forEach(u => { const i = o.hand.findIndex(c => c.uid === u); if (i < 0) return; const c = o.hand.splice(i, 1)[0]; evt(s, 'handLeft', { pid: o.id, uid: u }); resetInst(c); o.resources.push({ card: c, faceUp: false, exhausted: true }); }); if (a.list.length) L(s, tr`${o.hero.name} legt ${a.list.length} Karte(n) verdeckt und erschöpft in die Ressourcenreihe.`, '', a.pid); } } };
 // Retainer Ryn: "When this ally sabotages a player, that player chooses an ability, ally, equipment, or resource he controls and puts it on top of its owner's deck."
-FX[5205] = { sabotage: 'Player', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5205, k: 'go', a: { opp: oppPid(s, pid) } }); } },
+FX[5205] = { sabotage: 'Player', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5205, k: 'go', a: { opp: sabotagedPid(s, d) } }); } },
     k: { go: (s, a) => { const o = me(s, a.opp); const l = [...nonHeroCards(s, o).filter(c => ctrlOf(s, c) === o.id).map(c => ({ label: c.name, v: c.uid, ai: -cardValue(s, c) })), ...o.resources.map(r => ({ label: r.faceUp ? r.card.name : tr('verdeckte Ressource'), v: r.card.uid, ai: -1 }))];
             if (l.length) ask(s, { pid: a.opp, prompt: tr('Retainer Ryn: eigene Karte oben auf das Deck ihres Besitzers'), src: 'Retainer Ryn', opts: l, k: '5205:do', a }); },
         do: (s, a, v) => { const o = me(s, a.opp); const i = o.resources.findIndex(r => r.card.uid === v);
             if (i >= 0) { const r = o.resources.splice(i, 1)[0]; me(s, r.card.owner || o.id).deck.push(deckId(r.card)); L(s, tr`${r.faceUp ? r.card.name : tr('Eine Ressource')} kommt oben auf das Deck.`, '', o.id); return; }
             const c = findCharacter(s, v); if (c) leavePlay(s, c, 'deckTop', { destroyed: false }); } } };
 // Spymaster Thalodien: "When this ally sabotages a deck, reveal cards from the top until you reveal a non-quest. Remove that card from the game and put the rest on the bottom. You may play that card without paying its cost this turn. (If it has X in its cost, X is 0.)"
-FX[5207] = { sabotage: 'Deck', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5207, k: 'go', a: { pid, opp: oppPid(s, pid) } }); } },
+FX[5207] = { sabotage: 'Deck', on: { sabotages: (s, c, d, pid) => { if (d.att === c.uid) trig(s, { id: 5207, k: 'go', a: { pid, opp: sabotagedPid(s, d) } }); } },
     k: { go: (s, a) => { const o = me(s, a.opp); const rev = []; let hit = null; while (o.deck.length) { const id = o.deck.pop(); if (CARDS[id].type === 'Quest') { rev.push(id); continue; } hit = id; break; }
         L(s, tr`👁 Spymaster Thalodien deckt auf: ${[...rev, hit].filter(Boolean).map(id => CARDS[id].name).join(', ') || '–'}`, '', a.pid); putBottom(s, o.id, rev);
         if (!hit) return; const c = makeCardInst(hit, false, o.id); o.removed.push(c); addPE(s, a.pid, { k: 'rfgPlayUid', uid: c.uid }); addPE(s, a.pid, { k: 'freePlayUid', uid: c.uid }); } } };

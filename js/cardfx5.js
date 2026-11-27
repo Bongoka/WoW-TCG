@@ -23,8 +23,8 @@ FX[3104] = { on: legsPay(3104, 'Paladin'),
         go: (s, a) => mustPick(s, a.pid, tr('Judgement Legplates: Eigener Ally – aller Schaden an und von ihm wird verhindert'), 'Judgement Legplates', targetCands(s, a.pid, { ally: true, side: 'friendly' }), '3104:do', a, u => cardValue(s, findCharacter(s, u))),
         do: (s, a, v) => { const t = findCharacter(s, v); if (t) { addTM(t, { k: 'preventAll', turn: s.turn }); addTM(t, { k: 'noDmgOut', turn: s.turn }); } } } };
 FX[3105] = { on: legsPay(3105, 'Priest'),
-    k: { ask: legsAsk(3105, tr('Heile 2 bei jedem eigenen Ally'), (s, pid) => alliesOf(me(s, pid)).filter(x => x.damage > 0).map(x => x.uid)),
-        go: (s, a) => alliesOf(me(s, a.pid)).forEach(x => heroHeal(s, a.pid, x.uid, 2)) } };
+    k: { ask: legsAsk(3105, tr('Heile 2 bei jedem eigenen Ally'), (s, pid) => friendAllies(s, pid).filter(x => x.damage > 0).map(x => x.uid)),
+        go: (s, a) => friendAllies(s, a.pid).forEach(x => heroHeal(s, a.pid, x.uid, 2)) } };
 // Legplates of Ten Storms: "2 nature damage divided as you choose to up to two target heroes and/or allies"
 FX[3106] = { on: legsPay(3106, 'Shaman'),
     k: { ask: legsAsk(3106, tr('2 Naturschaden verteilen'), (s, pid) => targetCands(s, pid, CH)),
@@ -47,7 +47,7 @@ FX[3110] = { on: legsPay(3110, 'Druid'),
     k: { ask: legsAsk(3110, 'Ally +1 ATK', (s, pid) => targetCands(s, pid, ALLY)),
         go: (s, a) => mustPick(s, a.pid, tr('Stormrage Legguards: Ziel-Ally +1 ATK in diesem Zug'), 'Stormrage Legguards', targetCands(s, a.pid, ALLY), '3110:do', a, u => ctrlOf(s, findCharacter(s, u)) === a.pid ? 3 : -3),
         do: (s, a, v) => { const t = findCharacter(s, v); if (t) addTM(t, { k: 'atk', v: 1, turn: s.turn }); } } };
-FX[3111] = { aura: { dmgOut: (s, src, sp, from, t) => from && ctrlOf(s, from) === sp && (from.type === 'Hero' || isAllyLike(from)) && hasType(t, 'Elemental') ? 1 : 0 } };
+FX[3111] = { aura: { dmgOut: (s, src, sp, from, t) => from && friendOf(s, from, sp) && (from.type === 'Hero' || isAllyLike(from)) && hasType(t, 'Elemental') ? 1 : 0 } };
 FX[3112] = { on: { resEnters: (s, c, d, pid) => { if (d.pid === pid) trig(s, { k: 'healHero', a: { pid, amt: 2 } }); } } };
 FX[3113] = { on: { cardPlayed: (s, c, d, pid) => { if (d.pid === pid && d.card.type === 'Ability') trig(s, { id: 3113, k: 'ask', a: { pid, uid: c.uid, ab: d.card.uid } }); } },
     k: { ask: (s, a) => { const c = findCharacter(s, a.uid); if (!c || !isInPlayZone((locate(s, a.uid) || {}).zone)) return; mayPay(s, a.pid, 1, tr('Talisman of Ephemeral Power: (1) bezahlen und auf die Hand nehmen (Fähigkeit +1 Schaden)?'), 'Talisman of Ephemeral Power', '3113:go', a, 0.5); },
@@ -68,7 +68,7 @@ FX[3117] = { on: strikeLongRange,
     enter: (s, c, pid) => { if (heroOf(s, pid).class === 'Hunter') mustPick(s, pid, tr('Blastershot Launcher: 3 Fernkampfschaden an Ziel'), 'Blastershot Launcher', targetCands(s, pid, CH), 'E:doDmg', { src: heroOf(s, pid).uid, pid, amt: 3, dt: 'Ranged' }); } };
 FX[3118] = { enter: (s, c, pid) => mayPick(s, pid, tr("Bonereaver's Edge: Ziel-Rüstung zerstören?"), "Bonereaver's Edge", targetCands(s, pid, { armor: true }), 'E:optDestroy', {}, u => ctrlOf(s, findCharacter(s, u)) === pid ? -5 : 3 + defOf(s, findCharacter(s, u))) };
 FX[3119] = { powers: [{ key: 'brut', label: tr('Zerstören: Gegner können nicht geheilt werden'), selfCost: selfDestroyCost,
-    resolve: (s, it) => { addPE(s, it.pl === 1 ? 2 : 1, { k: 'noHeal' }); L(s, tr('Brutality Blade: Gegnerische Helden und Allies können in diesem Zug nicht geheilt werden.')); }, aiSkip: () => true }] };
+    resolve: (s, it) => { addPE(s, oppId(s, it.pl), { k: 'noHeal' }); L(s, tr('Brutality Blade: Gegnerische Helden und Allies können in diesem Zug nicht geheilt werden.')); }, aiSkip: () => true }] };
 FX[3120] = { on: { startOfTurn: (s, c, d, pid) => { if (d.pid === pid) trig(s, { id: 3120, k: 'add', a: { uid: c.uid } }); },
         dmg: (s, c, d) => { if (d.combat && (d.weapons || []).includes(c.uid)) trig(s, { id: 3120, k: 'clear', a: { uid: c.uid } }); } },
     k: { add: (s, a) => { const w = findCharacter(s, a.uid); if (w) { w.counters = w.counters || {}; w.counters.atk1 = (w.counters.atk1 || 0) + 1; } },
