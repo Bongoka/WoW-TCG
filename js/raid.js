@@ -1,7 +1,8 @@
 // ============================================================================
 // RAIDS – mehrere Spieler gegen einen Boss (DOM-frei, läuft auch in Node/Simulation)
 // Regeln: World of Warcraft TCG Raid Rules vom 29.09.2008 (docs/wow_raid_rules.txt, R100–R505) und die Regelhefte der
-// Raid-Decks (docs/wow_raid_onyxia.txt). Der Boss ist Spieler 2 (oben), der Mensch Spieler 1, CPU-Raider 3 … 6.
+// Raid-Decks (docs/wow_raid_onyxia.txt). Der Boss ist Spieler 2 (oben), der Mensch Spieler 1, CPU-Raider 3 … 6 –
+// spielt der Mensch den Boss, ist der Boss Spieler 1 und die Raider 2 … 6 (daher immer s.raid.boss, RAID_BOSS nur beim Aufbau).
 // Ein Raid ist ein Eintrag in RAIDS: Decks, Startaufbau, Boss-Stufen. Neue Raids/Dungeons: weiterer Eintrag + Karten-FX.
 // ============================================================================
 const RAIDS = {};
@@ -14,23 +15,25 @@ function raidStage(s) { return s.raid ? s.raid.stage : 0; }
 // Neuer Raid. raiders: [{ hero, cards, name? }] in Sitzreihenfolge (Platz 1, 2, …). Der Raider raiders[me] wird Spieler 1
 // (unten, Mensch), die übrigen der Reihe nach 3, 4, … – die Zugreihenfolge folgt den Plätzen. s.raidSeat: Spieler-ID → Platz.
 // Raid Rules R100.1: alle Raider-Helden gehören zur selben Fraktion (prüft raidCheckParty, nicht hier)
+// me < 0: der Mensch spielt den Boss – der Boss wird Spieler 1 (unten), die Raider der Reihe nach 2, 3, …
 function newRaidState(raidId, raiders, me = 0) {
-    const R = RAIDS[raidId];
-    const s = newGameState(raiders[me].hero, raiders[me].cards, R.bossHero(1), R.mainDeck.slice());
-    const pids = [RAID_BOSS];
+    const R = RAIDS[raidId], bossMe = me < 0, B = bossMe ? 1 : RAID_BOSS;
+    const s = bossMe ? newGameState(R.bossHero(1), R.mainDeck.slice(), raiders[0].hero, raiders[0].cards)
+        : newGameState(raiders[me].hero, raiders[me].cards, R.bossHero(1), R.mainDeck.slice());
+    const pids = [B];
     s.raidSeat = {};
-    let next = 3;
+    let next = bossMe ? 2 : 3;
     raiders.forEach((r, i) => {
         const id = i === me ? 1 : next++;
-        if (id !== 1) s['p' + id] = createPlayerState(id, r.hero, r.cards);
+        if (id > 2) s['p' + id] = createPlayerState(id, r.hero, r.cards);
         pids.push(id); s.raidSeat[id] = i + 1;
     });
     s.pids = pids;                                                    // R200.4: der Boss beginnt, dann im Uhrzeigersinn
-    s.team = {}; pids.forEach(i => { s.team[i] = i === RAID_BOSS ? 'boss' : 'raid'; });
-    s.teamLead = { raid: 1, boss: RAID_BOSS };
-    s.raid = { id: raidId, boss: RAID_BOSS, stage: 1, events: R.eventDeck ? shuffleDeck(R.eventDeck.slice()) : null, eventGy: [] };
-    s.activePlayer = RAID_BOSS; s.lastTurnOf = { [RAID_BOSS]: 1 };
-    pids.forEach(i => { if (i !== RAID_BOSS) s.lastTurnOf[i] = 0; });
+    s.team = {}; pids.forEach(i => { s.team[i] = i === B ? 'boss' : 'raid'; });
+    s.teamLead = { raid: pids[1], boss: B };
+    s.raid = { id: raidId, boss: B, stage: 1, events: R.eventDeck ? shuffleDeck(R.eventDeck.slice()) : null, eventGy: [] };
+    s.activePlayer = B; s.lastTurnOf = { [B]: 1 };
+    pids.forEach(i => { if (i !== B) s.lastTurnOf[i] = 0; });
     if (R.setup) R.setup(s);                                         // eigener Aufbau des Raids (Molten Core: Lucifron, Tokens, Runen …)
     return s;
 }

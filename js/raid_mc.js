@@ -37,7 +37,7 @@ RAIDS.mc = {
         s.raid.bossTurnNo = 0; s.raid.gone = false;
         p.runes = [];
         p.hero.boss = true; p.hero.atkType = CARDS[MC.LUCIFRON].atkType;
-        const first = s.pids.find(i => i !== RAID_BOSS);                                  // der Raider links vom Boss (erster Platz)
+        const first = s.pids.find(i => i !== s.raid.boss);                                  // der Raider links vom Boss (erster Platz)
         s.activePlayer = first; s.lastTurnOf = { [first]: 1 }; s.pids.forEach(i => { if (i !== first) s.lastTurnOf[i] = 0; });
         s.firstDrawOk = true;                                                             // R300.6: alle ziehen im ersten Draw-Step
         s.raid.setupTokens = true;

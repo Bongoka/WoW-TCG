@@ -33,7 +33,14 @@
     display: flex; align-items: center; justify-content: center; box-shadow: 0 0 8px rgba(255, 207, 107, .7); }
 
 /* Plätze: Deck-Box, Name, Steuerung */
-.rsu-seats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rsu-seats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 5fr); gap: 14px; }
+.rsu-raiders { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rsu-bossslot { display: grid; }
+/* Boss-Platz: Bild des Raids statt Deck-Box, rötlich abgesetzt */
+.rsu-seat.rsu-boss { border-color: rgba(200, 70, 40, .55); background: linear-gradient(rgba(150, 30, 10, .22), rgba(0, 0, 0, .42)); }
+.rsu-seat.rsu-boss.c-human { border-color: rgba(255, 120, 70, .85); box-shadow: 0 0 14px rgba(255, 90, 40, .3); }
+.rsu-seat.rsu-boss .rsu-num { color: #ff9a70; }
+.rsu-bossart { border: 1px solid rgba(255, 140, 80, .6) !important; background: #000 center 30% / cover no-repeat; cursor: default; }
 .rsu-seat { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; padding: 10px 6px 12px; border: 1px solid rgba(138, 106, 44, .35); border-radius: 8px;
     background: rgba(0, 0, 0, .38); text-align: center; transition: opacity .2s, border-color .2s, background .2s; }
 .rsu-seats.anim .rsu-seat { animation: rsuIn .35s calc(var(--k) * 50ms) both cubic-bezier(.2, .8, .3, 1); }
@@ -51,7 +58,7 @@
 .rsu-mode { margin: 12px 0 0; text-align: center; font-size: 13.5px; color: #e8dcc0; min-height: 1.3em; }
 .rsu-mode.err { color: #ff8a7a; font-weight: bold; }
 
-@media (max-width: 760px) { .rsu-seats { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); } }
+@media (max-width: 760px) { .rsu-seats { grid-template-columns: minmax(0, 1fr); } .rsu-raiders { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); } }
 @media (max-height: 560px) {
     .raid-box { padding: 12px 16px; }
     .raid-box h2 { font-size: 20px; margin-bottom: 8px; }

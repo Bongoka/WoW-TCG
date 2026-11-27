@@ -9,16 +9,17 @@
 // Die Plätze sind ein schlichtes Modell { c: 'human' | 'cpu' | 'off', d: Deck-ID oder '' (Zufall) } – die Online-Lobby kann später
 // dieselbe Darstellung (raidSeatsHTML, opts.locked für fremde Plätze) nutzen und eine weitere Steuerung (z. B. 'net') ergänzen.
 const RAID_SEATS = 5;
-const RAID_UI = { raid: 'onyxia', seats: null };
+const RAID_UI = { raid: 'onyxia', seats: null, boss: 'cpu' };   // boss: wer den Boss spielt ('cpu' | 'human')
 try {
     const o = JSON.parse(localStorage.getItem('wow_tcg_raid') || 'null');
     if (o && typeof o.raid === 'string') RAID_UI.raid = o.raid;
+    if (o && o.boss === 'human') RAID_UI.boss = 'human';
     if (o && Array.isArray(o.seats)) RAID_UI.seats = o.seats;
     else if (o && o.deck) RAID_UI.seats = [{ c: 'human', d: o.deck }, ...Array.from({ length: RAID_SEATS - 1 }, (_, i) => ({ c: i < (o.n || 3) ? 'cpu' : 'off', d: '' }))];   // alte Einstellung (ein Deck + Anzahl CPU)
 } catch (e) {}
 if (!RAID_UI.seats) RAID_UI.seats = [{ c: 'human', d: '' }, { c: 'cpu', d: '' }, { c: 'cpu', d: '' }, { c: 'cpu', d: '' }, { c: 'off', d: '' }];
 RAID_UI.seats = Array.from({ length: RAID_SEATS }, (_, i) => { const x = RAID_UI.seats[i] || {}; return { c: ['human', 'cpu', 'off'].includes(x.c) ? x.c : 'off', d: x.d || '' }; });
-const raidSave = () => { try { localStorage.setItem('wow_tcg_raid', JSON.stringify({ raid: RAID_UI.raid, seats: RAID_UI.seats })); } catch (e) {} };
+const raidSave = () => { try { localStorage.setItem('wow_tcg_raid', JSON.stringify({ raid: RAID_UI.raid, seats: RAID_UI.seats, boss: RAID_UI.boss })); } catch (e) {} };
 const RAID_TILE_ART = { onyxia: 'raidart/onyxia/Stage 1.webp', mc: 'raidart/mc/Ragnaros.webp' };
 
 function openRaidSetup() {
@@ -58,6 +59,15 @@ function raidSeatsHTML(seats, opts = {}) {
             <span class="mp-vis-tog rsu-ctl">${['human', 'cpu', 'off'].map(c => `<button data-c="${c}" class="${x.c === c ? 'on' : ''}"${lock ? ' disabled' : ''}>${lab[c]}</button>`).join('')}</span></div>`;
     }).join('');
 }
+// Boss-Platz vor den Raider-Plätzen: Bild des Raids, Spieler / CPU (kein Deck – der Boss spielt das Raid-Deck)
+function raidBossSeatHTML(raidId, c) {
+    const R = RAIDS[raidId], art = RAID_TILE_ART[R.id] || 'backgrounds/' + R.bg;
+    return `<div class="rsu-seat rsu-boss c-${c}" style="--k:0">
+        <b class="rsu-num">${tr('Boss')}</b>
+        <div class="mp-deckbox rsu-box"><div class="dbox-special rsu-bossart" style="background-image:url('${encodeURI(art).replace(/'/g, '%27')}')"></div></div>
+        <span class="rsu-name">${esc(R.bossName)}</span><small class="rsu-hero">${tr('Raid-Deck')}</small>
+        <span class="mp-vis-tog rsu-ctl">${['human', 'cpu'].map(x => `<button data-c="${x}" class="${c === x ? 'on' : ''}">${x === 'human' ? tr('Spieler') : 'CPU'}</button>`).join('')}</span></div>`;
+}
 // Drei getrennte Teile: Raid-Wahl (raidSetupRaid), Plätze (raidSetupSeats), Knöpfe. Ein Raid-Wechsel lässt die Plätze stehen.
 function renderRaidSetup() {
     if (!RAIDS[RAID_UI.raid]) RAID_UI.raid = 'onyxia';
@@ -67,19 +77,19 @@ function renderRaidSetup() {
         <div class="rsu-raids">${Object.values(RAIDS).map(x => { const art = RAID_TILE_ART[x.id] || 'backgrounds/' + x.bg;
             return `<button class="rsu-raid" data-id="${x.id}"><i style="background-image:url('${encodeURI(art).replace(/'/g, '%27')}')"></i><b>${esc(x.name)}</b><small>${tr('Boss')}: ${esc(x.bossName)}</small></button>`; }).join('')}</div>
         <p class="raid-intro"></p>
-        <div class="rsu-seats anim"></div>
+        <div class="rsu-seats anim"><div class="rsu-bossslot"></div><div class="rsu-raiders"></div></div>
         <p class="rsu-mode"></p>
         <p class="raid-hint"></p>
         <div class="raid-btns"><button class="raid-back">${tr('Zurück')}</button><button class="raid-go success">${tr('Raid starten')}</button></div></div>`;
     const click = () => { if (typeof sfx !== 'undefined') sfx.play('click'); };
     el.querySelector('.raid-back').onclick = closeRaidSetup;
-    el.querySelectorAll('.rsu-raid').forEach(b => b.onclick = () => { if (RAID_UI.raid === b.dataset.id) return; click(); RAID_UI.raid = b.dataset.id; raidSave(); raidSetupRaid(); raidSetupStatus(); });
+    el.querySelectorAll('.rsu-raid').forEach(b => b.onclick = () => { if (RAID_UI.raid === b.dataset.id) return; click(); RAID_UI.raid = b.dataset.id; raidSave(); raidSetupRaid(); raidSetupBoss(); raidSetupStatus(); });
     el.querySelector('.raid-go').onclick = () => {
         if (raidSeatCheck(RAID_UI.raid, RAID_UI.seats).err) return;
         closeRaidSetup();
         confirmLeaveGame(() => { document.getElementById('log-area').innerHTML = ''; initRaid(RAID_UI.raid, RAID_UI.seats.map(x => ({ ...x }))); });
     };
-    raidSetupRaid(); raidSetupSeats();
+    raidSetupRaid(); raidSetupBoss(); raidSetupSeats();
     setTimeout(() => { const s = el.querySelector('.rsu-seats'); if (s) s.classList.remove('anim'); }, 700);   // Einblenden der Plätze nur beim Öffnen
 }
 // Raid-Wahl: Kachel, Einleitung, Hintergrund, Hinweis
@@ -90,9 +100,15 @@ function raidSetupRaid() {
     el.querySelector('.raid-intro').textContent = R.intro ? tr(R.intro) : tr('Du und deine CPU-Mitspieler kämpft gemeinsam gegen den Boss. Der Boss spielt sein eigenes Raid-Deck, deckt zu Beginn jedes Zuges ein Event auf und kehrt nach jeder besiegten Stufe stärker zurück.');
     el.querySelector('.raid-hint').textContent = tr`Das Regelheft empfiehlt 3 bis 5 Raider (${R.recRaiders} sind ein guter Start). Alle Raider gehören zur selben Fraktion – „Zufall“ wählt ein Deck dieser Fraktion.`;
 }
+// Boss-Platz: Spieler / CPU
+function raidSetupBoss() {
+    const box = document.querySelector('#raid-setup .rsu-bossslot');
+    box.innerHTML = raidBossSeatHTML(RAID_UI.raid, RAID_UI.boss);
+    box.querySelectorAll('.rsu-ctl button').forEach(b => b.onclick = () => { if (typeof sfx !== 'undefined') sfx.play('click'); RAID_UI.boss = b.dataset.c; raidSave(); raidSetupBoss(); raidSetupStatus(); });
+}
 // Plätze: Deck-Boxen und Steuerung
 function raidSetupSeats() {
-    const el = document.getElementById('raid-setup'), seats = RAID_UI.seats, box = el.querySelector('.rsu-seats');
+    const el = document.getElementById('raid-setup'), seats = RAID_UI.seats, box = el.querySelector('.rsu-raiders');
     const click = () => { if (typeof sfx !== 'undefined') sfx.play('click'); };
     box.innerHTML = raidSeatsHTML(seats);
     box.querySelectorAll('.rsu-seat').forEach(st => {
@@ -108,8 +124,10 @@ function raidSetupSeats() {
 // Modus-Zeile und Start-Knopf (hängen von Raid und Plätzen ab)
 function raidSetupStatus() {
     const el = document.getElementById('raid-setup');
-    const chk = raidSeatCheck(RAID_UI.raid, RAID_UI.seats), humans = chk.used.filter(x => x.c === 'human').length;
-    const mode = chk.err || (humans > 1 ? tr`Hotseat: ${humans} Spieler wechseln sich an diesem Gerät ab – die Kamera fährt jeweils zu dem, der dran ist.`
+    const chk = raidSeatCheck(RAID_UI.raid, RAID_UI.seats), humans = chk.used.filter(x => x.c === 'human').length, n = chk.used.length;
+    const mode = chk.err || (RAID_UI.boss === 'human' ? (humans ? tr`Hotseat: Du spielst den Boss gegen ${n} Raider (${humans} davon Spieler) – vor jedem Wechsel ein Zwischenbildschirm.`
+            : tr`Du spielst den Boss gegen ${n} CPU-Raider.`)
+        : humans > 1 ? tr`Hotseat: ${humans} Spieler wechseln sich an diesem Gerät ab – die Kamera fährt jeweils zu dem, der dran ist.`
         : humans === 1 ? (chk.used.length > 1 ? tr`Du und ${chk.used.length - 1} CPU-Mitspieler.` : tr('Du allein gegen den Boss.'))
         : tr('Nur CPU: zum Zuschauen.'));
     const m = el.querySelector('.rsu-mode'); m.textContent = mode; m.classList.toggle('err', !!chk.err);
@@ -147,17 +165,18 @@ function initRaid(raidId, seats) {
     const decks = chk.decks.map(d => d || rnd.shift());
     if (decks.some(d => !d)) { showToast(tr('Deck nicht gefunden')); return; }
     const humanIdx = chk.used.map((x, k) => x.c === 'human' ? k : -1).filter(k => k >= 0);
+    const bossHuman = RAID_UI.boss === 'human';                                       // Mensch spielt den Boss: der Boss wird Spieler 1 (unten)
     hideGameOver();
-    G = newRaidState(raidId, decks, humanIdx.length ? humanIdx[0] : 0);
-    const raiders = G.pids.filter(i => i !== RAID_BOSS);                               // in Platz-Reihenfolge
-    G.real = true; G.humans = humanIdx.map(k => raiders[k]);
+    G = newRaidState(raidId, decks, bossHuman ? -1 : humanIdx.length ? humanIdx[0] : 0);
+    const raiders = G.pids.filter(i => i !== G.raid.boss);                             // in Platz-Reihenfolge
+    G.real = true; G.humans = [...(bossHuman ? [G.raid.boss] : []), ...humanIdx.map(k => raiders[k])];
     raidArtPreload(raidId); raidMusicReset(); raidMusicPreload(raidId);
     if (G.humans.length > 1) G.hotseat = { seat: G.raidSeat[1] };
     if (!G.humans.length) G.spectate = true;
     UI.reset(); UI.handOrder = null;
     dealOpeningHands(G);
     for (const pid of G.pids) if (!isHuman(G, pid) && !isBoss(G, pid) && aiWantsMulligan(G, pid)) doMulligan(G, pid);   // R200.3: Boss mit dem Raid-Deck, alle dürfen mulligan
-    if (R.bossMulligan && aiWantsMulligan(G, RAID_BOSS)) doMulligan(G, RAID_BOSS);   // Molten Core: der Boss behält seine Starthand (R300.5)
+    if (R.bossMulligan && !bossHuman && aiWantsMulligan(G, G.raid.boss)) doMulligan(G, G.raid.boss);   // Molten Core: der Boss behält seine Starthand (R300.5)
     refreshDisplay(G);
     resetBanter();
     const go = () => {
@@ -185,7 +204,8 @@ function initRaid(raidId, seats) {
         const pid = +Object.keys(G.raidSeat).find(k => G.raidSeat[k] === left[0]);
         hotseatHandoff(tr('Starthand'), () => mull(left.slice(1)), pid);
     };
-    mull(G.humans.slice(1).map(pid => G.raidSeat[pid]));
+    const rest = G.humans.slice(1).map(pid => G.raidSeat[pid]);
+    if (bossHuman && !R.bossMulligan) next(rest); else mull(rest);                    // Molten Core: kein Mulligan für den Boss (R300.5)
 }
 
 // ---------------------------------------------------------------- Raid-Hotseat: weiches Reaktionsfenster
@@ -373,9 +393,9 @@ async function raidMusic(kind) {
 // Bei jeder Anzeige: Held eines Raiders fällt auf 30 % Leben (einmal je Held, nach Heilung über 50 % wieder), Spielende
 function raidMusicWatch() {
     if (!G || !G.raid || !G.real) return;
-    if (G.gameOver) { if (!RM.over) { RM.over = true; raidMusic(G.winnerTeam === 'raid' ? 'win' : 'lose'); } return; }
+    if (G.gameOver) { if (!RM.over) { RM.over = true; raidMusic(G.winnerTeam === (G.team || {})[1] ? 'win' : 'lose'); } return; }
     for (const pid of G.pids) {
-        if (isBoss(G, pid)) continue;
+        if (isBoss(G, pid) || !isFoePid(G, G.raid.boss, pid) || isHuman(G, G.raid.boss)) continue;   // nur, wenn der Mensch im Raid ist
         const p = getPlayer(G, pid), h = p && p.hero; if (!h || p.out) continue;
         const max = Math.max(1, hpOf(G, h)), r = (max - (h.damage || 0)) / max;
         if (r > 0.5) delete RM.low[pid];
@@ -535,6 +555,7 @@ function raidVoiceSet() {
 // Sprechblase erst, wenn die Bühne frei ist (Event, Stufen-Titel, ausgespielte Karte) – höchstens 4 s warten, sonst verfällt sie
 let _raidSayTok = 0;
 async function raidSpeak(text, sndKey) {
+    if (G && G.raid && isHuman(G, G.raid.boss)) return;                                  // der Mensch spielt den Boss: er spricht selbst
     const tok = ++_raidSayTok, t0 = performance.now();
     while ((raidHolding() || document.querySelector('.fx-showcase')) && performance.now() - t0 < 4000) await new Promise(r => setTimeout(r, 120));
     if (tok !== _raidSayTok || !G || !G.raid || G.gameOver && !/win|lose/.test(sndKey || '')) return;   // inzwischen ein neuerer Satz

@@ -294,7 +294,8 @@ function netModeIdx(s, pid, a) { const ms = netModes(s, pid, a); return ms ? ms.
 // Spieler-IDs tauschen: Spieler 1 ⇄ 2 in allen Feldern, die eine Spieler-ID tragen
 // NET_PID_KEYS: Wert ist eine Spieler-ID (auch Listen davon, z. B. order: [1, 2]); nur die Werte 1 und 2 werden getauscht
 const NET_PID_KEYS = new Set(['pid', 'prio', 'actorId', 'srcPl', 'pl', 'owner', 'by', 'opp', 'first', 'wantedBy', 'onTurnOf', 'chooser', 'apid', 'dpid', 'activePlayer', 'winner', 'firstPid',
-    'resolvingPl', '_logPid', 'pids', 'lastTurnPid9', 'sp', 'tp', 'tpid', 'hpid', 'spid', 'wasCtrl', 'from', 'to', 'ctrl', 'who', 'o', 'horrid', 'reveal', 'alashon8', 'mcFrom', 'helwenFrom', 'vunFrom13', 'order']);
+    'resolvingPl', '_logPid', 'pids', 'lastTurnPid9', 'sp', 'tp', 'tpid', 'hpid', 'spid', 'wasCtrl', 'from', 'to', 'ctrl', 'who', 'o', 'horrid', 'reveal', 'alashon8', 'mcFrom', 'helwenFrom', 'vunFrom13', 'order',
+    'boss', 'raid']);   // Raid: s.raid.boss, s.teamLead.raid/.boss (s.raid selbst ist ein Objekt und wird normal durchlaufen)
 // NET_PID_MAPS: Schlüssel ist eine Spieler-ID ("1"/"2") oder beginnt damit ("1:ally", "2:hero_1" …)
 const NET_PID_MAPS = new Set(['lastTurnOf', 'firstTurnOf', 'halion15', 'widow15', 'urn15', 'skip', 'netReady', 'chosen', 'bids',
     'abil9', 'allyDmg12', 'died11', 'disc9', 'gyIn17', 'healed13', 'heroAtk17', 'heroDmg13', 'heroHit10', 'heroHurtBy11', 'holy13', 'left13', 'q9', 'questRes12', 'sh12', 'shHero12', 'nature',

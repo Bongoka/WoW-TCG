@@ -2612,6 +2612,39 @@ function runRuleTests() {
         assert(JSON.stringify(m.pids) === '[2,3,1,4,5]' && m.activePlayer === 1 && m.lastTurnOf[1] === 6 && m.raidSeat[1] === 2 && m.raidSeat[4] === 3 && m.team[1] === 'raid', 'Spieler-IDs nicht getauscht');
         assert(JSON.stringify(pidSwap(m, 1, 4)) === JSON.stringify(st), 'Zweimal getauscht ≠ Original');
     });
+    // Mensch spielt den Boss (newRaidState(…, -1)): Boss = Spieler 1, Raider 2, 3 …; Regeln hängen an s.raid.boss, nicht an Spieler 2
+    test(220, 'Raid: Boss als Spieler 1 (Mensch spielt den Boss) – Aufbau, Teams, Tausch 1 ⇄ 3 nimmt s.raid.boss/teamLead mit, KI-Partie läuft regelgerecht (Boss legt keine Ressourcen, Event-Phase)', () => {
+        const ds = ['alliance_hunter', 'alliance_mage', 'alliance_priest'].map(deck);
+        const s = newRaidState('onyxia', ds, -1); s.real = false;
+        assert(s.raid.boss === 1 && isBoss(s, 1) && s.p1.hero.id === 17001 && s.p2.hero.id === ds[0].hero && s.p3.hero.id === ds[1].hero && s.p4.hero.id === ds[2].hero, 'Aufbau falsch');
+        assert(JSON.stringify(s.pids) === '[1,2,3,4]' && s.activePlayer === 1 && s.team[1] === 'boss' && s.team[2] === 'raid' && s.teamLead.raid === 2 && s.raidSeat[2] === 1 && s.raidSeat[1] === undefined, 'Zugreihenfolge/Teams falsch: ' + JSON.stringify(s.pids));
+        if (typeof pidSwap === 'function') {
+            const m = pidSwap(JSON.parse(JSON.stringify(s)), 1, 3);
+            assert(m.raid.boss === 3 && m.teamLead.boss === 3 && m.team[3] === 'boss' && m.p3.hero.id === 17001 && m.p1.hero.id === ds[1].hero, 'Tausch nimmt den Boss nicht mit');
+        }
+        const mc = newRaidState('mc', ds, -1);
+        assert(mc.raid.boss === 1 && mc.activePlayer === 2, 'Molten Core: Aufbau mit Boss als Spieler 1 falsch (R300.6: Raider links vom Boss beginnt)');
+        for (const st of [s, mc]) {
+            dealOpeningHands(st); st._batch = []; raidBegin(st); autoResolve(st);
+            if (st === mc) assert(mc.p1.allies.filter(a => a.id === 17405).length === 2 && mc.activePlayer === 2, 'Molten Core: Lucifron ohne Flamewaker Protectors beim Boss (Spieler 1)');
+            let guard = 0, evs = 0;
+            while (!st.gameOver && st.turn < 9 && guard++ < 3000) {
+                const pid = st.activePlayer; let steps = 0;
+                while (!st.gameOver && steps < 25 && guard++ < 3000) {
+                    if (st.pending) { autoResolve(st); continue; }
+                    if (!isIdle(st)) { process(st); autoResolve(st); if (!isIdle(st)) break; }
+                    const d = fastAiAction(st, pid); if (!d || !d.action) break;
+                    if (d.action.type === 'PLAY_RESOURCE' && isBoss(st, pid)) assert(false, 'Boss darf keine Ressource legen (R100.3)');
+                    if (!applyAction(st, d.action, true, pid)) break;
+                    autoResolve(st); steps++;
+                }
+                if (st.activePlayer === pid && !st.gameOver) { applyAction(st, { type: 'END_TURN', actorId: pid }, true, pid); autoResolve(st); }
+                if (st.raid.eventGy || st.p1.resources.length) evs = st.p1.resources.length;
+            }
+            assert(st.turn >= 9 || st.gameOver, `${st.raid.id}: Partie hängt in Zug ${st.turn}`);
+            if (st.raid.id === 'onyxia') assert(evs > 0, 'Onyxia: keine Events in der Ressourcenreihe des Bosses (R201.2a)');
+        }
+    });
     test(208, 'Raid: Zugreihenfolge Boss → Raider im Uhrzeigersinn (R200.4), Priorität erst nach dem Passen aller Spieler, Boss legt keine Ressourcen, Handlimit 10 (R100.3/4), zieht so viele Karten wie die Stufe (R201.1)', () => {
         const s = raid(3);
         assert(s.pids.join() === '2,1,3,4' && teamOf(s, 1) === teamOf(s, 3) && isFoePid(s, 1, 2), 'Spieler/Teams falsch: ' + s.pids.join());

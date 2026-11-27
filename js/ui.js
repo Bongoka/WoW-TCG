@@ -927,12 +927,13 @@ function bestCardOf(pid) {
 }
 function showGameOver() {
     const ov = document.getElementById('gameover'); if (!ov || !G) return;
-    const won = G.raid ? G.winnerTeam === 'raid' : G.winner === 1, draw = !G.winner;                // Raid: alle Raider gewinnen oder verlieren gemeinsam (auch Hotseat)
+    const won = G.raid ? G.winnerTeam === (G.team || {})[1] : G.winner === 1, draw = !G.winner;        // Raid: alle Raider gewinnen oder verlieren gemeinsam (auch Hotseat); spielt der Mensch den Boss, aus seiner Sicht
+    const raidVs = G.raid && G.humans && new Set(G.humans.map(p => G.team[p])).size > 1;            // Hotseat Boss gegen Raider: ein Gewinner, kein Verlierer am Gerät
     const title = document.getElementById('go-title');
-    title.textContent = draw ? tr('UNENTSCHIEDEN') : !G.raid && (G.hotseat || G.spectate) ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
-    title.className = draw ? '' : (won || !G.raid && (G.hotseat || G.spectate) ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
+    title.textContent = draw ? tr('UNENTSCHIEDEN') : raidVs ? (G.winnerTeam === 'raid' ? tr('DER RAID GEWINNT!') : tr`${raidDef(G).bossName.toUpperCase()} GEWINNT!`) : !G.raid && (G.hotseat || G.spectate) ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
+    title.className = draw ? '' : (won || raidVs || !G.raid && (G.hotseat || G.spectate) ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
     const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
-    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (won ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
+    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (G.winnerTeam === 'raid' ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
     box.innerHTML = ''; cap.textContent = '';
     const best = draw ? null : bestCardOf(G.winner);

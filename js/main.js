@@ -359,7 +359,7 @@ function hotseatHandoff(sub, after, to = 2) {
         document.body.appendChild(el);
     }
     const next = seatOf(to);
-    el.querySelector('.hs-who').textContent = tr`Spieler ${next}`;
+    el.querySelector('.hs-who').textContent = G.raid && isBoss(G, to) ? tr('Boss') : tr`Spieler ${next}`;   // Raid: der Boss hat keinen Platz
     el.querySelector('.hs-hero').textContent = getPlayer(G, to).hero.name;
     el.querySelector('.hs-sub').textContent = sub;
     HOTSEAT.open = true; el.classList.remove('out'); el.style.display = 'flex';
