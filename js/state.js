@@ -24,6 +24,9 @@ function applyRandomDamage(card, force = false) {
 // Karteninstanz: b = gedruckte Grundwerte; atk/hp/def/strike sind Anzeige-Werte (refreshDisplay)
 function makeCardInst(cardId, forceMask = false, ownerPid) {
     const d = CARDS[cardId];
+    // Verdeckte Karte (id 0): nur in der Online-Sicht eines Mitspielers (Decks sind dort verdeckt, online.js netRedact) –
+    // die lokale Vorschau zieht dann einen Platzhalter, den der Stand des Hosts gleich ersetzt
+    if (!d) return { uid: 'c_' + Math.random().toString(36).substr(2, 9), id: 0, name: '', type: 'Hidden', hidden: true, cost: 0, damage: 0, exhausted: false, tm: [], counters: {}, owner: ownerPid, b: { atk: 0, hp: 0, def: 0, strike: 0 } };
     const inst = { ...d, uid: 'c_' + Math.random().toString(36).substr(2, 9), isFoil: Math.random() < 0.1,
         damage: 0, exhausted: false, tm: [], counters: {}, owner: ownerPid,
         b: { atk: d.atk || 0, hp: d.hp || 0, def: d.def || 0, strike: d.strike || 0 } };

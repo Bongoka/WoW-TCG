@@ -8,6 +8,8 @@
 // ============================================================================
 const CHANGELOG = {
     top: [
+        ['2026-11-28', 'Online-Spiel neu: eigener Server, 1 gegen 1, 2 gegen 2 und Raids online; laufenden Partien zuschauen oder einen CPU-Platz übernehmen; nach einem Verbindungsabbruch wartet der Platz (oder die CPU übernimmt) – und fremde Handkarten bleiben wirklich geheim',
+                       'Online play reworked: own server, 1 vs 1, 2 vs 2 and raids online; watch running games or take over a CPU seat; after a disconnect the seat waits (or the CPU takes over) – and other players\' hands stay truly secret'],
         ['2026-11-27', 'Raid-Modus: Onyxia\'s Lair und Molten Core mit Raid-Regeln, Boss-Decks, Events und Minions – bis zu 5 Plätze, auch als Koop-Hotseat',
                        'Raid mode: Onyxia\'s Lair and Molten Core with raid rules, boss decks, events and minions – up to 5 seats, also as co-op hotseat'],
         ['2026-11-27', 'Spielfeld im Hochformat: auf dem Handy hochkant spielen',
@@ -58,6 +60,12 @@ const CHANGELOG = {
                        'First version: Heroes of Azeroth against the CPU'],
     ],
     days: [
+        ['2026-11-28', [
+            ['Online: Lobbys laufen über einen eigenen Server auf derselben Seite statt über einen öffentlichen Chat-Server; Modus wählbar (1 gegen 1, 2 gegen 2, Raid Onyxia/Molten Core), freie Plätze mit CPU füllen', 'Online: lobbies run on our own server on the same site instead of a public chat server; choose the mode (1 vs 1, 2 vs 2, raid Onyxia/Molten Core), fill open seats with CPUs'],
+            ['Online: jeder bekommt nur noch seine eigene Sicht – Hand und verdeckte Ressourcen der Gegner sowie die Reihenfolge aller Decks werden nicht mehr übertragen (Teams sehen ihre Hände gegenseitig)', 'Online: everyone only receives their own view – opponents\' hands and face-down resources and the order of all decks are no longer sent (teams see each other\'s hands)'],
+            ['Online: Drop-in/out – laufenden Partien beitreten und zuschauen, einen CPU-Platz übernehmen; bei Verbindungsabbruch wird automatisch neu verbunden, die anderen wählen „Warten“ oder „CPU übernimmt“, wer zurückkommt, bekommt seinen Platz wieder; ist der Host weg, kann ein Mitspieler die Partie übernehmen', 'Online: drop-in/out – join running games as a spectator, take over a CPU seat; after a disconnect the game reconnects automatically, the others choose "Wait" or "CPU takes over", returning players get their seat back; if the host is gone, another player can take over the game'],
+            ['Neuer Modus 2 gegen 2 (online): zwei Teams, abwechselnd am Zug, ein Team ist raus, wenn beide Helden gefallen sind', 'New 2 vs 2 mode (online): two teams taking turns, a team is out once both heroes have fallen'],
+        ]],
         ['2026-11-27', [
             ['Molten Core: Das Minion-Deck hat jetzt die echte Aufteilung (u. a. 8× Flame Imps, 2× Molten Destroyer)', 'Molten Core: the Minion deck now has its real card counts (e.g. 8× Flame Imps, 2× Molten Destroyer)'],
             ['Raid: CPU-Raider schonen ihre Mitspieler (kein verteilter Schaden mehr auf Verbündete, Heilen und Schützen von Mitspielern erlaubt); Karten mit „opposing“/„opponent“ (z. B. Watcher Mal\'wi, Sentry Totem, Blizzard) wirken im Raid nur noch auf das gegnerische Team', 'Raid: CPU raiders spare their teammates (no more divided damage on allies, healing and protecting teammates allowed); cards saying "opposing"/"opponent" (e.g. Watcher Mal\'wi, Sentry Totem, Blizzard) now only affect the other team in raids'],

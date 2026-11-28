@@ -19,6 +19,9 @@ Der CPU-Worker (`js/aiworker.js`) übernimmt die Versionsnummer automatisch von 
 - Limit von Pages: 20.000 Dateien je Projekt (jetzt ≈ 8.600), 25 MB je Datei; kein Speicher- oder Traffic-Limit. Alle Bilder (≈ 24.000) passen nicht – dafür wäre R2 + eigene Domain nötig.
 - `_headers`: Bilder, Töne usw. 30 Tage im Browser-Cache.
 
+### Online-Server
+Worker `wowtcg-net` (`server/net/worker.js`, Durable Objects `Room` je Lobby-Code und eine `Lobby`) – reines Relais, die Partie rechnet der Host im Browser. Erreichbar über die Pages-Funktion `server/pages/functions/net/[[path]].js` unter `https://wowtcg.pages.dev/net/…` (Bindung in `server/pages/wrangler.toml`). `node bin/cfdeploy.js` deployt zuerst den Worker, dann Pages aus `server/pages` (mit Funktion); klappt der Worker nicht, nur die Spieldateien. Einmalig nötig: eine workers.dev-Subdomain im Cloudflare-Konto (Dashboard → Workers & Pages einmal öffnen), sonst lehnt Cloudflare jeden Worker ab. Andere Adressen (GitHub Pages, lokal) verbinden sich mit `wss://wowtcg.pages.dev/net`.
+
 ### Kartenbilder
 Ordner je Set (`SET_IMG` in main.js): `cards/<set>` (716×1000), `<set> small` (358×500), `<set> big` (1432×2000), `<set> scans` (745×1040) und `<set> scans small` (372×519), alles WebP mit Qualität 92. Auf GitHub liegen nur `<set>` und `<set> small`. Dateinamen überall `<PRÄFIX>-<Nr> <Kartenname>[ (EA)| (Back)].webp` (`cardImgBase`/`imgFileName` in main.js), z. B. `AZEROTH-100 Lobotomize (EA).webp`.
 

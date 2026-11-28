@@ -30,6 +30,8 @@ Alte gegen neue CPU: `node bin/aicompare.js --n N [--seed S]` (Spiegelmatches mi
 Kartenprüfung (alle Karten + KI): `node bin/cardcheck.js` → `reports/cardcheck.md` (nicht in Git). Optionen: `--sims N` Wächter-Partien, `--focus N`/`--ki N` gezielte Partien und Spiel-KI-Proben je Reaktionskarte, `--dumm N` Partien Spiel-KI gegen Spiel-KI mit Prüfung jeder Entscheidung (Schaden an Eigenem, Hilfe für den Gegner, wirkungslos, verpasstes Lethal …), `--baseline` (danach nur neue Funde), `--repro SEED [--card ID]`, `--zeitpunkt [--card ID]` (wann jede Karte/Quest/Kraft im Gegnerzug spielbar ist, wo der Mensch gefragt wird und wo die CPU sie spielt → `reports/zeitpunkt.md`). Funde der Art „tut nichts“ bei bedingten Texten sind Warnungen. Neue KI-Regeln: `aiBadTargets` (engine.js), `aiUseless`/Rausch-Toleranz/`enablerPlans` (ai.js).
 
 
+Online (Ende zu Ende): lokalen Server starten (`cd server/net && npx wrangler dev --port 8787`), dann `node bin/nete2e.js team|duel|raid onyxia|raid mc [--drop|--spec|--hostdrop]` – mehrere Spieler mit dem echten Spiel-Code spielen über den Server; geprüft werden gleicher Endstand, keine verdeckten Karten in den empfangenen Sichten, keine Fehler. Im Browser: `?net=ws://127.0.0.1:8787/net` an die Adresse hängen.
+
 ## Simulation & Statistik
 
 - Je Karte zählen nur Spiele, in denen sie im Deck war: Winrate wenn **früh gezogen** (Starthand nach Mulligan + oberste `SIM_EARLY_DRAWS` Karten) vs. wenn **nicht früh gezogen** (Δ). Gilt auch für Quests. Ausgabe: beste/schlechteste Karten je Manakosten (8+ zusammengefasst) und Quests.

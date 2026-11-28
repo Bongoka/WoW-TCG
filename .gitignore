@@ -4917,3 +4917,6 @@ Tokens small/*
 
 # Cloudflare-Wrangler-Cache (Kontodaten, nur lokal)
 /.wrangler/
+
+# Wrangler (Cloudflare): lokaler Cache und Testdaten des Online-Servers
+.wrangler/

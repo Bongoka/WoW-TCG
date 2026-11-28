@@ -18,7 +18,7 @@ function mmBuild() {
                 <nav class="mm-nav">
                     <button class="mm-btn mm-continue" data-a="continue"><span>${tr('Spiel fortsetzen')}</span><small>${tr('Zurück in die laufende Partie')}</small></button>
                     <button class="mm-btn mm-primary" data-a="quick"><span>${tr('Spielen')}</span><small>${tr('Decks und Gegner wählen')}</small></button>
-                    <button class="mm-btn" data-a="online"><span>${tr('Online-Spiel')}</span><small>${tr('1 gegen 1 mit Freunden')}</small></button>
+                    <button class="mm-btn" data-a="online"><span>${tr('Online-Spiel')}</span><small>${tr('1 gegen 1, 2 gegen 2 und Raids')}</small></button>
                     <button class="mm-btn" data-a="raid"><span>${tr('Raid')}</span><small>${tr('Gemeinsam gegen einen Raid-Boss – oder selbst der Boss sein')}</small></button>
                     <div class="mm-sep"></div>
                     <button class="mm-btn" data-a="learn"><span>${tr('Regeln lernen')}</span><small>${tr('Videos und Tutorial-Match')}</small></button>

@@ -2908,6 +2908,36 @@ function runRuleTests() {
         mcFlip(s); flushBatch(s); process(s); autoResolve(s);
         assert(!b.hero.flipped && foes().reduce((n, c) => n + (c.damage || 0), 0) === 5, 'Vorderseite löst erneut aus');
     });
+    // Online: jeder bekommt seine eigene Sicht (online.js netViewFor/netRedact) – nichts Verdecktes im Datenstrom
+    if (typeof netViewFor === 'function') test(241, 'Online: eigene Sicht je Spieler – fremde Hand, verdeckte Ressourcen, Deck-Reihenfolge und fremde Wahl verdeckt; Zuschauer ohne Hand; Wahl über die Position', () => {
+        const s = fresh('alliance_mage', 'alliance_hunter'); res(s, 2, 2); hand(s, 2, 33); res(s, 1, 1);
+        const v = netViewFor(s, 2, false);
+        assert(v.p1.hero.uid === s.p2.hero.uid && v.p1.hand.length === s.p2.hand.length && v.p1.hand.every(c => !c.hidden && c.id), 'Eigene Hand fehlt');
+        assert(v.p2.hand.length === s.p1.hand.length && v.p2.hand.every(c => c.hidden && !c.id && c.uid), 'Gegnerhand sichtbar');
+        assert(v.p2.resources.every(r => r.faceUp || r.card.hidden) && v.p1.resources.every(r => !r.card.hidden), 'Verdeckte Ressourcen falsch');
+        assert([v.p1, v.p2].every(p => p.deck.every(id => id === 0)) && v.p1.deck.length === s.p2.deck.length && s.p1.deck.some(Boolean), 'Deck-Reihenfolge sichtbar oder Original verändert');
+        const sp = netViewFor(s, 1, true);
+        assert(sp.spectate && sp.p1.hand.every(c => c.hidden) && sp.p2.hand.every(c => c.hidden), 'Zuschauer sieht Hände');
+        s.pending = { kind: 'choose', pid: 1, prompt: 'x', opts: [{ v: P(s, 1).hero.uid, label: 'a' }] };
+        const vp = netViewFor(s, 2, false);
+        assert(vp.pending.pid === 2 && vp.pending.kind === 'choose' && !vp.pending.opts, 'Wahl des Gegners sichtbar');
+        // Wahl mit Spieler-ID (v = Spieler): der Gast schickt die Position, der Host setzt seinen Wert ein
+        s.pending = { kind: 'choose', pid: 2, opts: [{ v: 2, plSelf: true, label: 'Du' }, { v: 1, plFoe: true, label: 'Gegner' }] };
+        const g = netViewFor(s, 2, false), a = netEncodeAction(g, { type: 'CHOOSE', v: 1 });
+        assert(g.pending.opts[0].v === 1 && a.oi === 0 && netDecodeAction(s, a, 2).v === 2, 'Wahl über die Position nicht übersetzt');
+        // 2 gegen 2: Team sieht sich, Teams abwechselnd, Spieler 1 = eigener Platz
+        const d = ['alliance_mage', 'horde_warrior', 'alliance_hunter', 'horde_shaman'].map(k => deck(k));
+        const { s: t, pidOf } = newTeamState(d, ['A', 'B', 'A', 'B'], 2); dealOpeningHands(t);
+        assert(pidOf[2] === 1 && t.team[pidOf[0]] === t.team[1] && t.team[2] !== t.team[1], 'Plätze → Spieler falsch');
+        assert(t.pids.every((p, i) => t.team[p] !== t.team[t.pids[(i + 1) % 4]]), 'Teams nicht abwechselnd am Zug');
+        const tv = netViewFor(t, pidOf[0], false), mate = tv.pids.find(p => p !== 1 && tv.team[p] === tv.team[1]);
+        assert(tv.p1.hero.uid === t['p' + pidOf[0]].hero.uid && tv['p' + mate].hand.every(c => !c.hidden) && allPl(tv).filter(p => tv.team[p.id] !== tv.team[1]).every(p => p.hand.every(c => c.hidden)), 'Team-Sicht falsch');
+        assert(JSON.stringify(pidSwap(pidSwap(t, 1, 3), 1, 3)) === JSON.stringify(t) && pidSwap(t, 1, 3).teamLead[t.team[3]] === 1, 'Tausch im 2 gegen 2 nicht umkehrbar');
+        // Ein Team ist raus, wenn beide Helden gefallen sind (eliminate)
+        const foes = t.pids.filter(p => t.team[p] !== t.team[1]);
+        eliminate(t, foes[0]); assert(!t.gameOver, 'Spiel endet schon nach dem ersten Helden');
+        eliminate(t, foes[1]); assert(t.gameOver && t.winnerTeam === t.team[1], 'Team gewinnt nicht');
+    });
     return results;
 }
 

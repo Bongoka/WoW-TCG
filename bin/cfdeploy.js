@@ -2,6 +2,7 @@
 // Baut den Upload-Ordner für Cloudflare Pages (../wowtcg-cfdeploy, gleiches Laufwerk für Hardlinks) und lädt ihn hoch.
 //   node bin/cfdeploy.js            Ordner bauen und hochladen (npx wrangler pages deploy)
 //   node bin/cfdeploy.js --build    nur bauen
+// Dazu den Online-Server: Worker wowtcg-net (server/net) und die Pages-Funktion /net (server/pages/functions)
 // Nur was das Spiel braucht (Git-Dateien aus GAME_PATHS, kein bin/docs/android/Addon), Kartenbilder = Scans
 // ("<set> scans" 745 px, "<set> scans small" 372 px); Karten ohne Scan bekommen das normale Bild ("<set>", "<set> small").
 // js/imgindex.js wird für den Upload neu erzeugt (nur hochgeladene Ordner, keine Extended Art) – das Spiel schaltet
@@ -65,6 +66,10 @@ if (extra.length) console.log('Zusatzbilder:', extra.join('; '));
 console.log(`${OUT}: ${n} Dateien` + (noImg.length ? `, ${noImg.length} Karten ganz ohne Bild: ${noImg.slice(0, 10).join('; ')}` : ''));
 if (n > 20000) { console.error('Mehr als 20.000 Dateien – Cloudflare Pages lehnt das ab.'); process.exit(1); }
 if (process.argv.includes('--build')) process.exit(0);
+// Online-Server (Worker mit Durable Objects, server/net) zuerst – die Pages-Funktion /net (server/pages/functions) bindet ihn.
+// Klappt der Worker nicht (z. B. fehlt die workers.dev-Subdomain des Kontos), gehen nur die Spieldateien hoch (Online-Spiel dann ohne Server).
+const net = spawnSync('npx', ['-y', 'wrangler', 'deploy'], { stdio: 'inherit', shell: true, cwd: path.join(ROOT, 'server', 'net') });
+if (net.status) console.log('\n⚠ Online-Server (server/net) nicht deployt – lade nur die Spieldateien hoch.\n');
 const r = spawnSync('npx', ['-y', 'wrangler', 'pages', 'deploy', OUT, '--project-name', PROJECT, '--branch', 'main', '--commit-dirty=true'],
-    { stdio: 'inherit', shell: true });
+    { stdio: 'inherit', shell: true, cwd: net.status ? ROOT : path.join(ROOT, 'server', 'pages') });   // server/pages: functions/ + wrangler.toml (Bindung an wowtcg-net)
 process.exit(r.status);

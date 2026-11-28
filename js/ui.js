@@ -558,7 +558,7 @@ function render() {
     renderBattlefield(bot, "bot-allies", false);
     renderHeroCard(bot, "bot-hero-card-container");
     renderResourceTray(bot, "bot-resource-tray", bot.id === 1);
-    renderPlayerHand(G.raid && VIEW.on ? bot : G.p1);                 // Raid: unten die Hand des gezeigten Mitspielers (eigenes Team, nur ansehen)
+    renderPlayerHand(G.pids && VIEW.on ? bot : G.p1);                 // Mehrspieler (Raid, 2 gegen 2): unten die Hand des gezeigten Mitspielers (eigenes Team, nur ansehen)
     updateHandAuto(document.getElementById('bot-hand'));
     layoutBoard();
     renderPendingPanel();
@@ -574,12 +574,13 @@ function render() {
 function renderOppThinking() {
     let el = document.getElementById('opp-thinking');
     const d = G.pending, w = G.win;
-    const deciding = G.online && !G.gameOver && ((d && d.pid === 2) || (!d && w && w.prio === 2));
-    const mull = G.online && !G.gameOver && G.netReady && G.netReady[1] && !G.netReady[2];          // eigene Starthand gewählt, der Gegner wählt noch
+    const deciding = G.online && !G.gameOver && !G.spectate && ((d && d.pid && d.pid !== 1) || (!d && w && w.prio && w.prio !== 1));
+    const mull = G.online && !G.gameOver && G.netReady && G.netReady[1] && Object.values(G.netReady).some(r => !r);   // eigene Starthand gewählt, andere wählen noch
     const show = mull || (deciding && (G.activePlayer === 1 || G.chain.some(it => it.pl === 1) || !!G.battle));
     if (!show) { if (el) el.classList.remove('show'); return; }
     if (!el) { el = document.createElement('div'); el.id = 'opp-thinking'; el.innerHTML = '<b></b><span></span>'; document.body.appendChild(el); }
-    el.firstChild.textContent = tr('Der Gegner überlegt …');
+    const who = G.pids && G.netSeats && d && G.netSeats[d.pid] ? getPlayer(G, d.pid).hero.name + (G.netSeats[d.pid].c ? '' : ` (${G.netSeats[d.pid].n})`) : null;   // Mehrspieler: wer gerade entscheidet
+    el.firstChild.textContent = who ? tr`${who} überlegt …` : tr('Der Gegner überlegt …');
     el.lastChild.textContent = mull ? tr('Er wählt noch seine Starthand.') : d && d.kind === 'choose' ? tr('Er trifft gerade eine Entscheidung.') : tr('Er kann auf deine Aktion reagieren.');
     el.classList.add('show');
 }
@@ -928,13 +929,13 @@ function bestCardOf(pid) {
 }
 function showGameOver() {
     const ov = document.getElementById('gameover'); if (!ov || !G) return;
-    const won = G.raid ? G.winnerTeam === (G.team || {})[1] : G.winner === 1, draw = !G.winner;        // Raid: alle Raider gewinnen oder verlieren gemeinsam (auch Hotseat); spielt der Mensch den Boss, aus seiner Sicht
+    const won = G.team ? G.winnerTeam === G.team[1] : G.winner === 1, draw = !G.winner;        // Teams (Raid, 2 gegen 2): alle Raider gewinnen oder verlieren gemeinsam (auch Hotseat); spielt der Mensch den Boss, aus seiner Sicht
     const raidVs = G.raid && G.humans && new Set(G.humans.map(p => G.team[p])).size > 1;            // Hotseat Boss gegen Raider: ein Gewinner, kein Verlierer am Gerät
     const title = document.getElementById('go-title');
     title.textContent = draw ? tr('UNENTSCHIEDEN') : raidVs ? (G.winnerTeam === 'raid' ? tr('DER RAID GEWINNT!') : tr`${raidDef(G).bossName.toUpperCase()} GEWINNT!`) : !G.raid && (G.hotseat || G.spectate) ? tr`SPIELER ${seatOf(G.winner)} GEWINNT!` : (won ? tr('SIEG!') : tr('NIEDERLAGE'));
     title.className = draw ? '' : (won || raidVs || !G.raid && (G.hotseat || G.spectate) ? 'win' : 'lose');       // Hotseat / CPU gegen CPU: ein Gewinner, kein Verlierer am Gerät
     const winner = draw ? null : getPlayer(G, G.winner), loser = draw ? null : getOpponent(G, G.winner);
-    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (G.winnerTeam === 'raid' ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
+    document.getElementById('go-sub').textContent = draw ? tr('Beide Helden sind gefallen.') : G.raid ? (G.winnerTeam === 'raid' ? tr`Der Raid besiegt ${raidDef(G).bossName} in Zug ${G.turn}.` : tr`${raidDef(G).bossName} vernichtet den Raid in Zug ${G.turn}.`) : G.team ? tr`Team ${G.winnerTeam} gewinnt in Zug ${G.turn}.` : tr`${winner.hero.name} besiegt ${loser.hero.name} in Zug ${G.turn}.`;
     const box = document.getElementById('go-card'), cap = document.getElementById('go-caption');
     box.innerHTML = ''; cap.textContent = '';
     const party = allPl(G).length > 2 && typeof showPartyResult === 'function';                    // mehr als zwei Spieler: alle Mitspieler mit Errungenschaften (matchresult.js)

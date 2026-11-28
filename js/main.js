@@ -505,7 +505,7 @@ function cpuRespond(s, pid) {
     return cpuWorkerCall(s, { pid, respond: true, state: st() }, () => { const c = st(); c.real = false; const o = respondOptions(c, pid)[0]; return o ? [o] : []; });
 }
 // Antwort-Vorausschau im Hintergrund: nur die laufende Partie im Browser mit Worker (nicht online, nicht im Tutorial)
-function cpuAsyncRespond(s) { return s === G && !s.online && cpuWorkerUsable() && !(typeof TUT !== 'undefined' && TUT.active); }
+function cpuAsyncRespond(s) { return s === G && (!s.online || netCpuHere()) && cpuWorkerUsable() && !(typeof TUT !== 'undefined' && TUT.active); }
 function cpuWorkerUsable() { return !CPU_WORKER.broken && typeof Worker !== 'undefined'; }
 function cpuWorkerCall(s, msg, sync) {
     if (!cpuWorkerUsable()) return Promise.resolve(sync());
@@ -548,10 +548,12 @@ async function cpuThinkRun() {
     if (G && !G.gameOver) { if (G.hotseat) hotseatCheck(); setTimeout(driveCpu, 30); }
 }
 
+// Online: CPU-Plätze (2 gegen 2, Raid, übernommene Plätze) rechnet der Host, sobald alle Starthände gewählt sind
+function netCpuHere() { return typeof NET !== 'undefined' && NET.role === 'host' && !!G && G.online && netAllReady(); }
 // CPU steuern: läuft, solange die CPU am Zug ist und keine Entscheidung des Menschen offen ist
 let _cpuRunning = false;
 async function driveCpu() {
-    if (_cpuRunning || !G || G.gameOver || G.online) return;                               // online: kein CPU-Gegner
+    if (_cpuRunning || !G || G.gameOver || (G.online && !netCpuHere())) return;            // online: CPU-Plätze steuert nur der Host (nach allen Starthänden)
     _cpuRunning = true;
     let steps = 0, announced = false, turnOf = null;
     const game = G;

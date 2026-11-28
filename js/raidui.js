@@ -597,7 +597,7 @@ const raidSideOf = pid => raidSides().bot.includes(pid) ? 'bot' : 'top';
 
 // Vor jedem Zeichnen: Kamera einrichten bzw. dem Spieler am Zug folgen
 function raidCamFollow() {
-    if (!G || !G.raid || !G.pids) { if (VIEW.on) raidCamOff(); return; }
+    if (!G || !G.pids) { if (VIEW.on) raidCamOff(); return; }
     const sd = raidSides();
     if (!VIEW.on || !sd.bot.includes(VIEW.bot) || !sd.top.includes(VIEW.top)) {
         Object.assign(VIEW, { on: true, bot: sd.bot.includes(1) ? 1 : sd.bot[0], top: sd.top[0] });
@@ -631,7 +631,7 @@ function raidCamMove(side, pid, mode) {
     };
     const done = () => {
         CAM.busy = false;
-        if (!G || !G.raid) return;
+        if (!G || !G.pids) return;
         layoutBoard(false);
         const q = CAM.queue; CAM.queue = null;
         if (q) raidCamMove(...q); else render();
@@ -642,7 +642,7 @@ function raidCamMove(side, pid, mode) {
         b.style.setProperty('--cam-t', CAM_OUT + 'ms'); b.style.setProperty('--cam-ease', CAM_EASE_OUT);
         b.classList.add('cam-out-' + side);
         setTimeout(() => {
-            if (!G || !G.raid) { CAM.busy = false; return; }
+            if (!G || !G.pids) { CAM.busy = false; return; }
             b.style.setProperty('--cam-t', '0s');
             b.classList.remove('cam-out-' + side); b.classList.add('cam-in-' + side);
             swap(); void b.offsetWidth;
@@ -654,7 +654,7 @@ function raidCamMove(side, pid, mode) {
         raidBgPan(side, steps, CAM_CUT * 2, 'cubic-bezier(.45, 0, .25, 1)');   // Überblenden: Hintergrund genau so lange wie Aus- und Einblenden
         b.classList.add('cam-cut-' + side);
         setTimeout(() => {
-            if (!G || !G.raid) { CAM.busy = false; return; }
+            if (!G || !G.pids) { CAM.busy = false; return; }
             swap(); b.classList.remove('cam-cut-' + side);
             setTimeout(done, CAM_CUT + 60);
         }, CAM_CUT);
@@ -763,7 +763,7 @@ function raidPanelFit(el) {
 }
 function renderRaidStrip() {
     let bar = document.getElementById('raid-strip');
-    if (!G || !G.raid || !VIEW.on) { if (bar) bar.remove(); document.body.classList.remove('raid-on'); return; }
+    if (!G || !G.pids || !VIEW.on) { if (bar) bar.remove(); document.body.classList.remove('raid-on'); return; }
     document.body.classList.add('raid-on');
     if (!bar) { bar = document.createElement('div'); bar.id = 'raid-strip'; (document.getElementById('battlefield-zone') || document.body).appendChild(bar); }
     const sd = raidSides(), teams = ['bot', 'top'].filter(s => sd[s].length > 1);
